@@ -1,0 +1,6 @@
+[package]
+name = "zinc64"
+version = "0.1.0"
+authors = ["Sebastian Jastrzebski <sebby@digitalstream.io>"]
+
+[dependencies]
