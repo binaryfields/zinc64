@@ -14,9 +14,27 @@
  * limitations under the License.
  */
 
-pub mod cia;
-mod deviceio;
-mod keyboard;
+// http://sta.c64.org/cbm64kbdlay.html
+// http://unusedino.de/ec64/technical/aay/c64/keybmatr.htm
 
-pub use self::deviceio::DeviceIo;
-pub use self::keyboard::Keyboard;
+// TODO keyboard: add scancode mapping
+
+pub struct Keyboard {
+    matrix: [u8; 8],
+}
+
+impl Keyboard {
+    pub fn new() -> Keyboard {
+        Keyboard {
+            matrix: [0xff; 8]
+        }
+    }
+
+    pub fn get_row(&self, row: u8) -> u8 {
+        self.matrix[row as usize]
+    }
+
+    pub fn set_row(&mut self, row: u8, value: u8) {
+        self.matrix[row as usize] = value;
+    }
+}

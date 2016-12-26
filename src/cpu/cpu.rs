@@ -124,11 +124,11 @@ impl Cpu {
         } else if self.irq_line && !self.test_flag(Flag::IntDisable) {
             self.interrupt(Interrupt::Irq);
         }
-        // let pc = self.pc;
+        let pc = self.pc;
         let opcode = self.fetch_op();
         let op = Instruction::decode(self, opcode);
-        // self.dump_registers();
-        // println!("exec 0x{:x}: {:?}", pc, op);
+        self.dump_registers();
+        println!("exec 0x{:x}: {:?}", pc, op);
         self.execute_instruction(&op);
     }
 

@@ -15,9 +15,13 @@
  */
 
 use std::io;
+use std::cell::RefCell;
 use std::path::Path;
+use std::option::Option;
+use std::rc::Rc;
 use std::result::Result;
 
+use io::DeviceIo;
 use mem::Addressable;
 use mem::Ram;
 use mem::Rom;
@@ -29,15 +33,13 @@ use mem::Rom;
 //   based on zones that can be mapped to different banks. CPU uses IoPort @ 0x0001 to reconfigure
 //   memory layout.
 
-// TODO mem: add device io
-
 pub struct Memory {
     configuration: [Bank; 16],
     ram: Box<Addressable>,
     basic: Box<Addressable>,
     charset: Box<Addressable>,
     kernal: Box<Addressable>,
-    io: Box<Addressable>,
+    device_io: Option<Rc<RefCell<DeviceIo>>>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -84,32 +86,12 @@ impl Memory {
             basic: basic,
             charset: charset,
             kernal: kernal,
-            io: Box::new(Ram::new(0x10000)),
+            device_io: None,
         })
     }
 
-    fn get_bank(&self, address: u16) -> &Box<Addressable> {
-        let zone = (address & 0xf000) >> 12;
-        let bank = self.configuration[zone as usize];
-        match bank {
-            Bank::Ram => &self.ram,
-            Bank::Basic => &self.basic,
-            Bank::Charset => &self.charset,
-            Bank::Kernal => &self.kernal,
-            Bank::Io => &self.io,
-        }
-    }
-
-    fn get_bank_mut(&mut self, address: u16) -> &mut Box<Addressable> {
-        let zone = (address & 0xf000) >> 12;
-        let bank = self.configuration[zone as usize];
-        match bank {
-            Bank::Ram => &mut self.ram,
-            Bank::Basic => &mut self.basic,
-            Bank::Charset => &mut self.charset,
-            Bank::Kernal => &mut self.kernal,
-            Bank::Io => &mut self.io,
-        }
+    pub fn set_device_io(&mut self, device_io: Rc<RefCell<DeviceIo>>) {
+        self.device_io = Some(device_io);
     }
 
     pub fn switch_banks(&mut self, mode: u8) {
@@ -145,13 +127,37 @@ impl Memory {
 
 impl Addressable for Memory {
     fn read(&self, address: u16) -> u8 {
-        let bank = self.get_bank(address);
-        bank.read(address)
+        let zone = (address & 0xf000) >> 12;
+        let bank = self.configuration[zone as usize];
+        match bank {
+            Bank::Ram => self.ram.read(address),
+            Bank::Basic => self.basic.read(address),
+            Bank::Charset => self.charset.read(address),
+            Bank::Kernal => self.kernal.read(address),
+            Bank::Io => {
+                match self.device_io {
+                    Some(ref io) => io.borrow().read(address),
+                    None => panic!("invalid device io"),
+                }
+            },
+        }
     }
 
     fn write(&mut self, address: u16, value: u8) {
-        let bank = self.get_bank_mut(address);
-        bank.write(address, value);
+        let zone = (address & 0xf000) >> 12;
+        let bank = self.configuration[zone as usize];
+        match bank {
+            Bank::Ram => self.ram.write(address, value),
+            Bank::Basic => self.basic.write(address, value),
+            Bank::Charset => self.charset.write(address, value),
+            Bank::Kernal => self.kernal.write(address, value),
+            Bank::Io => {
+                match self.device_io {
+                    Some(ref io) => io.borrow_mut().write(address, value),
+                    None => panic!("invalid device io"),
+                }
+            },
+        }
     }
 }
 
@@ -177,14 +183,14 @@ mod tests {
     }
 
     #[test]
-    fn write_page0() {
+    fn write_page_0() {
         let mut mem = Memory::new().unwrap();
         mem.write(0x00f0, 0xff);
         assert_eq!(0xff, mem.ram.read(0x00f0));
     }
 
     #[test]
-    fn write_page1() {
+    fn write_page_1() {
         let mut mem = Memory::new().unwrap();
         mem.write(0x0100, 0xff);
         assert_eq!(0xff, mem.ram.read(0x0100));
