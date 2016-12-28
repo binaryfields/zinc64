@@ -148,9 +148,9 @@ impl Addressable for Memory {
         let bank = self.configuration[zone as usize];
         match bank {
             Bank::Ram => self.ram.write(address, value),
-            Bank::Basic => self.basic.write(address, value),
-            Bank::Charset => self.charset.write(address, value),
-            Bank::Kernal => self.kernal.write(address, value),
+            Bank::Basic => self.ram.write(address, value),
+            Bank::Charset => self.ram.write(address, value),
+            Bank::Kernal => self.ram.write(address, value),
             Bank::Io => {
                 match self.device_io {
                     Some(ref io) => io.borrow_mut().write(address, value),
