@@ -45,7 +45,7 @@ pub enum Instruction {
     PHP(u8),
     PLA(u8),
     PLP(u8),
-    // Arithmetic (8)
+    // Arithmetic (11)
     ADC(Operand, u8),
     // TODO review
     SBC(Operand, u8),
