@@ -18,6 +18,8 @@ use sdl2::keyboard::Keycode;
 
 // SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
 
+// TODO keyboard: add test cases
+
 pub struct Keyboard {
     matrix: [u8; 8],
 }
