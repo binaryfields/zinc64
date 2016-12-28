@@ -119,6 +119,10 @@ impl Memory {
         }
     }
 
+    pub fn write_direct(&mut self, address: u16, value: u8) {
+        self.ram.write(address, value);
+    }
+
     fn test_control(&self, mode: u8, line: ControlLine) -> bool {
         if mode & (line as u8) != 0 { true } else { false }
     }

@@ -14,6 +14,31 @@
  * limitations under the License.
  */
 
-mod app;
+mod bin;
+mod hex;
 
-pub use self::app::AppWindow;
+use std::cell::RefCell;
+use std::io;
+use std::path::Path;
+use std::rc::Rc;
+use std::result::Result;
+
+use c64::C64;
+use mem::Memory;
+
+pub trait Loader {
+    fn load(&self, c64: &C64, path: &Path, offset: u16) -> Result<(), io::Error>;
+}
+
+pub struct Loaders {}
+
+impl Loaders {
+    pub fn new(ext: Option<&str>) -> Box<Loader> {
+        match ext {
+            Some("bin") => Box::new(bin::BinLoader::new()),
+            Some("hex") => Box::new(hex::HexLoader::new()),
+            _ => panic!("invalid loader {}", ext.unwrap_or(""))
+        }
+    }
+}
+

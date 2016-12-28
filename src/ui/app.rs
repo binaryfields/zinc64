@@ -13,49 +13,58 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-extern crate sdl2;
-
 use std::result::Result;
 
-use self::sdl2::pixels::PixelFormatEnum;
-use self::sdl2::rect::Rect;
-use self::sdl2::event::{Event, EventPump};
-use self::sdl2::keyboard::Keycode;
-use self::sdl2::video::Window;
-use self::sdl2::render::Renderer;
-use self::sdl2::render::Texture;
+use c64::C64;
 
-struct MainWindow {
-    window: Window,
-    renderer: Renderer,
+use sdl2;
+use sdl2::EventPump;
+use sdl2::event::Event;
+use sdl2::keyboard::{Keycode, Mod};
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::rect::Rect;
+use sdl2::render::{Renderer, Texture};
+use sdl2::video::Window;
+
+pub struct AppWindow {
+    c64: C64,
+    renderer: Renderer<'static>,
     texture: Texture,
     event_pump: EventPump,
 }
 
-impl MainWindow {
-    pub fn new() -> Result<MainWindow, String> {
+impl AppWindow {
+    pub fn new(c64: C64) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
         let window = video.window("zinc64", 800, 600)
             .position_centered()
             .opengl()
-            .build()?;
-        let renderer = window.renderer().build()?;
-        let texture = renderer.create_texture_streaming(PixelFormatEnum::RGB24, 256, 256)?;
-        let event_pump = sdl.event_pump()?;
-        MainWindow {
-            window: window,
-            renderer: renderer,
-            texture: texture,
-            event_pump: event_pump,
-        }
+            .build()
+            .unwrap();
+        let renderer = window.renderer()
+            .accelerated()
+            .build()
+            .unwrap();
+        let texture = renderer.create_texture_streaming(PixelFormatEnum::RGB24, 256, 256)
+            .unwrap();
+        let event_pump = sdl.event_pump()
+            .unwrap();
+        Ok(
+            AppWindow {
+                c64: c64,
+                renderer: renderer,
+                texture: texture,
+                event_pump: event_pump,
+            }
+        )
     }
 
     pub fn render(&mut self) {
         self.texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             for y in 0..256 {
                 for x in 0..256 {
-                    let offset = y*pitch + x*3;
+                    let offset = y * pitch + x * 3;
                     buffer[offset + 0] = x as u8;
                     buffer[offset + 1] = y as u8;
                     buffer[offset + 2] = 0;
@@ -64,25 +73,47 @@ impl MainWindow {
         }).unwrap();
 
         self.renderer.clear();
-        self.renderer.copy(&texture, None, Some(Rect::new(100, 100, 256, 256))).unwrap();
-        self.renderer.copy_ex(&texture, None,
-                         Some(Rect::new(450, 100, 256, 256)), 30.0, None, false, false).unwrap();
+        self.renderer.copy(&self.texture, None, Some(Rect::new(100, 100, 256, 256))).unwrap();
+        self.renderer.copy_ex(&self.texture, None,
+                              Some(Rect::new(450, 100, 256, 256)), 30.0, None, false, false).unwrap();
         self.renderer.present();
     }
 
     pub fn run(&mut self) {
+        let mut last_pc = 0x0000;
         'running: loop {
-            for event in event_pump.poll_iter() {
+            for event in self.event_pump.poll_iter() {
                 match event {
-                    Event::Quit {..}
+                    Event::Quit { .. }
                     | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                         break 'running
                     },
+                    Event::KeyDown { keycode: Some(Keycode::F9), keymod: LALTMOD, .. } => {
+                        self.c64.reset();
+                    }
+                    Event::KeyDown { keycode: Some(key), .. } => {
+                        let keyboard = self.c64.get_keyboard();
+                        keyboard.borrow_mut().on_key_down(key);
+
+                    }
+                    Event::KeyUp { keycode: Some(key), .. } => {
+                        let keyboard = self.c64.get_keyboard();
+                        keyboard.borrow_mut().on_key_up(key);
+                    }
                     _ => {}
                 }
             }
-            // The rest of the game loop goes here...
+            self.c64.step();
+            // TODO c64: add breakpoint and infinite loop detection
+            let cpu = self.c64.get_cpu();
+            let pc = cpu.borrow().get_pc();
+            if pc == 0x3463 {
+                break 'running;
+            }
+            if pc == last_pc {
+                panic!("trap at 0x{:x}", pc);
+            }
+            last_pc = pc;
         }
     }
-}
 }
