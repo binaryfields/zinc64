@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Sebastian Jastrzebski <sebby@digitalstream.io>"]
 
 [dependencies]
+gl = "0.6.0"
+sdl2 = "0.27.2"
