@@ -23,6 +23,7 @@ mod io;
 mod loader;
 mod mem;
 mod ui;
+mod video;
 
 use std::env;
 use std::ffi::OsStr;

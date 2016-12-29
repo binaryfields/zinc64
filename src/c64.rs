@@ -24,6 +24,7 @@ use mem::{Addressable, BaseAddr, Memory};
 use io::cia;
 use io::DeviceIo;
 use io::Keyboard;
+use video::Vic;
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -39,7 +40,7 @@ pub struct C64 {
     cia1: Rc<RefCell<cia::Cia>>,
     cia2: Rc<RefCell<cia::Cia>>,
     keyboard: Rc<RefCell<Keyboard>>,
-    //vid: Rc<RefCell<Vic>>,
+    vic: Rc<RefCell<Vic>>,
     //sid: Rc<RefCell<Sid>>,
 }
 
@@ -60,8 +61,11 @@ impl C64 {
         let cia2 = Rc::new(RefCell::new(
             cia::Cia::new(cia::Mode::Cia2, cpu.clone(), keyboard.clone())
         ));
+        let vic = Rc::new(RefCell::new(
+            Vic::new(cpu.clone(), mem.clone())
+        ));
         let device_io = Rc::new(RefCell::new(
-            DeviceIo::new(cia1.clone(), cia2.clone())
+            DeviceIo::new(cia1.clone(), cia2.clone(), vic.clone())
         ));
         mem.borrow_mut().set_device_io(device_io.clone());
         cpu.borrow_mut().write(BaseAddr::IoPortDdr.addr(), 0x2f);
@@ -73,6 +77,7 @@ impl C64 {
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
                 keyboard: keyboard.clone(),
+                vic: vic.clone(),
             }
         )
     }
