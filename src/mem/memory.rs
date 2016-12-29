@@ -22,6 +22,7 @@ use std::rc::Rc;
 use std::result::Result;
 
 use io::DeviceIo;
+use io::cia::Cia;
 use mem::Addressable;
 use mem::Ram;
 use mem::Rom;
@@ -34,11 +35,13 @@ use mem::Rom;
 //   memory layout.
 
 pub struct Memory {
-    configuration: [Bank; 16],
+    cpu_map: [Bank; 16],
+    vic_map: [Bank; 16],
     ram: Box<Addressable>,
     basic: Box<Addressable>,
     charset: Box<Addressable>,
     kernal: Box<Addressable>,
+    cia2: Option<Rc<RefCell<Cia>>>,
     device_io: Option<Rc<RefCell<DeviceIo>>>,
 }
 
@@ -80,14 +83,23 @@ impl Memory {
         let basic = Box::new(Rom::load(Path::new("rom/basic.rom"), BaseAddr::Basic.addr())?);
         let charset = Box::new(Rom::load(Path::new("rom/characters.rom"), BaseAddr::Charset.addr())?);
         let kernal = Box::new(Rom::load(Path::new("rom/kernal.rom"), BaseAddr::Kernal.addr())?);
+        let mut vic_map = [Bank::Ram; 16];
+        vic_map[0x1] = Bank::Charset;
+        vic_map[0x9] = Bank::Charset;
         Ok(Memory {
-            configuration: [Bank::Ram; 16],
+            cpu_map: [Bank::Ram; 16],
+            vic_map: vic_map,
             ram: Box::new(Ram::new(0x10000)),
             basic: basic,
             charset: charset,
             kernal: kernal,
+            cia2: None,
             device_io: None,
         })
+    }
+
+    pub fn set_cia2(&mut self, cia: Rc<RefCell<Cia>>) {
+        self.cia2 = Some(cia);
     }
 
     pub fn set_device_io(&mut self, device_io: Rc<RefCell<DeviceIo>>) {
@@ -115,7 +127,23 @@ impl Memory {
                 0xe ... 0xf => if hiram { Bank::Kernal} else { Bank::Ram },
                 _ => panic!("invalid zone")
             };
-            self.configuration[zone] = bank;
+            self.cpu_map[zone] = bank;
+        }
+    }
+
+    fn vic_read(&self, address: u16) -> u8 {
+        if let Some(ref cia2) = self.cia2 {
+            let port_a = cia2.borrow_mut().read(0x00);
+            let full_address = ((!port_a & 0x03) as u16) << 14 | address;
+            let zone = (full_address & 0xf000) >> 12;
+            let bank = self.vic_map[zone as usize];
+            match bank {
+                Bank::Ram => self.ram.read(full_address),
+                Bank::Charset => self.charset.read(full_address),
+                _ => panic!("invalid bank {}", bank as u8),
+            }
+        } else {
+            panic!("cia2 is not set");
         }
     }
 
@@ -132,7 +160,7 @@ impl Memory {
 impl Addressable for Memory {
     fn read(&self, address: u16) -> u8 {
         let zone = (address & 0xf000) >> 12;
-        let bank = self.configuration[zone as usize];
+        let bank = self.cpu_map[zone as usize];
         match bank {
             Bank::Ram => self.ram.read(address),
             Bank::Basic => self.basic.read(address),
@@ -149,7 +177,7 @@ impl Addressable for Memory {
 
     fn write(&mut self, address: u16, value: u8) {
         let zone = (address & 0xf000) >> 12;
-        let bank = self.configuration[zone as usize];
+        let bank = self.cpu_map[zone as usize];
         match bank {
             Bank::Ram => self.ram.write(address, value),
             Bank::Basic => self.ram.write(address, value),
@@ -174,7 +202,7 @@ mod tests {
     #[test]
     fn new_memory() {
         let mem = Memory::new().unwrap();
-        for bank in &mem.configuration {
+        for bank in &mem.cpu_map {
             assert_eq!(Bank::Ram, *bank);
         }
     }
@@ -204,25 +232,25 @@ mod tests {
     fn switch_banks_mode_24() {
         let mut mem = Memory::new().unwrap();
         mem.switch_banks(24);
-        assert_eq!(Bank::Ram, mem.configuration[0x0]);
-        assert_eq!(Bank::Ram, mem.configuration[0x9]);
-        assert_eq!(Bank::Ram, mem.configuration[0xa]);
-        assert_eq!(Bank::Ram, mem.configuration[0xb]);
-        assert_eq!(Bank::Ram, mem.configuration[0xd]);
-        assert_eq!(Bank::Ram, mem.configuration[0xe]);
-        assert_eq!(Bank::Ram, mem.configuration[0xf]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0x0]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0x9]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0xa]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0xb]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0xd]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0xe]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0xf]);
     }
 
     #[test]
     fn switch_banks_mode_31() {
         let mut mem = Memory::new().unwrap();
         mem.switch_banks(31);
-        assert_eq!(Bank::Ram, mem.configuration[0x0]);
-        assert_eq!(Bank::Ram, mem.configuration[0x9]);
-        assert_eq!(Bank::Basic, mem.configuration[0xa]);
-        assert_eq!(Bank::Basic, mem.configuration[0xb]);
-        assert_eq!(Bank::Io, mem.configuration[0xd]);
-        assert_eq!(Bank::Kernal, mem.configuration[0xe]);
-        assert_eq!(Bank::Kernal, mem.configuration[0xf]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0x0]);
+        assert_eq!(Bank::Ram, mem.cpu_map[0x9]);
+        assert_eq!(Bank::Basic, mem.cpu_map[0xa]);
+        assert_eq!(Bank::Basic, mem.cpu_map[0xb]);
+        assert_eq!(Bank::Io, mem.cpu_map[0xd]);
+        assert_eq!(Bank::Kernal, mem.cpu_map[0xe]);
+        assert_eq!(Bank::Kernal, mem.cpu_map[0xf]);
     }
 }

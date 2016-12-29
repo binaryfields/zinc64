@@ -25,7 +25,7 @@ use mem::{Addressable, BaseAddr, Memory};
 use io::cia;
 use io::DeviceIo;
 use io::Keyboard;
-use video::Vic;
+use video::{ColorRam, Vic};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -39,6 +39,7 @@ pub struct C64 {
     config: Config,
     cpu: Rc<RefCell<Cpu>>,
     mem: Rc<RefCell<Memory>>,
+    color_ram: Rc<RefCell<ColorRam>>,
     cia1: Rc<RefCell<cia::Cia>>,
     cia2: Rc<RefCell<cia::Cia>>,
     keyboard: Rc<RefCell<Keyboard>>,
@@ -63,12 +64,19 @@ impl C64 {
         let cia2 = Rc::new(RefCell::new(
             cia::Cia::new(cia::Mode::Cia2, cpu.clone(), keyboard.clone())
         ));
+        let color_ram = Rc::new(RefCell::new(
+            ColorRam::new(1024)
+        ));
         let vic = Rc::new(RefCell::new(
-            Vic::new(cpu.clone(), mem.clone())
+            Vic::new(cpu.clone(), mem.clone(), color_ram.clone())
         ));
         let device_io = Rc::new(RefCell::new(
-            DeviceIo::new(cia1.clone(), cia2.clone(), vic.clone())
+            DeviceIo::new(cia1.clone(),
+                          cia2.clone(),
+                          color_ram.clone(),
+                          vic.clone())
         ));
+        mem.borrow_mut().set_cia2(cia2.clone());
         mem.borrow_mut().set_device_io(device_io.clone());
         cpu.borrow_mut().write(BaseAddr::IoPortDdr.addr(), 0x2f);
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 31);
@@ -77,6 +85,7 @@ impl C64 {
                 config: config,
                 cpu: cpu.clone(),
                 mem: mem.clone(),
+                color_ram: color_ram.clone(),
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
                 keyboard: keyboard.clone(),

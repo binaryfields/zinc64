@@ -15,6 +15,8 @@
  */
 
 mod color;
+mod color_ram;
 mod vic;
 
+pub use self::color_ram::ColorRam;
 pub use self::vic::Vic;

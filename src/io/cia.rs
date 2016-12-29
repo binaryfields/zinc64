@@ -259,11 +259,11 @@ impl Cia {
     }
 
     fn read_cia2_port_a(&self) -> u8 {
-        0
+        self.port_a
     }
 
     fn read_cia2_port_b(&self) -> u8 {
-        0
+        self.port_b
     }
 
     fn scan_keyboard(&self, columns: u8) -> u8 {

@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use cpu::Cpu;
 use mem::Memory;
+use video::ColorRam;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
@@ -26,6 +27,7 @@ pub struct Vic {
     // Dependencies
     cpu: Rc<RefCell<Cpu>>,
     mem: Rc<RefCell<Memory>>,
+    color_ram: Rc<RefCell<ColorRam>>,
     // Control
     mode: Mode,
     enabled: bool,
@@ -227,10 +229,13 @@ impl Sprite {
 }
 
 impl Vic {
-    pub fn new(cpu: Rc<RefCell<Cpu>>, mem: Rc<RefCell<Memory>>) -> Vic {
+    pub fn new(cpu: Rc<RefCell<Cpu>>,
+               mem: Rc<RefCell<Memory>>,
+               color_ram: Rc<RefCell<ColorRam>>) -> Vic {
         Vic {
             cpu: cpu,
             mem: mem,
+            color_ram: color_ram,
             mode: Mode::Text,
             enabled: true,
             rsel: true,
@@ -251,6 +256,8 @@ impl Vic {
             light_pen_pos: [0; 2],
         }
     }
+
+    // -- Device I/O
 
     pub fn read(&mut self, reg: u8) -> u8 {
         match Reg::from(reg) {
@@ -531,3 +538,4 @@ impl Vic {
         if (value & (1 << bit)) != 0 { 1 } else { 0 }
     }
 }
+

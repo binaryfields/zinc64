@@ -501,7 +501,7 @@ impl Cpu {
     }
 
     fn tick(&mut self, elapsed: u8) {
-        self.cycles += elapsed as u32;
+        self.cycles.wrapping_add(elapsed as u32);
     }
 
     // -- Flag Ops
