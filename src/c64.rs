@@ -20,6 +20,7 @@ use std::rc::Rc;
 use std::result::Result;
 
 use cpu::Cpu;
+use config::Config;
 use mem::{Addressable, BaseAddr, Memory};
 use io::cia;
 use io::DeviceIo;
@@ -35,6 +36,7 @@ use video::Vic;
 
 #[allow(dead_code)]
 pub struct C64 {
+    config: Config,
     cpu: Rc<RefCell<Cpu>>,
     mem: Rc<RefCell<Memory>>,
     cia1: Rc<RefCell<cia::Cia>>,
@@ -45,7 +47,7 @@ pub struct C64 {
 }
 
 impl C64 {
-    pub fn new() -> Result<C64, io::Error> {
+    pub fn new(config: Config) -> Result<C64, io::Error> {
         let mem = Rc::new(RefCell::new(
             Memory::new()?
         ));
@@ -72,6 +74,7 @@ impl C64 {
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 31);
         Ok(
             C64 {
+                config: config,
                 cpu: cpu.clone(),
                 mem: mem.clone(),
                 cia1: cia1.clone(),
@@ -83,6 +86,7 @@ impl C64 {
     }
 
     pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> { self.cpu.clone() }
+    pub fn get_config(&self) -> &Config { &self.config }
     pub fn get_memory(&self) -> Rc<RefCell<Memory>> { self.mem.clone() }
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> { self.keyboard.clone() }
 
@@ -115,11 +119,12 @@ impl C64 {
 mod tests {
     use super::*;
     use std::path::Path;
+    use config::Config;
     use mem::BaseAddr;
 
     //#[test]
     fn cpu_test() {
-        let mut c64 = C64::new().unwrap();
+        let mut c64 = C64::new(Config::pal()).unwrap();
         let cpu = c64.get_cpu();
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0x00);
         c64.load(Path::new("rom/6502_functional_test.bin"), 0x0400).unwrap();
@@ -139,7 +144,7 @@ mod tests {
 
     #[test]
     fn mem_layout() {
-        let c64 = C64::new().unwrap();
+        let c64 = C64::new(Config::pal()).unwrap();
         let cpu = c64.get_cpu();
         assert_eq!(0x94, cpu.borrow().read(BaseAddr::Basic.addr()));
     }
@@ -172,7 +177,7 @@ mod tests {
             0xd0, 0xf9,
             0x58
         ];
-        let mut c64 = C64::new().unwrap();
+        let mut c64 = C64::new(Config::pal()).unwrap();
         let cpu = c64.get_cpu();
         let keyboard = c64.get_keyboard();
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0x00);

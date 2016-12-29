@@ -18,11 +18,13 @@ extern crate getopts;
 extern crate sdl2;
 
 mod c64;
+mod config;
 mod cpu;
 mod io;
 mod loader;
 mod mem;
 mod ui;
+mod util;
 mod video;
 
 use std::env;
@@ -31,6 +33,7 @@ use std::process;
 use std::result::Result;
 
 use c64::C64;
+use config::Config;
 use loader::Loaders;
 use mem::BaseAddr;
 use std::path::Path;
@@ -56,6 +59,7 @@ fn build_options() -> getopts::Options {
     let mut opts = getopts::Options::new();
     opts.optopt("f", "file", "file to load", "path")
         .optopt("b", "breakpoint", "set breakpoint at this address", "address")
+        .optopt("m", "model", "specify NTSC or PAL variants", "model")
         .optopt("o", "offset", "offset at which to load binary", "address")
         .optflag("h", "help", "display this help")
         .optflag("V", "version", "display this version");
@@ -86,7 +90,10 @@ fn run(args: Vec<String>) -> Result<i32, String> {
         print_version();
         Ok(0)
     } else {
-        let mut c64 = C64::new().unwrap();
+        let model = matches.opt_str("model")
+            .unwrap_or(String::from("pal"));
+        let config = Config::new(&model);
+        let mut c64 = C64::new(config).unwrap();
         let breakpoint = matches.opt_str("breakpoint")
             .map(|s| s.parse::<u16>().unwrap())
             .unwrap_or(0);

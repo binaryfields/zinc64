@@ -37,7 +37,8 @@ impl AppWindow {
     pub fn new(c64: C64) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
-        let window = video.window("zinc64", 800, 600)
+        let window_size = c64.get_config().visible_size;
+        let window = video.window("zinc64", window_size.width as u32, window_size.height as u32)
             .position_centered()
             .opengl()
             .build()
@@ -94,7 +95,6 @@ impl AppWindow {
                     Event::KeyDown { keycode: Some(key), .. } => {
                         let keyboard = self.c64.get_keyboard();
                         keyboard.borrow_mut().on_key_down(key);
-
                     }
                     Event::KeyUp { keycode: Some(key), .. } => {
                         let keyboard = self.c64.get_keyboard();
