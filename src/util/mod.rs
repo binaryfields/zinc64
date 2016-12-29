@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+pub mod bit;
 mod rect;
 
 pub use self::rect::{Dimension, Rect};

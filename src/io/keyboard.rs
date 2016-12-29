@@ -15,6 +15,7 @@
  */
 
 use sdl2::keyboard::Keycode;
+use util::bit;
 
 // SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
 
@@ -42,25 +43,19 @@ impl Keyboard {
     pub fn on_key_down(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);
         if mapping.0 != 0xff {
-            self.matrix[mapping.0 as usize] = self.bit_clear(self.matrix[mapping.0 as usize], mapping.1);
+            self.matrix[mapping.0 as usize] = bit::bit_update(self.matrix[mapping.0 as usize],
+                                                              mapping.1,
+                                                              false);
         }
     }
 
     pub fn on_key_up(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);
         if mapping.0 != 0xff {
-            self.matrix[mapping.0 as usize] = self.bit_set(self.matrix[mapping.0 as usize], mapping.1);
+            self.matrix[mapping.0 as usize] = bit::bit_update(self.matrix[mapping.0 as usize],
+                                                              mapping.1,
+                                                              true);
         }
-    }
-
-    fn bit_clear(&self, value: u8, bit: u8) -> u8 {
-        let mask = 1 << bit;
-        value & !mask
-    }
-
-    fn bit_set(&self, value: u8, bit: u8) -> u8 {
-        let mask = 1 << bit;
-        value | mask
     }
 
     fn map_keycode(&self, keycode: Keycode) -> (u8, u8) {
