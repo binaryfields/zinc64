@@ -17,6 +17,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use config::Config;
 use cpu::Cpu;
 use mem::{Addressable, Memory};
 use video::{ColorRam, RenderTarget};
@@ -32,6 +33,7 @@ use util::bit;
 
 pub struct Vic {
     // Dependencies
+    config: Config,
     cpu: Rc<RefCell<Cpu>>,
     mem: Rc<RefCell<Memory>>,
     color_ram: Rc<RefCell<ColorRam>>,
@@ -237,11 +239,13 @@ impl Sprite {
 }
 
 impl Vic {
-    pub fn new(cpu: Rc<RefCell<Cpu>>,
+    pub fn new(config: Config,
+               cpu: Rc<RefCell<Cpu>>,
                mem: Rc<RefCell<Memory>>,
                color_ram: Rc<RefCell<ColorRam>>,
                rt: Rc<RefCell<RenderTarget>>) -> Vic {
         Vic {
+            config: config,
             cpu: cpu,
             mem: mem,
             color_ram: color_ram,

@@ -72,7 +72,8 @@ impl C64 {
             RenderTarget::new(config.visible_size)
         ));
         let vic = Rc::new(RefCell::new(
-            Vic::new(cpu.clone(),
+            Vic::new(config.clone(),
+                     cpu.clone(),
                      mem.clone(),
                      color_ram.clone(),
                      rt.clone())
