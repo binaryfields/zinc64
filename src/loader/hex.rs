@@ -98,7 +98,7 @@ impl Loader for HexLoader {
         let memory = c64.get_memory();
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        let lines: Vec<_>  = reader.lines().collect();
+        let lines: Vec<_> = reader.lines().collect();
         let mut mem = memory.borrow_mut();
         let mut address = offset;
         let mut line_num = 0;

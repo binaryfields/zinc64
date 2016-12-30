@@ -32,13 +32,8 @@ impl Keyboard {
         }
     }
 
-    pub fn get_row(&self, row: u8) -> u8 {
-        self.matrix[row as usize]
-    }
-
-    pub fn set_row(&mut self, row: u8, value: u8) {
-        self.matrix[row as usize] = value;
-    }
+    pub fn get_row(&self, row: u8) -> u8 { self.matrix[row as usize] }
+    pub fn set_row(&mut self, row: u8, value: u8) { self.matrix[row as usize] = value; }
 
     pub fn on_key_down(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);
@@ -57,6 +52,8 @@ impl Keyboard {
                                                               true);
         }
     }
+
+    // -- Internal Ops
 
     fn map_keycode(&self, keycode: Keycode) -> (u8, u8) {
         match keycode {

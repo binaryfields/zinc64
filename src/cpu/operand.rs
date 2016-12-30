@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn address_relative_neg_max() {
         let mut cpu = setup_cpu().unwrap();
-        cpu.set_pc( 0x0505);
+        cpu.set_pc(0x0505);
         let op = Operand::Relative(-128);
         assert_eq!(0x0485, op.ea(&cpu));
     }

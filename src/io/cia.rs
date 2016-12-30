@@ -228,6 +228,8 @@ impl Cia {
         self.cnt_last = self.cnt_line;
     }
 
+    // -- Internal Ops
+
     fn read_cia1_port_a(&self) -> u8 {
         // paddles on 01 = port 1, 10 = port 2
         let paddles = 1u8 << 6;
@@ -282,8 +284,20 @@ impl Cia {
     #[allow(dead_code)]
     pub fn read(&mut self, reg: u8) -> u8 {
         match Reg::from(reg) {
-            Reg::PRA => if self.mode == Mode::Cia1 { self.read_cia1_port_a() } else { self.read_cia2_port_a() },
-            Reg::PRB => if self.mode == Mode::Cia1 { self.read_cia1_port_b() } else { self.read_cia2_port_b() },
+            Reg::PRA => {
+                if self.mode == Mode::Cia1 {
+                    self.read_cia1_port_a()
+                } else {
+                    self.read_cia2_port_a()
+                }
+            },
+            Reg::PRB => {
+                if self.mode == Mode::Cia1 {
+                    self.read_cia1_port_b()
+                } else {
+                    self.read_cia2_port_b()
+                }
+            },
             Reg::DDRA => self.ddr_a,
             Reg::DDRB => self.ddr_b,
             Reg::TALO => (self.timer_a.value & 0xff) as u8,

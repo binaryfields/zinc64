@@ -98,10 +98,7 @@ impl Memory {
         })
     }
 
-    pub fn set_cia2(&mut self, cia: Rc<RefCell<Cia>>) {
-        self.cia2 = Some(cia);
-    }
-
+    pub fn set_cia2(&mut self, cia: Rc<RefCell<Cia>>) { self.cia2 = Some(cia); }
     pub fn set_device_io(&mut self, device_io: Rc<RefCell<DeviceIo>>) {
         self.device_io = Some(device_io);
     }
@@ -124,7 +121,7 @@ impl Memory {
                         Bank::Io
                     }
                 },
-                0xe ... 0xf => if hiram { Bank::Kernal} else { Bank::Ram },
+                0xe ... 0xf => if hiram { Bank::Kernal } else { Bank::Ram },
                 _ => panic!("invalid zone")
             };
             self.cpu_map[zone] = bank;

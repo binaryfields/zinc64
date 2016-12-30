@@ -44,6 +44,8 @@ impl RenderTarget {
         self.pixels[index] = Color::from(color).rgb();
     }
 
+    // -- Internal Ops
+
     fn index(&self, x: u16, y: u16) -> usize {
         (y as usize) * (self.dim.width as usize) + (x as usize)
     }

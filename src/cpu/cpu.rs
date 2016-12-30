@@ -570,7 +570,19 @@ impl Cpu {
         6
     }
 
-    // -- Memory Access
+    // -- Memory Ops
+
+    pub fn fetch_op(&mut self) -> u8 {
+        let op = self.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
+        op
+    }
+
+    pub fn fetch_word(&mut self) -> u16 {
+        let word = self.read_word(self.pc);
+        self.pc = self.pc.wrapping_add(2);
+        word
+    }
 
     pub fn read(&self, address: u16) -> u8 {
         self.mem.borrow().read(address)
@@ -587,18 +599,6 @@ impl Cpu {
             0x0001 => self.mem.borrow_mut().switch_banks(value),
             _ => self.mem.borrow_mut().write(address, value),
         }
-    }
-
-    pub fn fetch_op(&mut self) -> u8 {
-        let op = self.read(self.pc);
-        self.pc = self.pc.wrapping_add(1);
-        op
-    }
-
-    pub fn fetch_word(&mut self) -> u16 {
-        let word = self.read_word(self.pc);
-        self.pc = self.pc.wrapping_add(2);
-        word
     }
 
     // -- Stack Ops
