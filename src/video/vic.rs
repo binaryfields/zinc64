@@ -18,17 +18,24 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cpu::Cpu;
-use mem::Memory;
-use video::ColorRam;
+use mem::{Addressable, Memory};
+use video::{ColorRam, RenderTarget};
 use util::bit;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
+
+// TODO vic: implement raster int
+// TODO vic: implement rsel/csel
+// TODO vic: implement scroll
+// TODO vic: implement remaining modes
+// TODO vic: implement sprites
 
 pub struct Vic {
     // Dependencies
     cpu: Rc<RefCell<Cpu>>,
     mem: Rc<RefCell<Memory>>,
     color_ram: Rc<RefCell<ColorRam>>,
+    rt: Rc<RefCell<RenderTarget>>,
     // Control
     mode: Mode,
     enabled: bool,
@@ -232,11 +239,13 @@ impl Sprite {
 impl Vic {
     pub fn new(cpu: Rc<RefCell<Cpu>>,
                mem: Rc<RefCell<Memory>>,
-               color_ram: Rc<RefCell<ColorRam>>) -> Vic {
+               color_ram: Rc<RefCell<ColorRam>>,
+               rt: Rc<RefCell<RenderTarget>>) -> Vic {
         Vic {
             cpu: cpu,
             mem: mem,
             color_ram: color_ram,
+            rt: rt,
             mode: Mode::Text,
             enabled: true,
             rsel: true,

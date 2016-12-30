@@ -37,8 +37,7 @@ impl AppWindow {
     pub fn new(c64: C64) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
-        let window_size = c64.get_config().visible_size;
-        let window = video.window("zinc64", window_size.width as u32, window_size.height as u32)
+        let window = video.window("zinc64", 800, 600)
             .position_centered()
             .opengl()
             .build()
@@ -47,7 +46,10 @@ impl AppWindow {
             .accelerated()
             .build()
             .unwrap();
-        let texture = renderer.create_texture_streaming(PixelFormatEnum::RGB24, 256, 256)
+        let screen_size = c64.get_config().visible_size;
+        let texture = renderer.create_texture_streaming(PixelFormatEnum::ARGB8888,
+                                                        screen_size.width as u32,
+                                                        screen_size.height as u32)
             .unwrap();
         let event_pump = sdl.event_pump()
             .unwrap();
@@ -62,21 +64,23 @@ impl AppWindow {
     }
 
     pub fn render(&mut self) {
+        let screen_size = self.c64.get_config().visible_size;
+        let rt_ref = self.c64.get_render_target();
+        let rt = rt_ref.borrow();
         self.texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            for y in 0..256 {
-                for x in 0..256 {
-                    let offset = y * pitch + x * 3;
-                    buffer[offset + 0] = x as u8;
+            for y in 0..(screen_size.height as usize) {
+                for x in 0..(screen_size.width as usize) {
+                    let offset = y * pitch + x * 4;
+                    let color = rt.read(x as u16, y as u16);
+                    buffer[offset + 0] = 0 as u8;
                     buffer[offset + 1] = y as u8;
-                    buffer[offset + 2] = 0;
+                    buffer[offset + 2] = x as u8;
+                    buffer[offset + 3] = 0 as u8;
                 }
             }
         }).unwrap();
-
         self.renderer.clear();
-        self.renderer.copy(&self.texture, None, Some(Rect::new(100, 100, 256, 256))).unwrap();
-        self.renderer.copy_ex(&self.texture, None,
-                              Some(Rect::new(450, 100, 256, 256)), 30.0, None, false, false).unwrap();
+        self.renderer.copy(&self.texture, None, None).unwrap();
         self.renderer.present();
     }
 

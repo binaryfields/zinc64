@@ -25,7 +25,7 @@ use mem::{Addressable, BaseAddr, Memory};
 use io::cia;
 use io::DeviceIo;
 use io::Keyboard;
-use video::{ColorRam, Vic};
+use video::{ColorRam, RenderTarget, Vic};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -43,6 +43,7 @@ pub struct C64 {
     cia1: Rc<RefCell<cia::Cia>>,
     cia2: Rc<RefCell<cia::Cia>>,
     keyboard: Rc<RefCell<Keyboard>>,
+    rt: Rc<RefCell<RenderTarget>>,
     vic: Rc<RefCell<Vic>>,
     //sid: Rc<RefCell<Sid>>,
 }
@@ -67,8 +68,14 @@ impl C64 {
         let color_ram = Rc::new(RefCell::new(
             ColorRam::new(1024)
         ));
+        let rt = Rc::new(RefCell::new(
+            RenderTarget::new(config.visible_size)
+        ));
         let vic = Rc::new(RefCell::new(
-            Vic::new(cpu.clone(), mem.clone(), color_ram.clone())
+            Vic::new(cpu.clone(),
+                     mem.clone(),
+                     color_ram.clone(),
+                     rt.clone())
         ));
         let device_io = Rc::new(RefCell::new(
             DeviceIo::new(cia1.clone(),
@@ -89,15 +96,17 @@ impl C64 {
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
                 keyboard: keyboard.clone(),
+                rt: rt.clone(),
                 vic: vic.clone(),
             }
         )
     }
 
-    pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> { self.cpu.clone() }
     pub fn get_config(&self) -> &Config { &self.config }
-    pub fn get_memory(&self) -> Rc<RefCell<Memory>> { self.mem.clone() }
+    pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> { self.cpu.clone() }
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> { self.keyboard.clone() }
+    pub fn get_memory(&self) -> Rc<RefCell<Memory>> { self.mem.clone() }
+    pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> { self.rt.clone() }
 
     pub fn load(&mut self, code: &Vec<u8>, offset: u16) {
         let mut mem = self.mem.borrow_mut();

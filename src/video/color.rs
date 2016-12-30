@@ -37,8 +37,7 @@
 }
 
 impl Color {
-
-    pub fn get(color: u8) -> Color {
+    pub fn from(color: u8) -> Color {
         match color {
             0 => Color::Black,
             1 => Color::White,

@@ -131,7 +131,7 @@ impl Memory {
         }
     }
 
-    fn vic_read(&self, address: u16) -> u8 {
+    pub fn vic_read(&self, address: u16) -> u8 {
         if let Some(ref cia2) = self.cia2 {
             let port_a = cia2.borrow_mut().read(0x00);
             let full_address = ((!port_a & 0x03) as u16) << 14 | address;
