@@ -561,11 +561,13 @@ impl Cpu {
             };
             self.push(sr);
         }
-        self.set_flag(Flag::IntDisable);
+            self.set_flag(Flag::IntDisable);
         self.pc = self.read_word(interrupt.vector());
-        // FIXME cpu: what clears irq line
-        if self.nmi_line {
+        if interrupt == Interrupt::Nmi && self.nmi_line {
             self.nmi_line = false;
+        }
+        if interrupt == Interrupt::Irq && self.irq_line {
+            self.irq_line = false;
         }
         6
     }
@@ -596,7 +598,10 @@ impl Cpu {
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0x0001 => self.mem.borrow_mut().switch_banks(value),
+            0x0001 => {
+                self.mem.borrow_mut().switch_banks(value);
+                self.mem.borrow_mut().write(address, value); // FIXME
+            },
             _ => self.mem.borrow_mut().write(address, value),
         }
     }

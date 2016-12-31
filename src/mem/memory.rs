@@ -40,6 +40,7 @@ pub struct Memory {
     ram: Box<Addressable>,
     basic: Box<Addressable>,
     charset: Box<Addressable>,
+    charset_vic: Box<Addressable>, // FIXME remove this hack
     kernal: Box<Addressable>,
     cia2: Option<Rc<RefCell<Cia>>>,
     device_io: Option<Rc<RefCell<DeviceIo>>>,
@@ -82,6 +83,7 @@ impl Memory {
     pub fn new() -> Result<Memory, io::Error> {
         let basic = Box::new(Rom::load(Path::new("rom/basic.rom"), BaseAddr::Basic.addr())?);
         let charset = Box::new(Rom::load(Path::new("rom/characters.rom"), BaseAddr::Charset.addr())?);
+        let charset_vic = Box::new(Rom::load(Path::new("rom/characters.rom"), 0)?);
         let kernal = Box::new(Rom::load(Path::new("rom/kernal.rom"), BaseAddr::Kernal.addr())?);
         let mut vic_map = [Bank::Ram; 16];
         vic_map[0x1] = Bank::Charset;
@@ -92,6 +94,7 @@ impl Memory {
             ram: Box::new(Ram::new(0x10000)),
             basic: basic,
             charset: charset,
+            charset_vic: charset_vic,
             kernal: kernal,
             cia2: None,
             device_io: None,
@@ -136,7 +139,13 @@ impl Memory {
             let bank = self.vic_map[zone as usize];
             match bank {
                 Bank::Ram => self.ram.read(full_address),
-                Bank::Charset => self.charset.read(full_address),
+                Bank::Charset => {
+                    if zone == 0x1 {
+                        self.charset_vic.read(full_address - 0x1000)
+                    } else {
+                        self.charset_vic.read(full_address - 0x9000)
+                    }
+                },
                 _ => panic!("invalid bank {}", bank as u8),
             }
         } else {
