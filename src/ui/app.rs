@@ -79,8 +79,8 @@ impl AppWindow {
                         let offset = y * pitch + x * 4;
                         let color = rt.read(x as u16, y as u16);
                         buffer[offset + 0] = (color & 0x000000ff) as u8;
-                        buffer[offset + 1] = (color & 0x0000ff00 >> 8) as u8;
-                        buffer[offset + 2] = (color & 0x00ff0000 >> 16) as u8;
+                        buffer[offset + 1] = ((color & 0x0000ff00) >> 8) as u8;
+                        buffer[offset + 2] = ((color & 0x00ff0000) >> 16) as u8;
                         buffer[offset + 3] = 0 as u8;
                     }
                 }
@@ -119,7 +119,7 @@ impl AppWindow {
             self.c64.step();
             let rt = self.c64.get_render_target();
             if rt.borrow().get_sync() {
-                //self.wait_vsync(); // FIXME
+                self.wait_vsync();
                 self.render();
             }
             // TODO c64: add breakpoint and infinite loop detection

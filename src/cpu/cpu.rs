@@ -124,11 +124,11 @@ impl Cpu {
         } else if self.irq_line && !self.test_flag(Flag::IntDisable) {
             self.interrupt(Interrupt::Irq);
         }
-        let pc = self.pc;
+        // let pc = self.pc;
         let opcode = self.fetch_op();
         let op = Instruction::decode(self, opcode);
-        self.dump_registers();
-        println!("exec 0x{:x}: {:?}", pc, op);
+        // self.dump_registers();
+        // println!("exec 0x{:x}: {:?}", pc, op);
         self.execute_instruction(&op);
     }
 
@@ -546,30 +546,33 @@ impl Cpu {
     // -- Interrupt Ops
 
     fn interrupt(&mut self, interrupt: Interrupt) -> u8 {
-        if interrupt != Interrupt::Reset {
-            let pc = if interrupt == Interrupt::Break {
-                self.pc + 1
-            } else {
-                self.pc
-            };
-            self.push(((pc >> 8) & 0xff) as u8);
-            self.push((pc & 0xff) as u8);
-            let sr = if interrupt == Interrupt::Break {
-                self.p | (Flag::Break as u8) | (Flag::Reserved as u8)
-            } else {
-                self.p
-            };
-            self.push(sr);
+        let pc = self.pc;
+        let p = self.p;
+        match interrupt {
+            Interrupt::Irq => {
+                self.push(((pc >> 8) & 0xff) as u8);
+                self.push((pc & 0xff) as u8);
+                self.push(p & 0xef);
+                self.set_flag(Flag::IntDisable);
+                self.irq_line = false;
+            },
+            Interrupt::Nmi => {
+                self.push(((pc >> 8) & 0xff) as u8);
+                self.push((pc & 0xff) as u8);
+                self.push(p & 0xef);
+                self.set_flag(Flag::IntDisable);
+                self.nmi_line = false;
+            },
+            Interrupt::Break => {
+                self.push((((pc + 1) >> 8) & 0xff) as u8);
+                self.push(((pc + 1) & 0xff) as u8);
+                self.push(p | (Flag::Break as u8) | (Flag::Reserved as u8));
+                self.set_flag(Flag::IntDisable);
+            },
+            Interrupt::Reset => {},
         }
-            self.set_flag(Flag::IntDisable);
         self.pc = self.read_word(interrupt.vector());
-        if interrupt == Interrupt::Nmi && self.nmi_line {
-            self.nmi_line = false;
-        }
-        if interrupt == Interrupt::Irq && self.irq_line {
-            self.irq_line = false;
-        }
-        6
+        7
     }
 
     // -- Memory Ops
