@@ -413,7 +413,7 @@ impl Vic {
     // g-access
     #[inline(always)]
     fn fetch_char_pixels(&self, ch: u8, rc: u8) -> u8 {
-        let address = self.char_base | (ch as u16) << 3 | rc as u16;
+        let address = self.char_base | ((ch as u16) << 3) | rc as u16;
         self.mem.borrow().vic_read(address)
     }
 
@@ -497,15 +497,15 @@ impl Vic {
                 m0ye | m1ye | m2ye | m3ye | m4ye | m5ye | m6ye | m7ye
             },
             Reg::MEMPTR => {
-                let vm = ((self.video_matrix & 0x3c00 >> 10) as u8) << 4;
-                let cb = ((self.char_base & 0x3800 >> 11) as u8) << 1;
+                let vm = (((self.video_matrix & 0x3c00) >> 10) as u8) << 4;
+                let cb = (((self.char_base & 0x3800) >> 11) as u8) << 1;
                 vm | cb | 0x01
             },
             Reg::IRR => {
                 let raster_int = if self.raster_int { 1 << 0 } else { 0 };
                 let int_data = raster_int;
                 let int_occurred = if int_data > 0 { 1 << 7 } else { 0 };
-                int_data | int_occurred
+                int_data | int_occurred | 0x70
             },
             Reg::IMR => self.int_enable | 0xf0,
             Reg::MDP => {
@@ -564,21 +564,21 @@ impl Vic {
 
     pub fn write(&mut self, reg: u8, value: u8) {
         match Reg::from(reg) {
-            Reg::M0X => self.sprites[0].x = self.sprites[0].x & 0xff00 | (value as u16),
+            Reg::M0X => self.sprites[0].x = (self.sprites[0].x & 0xff00) | (value as u16),
             Reg::M0Y => self.sprites[0].y = value,
-            Reg::M1X => self.sprites[1].x = self.sprites[1].x & 0xff00 | (value as u16),
+            Reg::M1X => self.sprites[1].x = (self.sprites[1].x & 0xff00) | (value as u16),
             Reg::M1Y => self.sprites[1].y = value,
-            Reg::M2X => self.sprites[2].x = self.sprites[2].x & 0xff00 | (value as u16),
+            Reg::M2X => self.sprites[2].x = (self.sprites[2].x & 0xff00) | (value as u16),
             Reg::M2Y => self.sprites[2].y = value,
-            Reg::M3X => self.sprites[3].x = self.sprites[3].x & 0xff00 | (value as u16),
+            Reg::M3X => self.sprites[3].x = (self.sprites[3].x & 0xff00) | (value as u16),
             Reg::M3Y => self.sprites[3].y = value,
-            Reg::M4X => self.sprites[4].x = self.sprites[4].x & 0xff00 | (value as u16),
+            Reg::M4X => self.sprites[4].x = (self.sprites[4].x & 0xff00) | (value as u16),
             Reg::M4Y => self.sprites[4].y = value,
-            Reg::M5X => self.sprites[5].x = self.sprites[5].x & 0xff00 | (value as u16),
+            Reg::M5X => self.sprites[5].x = (self.sprites[5].x & 0xff00) | (value as u16),
             Reg::M5Y => self.sprites[5].y = value,
-            Reg::M6X => self.sprites[6].x = self.sprites[6].x & 0xff00 | (value as u16),
+            Reg::M6X => self.sprites[6].x = (self.sprites[6].x & 0xff00) | (value as u16),
             Reg::M6Y => self.sprites[6].y = value,
-            Reg::M7X => self.sprites[7].x = self.sprites[7].x & 0xff00 | (value as u16),
+            Reg::M7X => self.sprites[7].x = (self.sprites[7].x & 0xff00) | (value as u16),
             Reg::M7Y => self.sprites[7].y = value,
             Reg::MX8 => {
                 self.sprites[0].x = bit::bit_update16(self.sprites[0].x, 8, bit::bit_test(value, 0));
@@ -600,7 +600,7 @@ impl Vic {
                 let rsel = bit::bit_set(3, self.rsel);
                 self.scroll_y = value & 0x07;
             }
-            Reg::RASTER => self.raster_compare = self.raster_compare & 0xff00 | (value as u16),
+            Reg::RASTER => self.raster_compare = (self.raster_compare & 0xff00) | (value as u16),
             Reg::LPX => self.light_pen_pos[0] = value,
             Reg::LPY => self.light_pen_pos[1] = value,
             Reg::ME => {
