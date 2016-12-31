@@ -47,9 +47,7 @@ pub enum Instruction {
     PLP(u8),
     // Arithmetic (11)
     ADC(Operand, u8),
-    // TODO review
     SBC(Operand, u8),
-    // TODO review
     DEC(Operand, u8),
     DEX(u8),
     DEY(u8),
@@ -67,9 +65,7 @@ pub enum Instruction {
     ASL(Operand, u8),
     LSR(Operand, u8),
     ROL(Operand, u8),
-    // TODO review
     ROR(Operand, u8),
-    // TODO review
     // Control Flow (11)
     BCC(Operand, u8),
     BCS(Operand, u8),
