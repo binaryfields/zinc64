@@ -365,22 +365,22 @@ impl Cia {
                 self.ddr_b = value;
             },
             Reg::TALO => {
-                let value = self.timer_a.latch & 0xff00 | (value as u16);
+                let value = (self.timer_a.latch & 0xff00) | (value as u16);
                 self.timer_a.latch = value;
             },
             Reg::TAHI => {
-                let value = self.timer_a.latch & 0x00ff | ((value as u16) << 8);
+                let value = (self.timer_a.latch & 0x00ff) | ((value as u16) << 8);
                 self.timer_a.latch = value;
                 if !self.timer_a.enabled {
                     self.timer_a.value = value;
                 }
             },
             Reg::TBLO => {
-                let value = self.timer_b.latch & 0xff00 | (value as u16);
+                let value = (self.timer_b.latch & 0xff00) | (value as u16);
                 self.timer_b.latch = value;
             },
             Reg::TBHI => {
-                let value = self.timer_b.latch & 0x00ff | ((value as u16) << 8);
+                let value = (self.timer_b.latch & 0x00ff) | ((value as u16) << 8);
                 self.timer_b.latch = value;
                 if !self.timer_b.enabled {
                     self.timer_b.value = value;
