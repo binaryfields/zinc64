@@ -69,8 +69,8 @@ const VISIBLE_WIDTH_PAL: u16 = 403;
 const VISIBLE_HEIGHT_PAL: u16 = 284;
 const VISIBLE_FIRST_LINE_PAL: u16 = 16;
 const VISIBLE_LAST_LINE_PAL: u16 = 299;
-const VISIBLE_FIRST_COL_PAL: u16 = 76; // original 480, but we offset x to beg of display
-const VISIBLE_LAST_COL_PAL: u16 = 480; // original 380, but we offset x to beg of display
+const VISIBLE_FIRST_COL_PAL: u16 = 80; // translated 76, original 480, but we offset x to beg of display
+const VISIBLE_LAST_COL_PAL: u16 = 484; // translated 480, original 380, but we offset x to beg of display
 
 /*
 
@@ -115,8 +115,8 @@ const WINDOW_WIDTH: u16 = 320;
 const WINDOW_HEIGHT: u16 = 200;
 const WINDOW_FIRST_LINE: u16 = 51;
 const WINDOW_LAST_LINE: u16 = 250;
-const WINDOW_FIRST_COL: u16 = 124; // original 24
-const WINDOW_LAST_COL: u16 = 443; // original 343
+const WINDOW_FIRST_COL: u16 = 128; // translated 124, original 24
+const WINDOW_LAST_COL: u16 = 447; // translated 443, original 343
 
 const RASTER_TIME_BYTE_PAL: u16 = 1; // 8 pixels/cpu cycle
 const RASTER_LINE_CYCLES_PAL: u16 = DISPLAY_WIDTH_PAL / 8 * RASTER_TIME_BYTE_PAL; // 63
@@ -133,6 +133,7 @@ pub struct Config {
     pub window: Rect,
     pub raster_line_cycles: u16,
     pub refresh_rate: f64,
+    pub refrest_rate_ns: u64,
 }
 
 impl Config {
@@ -156,6 +157,7 @@ impl Config {
             window: Rect::new_with_dim(WINDOW_FIRST_COL, WINDOW_FIRST_LINE, window_size),
             raster_line_cycles: RASTER_LINE_CYCLES_PAL,
             refresh_rate: RASTER_REFRESH_RATE_PAL,
+            refrest_rate_ns: ((1.0 / RASTER_REFRESH_RATE_PAL) * 1_000_000_000.0) as u64,
         }
     }
 }

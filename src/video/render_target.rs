@@ -19,7 +19,8 @@ use util::Dimension;
 
 pub struct RenderTarget {
     dim: Dimension,
-    pixels: Vec<u32>
+    pixels: Vec<u32>,
+    sync: bool
 }
 
 impl RenderTarget {
@@ -27,8 +28,12 @@ impl RenderTarget {
         RenderTarget {
             dim: dim,
             pixels: vec![0; (dim.width as usize) * (dim.height as usize)],
+            sync: false,
         }
     }
+
+    pub fn get_sync(&self) -> bool { self.sync }
+    pub fn set_sync(&mut self, value: bool) { self.sync = value; }
 
     pub fn dimension(&self) -> Dimension {
         self.dim

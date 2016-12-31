@@ -126,10 +126,11 @@ impl C64 {
     pub fn step(&mut self) {
         let prev_cycles = self.cpu.borrow().get_cycles();
         self.cpu.borrow_mut().execute();
-        let elapsed = self.cpu.borrow().get_cycles() - prev_cycles + 1;
-        for i in 0..elapsed {
+        let elapsed = self.cpu.borrow().get_cycles() - prev_cycles;
+        for i in 0..(elapsed + 1) {
             self.cia1.borrow_mut().step();
             self.cia2.borrow_mut().step();
+            self.vic.borrow_mut().step();
         }
     }
 }

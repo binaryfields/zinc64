@@ -25,43 +25,12 @@ use util::bit;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
-// TODO vic: implement raster int
-// TODO vic: implement rsel/csel
+// TODO impl bad line logic
+// TODO vic: implement cpu stalling
+// TODO vic: implement den/rsel/csel
 // TODO vic: implement scroll
 // TODO vic: implement remaining modes
 // TODO vic: implement sprites
-
-pub struct Vic {
-    // Dependencies
-    config: Config,
-    cpu: Rc<RefCell<Cpu>>,
-    mem: Rc<RefCell<Memory>>,
-    color_ram: Rc<RefCell<ColorRam>>,
-    rt: Rc<RefCell<RenderTarget>>,
-    // Control
-    mode: Mode,
-    enabled: bool,
-    rsel: bool,
-    csel: bool,
-    scroll_x: u8,
-    scroll_y: u8,
-    irq_enable: u8,
-    irq_status: u8,
-    // Internal Counters
-    raster: u16,
-    raster_compare: u16,
-    video_counter: u16,
-    // Memory Pointers
-    char_base: u16,
-    video_matrix: u16,
-    // Color and Sprite Data
-    border_color: u8,
-    background_color: [u8; 4],
-    sprites: [Sprite; 8],
-    sprite_multicolor: [u8; 2],
-    // Misc
-    light_pen_pos: [u8; 2],
-}
 
 #[derive(Copy, Clone)]
 enum Mode {
@@ -238,6 +207,46 @@ impl Sprite {
     }
 }
 
+pub struct Vic {
+    // Dependencies
+    config: Config,
+    cpu: Rc<RefCell<Cpu>>,
+    mem: Rc<RefCell<Memory>>,
+    color_ram: Rc<RefCell<ColorRam>>,
+    rt: Rc<RefCell<RenderTarget>>,
+    // Counters
+    raster: u16,
+    x_pos: u16,
+    vc_base: u16,
+    vc: u16,
+    rc: u8,
+    // Display Options
+    mode: Mode,
+    den: bool,
+    rsel: bool,
+    csel: bool,
+    scroll_x: u8,
+    scroll_y: u8,
+    // Interrupt
+    int_enable: u8,
+    raster_compare: u16,
+    raster_int: bool,
+    // I/O
+    light_pen_pos: [u8; 2],
+    // Memory Pointers
+    char_base: u16,
+    video_matrix: u16,
+    // Sprite and Color Data
+    background_color: [u8; 4],
+    border_color: u8,
+    sprites: [Sprite; 8],
+    sprite_multicolor: [u8; 2],
+    // Video Matrix Line Buffer
+    vm_buffer: [u8; 40],
+    vm_color_buffer: [u8; 40],
+    vmli: u8,
+}
+
 impl Vic {
     pub fn new(config: Config,
                cpu: Rc<RefCell<Cpu>>,
@@ -250,24 +259,168 @@ impl Vic {
             mem: mem,
             color_ram: color_ram,
             rt: rt,
+            raster: 0x0100,
+            x_pos: 0,
+            vc_base: 0,
+            vc: 0,
+            rc: 0,
             mode: Mode::Text,
-            enabled: true,
+            den: true,
             rsel: true,
             csel: true,
             scroll_x: 0,
-            scroll_y: 3,
-            irq_enable: 0x00,
-            irq_status: 0x00,
-            raster: 0x0100,
+            scroll_y: 0, // FIXME default 3
+            int_enable: 0x00,
+            raster_int: false,
             raster_compare: 0x00,
-            video_counter: 0,
+            light_pen_pos: [0; 2],
             char_base: 4096,
             video_matrix: 1024,
             border_color: 0x0e,
             background_color: [0x06, 0, 0, 0],
             sprites: [Sprite::new(); 8],
             sprite_multicolor: [0; 2],
-            light_pen_pos: [0; 2],
+            vm_buffer: [0; 40],
+            vm_color_buffer: [0; 40],
+            vmli: 0,
+        }
+    }
+
+    pub fn step(&mut self) {
+        if bit::bit_test(self.int_enable, 0) && self.x_pos == 0 {
+            if self.raster == self.raster_compare  {
+                self.raster_int = true;
+                self.cpu.borrow_mut().set_irq();
+            }
+        }
+        if self.is_bad_line(self.raster) {
+            let vc = self.vc;
+            //self.fetch_vm_line(vc); // FIXME vc_base
+        }
+        if self.is_visible(self.x_pos, self.raster) {
+            // 2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
+            // (VCBASE->VC) and VMLI is cleared. f there is a Bad Line Condition in
+            // this phase, RC is also reset to zero.
+            if self.x_pos == 112 {
+                self.vc = self.vc_base;
+                self.vmli = 0;
+                if self.is_bad_line(self.raster) {
+                    self.rc = 0;
+                }
+            }
+            if self.is_window(self.x_pos, self.raster) {
+                let char_code = self.fetch_char_code(self.vc);
+                let char_color = self.fetch_char_color(self.vc);
+                let char_data = self.fetch_char_pixels(char_code, self.rc);
+                self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
+                // 4. VC and VMLI are incremented after each g-access in display state.
+                self.vc += 1;
+                self.vmli += 1;
+            } else {
+                self.draw_border(self.x_pos, self.raster);
+            }
+            // 5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
+            // logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE).
+            if self.x_pos == 464 {
+                if self.rc == 7 {
+                    self.vc_base = self.vc;
+                }
+                self.rc += 1;
+            }
+        }
+        // Update raster counters
+        self.x_pos += 8;
+        if self.x_pos >= self.config.display_size.width {
+            self.x_pos = 0;
+            self.raster += 1;
+            if self.raster >= self.config.display_size.height {
+                self.raster = 0;
+                // 1. Once somewhere outside of the range of raster lines $30-$f7, VCBASE is reset to zero.
+                self.vc_base = 0;
+                let mut rt = self.rt.borrow_mut();
+                rt.set_sync(true);
+            }
+        }
+    }
+
+    // Raster Queries
+
+    #[inline(always)]
+    fn is_bad_line(&self, y: u16) -> bool {
+        if y >= 0x30 && y <= 0xf7 {
+            if y >= self.config.window.top {
+                (y - self.config.window.top) % 8 == 0
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    #[inline(always)]
+    fn is_visible(&self, x: u16, y: u16) -> bool {
+        let vis = &self.config.visible;
+        y >= vis.top && y <= vis.bottom && x >= vis.left && x <= vis.right
+    }
+
+    #[inline(always)]
+    fn is_window(&self, x: u16, y: u16) -> bool {
+        let win = &self.config.window;
+        y >= win.top && y <= win.bottom && x >= win.left && x <= win.right
+    }
+
+    // -- Draw Ops
+
+    fn draw_border(&self, x: u16, y: u16) {
+        let mut rt = self.rt.borrow_mut();
+        let x_trans = x - self.config.visible.left;
+        let y_trans = y - self.config.visible.top;
+        for i in 0..8u16 {
+            if x_trans + i < self.config.visible_size.width {
+                rt.write(x_trans + i, y_trans, self.border_color);
+            }
+        }
+    }
+
+    fn draw_text_char(&self, x: u16, y: u16, data: u8, color: u8) {
+        let mut rt = self.rt.borrow_mut();
+        let y_trans = y - self.config.visible.top;
+        for i in 0..8u16 {
+            let x_trans = x - self.config.visible.left + 7 - i;
+            if bit::bit_test(data, i as u8) {
+                rt.write(x_trans, y_trans, color);
+            } else {
+                rt.write(x_trans, y_trans, self.background_color[0])
+            }
+        }
+    }
+
+    // -- Memory Ops
+
+    // c-access
+    #[inline(always)]
+    fn fetch_char_code(&self, vc: u16) -> u8 {
+        let address = self.video_matrix | vc;
+        self.mem.borrow().vic_read(address)
+    }
+
+    #[inline(always)]
+    fn fetch_char_color(&self, vc: u16) -> u8 {
+        self.color_ram.borrow().read(vc)
+    }
+
+    // g-access
+    #[inline(always)]
+    fn fetch_char_pixels(&self, ch: u8, rc: u8) -> u8 {
+        let address = self.char_base | (ch as u16) << 3 | rc as u16;
+        self.mem.borrow().vic_read(address)
+    }
+
+    fn fetch_vm_line(&mut self, vc: u16) {
+        for i in 0..40u16 {
+            self.vm_buffer[i as usize] = self.fetch_char_code(vc + i);
+            self.vm_color_buffer[i as usize] = self.fetch_char_color(vc + i);
         }
     }
 
@@ -306,7 +459,7 @@ impl Vic {
                 let rst8 = bit::bit_val16(self.raster, 8) << 7;
                 let ecm = bit::bit_val(self.mode.value(), 2) << 6;
                 let bmm = bit::bit_val(self.mode.value(), 1) << 5;
-                let den = bit::bit_set(4, self.enabled);
+                let den = bit::bit_set(4, self.den);
                 let rsel = bit::bit_set(3, self.rsel);
                 let yscroll = self.scroll_y & 0x07;
                 rst8 | ecm | bmm | den | rsel | yscroll
@@ -348,8 +501,13 @@ impl Vic {
                 let cb = ((self.char_base & 0x3800 >> 11) as u8) << 1;
                 vm | cb | 0x01
             },
-            Reg::IRR => self.irq_status,
-            Reg::IMR => self.irq_enable,
+            Reg::IRR => {
+                let raster_int = if self.raster_int { 1 << 0 } else { 0 };
+                let int_data = raster_int;
+                let int_occurred = if int_data > 0 { 1 << 7 } else { 0 };
+                int_data | int_occurred
+            },
+            Reg::IMR => self.int_enable | 0xf0,
             Reg::MDP => {
                 let m0dp = bit::bit_set(0, self.sprites[0].priority);
                 let m1dp = bit::bit_set(1, self.sprites[1].priority);
@@ -437,7 +595,7 @@ impl Vic {
                 let mode = bit::bit_update(self.mode.value(), 2, bit::bit_test(value, 6));
                 let mode2 = bit::bit_update(mode, 1, bit::bit_test(value, 5));
                 self.mode = Mode::from(mode);
-                self.enabled = bit::bit_test(value, 4);
+                self.den = bit::bit_test(value, 4);
                 self.rsel = bit::bit_test(value, 3);
                 let rsel = bit::bit_set(3, self.rsel);
                 self.scroll_y = value & 0x07;
@@ -475,8 +633,12 @@ impl Vic {
                 self.video_matrix = (((value & 0xf0) >> 4) as u16) << 10;
                 self.char_base = (((value & 0x0f) >> 1) as u16) << 11;
             },
-            Reg::IRR => self.irq_status = value,
-            Reg::IMR => self.irq_enable = value,
+            Reg::IRR => {
+                if bit::bit_test(value, 0) {
+                    self.raster_int = false;
+                }
+            },
+            Reg::IMR => self.int_enable = value & 0x0f,
             Reg::MDP => {
                 self.sprites[0].priority = bit::bit_test(value, 0);
                 self.sprites[1].priority = bit::bit_test(value, 1);

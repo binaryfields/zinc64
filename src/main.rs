@@ -16,6 +16,7 @@
 
 extern crate getopts;
 extern crate sdl2;
+extern crate time;
 
 mod c64;
 mod config;
@@ -39,6 +40,7 @@ use mem::BaseAddr;
 use std::path::Path;
 use ui::AppWindow;
 
+// TODO main: add console mode
 // TODO main: add breakpoint support
 
 static NAME: &'static str = "zinc64";
@@ -83,7 +85,7 @@ fn run(args: Vec<String>) -> Result<i32, String> {
         Ok(m) => m,
         Err(f) => return Err(format!("Invalid options\n{}", f)),
     };
-    if args.len() == 1 || matches.opt_present("help") {
+    if matches.opt_present("help") {
         print_help(&opts);
         Ok(0)
     } else if matches.opt_present("version") {
@@ -110,14 +112,13 @@ fn run(args: Vec<String>) -> Result<i32, String> {
                     .map_err(|err| format!("{}", err))?;
                 let cpu = c64.get_cpu();
                 cpu.borrow_mut().set_pc(offset);
-                cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 6); // FIXME
+                cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0); // FIXME 6
             },
             None => {
                 c64.reset();
             },
         }
         let mut app_window = AppWindow::new(c64)?;
-        app_window.render();
         app_window.run();
         Ok(0)
     }

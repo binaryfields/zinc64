@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 use std::result::Result;
+use std::thread;
+use std::time::Duration;
 
 use c64::C64;
 
@@ -25,12 +27,14 @@ use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::{Renderer, Texture};
 use sdl2::video::Window;
+use time;
 
 pub struct AppWindow {
     c64: C64,
     renderer: Renderer<'static>,
     texture: Texture,
     event_pump: EventPump,
+    last_frame_ts: u64,
 }
 
 impl AppWindow {
@@ -59,6 +63,7 @@ impl AppWindow {
                 renderer: renderer,
                 texture: texture,
                 event_pump: event_pump,
+                last_frame_ts: 0,
             }
         )
     }
@@ -66,22 +71,26 @@ impl AppWindow {
     pub fn render(&mut self) {
         let screen_size = self.c64.get_config().visible_size;
         let rt_ref = self.c64.get_render_target();
-        let rt = rt_ref.borrow();
-        self.texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            for y in 0..(screen_size.height as usize) {
-                for x in 0..(screen_size.width as usize) {
-                    let offset = y * pitch + x * 4;
-                    let color = rt.read(x as u16, y as u16);
-                    buffer[offset + 0] = 0 as u8;
-                    buffer[offset + 1] = y as u8;
-                    buffer[offset + 2] = x as u8;
-                    buffer[offset + 3] = 0 as u8;
+        {
+            let rt = rt_ref.borrow();
+            self.texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
+                for y in 0..(screen_size.height as usize) {
+                    for x in 0..(screen_size.width as usize) {
+                        let offset = y * pitch + x * 4;
+                        let color = rt.read(x as u16, y as u16);
+                        buffer[offset + 0] = (color & 0x000000ff) as u8;
+                        buffer[offset + 1] = (color & 0x0000ff00 >> 8) as u8;
+                        buffer[offset + 2] = (color & 0x00ff0000 >> 16) as u8;
+                        buffer[offset + 3] = 0 as u8;
+                    }
                 }
-            }
-        }).unwrap();
+            }).unwrap();
+        }
+        rt_ref.borrow_mut().set_sync(false);
         self.renderer.clear();
         self.renderer.copy(&self.texture, None, None).unwrap();
         self.renderer.present();
+        self.last_frame_ts = time::precise_time_ns();
     }
 
     pub fn run(&mut self) {
@@ -108,6 +117,11 @@ impl AppWindow {
                 }
             }
             self.c64.step();
+            let rt = self.c64.get_render_target();
+            if rt.borrow().get_sync() {
+                //self.wait_vsync(); // FIXME
+                self.render();
+            }
             // TODO c64: add breakpoint and infinite loop detection
             let cpu = self.c64.get_cpu();
             let pc = cpu.borrow().get_pc();
@@ -118,6 +132,15 @@ impl AppWindow {
                 panic!("trap at 0x{:x}", pc);
             }
             last_pc = pc;
+        }
+    }
+
+    fn wait_vsync(&self) {
+        let elapsed_ns = time::precise_time_ns() - self.last_frame_ts;
+        if elapsed_ns < self.c64.get_config().refrest_rate_ns {
+            let wait_ns = self.c64.get_config().refrest_rate_ns - elapsed_ns;
+            let wait = Duration::from_millis(wait_ns / 1_000_000);
+            thread::sleep(wait);
         }
     }
 }
