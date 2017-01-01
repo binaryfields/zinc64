@@ -101,27 +101,12 @@ impl AppWindow {
     }
 
     fn render(&mut self) {
-        let screen_size = self.c64.get_config().visible_size;
-        let rt_ref = self.c64.get_render_target();
-        {
-            let rt = rt_ref.borrow();
-            self.texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-                for y in 0..(screen_size.height as usize) {
-                    for x in 0..(screen_size.width as usize) {
-                        let offset = y * pitch + x * 4;
-                        let color = rt.read(x as u16, y as u16);
-                        buffer[offset + 0] = (color & 0x000000ff) as u8;
-                        buffer[offset + 1] = ((color & 0x0000ff00) >> 8) as u8;
-                        buffer[offset + 2] = ((color & 0x00ff0000) >> 16) as u8;
-                        buffer[offset + 3] = 0 as u8;
-                    }
-                }
-            }).unwrap();
-        }
-        rt_ref.borrow_mut().set_sync(false);
+        let rt = self.c64.get_render_target();
+        self.texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch());
         self.renderer.clear();
         self.renderer.copy(&self.texture, None, None).unwrap();
         self.renderer.present();
+        rt.borrow_mut().set_sync(false);
         self.last_frame_ts = time::precise_time_ns();
     }
 

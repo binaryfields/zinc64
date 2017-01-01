@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+use std::mem;
 use video::color::Color;
 use util::Dimension;
+
+const PIXEL_BYTES: usize = 4;
 
 pub struct RenderTarget {
     dim: Dimension,
@@ -32,21 +35,17 @@ impl RenderTarget {
         }
     }
 
+    pub fn get_dimension(&self) -> Dimension { self.dim }
+    pub fn get_pitch(&self) -> usize { self.dim.width as usize * PIXEL_BYTES }
+    pub fn get_pixel_data(&self) -> &[u8] {
+        unsafe { mem::transmute::<&[u32], &[u8]>(self.pixels.as_ref()) }
+    }
     pub fn get_sync(&self) -> bool { self.sync }
     pub fn set_sync(&mut self, value: bool) { self.sync = value; }
 
-    pub fn dimension(&self) -> Dimension {
-        self.dim
-    }
-
-    pub fn read(&self, x: u16, y: u16) -> u32 {
-        let index = self.index(x, y);
-        self.pixels[index]
-    }
-
     pub fn write(&mut self, x: u16, y: u16, color: u8) {
         let index = self.index(x, y);
-        self.pixels[index] = Color::from(color).rgb();
+        self.pixels[index] =  Color::from(color).rgb();
     }
 
     // -- Internal Ops
