@@ -29,11 +29,19 @@ use sdl2::render::{Renderer, Texture};
 use sdl2::video::Window;
 use time;
 
+#[derive(PartialEq)]
+enum State {
+    Running,
+    Paused,
+    Stopped,
+}
+
 pub struct AppWindow {
     c64: C64,
     renderer: Renderer<'static>,
     texture: Texture,
     event_pump: EventPump,
+    state: State,
     last_frame_ts: u64,
 }
 
@@ -63,12 +71,36 @@ impl AppWindow {
                 renderer: renderer,
                 texture: texture,
                 event_pump: event_pump,
+                state: State::Running,
                 last_frame_ts: 0,
             }
         )
     }
 
-    pub fn render(&mut self) {
+    fn handle_events(&mut self) {
+        for event in self.event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                    self.state = State::Stopped;
+                },
+                Event::KeyDown { keycode: Some(Keycode::F9), keymod: LALTMOD, .. } => {
+                    self.c64.reset();
+                }
+                Event::KeyDown { keycode: Some(key), .. } => {
+                    let keyboard = self.c64.get_keyboard();
+                    keyboard.borrow_mut().on_key_down(key);
+                }
+                Event::KeyUp { keycode: Some(key), .. } => {
+                    let keyboard = self.c64.get_keyboard();
+                    keyboard.borrow_mut().on_key_up(key);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn render(&mut self) {
         let screen_size = self.c64.get_config().visible_size;
         let rt_ref = self.c64.get_render_target();
         {
@@ -94,30 +126,19 @@ impl AppWindow {
     }
 
     pub fn run(&mut self) {
+        while self.state == State::Running {
+            self.handle_events();
+            self.run_frame();
+        }
+    }
+
+    fn run_frame(&mut self) {
+        let frame_cycles = (self.c64.get_config().cpu_frequency as f64
+            / self.c64.get_config().refresh_rate) as u64;
         let mut last_pc = 0x0000;
-        'running: loop {
-            for event in self.event_pump.poll_iter() {
-                match event {
-                    Event::Quit { .. }
-                    | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                        break 'running
-                    },
-                    Event::KeyDown { keycode: Some(Keycode::F9), keymod: LALTMOD, .. } => {
-                        self.c64.reset();
-                    }
-                    Event::KeyDown { keycode: Some(key), .. } => {
-                        let keyboard = self.c64.get_keyboard();
-                        keyboard.borrow_mut().on_key_down(key);
-                    }
-                    Event::KeyUp { keycode: Some(key), .. } => {
-                        let keyboard = self.c64.get_keyboard();
-                        keyboard.borrow_mut().on_key_up(key);
-                    }
-                    _ => {}
-                }
-            }
+        let rt = self.c64.get_render_target();
+        for i in 0..frame_cycles {
             self.c64.step();
-            let rt = self.c64.get_render_target();
             if rt.borrow().get_sync() {
                 self.wait_vsync();
                 self.render();
@@ -126,7 +147,7 @@ impl AppWindow {
             let cpu = self.c64.get_cpu();
             let pc = cpu.borrow().get_pc();
             if pc == 0x3463 {
-                break 'running;
+                self.state = State::Stopped;
             }
             if pc == last_pc {
                 panic!("trap at 0x{:x}", pc);
