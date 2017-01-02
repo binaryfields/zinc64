@@ -253,10 +253,10 @@ impl Cia {
         let joy_fire = 1u8 << 4;
         let timer_a_out = 1u8 << 6;
         let timer_b_out = 1u8 << 7;
-        let keyboard = if self.port_a != 0xff {
-            self.scan_keyboard(!self.port_a)
-        } else {
-            0xff
+        let keyboard = match self.port_a {
+            0x00 => 0x00,
+            0xff => 0xff,
+            _ => self.scan_keyboard(!self.port_a),
         };
         keyboard  // FIXME | joy_left | joy_right | joy_up | joy_down | joy_fire | timer_a_out | timer_b_out
     }
@@ -285,17 +285,15 @@ impl Cia {
     pub fn read(&mut self, reg: u8) -> u8 {
         match Reg::from(reg) {
             Reg::PRA => {
-                if self.mode == Mode::Cia1 {
-                    self.read_cia1_port_a()
-                } else {
-                    self.read_cia2_port_a()
+                match self.mode {
+                    Mode::Cia1 => self.read_cia1_port_a(),
+                    Mode::Cia2 => self.read_cia2_port_a(),
                 }
             },
             Reg::PRB => {
-                if self.mode == Mode::Cia1 {
-                    self.read_cia1_port_b()
-                } else {
-                    self.read_cia2_port_b()
+                match self.mode {
+                    Mode::Cia1 => self.read_cia1_port_b(),
+                    Mode::Cia2 => self.read_cia2_port_b(),
                 }
             },
             Reg::DDRA => self.ddr_a,

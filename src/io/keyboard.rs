@@ -58,7 +58,7 @@ impl Keyboard {
     fn map_keycode(&self, keycode: Keycode) -> (u8, u8) {
         match keycode {
             // Row 0
-            Keycode::Delete => (0, 0),
+            Keycode::Backspace => (0, 0),
             Keycode::Return => (0, 1),
             // Keycode::F7 => (0, 2),
             Keycode::F7 => (0, 3),
