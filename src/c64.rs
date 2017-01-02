@@ -123,6 +123,25 @@ impl C64 {
         self.cpu.borrow_mut().reset();
     }
 
+    pub fn run_frame(&mut self) -> bool {
+        let frame_cycles = (self.config.cpu_frequency as f64
+            / self.config.refresh_rate) as u64;
+        let mut last_pc = 0x0000;
+        for i in 0..frame_cycles {
+            self.step();
+            // TODO c64: add breakpoint and infinite loop detection
+            let pc = self.cpu.borrow().get_pc();
+            if pc == 0x3463 {
+                return false;
+            }
+            if pc == last_pc {
+                panic!("trap at 0x{:x}", pc);
+            }
+            last_pc = pc;
+        }
+        true
+    }
+
     pub fn step(&mut self) {
         let prev_cycles = self.cpu.borrow().get_cycles();
         self.cpu.borrow_mut().execute();

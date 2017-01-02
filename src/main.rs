@@ -40,7 +40,6 @@ use mem::BaseAddr;
 use std::path::Path;
 use ui::{AppWindow, Options};
 
-// TODO main: add console mode
 // TODO main: add breakpoint support
 
 static NAME: &'static str = "zinc64";
@@ -62,6 +61,7 @@ fn build_options() -> getopts::Options {
     opts.optopt("p", "program", "program to load", "path")
         .optflag("f", "fullscreen", "fullscreen window")
         .optopt("", "bp", "set breakpoint at this address", "address")
+        .optflag("", "console", "start in console mode")
         .optopt("", "model", "specify NTSC or PAL variants", "model")
         .optopt("", "offset", "offset at which to load binary", "address")
         .optopt("", "width", "window width", "width")
@@ -121,17 +121,26 @@ fn run(args: Vec<String>) -> Result<i32, String> {
                 c64.reset();
             },
         }
-        let options = Options {
-            fullscreen: matches.opt_present("fullscreen"),
-            width: matches.opt_str("width")
-                .map(|s| s.parse::<u32>().unwrap())
-                .unwrap_or(800),
-            height: matches.opt_str("height")
-                .map(|s| s.parse::<u32>().unwrap())
-                .unwrap_or(600),
-        };
-        let mut app_window = AppWindow::new(c64, options)?;
-        app_window.run();
+        if matches.opt_present("console") {
+            loop {
+                let running = c64.run_frame();
+                if !running {
+                    break;
+                }
+            }
+        } else {
+            let options = Options {
+                fullscreen: matches.opt_present("fullscreen"),
+                width: matches.opt_str("width")
+                    .map(|s| s.parse::<u32>().unwrap())
+                    .unwrap_or(800),
+                height: matches.opt_str("height")
+                    .map(|s| s.parse::<u32>().unwrap())
+                    .unwrap_or(600),
+            };
+            let mut app_window = AppWindow::new(c64, options)?;
+            app_window.run();
+        }
         Ok(0)
     }
 }
