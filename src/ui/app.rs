@@ -91,6 +91,10 @@ impl AppWindow {
                 | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     self.state = State::Stopped;
                 },
+                Event::KeyDown { keycode: Some(Keycode::P), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_pause();
+                },
                 Event::KeyDown { keycode: Some(Keycode::Return), keymod: keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_fullscreen();
@@ -125,9 +129,21 @@ impl AppWindow {
     pub fn run(&mut self) {
         let mut events = self.sdl.event_pump()
             .unwrap();
-        while self.state == State::Running {
-            self.handle_events(&mut events);
-            self.run_frame();
+        'running: loop {
+            match self.state {
+                State::Running => {
+                    self.handle_events(&mut events);
+                    self.run_frame();
+                },
+                State::Paused => {
+                    self.handle_events(&mut events);
+                    let wait = Duration::from_millis(20);
+                    thread::sleep(wait);
+                },
+                State::Stopped => {
+                    break 'running;
+                },
+            }
         }
     }
 
@@ -152,6 +168,14 @@ impl AppWindow {
                 panic!("trap at 0x{:x}", pc);
             }
             last_pc = pc;
+        }
+    }
+
+    fn toggle_pause(&mut self) {
+        match self.state {
+            State::Running => self.state = State::Paused,
+            State::Paused => self.state = State::Running,
+            _ => {},
         }
     }
 
