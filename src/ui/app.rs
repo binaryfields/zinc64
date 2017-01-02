@@ -51,6 +51,7 @@ pub struct AppWindow {
     texture: Texture,
     state: State,
     last_frame_ts: u64,
+    warp_mode: bool,
 }
 
 impl AppWindow {
@@ -81,6 +82,7 @@ impl AppWindow {
                 texture: texture,
                 state: State::Running,
                 last_frame_ts: 0,
+                warp_mode: false,
             }
         )
     }
@@ -95,6 +97,10 @@ impl AppWindow {
                 Event::KeyDown { keycode: Some(Keycode::P), keymod: keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_pause();
+                },
+                Event::KeyDown { keycode: Some(Keycode::W), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_warp();
                 },
                 Event::KeyDown { keycode: Some(Keycode::Return), keymod: keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
@@ -161,7 +167,9 @@ impl AppWindow {
         for i in 0..frame_cycles {
             self.c64.step();
             if rt.borrow().get_sync() {
-                self.wait_vsync();
+                if !self.warp_mode {
+                    self.wait_vsync();
+                }
                 self.render();
             }
             if self.c64.check_breakpoints() {
@@ -176,14 +184,6 @@ impl AppWindow {
             }
             last_pc = pc;
 
-        }
-    }
-
-    fn toggle_pause(&mut self) {
-        match self.state {
-            State::Running => self.state = State::Paused,
-            State::Paused => self.state = State::Running,
-            _ => {},
         }
     }
 
@@ -202,6 +202,18 @@ impl AppWindow {
             },
             None => panic!("invalid window"),
         }
+    }
+
+    fn toggle_pause(&mut self) {
+        match self.state {
+            State::Running => self.state = State::Paused,
+            State::Paused => self.state = State::Running,
+            _ => {},
+        }
+    }
+
+    fn toggle_warp(&mut self) {
+        self.warp_mode = !self.warp_mode;
     }
 
     fn wait_vsync(&self) {
