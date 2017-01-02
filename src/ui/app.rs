@@ -98,6 +98,10 @@ impl AppWindow {
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_pause();
                 },
+                Event::KeyDown { keycode: Some(Keycode::Q), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.state = State::Stopped;
+                },
                 Event::KeyDown { keycode: Some(Keycode::W), keymod: keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_warp();
