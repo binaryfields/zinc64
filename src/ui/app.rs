@@ -20,13 +20,14 @@ use std::time::Duration;
 use c64::C64;
 
 use sdl2;
-use sdl2::EventPump;
+use sdl2::{EventPump, Sdl};
 use sdl2::event::Event;
-use sdl2::keyboard::{Keycode, Mod};
+use sdl2::keyboard;
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::{Renderer, Texture};
-use sdl2::video::Window;
+use sdl2::video::{FullscreenType, Window};
 use time;
 
 #[derive(PartialEq)]
@@ -36,24 +37,32 @@ enum State {
     Stopped,
 }
 
+pub struct Options {
+    pub fullscreen: bool,
+    pub width: u32,
+    pub height: u32,
+}
+
 pub struct AppWindow {
     c64: C64,
+    sdl: Sdl,
     renderer: Renderer<'static>,
     texture: Texture,
-    event_pump: EventPump,
     state: State,
     last_frame_ts: u64,
 }
 
 impl AppWindow {
-    pub fn new(c64: C64) -> Result<AppWindow, String> {
+    pub fn new(c64: C64, options: Options) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
-        let window = video.window("zinc64", 800, 600)
-            .position_centered()
-            .opengl()
-            .build()
-            .unwrap();
+        let mut builder = video.window("zinc64", options.width, options.height);
+        builder.position_centered();
+        builder.opengl();
+        if options.fullscreen {
+            builder.fullscreen();
+        }
+        let window = builder.build().unwrap();
         let renderer = window.renderer()
             .accelerated()
             .build()
@@ -63,28 +72,31 @@ impl AppWindow {
                                                         screen_size.width as u32,
                                                         screen_size.height as u32)
             .unwrap();
-        let event_pump = sdl.event_pump()
-            .unwrap();
         Ok(
             AppWindow {
                 c64: c64,
+                sdl: sdl,
                 renderer: renderer,
                 texture: texture,
-                event_pump: event_pump,
                 state: State::Running,
                 last_frame_ts: 0,
             }
         )
     }
 
-    fn handle_events(&mut self) {
-        for event in self.event_pump.poll_iter() {
+    fn handle_events(&mut self, events: &mut EventPump) {
+        for event in events.poll_iter() {
             match event {
                 Event::Quit { .. }
                 | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     self.state = State::Stopped;
                 },
-                Event::KeyDown { keycode: Some(Keycode::F9), keymod: LALTMOD, .. } => {
+                Event::KeyDown { keycode: Some(Keycode::Return), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_fullscreen();
+                },
+                Event::KeyDown { keycode: Some(Keycode::F9), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
                     self.c64.reset();
                 }
                 Event::KeyDown { keycode: Some(key), .. } => {
@@ -94,7 +106,7 @@ impl AppWindow {
                 Event::KeyUp { keycode: Some(key), .. } => {
                     let keyboard = self.c64.get_keyboard();
                     keyboard.borrow_mut().on_key_up(key);
-                }
+                },
                 _ => {}
             }
         }
@@ -111,8 +123,10 @@ impl AppWindow {
     }
 
     pub fn run(&mut self) {
+        let mut events = self.sdl.event_pump()
+            .unwrap();
         while self.state == State::Running {
-            self.handle_events();
+            self.handle_events(&mut events);
             self.run_frame();
         }
     }
@@ -138,6 +152,23 @@ impl AppWindow {
                 panic!("trap at 0x{:x}", pc);
             }
             last_pc = pc;
+        }
+    }
+
+    fn toggle_fullscreen(&mut self) {
+        match self.renderer.window_mut() {
+            Some(ref mut window) => {
+                match window.fullscreen_state() {
+                    FullscreenType::Off => {
+                        window.set_fullscreen(FullscreenType::True).unwrap();
+                    },
+                    FullscreenType::True => {
+                        window.set_fullscreen(FullscreenType::Off).unwrap();
+                    },
+                    _ => panic!("invalid fullscreen mode"),
+                }
+            },
+            None => panic!("invalid window"),
         }
     }
 

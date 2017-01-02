@@ -38,7 +38,7 @@ use config::Config;
 use loader::Loaders;
 use mem::BaseAddr;
 use std::path::Path;
-use ui::AppWindow;
+use ui::{AppWindow, Options};
 
 // TODO main: add console mode
 // TODO main: add breakpoint support
@@ -59,10 +59,13 @@ fn main() {
 
 fn build_options() -> getopts::Options {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "file", "file to load", "path")
-        .optopt("b", "breakpoint", "set breakpoint at this address", "address")
-        .optopt("m", "model", "specify NTSC or PAL variants", "model")
-        .optopt("o", "offset", "offset at which to load binary", "address")
+    opts.optopt("p", "program", "program to load", "path")
+        .optflag("f", "fullscreen", "fullscreen window")
+        .optopt("", "bp", "set breakpoint at this address", "address")
+        .optopt("", "model", "specify NTSC or PAL variants", "model")
+        .optopt("", "offset", "offset at which to load binary", "address")
+        .optopt("", "width", "window width", "width")
+        .optopt("", "height", "window height", "height")
         .optflag("h", "help", "display this help")
         .optflag("V", "version", "display this version");
     opts
@@ -96,15 +99,15 @@ fn run(args: Vec<String>) -> Result<i32, String> {
             .unwrap_or(String::from("pal"));
         let config = Config::new(&model);
         let mut c64 = C64::new(config).unwrap();
-        let breakpoint = matches.opt_str("breakpoint")
+        let breakpoint = matches.opt_str("bp")
             .map(|s| s.parse::<u16>().unwrap())
             .unwrap_or(0);
         let offset = matches.opt_str("offset")
             .map(|s| s.parse::<u16>().unwrap())
             .unwrap_or(0);
-        match matches.opt_str("file") {
-            Some(file) => {
-                let path = Path::new(&file);
+        match matches.opt_str("program") {
+            Some(program) => {
+                let path = Path::new(&program);
                 let ext = path.extension()
                     .map(|s| s.to_str().unwrap_or(""));
                 let loader = Loaders::new(ext);
@@ -118,7 +121,16 @@ fn run(args: Vec<String>) -> Result<i32, String> {
                 c64.reset();
             },
         }
-        let mut app_window = AppWindow::new(c64)?;
+        let options = Options {
+            fullscreen: matches.opt_present("fullscreen"),
+            width: matches.opt_str("width")
+                .map(|s| s.parse::<u32>().unwrap())
+                .unwrap_or(800),
+            height: matches.opt_str("height")
+                .map(|s| s.parse::<u32>().unwrap())
+                .unwrap_or(600),
+        };
+        let mut app_window = AppWindow::new(c64, options)?;
         app_window.run();
         Ok(0)
     }
