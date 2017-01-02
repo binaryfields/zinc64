@@ -46,6 +46,7 @@ pub struct C64 {
     rt: Rc<RefCell<RenderTarget>>,
     vic: Rc<RefCell<Vic>>,
     //sid: Rc<RefCell<Sid>>,
+    breakpoints: Vec<u16>,
 }
 
 impl C64 {
@@ -99,6 +100,7 @@ impl C64 {
                 keyboard: keyboard.clone(),
                 rt: rt.clone(),
                 vic: vic.clone(),
+                breakpoints: vec![0; 4],
             }
         )
     }
@@ -108,6 +110,15 @@ impl C64 {
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> { self.keyboard.clone() }
     pub fn get_memory(&self) -> Rc<RefCell<Memory>> { self.mem.clone() }
     pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> { self.rt.clone() }
+
+    pub fn add_breakpoint(&mut self, breakpoint: u16) {
+        self.breakpoints.push(breakpoint);
+    }
+
+    pub fn check_breakpoints(&self) -> bool {
+        let pc = self.cpu.borrow().get_pc();
+        !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)
+    }
 
     pub fn load(&mut self, code: &Vec<u8>, offset: u16) {
         let mut mem = self.mem.borrow_mut();
@@ -129,13 +140,14 @@ impl C64 {
         let mut last_pc = 0x0000;
         for i in 0..frame_cycles {
             self.step();
-            // TODO c64: add breakpoint and infinite loop detection
             let pc = self.cpu.borrow().get_pc();
-            if pc == 0x3463 {
+            if self.check_breakpoints() {
+                println!("trap at 0x{:x}", pc);
                 return false;
             }
             if pc == last_pc {
-                panic!("trap at 0x{:x}", pc);
+                println!("infinite loop at 0x{:x}", pc);
+                return false;
             }
             last_pc = pc;
         }

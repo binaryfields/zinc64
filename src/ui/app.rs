@@ -35,6 +35,7 @@ enum State {
     Running,
     Paused,
     Stopped,
+    Trapped,
 }
 
 pub struct Options {
@@ -143,6 +144,11 @@ impl AppWindow {
                 State::Stopped => {
                     break 'running;
                 },
+                State::Trapped => {
+                    let cpu = self.c64.get_cpu();
+                    println!("trapped at 0x{:x}", cpu.borrow().get_pc());
+                    break 'running;
+                },
             }
         }
     }
@@ -150,24 +156,26 @@ impl AppWindow {
     fn run_frame(&mut self) {
         let frame_cycles = (self.c64.get_config().cpu_frequency as f64
             / self.c64.get_config().refresh_rate) as u64;
-        let mut last_pc = 0x0000;
         let rt = self.c64.get_render_target();
+        let mut last_pc = 0x0000;
         for i in 0..frame_cycles {
             self.c64.step();
             if rt.borrow().get_sync() {
                 self.wait_vsync();
                 self.render();
             }
-            // TODO c64: add breakpoint and infinite loop detection
+            if self.c64.check_breakpoints() {
+                self.state = State::Trapped;
+                break;
+            }
             let cpu = self.c64.get_cpu();
             let pc = cpu.borrow().get_pc();
-            if pc == 0x3463 {
-                self.state = State::Stopped;
-            }
             if pc == last_pc {
-                panic!("trap at 0x{:x}", pc);
+                self.state = State::Trapped;
+                break;
             }
             last_pc = pc;
+
         }
     }
 

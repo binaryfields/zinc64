@@ -60,7 +60,7 @@ fn build_options() -> getopts::Options {
     let mut opts = getopts::Options::new();
     opts.optopt("p", "program", "program to load", "path")
         .optflag("f", "fullscreen", "fullscreen window")
-        .optopt("", "bp", "set breakpoint at this address", "address")
+        .optmulti("", "bp", "set breakpoint at this address", "address")
         .optflag("", "console", "start in console mode")
         .optopt("", "model", "specify NTSC or PAL variants", "model")
         .optopt("", "offset", "offset at which to load binary", "address")
@@ -99,9 +99,12 @@ fn run(args: Vec<String>) -> Result<i32, String> {
             .unwrap_or(String::from("pal"));
         let config = Config::new(&model);
         let mut c64 = C64::new(config).unwrap();
-        let breakpoint = matches.opt_str("bp")
-            .map(|s| s.parse::<u16>().unwrap())
-            .unwrap_or(0);
+        let bps_strs = matches.opt_strs("bp");
+        let bps = bps_strs.iter()
+            .map(|s| s.parse::<u16>().unwrap());
+        for bp in bps {
+            c64.add_breakpoint(bp);
+        }
         let offset = matches.opt_str("offset")
             .map(|s| s.parse::<u16>().unwrap())
             .unwrap_or(0);
