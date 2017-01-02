@@ -14,26 +14,26 @@
  * limitations under the License.
  */
 
-// Spec: C64 Programmer's Reference Guide p.455
+// Spec: http://unusedino.de/ec64/technical/misc/vic656x/colors/
 
 #[derive(Copy, Clone)]
  pub enum Color {
     Black = 0x000000,
     White = 0xffffff,
-    Red = 0x880000,
-    Cyan = 0xaaffee,
-    Purple = 0xcc44cc,
-    Green = 0x00cc55,
-    Blue = 0x0000aa,
-    Yellow = 0xeeee77,
-    Orange = 0xdd8855,
-    Brown = 0x664400,
-    LightRed = 0xff7777,
-    DarkGray = 0x333333,
-    MediumGray = 0x777777,
-    LightGreen = 0xaaff66,
-    LightBlue = 0x0088ff,
-    LightGray = 0xbbbbbb,
+    Red = 0x68372b,
+    Cyan = 0x70a4b2,
+    Purple = 0x6f3d86,
+    Green = 0x588d43,
+    Blue = 0x352879,
+    Yellow = 0xb8c76f,
+    Orange = 0x6f4f25,
+    Brown = 0x433900,
+    LightRed = 0x9a6759,
+    DarkGray = 0x444444,
+    MediumGray = 0x6c6c6c,
+    LightGreen = 0x9ad284,
+    LightBlue = 0x6c5eb5,
+    LightGray = 0x959595,
 }
 
 impl Color {
