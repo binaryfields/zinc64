@@ -35,8 +35,8 @@ use mem::Rom;
 //   memory layout.
 
 pub struct Memory {
-    cpu_map: [Bank; 16],
-    vic_map: [Bank; 16],
+    cpu_map: [Bank; 0x10],
+    vic_map: [Bank; 0x10],
     ram: Box<Addressable>,
     basic: Box<Addressable>,
     charset: Box<Addressable>,
@@ -46,13 +46,13 @@ pub struct Memory {
     device_io: Option<Rc<RefCell<DeviceIo>>>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 enum Bank {
-    Ram = 1,
-    Basic = 2,
-    Charset = 3,
-    Kernal = 4,
-    Io = 5
+    Ram,
+    Basic,
+    Charset,
+    Kernal,
+    Io,
 }
 
 enum ControlLine {
@@ -165,7 +165,7 @@ impl Memory {
 
 impl Addressable for Memory {
     fn read(&self, address: u16) -> u8 {
-        let zone = (address & 0xf000) >> 12;
+        let zone = address >> 12;
         let bank = self.cpu_map[zone as usize];
         match bank {
             Bank::Ram => self.ram.read(address),
@@ -182,7 +182,7 @@ impl Addressable for Memory {
     }
 
     fn write(&mut self, address: u16, value: u8) {
-        let zone = (address & 0xf000) >> 12;
+        let zone = address >> 12;
         let bank = self.cpu_map[zone as usize];
         match bank {
             Bank::Ram => self.ram.write(address, value),
