@@ -19,8 +19,8 @@ use std::rc::Rc;
 
 use io::ExpansionPort;
 use io::cia::Cia;
-use mem::Addressable;
-use video::{ColorRam, Vic};
+use mem::{Addressable, ColorRam};
+use video::Vic;
 
 pub struct DeviceIo {
     cia1: Rc<RefCell<Cia>>,
@@ -55,7 +55,7 @@ impl Addressable for DeviceIo {
             0xdc00 ... 0xdcff => self.cia1.borrow_mut().read((address & 0x000f) as u8),
             0xdd00 ... 0xddff => self.cia2.borrow_mut().read((address & 0x000f) as u8),
             0xde00 ... 0xdfff => self.expansion_port.borrow().read(address),
-            _ => panic!("invalid address")
+            _ => panic!("invalid address 0x{:x}", address)
         }
     }
 
@@ -67,7 +67,7 @@ impl Addressable for DeviceIo {
             0xdc00 ... 0xdcff => self.cia1.borrow_mut().write((address & 0x000f) as u8, value),
             0xdd00 ... 0xddff => self.cia2.borrow_mut().write((address & 0x000f) as u8, value),
             0xde00 ... 0xdfff => self.expansion_port.borrow_mut().write(address, value),
-            _ => panic!("invalid address")
+            _ => panic!("invalid address 0x{:x}", address)
         }
     }
 }

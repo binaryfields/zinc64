@@ -32,10 +32,12 @@ impl Rom {
         let mut data = Vec::new();
         let mut file = fs::File::open(path)?;
         file.read_to_end(&mut data)?;
-        Ok(Rom {
-            data: data,
-            offset: offset,
-        })
+        Ok(
+            Rom {
+                data: data,
+                offset: offset,
+            }
+        )
     }
 }
 

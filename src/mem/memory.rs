@@ -22,9 +22,9 @@ use std::rc::Rc;
 use std::result::Result;
 
 use cpu::CpuIo;
-use io::{DeviceIo, ExpansionPort, ExpansionPortIo};
+use io::{ExpansionPort, ExpansionPortIo};
 use io::cia::Cia;
-use mem::{Addressable, Bank, Configuration, MemoryMap, Ram, Rom};
+use mem::{Addressable, Bank, Configuration, DeviceIo, MemoryMap, Ram, Rom};
 use util::bit;
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
@@ -148,12 +148,12 @@ impl Addressable for Memory {
             Bank::RomL => if let Some(ref expansion_port) = self.expansion_port {
                 expansion_port.borrow().read(address)
             } else {
-                panic!("expansion port io not set")
+                panic!("expansion port not set")
             },
             Bank::RomH => if let Some(ref expansion_port) = self.expansion_port {
                 expansion_port.borrow().read(address)
             } else {
-                panic!("expansion port io not set")
+                panic!("expansion port not set")
             },
             Bank::Io => if let Some(ref device_io) = self.device_io {
                 device_io.borrow().read(address)

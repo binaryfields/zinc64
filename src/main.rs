@@ -22,6 +22,7 @@ extern crate time;
 mod c64;
 mod config;
 mod cpu;
+mod device;
 mod io;
 mod loader;
 mod mem;

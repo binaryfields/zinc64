@@ -17,7 +17,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mem::{Addressable, Cartridge, Memory};
+use device::Cartridge;
+use mem::{Addressable, Memory};
 
 pub struct ExpansionPortIo {
     pub game: bool,

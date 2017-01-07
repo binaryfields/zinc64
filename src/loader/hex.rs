@@ -96,10 +96,10 @@ impl HexLoader {
 impl Loader for HexLoader {
     fn load(&self, c64: &mut C64, path: &Path, offset: u16) -> Result<(), io::Error> {
         let memory = c64.get_memory();
+        let mut mem = memory.borrow_mut();
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         let lines: Vec<_> = reader.lines().collect();
-        let mut mem = memory.borrow_mut();
         let mut address = offset;
         let mut line_num = 0;
         for l in lines {

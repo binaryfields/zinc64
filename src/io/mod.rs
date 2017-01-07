@@ -15,10 +15,6 @@
  */
 
 pub mod cia;
-mod deviceio;
 mod expansion_port;
-mod keyboard;
 
-pub use self::deviceio::DeviceIo;
 pub use self::expansion_port::{ExpansionPort, ExpansionPortIo};
-pub use self::keyboard::Keyboard;

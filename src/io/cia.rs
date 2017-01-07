@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cpu::Cpu;
-use io::Keyboard;
+use device::Keyboard;
 use util::bit;
 
 // Spec: https://www.c64-wiki.com/index.php/CIA

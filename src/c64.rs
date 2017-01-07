@@ -21,10 +21,11 @@ use std::result::Result;
 
 use cpu::{Cpu, CpuIo};
 use config::Config;
-use mem::{Addressable, BaseAddr, Cartridge, Memory};
+use device::{Cartridge, Keyboard};
+use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
 use io::cia;
-use io::{DeviceIo, ExpansionPort, ExpansionPortIo, Keyboard};
-use video::{ColorRam, RenderTarget, Vic};
+use io::{ExpansionPort, ExpansionPortIo};
+use video::{RenderTarget, Vic};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different

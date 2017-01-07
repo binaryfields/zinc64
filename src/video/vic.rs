@@ -19,8 +19,8 @@ use std::rc::Rc;
 
 use config::Config;
 use cpu::Cpu;
-use mem::{Addressable, Memory};
-use video::{ColorRam, RenderTarget};
+use mem::{Addressable, ColorRam, Memory};
+use video::RenderTarget;
 use util::bit;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
