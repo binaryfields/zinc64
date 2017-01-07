@@ -75,9 +75,9 @@ impl Memory {
                expansion_port_io: Rc<RefCell<ExpansionPortIo>>) -> Result<Memory, io::Error> {
         let map = MemoryMap::new();
         let configuration = map.get(1);
-        let basic = Box::new(Rom::load(Path::new("rom/basic.rom"), BaseAddr::Basic.addr())?);
-        let charset = Box::new(Rom::load(Path::new("rom/characters.rom"), 0)?);
-        let kernal = Box::new(Rom::load(Path::new("rom/kernal.rom"), BaseAddr::Kernal.addr())?);
+        let basic = Box::new(Rom::load(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?);
+        let charset = Box::new(Rom::load(Path::new("res/rom/characters.rom"), 0)?);
+        let kernal = Box::new(Rom::load(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?);
         let ram = Box::new(Ram::new(capacity));
         Ok(Memory {
             cpu_io: cpu_io,
