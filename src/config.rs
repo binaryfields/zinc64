@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use device::joystick;
 use util::{Dimension, Rect};
 
 // http://codebase64.org/doku.php?id=base:cpu_clocking
@@ -125,7 +126,9 @@ const RASTER_REFRESH_RATE_PAL: f64 = (CLOCK_CPU_PAL as f64) / (RASTER_FRAME_CYCL
 
 #[derive(Copy, Clone)]
 pub struct Config {
+    // Cpu
     pub cpu_frequency: u32,
+    // Video
     pub display_size: Dimension,
     pub visible_size: Dimension,
     pub visible: Rect,
@@ -134,6 +137,9 @@ pub struct Config {
     pub raster_line_cycles: u16,
     pub refresh_rate: f64,
     pub refrest_rate_ns: u64,
+    // Devices
+    pub joystick1: joystick::Mode,
+    pub joystick2: joystick::Mode,
 }
 
 impl Config {
@@ -158,6 +164,8 @@ impl Config {
             raster_line_cycles: RASTER_LINE_CYCLES_PAL,
             refresh_rate: RASTER_REFRESH_RATE_PAL,
             refrest_rate_ns: ((1.0 / RASTER_REFRESH_RATE_PAL) * 1_000_000_000.0) as u64,
+            joystick1: joystick::Mode::Numpad,
+            joystick2: joystick::Mode::None,
         }
     }
 }

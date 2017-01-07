@@ -18,14 +18,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cpu::Cpu;
-use device::Keyboard;
+use device::{Joystick, Keyboard, Motion};
 use util::bit;
 
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
 
-// TODO cia: fix joy reading
-// TODO cia: add cia2 port logic
 // TODO cia: add timer output logic
 // TODO cia: add rtc
 // TODO cia: test cia read regs 0d-of
@@ -33,16 +31,19 @@ use util::bit;
 
 #[allow(dead_code)]
 pub struct Cia {
+    // Dependencies
     cpu: Rc<RefCell<Cpu>>,
+    joystick1: Option<Rc<RefCell<Joystick>>>,
+    joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     mode: Mode,
-    port_a: u8,
-    port_b: u8,
-    ddr_a: u8,
-    ddr_b: u8,
+    // Functional Units
+    port_a: Port,
+    port_b: Port,
     rtc: Rtc,
     timer_a: Timer,
     timer_b: Timer,
+    // I/O
     cnt_line: bool,
     cnt_last: bool,
 }
@@ -51,6 +52,34 @@ pub struct Cia {
 pub enum Mode {
     Cia1,
     Cia2,
+}
+
+struct Port {
+    latch: u8,
+    value: u8,
+    direction: u8,
+}
+
+impl Port {
+    pub fn new(direction: u8) -> Port {
+        Port {
+            latch: 0,
+            value: 0,
+            direction: direction,
+        }
+    }
+
+    pub fn set_value(&mut self, value: u8) {
+        self.latch = value;
+        // set input pins to 1
+        self.value = self.latch | !self.direction;
+    }
+
+    pub fn set_direction(&mut self, direction: u8) {
+        self.direction = direction;
+        // set input pins to 1
+        self.value = self.latch | !self.direction;
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -175,15 +204,19 @@ impl Timer {
 }
 
 impl Cia {
-    pub fn new(mode: Mode, cpu: Rc<RefCell<Cpu>>, keyboard: Rc<RefCell<Keyboard>>) -> Cia {
+    pub fn new(mode: Mode,
+               cpu: Rc<RefCell<Cpu>>,
+               joystick1: Option<Rc<RefCell<Joystick>>>,
+               joystick2: Option<Rc<RefCell<Joystick>>>,
+               keyboard: Rc<RefCell<Keyboard>>) -> Cia {
         Cia {
             cpu: cpu,
+            joystick1: joystick1,
+            joystick2: joystick2,
             keyboard: keyboard,
             mode: mode,
-            port_a: 0,
-            port_b: 0,
-            ddr_a: 0xff,
-            ddr_b: 0x00,
+            port_a: Port::new(0xff),
+            port_b: Port::new(0x00),
             rtc: Rtc {},
             timer_a: Timer::new(),
             timer_b: Timer::new(),
@@ -192,7 +225,9 @@ impl Cia {
         }
     }
 
-    pub fn set_cnt(&mut self, value: bool) { self.cnt_line = value; }
+    pub fn set_cnt(&mut self, value: bool) {
+        self.cnt_line = value;
+    }
 
     pub fn step(&mut self) {
         let timer_a_int = if self.timer_a.enabled {
@@ -232,49 +267,50 @@ impl Cia {
     // -- Internal Ops
 
     fn read_cia1_port_a(&self) -> u8 {
-        // paddles on 01 = port 1, 10 = port 2
-        let paddles = 1u8 << 6;
-        // joystick A on port 2
-        let joy_up = 1u8 << 0;
-        let joy_down = 1u8 << 1;
-        let joy_left = 1u8 << 2;
-        let joy_right = 1u8 << 3;
-        let joy_fire = 1u8 << 4;
-        joy_left | joy_right | joy_up | joy_down | joy_fire | 1 << 5 | paddles
+        let joystick = self.scan_joystick(&self.joystick2);
+        self.port_a.value & joystick
     }
 
     fn read_cia1_port_b(&self) -> u8 {
-        // paddles on 01 = port 1, 10 = port 2
-        let paddles = 1u8 << 6;
-        // joystick B on port 1
-        let joy_up = 1u8 << 0;
-        let joy_down = 1u8 << 1;
-        let joy_left = 1u8 << 2;
-        let joy_right = 1u8 << 3;
-        let joy_fire = 1u8 << 4;
-        let timer_a_out = 1u8 << 6;
-        let timer_b_out = 1u8 << 7;
-        let keyboard = match self.port_a {
+        // let timer_a_out = 1u8 << 6;
+        // let timer_b_out = 1u8 << 7;
+        let keyboard = match self.port_a.value {
             0x00 => 0x00,
             0xff => 0xff,
-            _ => self.scan_keyboard(!self.port_a),
+            _ => self.scan_keyboard(!self.port_a.value),
         };
-        keyboard  // FIXME | joy_left | joy_right | joy_up | joy_down | joy_fire | timer_a_out | timer_b_out
+        let joystick = self.scan_joystick(&self.joystick1);
+        self.port_b.value & keyboard & joystick
     }
 
     fn read_cia2_port_a(&self) -> u8 {
-        self.port_a
+        // iec inputs
+        self.port_a.value
     }
 
     fn read_cia2_port_b(&self) -> u8 {
-        self.port_b
+        self.port_b.value
+    }
+
+    fn scan_joystick(&self, joystick: &Option<Rc<RefCell<Joystick>>>) -> u8 {
+        if let Some(ref joystick) = *joystick {
+            let joy = joystick.borrow();
+            let joy_up = bit::bit_set(0, joy.get_y_axis() == Motion::Positive);
+            let joy_down = bit::bit_set(1, joy.get_y_axis() == Motion::Negative);
+            let joy_left = bit::bit_set(2, joy.get_x_axis() == Motion::Negative);
+            let joy_right = bit::bit_set(3, joy.get_x_axis() == Motion::Positive);
+            let joy_fire = bit::bit_set(4, joy.get_button());
+            !(joy_left | joy_right | joy_up | joy_down | joy_fire)
+        } else {
+            0xff
+        }
     }
 
     fn scan_keyboard(&self, columns: u8) -> u8 {
         let mut result = 0;
         for i in 0..8 {
             if bit::bit_test(columns, i) {
-                result = result | self.keyboard.borrow().get_row(i);
+                result |= self.keyboard.borrow().get_row(i);
             }
         }
         result
@@ -297,8 +333,8 @@ impl Cia {
                     Mode::Cia2 => self.read_cia2_port_b(),
                 }
             },
-            Reg::DDRA => self.ddr_a,
-            Reg::DDRB => self.ddr_b,
+            Reg::DDRA => self.port_a.direction,
+            Reg::DDRB => self.port_b.direction,
             Reg::TALO => (self.timer_a.value & 0xff) as u8,
             Reg::TAHI => (self.timer_a.value >> 8) as u8,
             Reg::TBLO => (self.timer_b.value & 0xff) as u8,
@@ -352,16 +388,16 @@ impl Cia {
     pub fn write(&mut self, reg: u8, value: u8) {
         match Reg::from(reg) {
             Reg::PRA => {
-                self.port_a = value;
+                self.port_a.set_value(value);
             },
             Reg::PRB => {
-                self.port_b = value;
+                self.port_b.set_value(value);
             },
             Reg::DDRA => {
-                self.ddr_a = value;
+                self.port_a.set_direction(value);
             },
             Reg::DDRB => {
-                self.ddr_b = value;
+                self.port_b.set_direction(value);
             },
             Reg::TALO => {
                 let value = (self.timer_a.latch & 0xff00) | (value as u16);

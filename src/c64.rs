@@ -21,10 +21,11 @@ use std::result::Result;
 
 use cpu::{Cpu, CpuIo};
 use config::Config;
-use device::{Cartridge, Keyboard};
+use device::{Cartridge, Joystick, Keyboard};
+use device::joystick;
 use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
-use io::cia;
 use io::{ExpansionPort, ExpansionPortIo};
+use io::cia;
 use video::{RenderTarget, Vic};
 
 // Design:
@@ -38,35 +39,56 @@ use video::{RenderTarget, Vic};
 pub struct C64 {
     // Deps
     config: Config,
-    // Memory
-    mem: Rc<RefCell<Memory>>,
-    color_ram: Rc<RefCell<ColorRam>>,
     // Chipset
     cpu: Rc<RefCell<Cpu>>,
+    mem: Rc<RefCell<Memory>>,
+    color_ram: Rc<RefCell<ColorRam>>,
+    cia1: Rc<RefCell<cia::Cia>>,
+    cia2: Rc<RefCell<cia::Cia>>,
     vic: Rc<RefCell<Vic>>,
     // sid: Rc<RefCell<Sid>>,
     // I/O
-    cia1: Rc<RefCell<cia::Cia>>,
-    cia2: Rc<RefCell<cia::Cia>>,
     expansion_port: Rc<RefCell<ExpansionPort>>,
     // Peripherals
+    joystick1: Option<Rc<RefCell<Joystick>>>,
+    joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     rt: Rc<RefCell<RenderTarget>>,
-    // joystick: Rc<RefCell<Joystick>>,
     // Debug
     breakpoints: Vec<u16>,
 }
 
 impl C64 {
     pub fn new(config: Config) -> Result<C64, io::Error> {
-        // I/O
+        // I/O Lines
         let cpu_io = Rc::new(RefCell::new(
             CpuIo::new()
         ));
         let expansion_port_io = Rc::new(RefCell::new(
             ExpansionPortIo::new()
         ));
-        // Memory
+        // Peripherals
+        let joystick1 = if config.joystick1 != joystick::Mode::None {
+            Some(Rc::new(RefCell::new(
+                Joystick::new(config.joystick1, 3200)))
+            )
+        } else {
+            None
+        };
+        let joystick2 = if config.joystick2 != joystick::Mode::None {
+            Some(Rc::new(RefCell::new(
+                Joystick::new(config.joystick2, 3200)))
+            )
+        } else {
+            None
+        };
+        let keyboard = Rc::new(RefCell::new(
+            Keyboard::new()
+        ));
+        let rt = Rc::new(RefCell::new(
+            RenderTarget::new(config.visible_size)
+        ));
+        // Chipset
         let mem = Rc::new(RefCell::new(
             Memory::new(0x10000,
                         cpu_io.clone(),
@@ -75,12 +97,22 @@ impl C64 {
         let color_ram = Rc::new(RefCell::new(
             ColorRam::new(1024)
         ));
-        // Chipset
         let cpu = Rc::new(RefCell::new(
             Cpu::new(cpu_io.clone(), mem.clone())
         ));
-        let rt = Rc::new(RefCell::new(
-            RenderTarget::new(config.visible_size)
+        let cia1 = Rc::new(RefCell::new(
+            cia::Cia::new(cia::Mode::Cia1,
+                          cpu.clone(),
+                          joystick1.clone(),
+                          joystick2.clone(),
+                          keyboard.clone())
+        ));
+        let cia2 = Rc::new(RefCell::new(
+            cia::Cia::new(cia::Mode::Cia2,
+                          cpu.clone(),
+                          joystick1.clone(),
+                          joystick2.clone(),
+                          keyboard.clone())
         ));
         let vic = Rc::new(RefCell::new(
             Vic::new(config.clone(),
@@ -89,17 +121,7 @@ impl C64 {
                      color_ram.clone(),
                      rt.clone())
         ));
-        // Peripherals
-        let keyboard = Rc::new(RefCell::new(
-            Keyboard::new()
-        ));
         // I/O
-        let cia1 = Rc::new(RefCell::new(
-            cia::Cia::new(cia::Mode::Cia1, cpu.clone(), keyboard.clone())
-        ));
-        let cia2 = Rc::new(RefCell::new(
-            cia::Cia::new(cia::Mode::Cia2, cpu.clone(), keyboard.clone())
-        ));
         let expansion_port = Rc::new(RefCell::new(
             ExpansionPort::new(expansion_port_io.clone(), mem.clone())
         ));
@@ -126,6 +148,8 @@ impl C64 {
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
                 expansion_port: expansion_port.clone(),
+                joystick1: joystick1,
+                joystick2: joystick2,
                 keyboard: keyboard.clone(),
                 rt: rt.clone(),
                 breakpoints: vec![0; 4],
@@ -138,6 +162,25 @@ impl C64 {
     }
     pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> {
         self.cpu.clone()
+    }
+    pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
+        if let Some(ref joystick) = self.joystick1 {
+            if joystick.borrow().get_index() == index {
+                return Some(joystick.clone());
+            }
+        }
+        if let Some(ref joystick) = self.joystick2 {
+            if joystick.borrow().get_index() == index {
+                return Some(joystick.clone());
+            }
+        }
+        None
+    }
+    pub fn get_joystick1(&self) -> Option<Rc<RefCell<Joystick>>> {
+        self.joystick1.clone()
+    }
+    pub fn get_joystick2(&self) -> Option<Rc<RefCell<Joystick>>> {
+        self.joystick2.clone()
     }
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> {
         self.keyboard.clone()

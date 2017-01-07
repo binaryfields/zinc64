@@ -15,7 +15,9 @@
  */
 
 mod cartridge;
+pub mod joystick;
 mod keyboard;
 
 pub use self::cartridge::{Cartridge, Chip, ChipType, HwType};
+pub use self::joystick::{Joystick, Motion};
 pub use self::keyboard::Keyboard;

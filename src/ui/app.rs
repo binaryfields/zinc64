@@ -22,6 +22,7 @@ use c64::C64;
 use sdl2;
 use sdl2::{EventPump, Sdl};
 use sdl2::event::Event;
+use sdl2::joystick::Joystick;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
@@ -40,15 +41,21 @@ enum State {
 
 pub struct Options {
     pub fullscreen: bool,
-    pub width: u32,
     pub height: u32,
+    pub width: u32,
 }
 
 pub struct AppWindow {
+    // Dependencies
     c64: C64,
+    // Renderer
     sdl: Sdl,
     renderer: Renderer<'static>,
     texture: Texture,
+    // Devices
+    joystick1: Option<Joystick>,
+    joystick2: Option<Joystick>,
+    // Runtime State
     state: State,
     last_frame_ts: u64,
     warp_mode: bool,
@@ -57,6 +64,7 @@ pub struct AppWindow {
 impl AppWindow {
     pub fn new(c64: C64, options: Options) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
+        // Initialize renderer
         let video = sdl.video()?;
         let mut builder = video.window("zinc64", options.width, options.height);
         builder.position_centered();
@@ -74,57 +82,36 @@ impl AppWindow {
                                                         screen_size.width as u32,
                                                         screen_size.height as u32)
             .unwrap();
+        // Initialize devices
+        let joystick_subsystem = sdl.joystick()?;
+        joystick_subsystem.set_event_state(true);
+        let joystick1 = c64.get_joystick1().and_then(|joystick| {
+            if !joystick.borrow().is_virtual() {
+                joystick_subsystem.open(joystick.borrow().get_index() as u32).ok()
+            } else {
+                None
+            }
+        });
+        let joystick2 = c64.get_joystick2().and_then(|joystick| {
+            if !joystick.borrow().is_virtual() {
+                joystick_subsystem.open(joystick.borrow().get_index() as u32).ok()
+            } else {
+                None
+            }
+        });
         Ok(
             AppWindow {
                 c64: c64,
                 sdl: sdl,
                 renderer: renderer,
                 texture: texture,
+                joystick1: joystick1,
+                joystick2: joystick2,
                 state: State::Running,
                 last_frame_ts: 0,
                 warp_mode: false,
             }
         )
-    }
-
-    fn handle_events(&mut self, events: &mut EventPump) {
-        for event in events.poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    self.state = State::Stopped;
-                },
-                Event::KeyDown { keycode: Some(Keycode::P), keymod: keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_pause();
-                },
-                Event::KeyDown { keycode: Some(Keycode::Q), keymod: keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
-                    self.state = State::Stopped;
-                },
-                Event::KeyDown { keycode: Some(Keycode::W), keymod: keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_warp();
-                },
-                Event::KeyDown { keycode: Some(Keycode::Return), keymod: keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_fullscreen();
-                },
-                Event::KeyDown { keycode: Some(Keycode::F9), keymod: keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
-                    self.c64.reset();
-                }
-                Event::KeyDown { keycode: Some(key), .. } => {
-                    let keyboard = self.c64.get_keyboard();
-                    keyboard.borrow_mut().on_key_down(key);
-                }
-                Event::KeyUp { keycode: Some(key), .. } => {
-                    let keyboard = self.c64.get_keyboard();
-                    keyboard.borrow_mut().on_key_up(key);
-                },
-                _ => {}
-            }
-        }
     }
 
     fn render(&mut self) {
@@ -187,7 +174,6 @@ impl AppWindow {
                 break;
             }
             last_pc = pc;
-
         }
     }
 
@@ -226,6 +212,83 @@ impl AppWindow {
             let wait_ns = self.c64.get_config().refrest_rate_ns - elapsed_ns;
             let wait = Duration::from_millis(wait_ns / 1_000_000);
             thread::sleep(wait);
+        }
+    }
+
+    // -- Event Handling
+
+    fn handle_events(&mut self, events: &mut EventPump) {
+        for event in events.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                    self.state = State::Stopped;
+                },
+                Event::KeyDown { keycode: Some(Keycode::P), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_pause();
+                },
+                Event::KeyDown { keycode: Some(Keycode::Q), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.state = State::Stopped;
+                },
+                Event::KeyDown { keycode: Some(Keycode::W), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_warp();
+                },
+                Event::KeyDown { keycode: Some(Keycode::Return), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_fullscreen();
+                },
+                Event::KeyDown { keycode: Some(Keycode::F9), keymod: keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.c64.reset();
+                }
+                Event::KeyDown { keycode: Some(key), .. } => {
+                    let keyboard = self.c64.get_keyboard();
+                    keyboard.borrow_mut().on_key_down(key);
+                    if let Some(ref mut joystick) = self.c64.get_joystick1() {
+                        if joystick.borrow().is_virtual() {
+                            joystick.borrow_mut().on_key_down(key);
+                        }
+                    }
+                    if let Some(ref mut joystick) = self.c64.get_joystick2() {
+                        if joystick.borrow().is_virtual() {
+                            joystick.borrow_mut().on_key_down(key);
+                        }
+                    }
+                }
+                Event::KeyUp { keycode: Some(key), .. } => {
+                    let keyboard = self.c64.get_keyboard();
+                    keyboard.borrow_mut().on_key_up(key);
+                    if let Some(ref mut joystick) = self.c64.get_joystick1() {
+                        if joystick.borrow().is_virtual() {
+                            joystick.borrow_mut().on_key_up(key);
+                        }
+                    }
+                    if let Some(ref mut joystick) = self.c64.get_joystick2() {
+                        if joystick.borrow().is_virtual() {
+                            joystick.borrow_mut().on_key_up(key);
+                        }
+                    }
+                },
+                Event::JoyAxisMotion { which: which, axis_idx: axis_idx, value: value, .. } => {
+                    if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
+                        joystick.borrow_mut().on_axis_motion(axis_idx, value);
+                    }
+                },
+                Event::JoyButtonDown { which: which, button_idx: button_idx, .. } => {
+                    if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
+                        joystick.borrow_mut().on_button_down(button_idx);
+                    }
+                },
+                Event::JoyButtonUp { which: which, button_idx: button_idx, .. } => {
+                    if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
+                        joystick.borrow_mut().on_button_up(button_idx);
+                    }
+                },
+                _ => {}
+            }
         }
     }
 }
