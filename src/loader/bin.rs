@@ -36,7 +36,7 @@ impl BinLoader {
 }
 
 impl Loader for BinLoader {
-    fn load(&self, c64: &C64, path: &Path, offset: u16) -> Result<(), io::Error> {
+    fn load(&self, c64: &mut C64, path: &Path, offset: u16) -> Result<(), io::Error> {
         let memory = c64.get_memory();
         let mut data = Vec::new();
         let mut file = File::open(path)?;
@@ -44,7 +44,7 @@ impl Loader for BinLoader {
         let mut mem = memory.borrow_mut();
         let mut address = offset;
         for byte in data {
-            mem.write_direct(address, byte);
+            mem.write_ram(address, byte);
             address = address.wrapping_add(1);
         }
         Ok(())

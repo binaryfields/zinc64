@@ -94,7 +94,7 @@ impl HexLoader {
 }
 
 impl Loader for HexLoader {
-    fn load(&self, c64: &C64, path: &Path, offset: u16) -> Result<(), io::Error> {
+    fn load(&self, c64: &mut C64, path: &Path, offset: u16) -> Result<(), io::Error> {
         let memory = c64.get_memory();
         let file = File::open(path)?;
         let reader = BufReader::new(file);
@@ -111,7 +111,7 @@ impl Loader for HexLoader {
             for token in tokens {
                 if !token.starts_with(".") {
                     if let Some(byte) = self.parse_byte(token) {
-                        mem.write_direct(address, byte);
+                        mem.write_ram(address, byte);
                         address = address.wrapping_add(1);
                     } else {
                         panic!("invalid bytecode {} at line {}", token, line_num);

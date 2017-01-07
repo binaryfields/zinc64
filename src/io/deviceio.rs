@@ -17,6 +17,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use io::ExpansionPort;
 use io::cia::Cia;
 use mem::Addressable;
 use video::{ColorRam, Vic};
@@ -25,6 +26,7 @@ pub struct DeviceIo {
     cia1: Rc<RefCell<Cia>>,
     cia2: Rc<RefCell<Cia>>,
     color_ram: Rc<RefCell<ColorRam>>,
+    expansion_port: Rc<RefCell<ExpansionPort>>,
     vic: Rc<RefCell<Vic>>,
 }
 
@@ -32,11 +34,13 @@ impl DeviceIo {
     pub fn new(cia1: Rc<RefCell<Cia>>,
                cia2: Rc<RefCell<Cia>>,
                color_ram: Rc<RefCell<ColorRam>>,
+               expansion_port: Rc<RefCell<ExpansionPort>>,
                vic: Rc<RefCell<Vic>>) -> DeviceIo {
         DeviceIo {
             cia1: cia1,
             cia2: cia2,
             color_ram: color_ram,
+            expansion_port: expansion_port,
             vic: vic,
         }
     }
@@ -50,8 +54,7 @@ impl Addressable for DeviceIo {
             0xd800 ... 0xdbff => self.color_ram.borrow().read((address - 0xd800)),
             0xdc00 ... 0xdcff => self.cia1.borrow_mut().read((address & 0x000f) as u8),
             0xdd00 ... 0xddff => self.cia2.borrow_mut().read((address & 0x000f) as u8),
-            0xde00 ... 0xdeff => 0x00, // I/O 1
-            0xdf00 ... 0xdfff => 0x00, // I/O 2
+            0xde00 ... 0xdfff => self.expansion_port.borrow().read(address),
             _ => panic!("invalid address")
         }
     }
@@ -63,8 +66,7 @@ impl Addressable for DeviceIo {
             0xd800 ... 0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
             0xdc00 ... 0xdcff => self.cia1.borrow_mut().write((address & 0x000f) as u8, value),
             0xdd00 ... 0xddff => self.cia2.borrow_mut().write((address & 0x000f) as u8, value),
-            0xde00 ... 0xdeff => {}, // I/O 1
-            0xdf00 ... 0xdfff => {}, // I/O 2
+            0xde00 ... 0xdfff => self.expansion_port.borrow_mut().write(address, value),
             _ => panic!("invalid address")
         }
     }

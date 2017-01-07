@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use cpu::Instruction;
 use mem::{Addressable, Memory};
+use util::bit;
 
 // Spec: http://nesdev.com/6502.txt
 // Design:
@@ -32,17 +33,47 @@ use mem::{Addressable, Memory};
 
 // TODO cpu: switch to clock accurate emulation
 
+pub struct CpuIo {
+    pub loram: bool,
+    pub hiram: bool,
+    pub charen: bool,
+    pub irq: bool,
+    pub nmi: bool,
+}
+
+impl CpuIo {
+    pub fn new() -> CpuIo {
+        CpuIo {
+            loram: false,
+            hiram: false,
+            charen: false,
+            irq: false,
+            nmi: false,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.loram = false;
+        self.hiram = false;
+        self.charen = false;
+        self.irq = false;
+        self.nmi = false;
+    }
+}
+
 #[allow(dead_code)]
 pub struct Cpu {
+    // Dependencies
     mem: Rc<RefCell<Memory>>,
+    // Registers
     pc: u16,
     a: u8,
     x: u8,
     y: u8,
     sp: u8,
     p: u8,
-    irq_line: bool,
-    nmi_line: bool,
+    // I/O
+    io: Rc<RefCell<CpuIo>>,
     cycles: u32,
 }
 
@@ -84,7 +115,8 @@ enum InterruptVector {
 }
 
 impl Cpu {
-    pub fn new(mem: Rc<RefCell<Memory>>) -> Cpu {
+    pub fn new(cpu_io: Rc<RefCell<CpuIo>>,
+               mem: Rc<RefCell<Memory>>) -> Cpu {
         Cpu {
             mem: mem,
             pc: 0,
@@ -93,24 +125,29 @@ impl Cpu {
             y: 0,
             sp: 0,
             p: 0,
-            irq_line: false,
-            nmi_line: false,
+            io: cpu_io,
             cycles: 0,
         }
     }
 
     pub fn get_a(&self) -> u8 { self.a }
+    pub fn get_cycles(&self) -> u32 { self.cycles }
+    pub fn get_pc(&self) -> u16 { self.pc }
     pub fn get_x(&self) -> u8 { self.x }
     pub fn get_y(&self) -> u8 { self.y }
-    pub fn get_pc(&self) -> u16 { self.pc }
-    pub fn get_cycles(&self) -> u32 { self.cycles }
 
     pub fn set_a(&mut self, value: u8) { self.a = value; }
+    pub fn set_pc(&mut self, value: u16) { self.pc = value; }
     pub fn set_x(&mut self, value: u8) { self.x = value; }
     pub fn set_y(&mut self, value: u8) { self.y = value; }
-    pub fn set_pc(&mut self, address: u16) { self.pc = address; }
-    pub fn set_irq(&mut self) { self.irq_line = true; }
-    pub fn set_nmi(&mut self) { self.nmi_line = true; }
+
+    pub fn set_irq(&mut self) {
+        self.io.borrow_mut().irq = true;
+    }
+
+    pub fn set_nmi(&mut self) {
+        self.io.borrow_mut().nmi = true;
+    }
 
     #[allow(dead_code)]
     fn dump_registers(&self) {
@@ -119,9 +156,9 @@ impl Cpu {
     }
 
     pub fn execute(&mut self) {
-        if self.nmi_line {
+        if self.io.borrow().nmi {
             self.interrupt(Interrupt::Nmi);
-        } else if self.irq_line && !self.test_flag(Flag::IntDisable) {
+        } else if self.io.borrow().irq && !self.test_flag(Flag::IntDisable) {
             self.interrupt(Interrupt::Irq);
         }
         // let pc = self.pc;
@@ -500,6 +537,19 @@ impl Cpu {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn reset(&mut self) -> u8 {
+        self.io.borrow_mut().reset();
+        self.pc = 0;
+        self.a = 0;
+        self.x = 0;
+        self.y = 0;
+        self.sp = 0;
+        self.p = 0;
+        self.cycles = 0;
+        self.interrupt(Interrupt::Reset)
+    }
+
     fn tick(&mut self, elapsed: u8) {
         self.cycles.wrapping_add(elapsed as u32);
     }
@@ -554,14 +604,14 @@ impl Cpu {
                 self.push((pc & 0xff) as u8);
                 self.push(p & 0xef);
                 self.set_flag(Flag::IntDisable);
-                self.irq_line = false;
+                self.io.borrow_mut().irq = false;
             },
             Interrupt::Nmi => {
                 self.push(((pc >> 8) & 0xff) as u8);
                 self.push((pc & 0xff) as u8);
                 self.push(p & 0xef);
                 self.set_flag(Flag::IntDisable);
-                self.nmi_line = false;
+                self.io.borrow_mut().nmi = false;
             },
             Interrupt::Break => {
                 self.push((((pc + 1) >> 8) & 0xff) as u8);
@@ -602,7 +652,13 @@ impl Cpu {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0001 => {
-                self.mem.borrow_mut().switch_banks(value);
+                {
+                    let mut io = self.io.borrow_mut();
+                    io.loram = bit::bit_test(value, 0);
+                    io.hiram = bit::bit_test(value, 1);
+                    io.charen = bit::bit_test(value, 2);
+                }
+                self.mem.borrow_mut().switch_banks();
                 self.mem.borrow_mut().write(address, value); // FIXME
             },
             _ => self.mem.borrow_mut().write(address, value),
@@ -621,22 +677,6 @@ impl Cpu {
         let addr = 0x0100 + self.sp as u16;
         self.write(addr, value);
         self.sp = self.sp.wrapping_sub(1);
-    }
-
-    // --
-
-    #[allow(dead_code)]
-    pub fn reset(&mut self) -> u8 {
-        self.pc = 0;
-        self.a = 0;
-        self.x = 0;
-        self.y = 0;
-        self.sp = 0;
-        self.p = 0;
-        self.irq_line = false;
-        self.nmi_line = false;
-        self.cycles = 0;
-        self.interrupt(Interrupt::Reset)
     }
 }
 

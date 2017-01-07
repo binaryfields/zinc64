@@ -15,6 +15,7 @@
  */
 
 mod bin;
+mod crt;
 mod hex;
 
 use std::cell::RefCell;
@@ -27,7 +28,7 @@ use c64::C64;
 use mem::Memory;
 
 pub trait Loader {
-    fn load(&self, c64: &C64, path: &Path, offset: u16) -> Result<(), io::Error>;
+    fn load(&self, c64: &mut C64, path: &Path, offset: u16) -> Result<(), io::Error>;
 }
 
 pub struct Loaders {}
@@ -36,6 +37,7 @@ impl Loaders {
     pub fn new(ext: Option<&str>) -> Box<Loader> {
         match ext {
             Some("bin") => Box::new(bin::BinLoader::new()),
+            Some("crt") => Box::new(crt::CrtLoader::new()),
             Some("hex") => Box::new(hex::HexLoader::new()),
             _ => panic!("invalid loader {}", ext.unwrap_or(""))
         }

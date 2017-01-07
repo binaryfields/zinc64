@@ -22,6 +22,7 @@ use io::Keyboard;
 use util::bit;
 
 // Spec: https://www.c64-wiki.com/index.php/CIA
+// http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
 
 // TODO cia: fix joy reading
 // TODO cia: add cia2 port logic

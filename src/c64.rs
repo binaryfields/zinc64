@@ -19,12 +19,11 @@ use std::io;
 use std::rc::Rc;
 use std::result::Result;
 
-use cpu::Cpu;
+use cpu::{Cpu, CpuIo};
 use config::Config;
-use mem::{Addressable, BaseAddr, Memory};
+use mem::{Addressable, BaseAddr, Cartridge, Memory};
 use io::cia;
-use io::DeviceIo;
-use io::Keyboard;
+use io::{DeviceIo, ExpansionPort, ExpansionPortIo, Keyboard};
 use video::{ColorRam, RenderTarget, Vic};
 
 // Design:
@@ -36,38 +35,48 @@ use video::{ColorRam, RenderTarget, Vic};
 
 #[allow(dead_code)]
 pub struct C64 {
+    // Deps
     config: Config,
-    cpu: Rc<RefCell<Cpu>>,
+    // Memory
     mem: Rc<RefCell<Memory>>,
     color_ram: Rc<RefCell<ColorRam>>,
+    // Chipset
+    cpu: Rc<RefCell<Cpu>>,
+    vic: Rc<RefCell<Vic>>,
+    // sid: Rc<RefCell<Sid>>,
+    // I/O
     cia1: Rc<RefCell<cia::Cia>>,
     cia2: Rc<RefCell<cia::Cia>>,
+    expansion_port: Rc<RefCell<ExpansionPort>>,
+    // Peripherals
     keyboard: Rc<RefCell<Keyboard>>,
     rt: Rc<RefCell<RenderTarget>>,
-    vic: Rc<RefCell<Vic>>,
-    //sid: Rc<RefCell<Sid>>,
+    // joystick: Rc<RefCell<Joystick>>,
+    // Debug
     breakpoints: Vec<u16>,
 }
 
 impl C64 {
     pub fn new(config: Config) -> Result<C64, io::Error> {
+        // I/O
+        let cpu_io = Rc::new(RefCell::new(
+            CpuIo::new()
+        ));
+        let expansion_port_io = Rc::new(RefCell::new(
+            ExpansionPortIo::new()
+        ));
+        // Memory
         let mem = Rc::new(RefCell::new(
-            Memory::new()?
-        ));
-        let cpu = Rc::new(RefCell::new(
-            Cpu::new(mem.clone())
-        ));
-        let keyboard = Rc::new(RefCell::new(
-            Keyboard::new()
-        ));
-        let cia1 = Rc::new(RefCell::new(
-            cia::Cia::new(cia::Mode::Cia1, cpu.clone(), keyboard.clone())
-        ));
-        let cia2 = Rc::new(RefCell::new(
-            cia::Cia::new(cia::Mode::Cia2, cpu.clone(), keyboard.clone())
+            Memory::new(0x10000,
+                        cpu_io.clone(),
+                        expansion_port_io.clone())?
         ));
         let color_ram = Rc::new(RefCell::new(
             ColorRam::new(1024)
+        ));
+        // Chipset
+        let cpu = Rc::new(RefCell::new(
+            Cpu::new(cpu_io.clone(), mem.clone())
         ));
         let rt = Rc::new(RefCell::new(
             RenderTarget::new(config.visible_size)
@@ -79,52 +88,71 @@ impl C64 {
                      color_ram.clone(),
                      rt.clone())
         ));
+        // Peripherals
+        let keyboard = Rc::new(RefCell::new(
+            Keyboard::new()
+        ));
+        // I/O
+        let cia1 = Rc::new(RefCell::new(
+            cia::Cia::new(cia::Mode::Cia1, cpu.clone(), keyboard.clone())
+        ));
+        let cia2 = Rc::new(RefCell::new(
+            cia::Cia::new(cia::Mode::Cia2, cpu.clone(), keyboard.clone())
+        ));
+        let expansion_port = Rc::new(RefCell::new(
+            ExpansionPort::new(expansion_port_io.clone(), mem.clone())
+        ));
         let device_io = Rc::new(RefCell::new(
             DeviceIo::new(cia1.clone(),
                           cia2.clone(),
                           color_ram.clone(),
+                          expansion_port.clone(),
                           vic.clone())
         ));
         mem.borrow_mut().set_cia2(cia2.clone());
         mem.borrow_mut().set_device_io(device_io.clone());
+        mem.borrow_mut().set_expansion_port(expansion_port.clone());
+        // Initialization
         cpu.borrow_mut().write(BaseAddr::IoPortDdr.addr(), 0x2f);
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 31);
         Ok(
             C64 {
                 config: config,
-                cpu: cpu.clone(),
                 mem: mem.clone(),
                 color_ram: color_ram.clone(),
+                cpu: cpu.clone(),
+                vic: vic.clone(),
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
+                expansion_port: expansion_port.clone(),
                 keyboard: keyboard.clone(),
                 rt: rt.clone(),
-                vic: vic.clone(),
                 breakpoints: vec![0; 4],
             }
         )
     }
 
-    pub fn get_config(&self) -> &Config { &self.config }
-    pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> { self.cpu.clone() }
-    pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> { self.keyboard.clone() }
-    pub fn get_memory(&self) -> Rc<RefCell<Memory>> { self.mem.clone() }
-    pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> { self.rt.clone() }
-
-    pub fn add_breakpoint(&mut self, breakpoint: u16) {
-        self.breakpoints.push(breakpoint);
+    pub fn get_config(&self) -> &Config {
+        &self.config
     }
-
-    pub fn check_breakpoints(&self) -> bool {
-        let pc = self.cpu.borrow().get_pc();
-        !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)
+    pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> {
+        self.cpu.clone()
+    }
+    pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> {
+        self.keyboard.clone()
+    }
+    pub fn get_memory(&self) -> Rc<RefCell<Memory>> {
+        self.mem.clone()
+    }
+    pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
+        self.rt.clone()
     }
 
     pub fn load(&mut self, code: &Vec<u8>, offset: u16) {
         let mut mem = self.mem.borrow_mut();
         let mut address = offset;
         for byte in code {
-            mem.write_direct(address, *byte);
+            mem.write_ram(address, *byte);
             address = address.wrapping_add(1);
         }
         self.cpu.borrow_mut().set_pc(offset);
@@ -132,6 +160,7 @@ impl C64 {
 
     pub fn reset(&mut self) {
         self.cpu.borrow_mut().reset();
+        //self.expansion_port.borrow_mut().reset();
     }
 
     pub fn run_frame(&mut self) -> bool {
@@ -163,6 +192,28 @@ impl C64 {
             self.cia2.borrow_mut().step();
             self.vic.borrow_mut().step();
         }
+    }
+
+    // -- Cartridge Ops
+
+    pub fn attach_cartridge(&mut self, cartridge: Cartridge) {
+        self.expansion_port.borrow_mut().attach(cartridge);
+    }
+
+    pub fn detach_cartridge(&mut self) {
+        self.expansion_port.borrow_mut().detach();
+        self.reset();
+    }
+
+    // -- Debug Ops
+
+    pub fn add_breakpoint(&mut self, breakpoint: u16) {
+        self.breakpoints.push(breakpoint);
+    }
+
+    pub fn check_breakpoints(&self) -> bool {
+        let pc = self.cpu.borrow().get_pc();
+        !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)
     }
 }
 

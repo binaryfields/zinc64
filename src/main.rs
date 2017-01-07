@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+extern crate byteorder;
 extern crate getopts;
 extern crate sdl2;
 extern crate time;
@@ -39,8 +40,6 @@ use loader::Loaders;
 use mem::BaseAddr;
 use std::path::Path;
 use ui::{AppWindow, Options};
-
-// TODO main: add breakpoint support
 
 static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -114,11 +113,12 @@ fn run(args: Vec<String>) -> Result<i32, String> {
                 let ext = path.extension()
                     .map(|s| s.to_str().unwrap_or(""));
                 let loader = Loaders::new(ext);
-                loader.load(&c64, path, offset)
+                loader.load(&mut c64, path, offset)
                     .map_err(|err| format!("{}", err))?;
-                let cpu = c64.get_cpu();
-                cpu.borrow_mut().set_pc(offset);
-                cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0); // FIXME 6
+                // FIXME let cpu = c64.get_cpu();
+                //cpu.borrow_mut().set_pc(offset);
+                //cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0);
+                c64.reset();
             },
             None => {
                 c64.reset();
