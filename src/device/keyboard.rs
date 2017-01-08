@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::collections::VecDeque;
+
 use sdl2::keyboard::Keycode;
 use util::bit;
 
@@ -23,17 +25,40 @@ use util::bit;
 
 pub struct Keyboard {
     matrix: [u8; 8],
+    buffer: VecDeque<(Keycode, bool)>,
 }
 
 impl Keyboard {
     pub fn new() -> Keyboard {
         Keyboard {
-            matrix: [0xff; 8]
+            matrix: [0xff; 8],
+            buffer: VecDeque::new(),
         }
     }
 
     pub fn get_row(&self, row: u8) -> u8 { self.matrix[row as usize] }
     pub fn set_row(&mut self, row: u8, value: u8) { self.matrix[row as usize] = value; }
+
+    pub fn drain_event(&mut self) {
+        if let Some((keycode, pressed)) = self.buffer.pop_front() {
+            match pressed {
+                true => self.on_key_down(keycode),
+                false => self.on_key_up(keycode),
+            }
+        }
+    }
+
+    pub fn enqueue(&mut self, str: &str) {
+        for c in str.to_string().chars() {
+            let keycode = self.map_char(c);
+            self.buffer.push_back((keycode, true));
+            self.buffer.push_back((keycode, false));
+        }
+    }
+
+    pub fn has_events(&self) -> bool {
+        !self.buffer.is_empty()
+    }
 
     pub fn on_key_down(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);
@@ -54,6 +79,61 @@ impl Keyboard {
     }
 
     // -- Internal Ops
+
+    fn map_char(&self, c: char) -> Keycode {
+        match c {
+            '\n' => Keycode::Return,
+            ' ' => Keycode::Space,
+            '$' => Keycode::Dollar,
+            '*' => Keycode::Asterisk,
+            '+' => Keycode::Plus,
+            ',' => Keycode::Comma,
+            '-' => Keycode::Minus,
+            '.' => Keycode::Period,
+            '/' => Keycode::Slash,
+            '0' => Keycode::Num0,
+            '1' => Keycode::Num1,
+            '2' => Keycode::Num2,
+            '3' => Keycode::Num3,
+            '4' => Keycode::Num4,
+            '5' => Keycode::Num5,
+            '6' => Keycode::Num6,
+            '7' => Keycode::Num7,
+            '8' => Keycode::Num8,
+            '9' => Keycode::Num9,
+            ':' => Keycode::Colon,
+            ';' => Keycode::Semicolon,
+            '=' => Keycode::Equals,
+            '@' => Keycode::At,
+            'A' => Keycode::A,
+            'B' => Keycode::B,
+            'C' => Keycode::C,
+            'D' => Keycode::D,
+            'E' => Keycode::E,
+            'F' => Keycode::F,
+            'G' => Keycode::G,
+            'H' => Keycode::H,
+            'I' => Keycode::I,
+            'J' => Keycode::J,
+            'K' => Keycode::K,
+            'L' => Keycode::L,
+            'M' => Keycode::M,
+            'N' => Keycode::N,
+            'O' => Keycode::O,
+            'P' => Keycode::P,
+            'Q' => Keycode::Q,
+            'R' => Keycode::R,
+            'S' => Keycode::S,
+            'T' => Keycode::T,
+            'U' => Keycode::U,
+            'V' => Keycode::V,
+            'W' => Keycode::W,
+            'X' => Keycode::X,
+            'Y' => Keycode::Y,
+            'Z' => Keycode::Z,
+            _ => panic!("unsupported char {}", c),
+        }
+    }
 
     fn map_keycode(&self, keycode: Keycode) -> (u8, u8) {
         match keycode {

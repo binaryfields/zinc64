@@ -37,7 +37,7 @@ use std::result::Result;
 
 use c64::C64;
 use config::Config;
-use loader::Loaders;
+use loader::{BinLoader, Loader, Loaders};
 use mem::BaseAddr;
 use std::path::Path;
 
@@ -57,8 +57,10 @@ fn main() {
 
 fn build_cli_options() -> getopts::Options {
     let mut opts = getopts::Options::new();
-    opts.optopt("p", "program", "program to load", "path")
-        .optopt("", "model", "set NTSC or PAL variants", "model")
+    opts.optopt("", "model", "set NTSC or PAL variants", "model")
+        // Autostart
+        .optopt("", "autostart", "attach and autostart image", "image")
+        .optopt("", "binary", "load binary into memory", "path")
         .optopt("", "offset", "offset at which to load binary", "address")
         // Devices
         .optopt("", "joydev1", "set device for joystick 1", "numpad")
@@ -113,36 +115,40 @@ fn print_version() {
     println!("{} {}", NAME, VERSION);
 }
 
+fn process_autostart_options(c64: &mut C64, matches: &getopts::Matches) -> Result<(), String> {
+    match matches.opt_str("autostart") {
+        Some(image_path) => {
+            let path = Path::new(&image_path);
+            let loader = Loaders::from_path(path);
+            let mut autostart = loader.autostart(path)
+                .map_err(|err| format!("{}", err))?;
+            autostart.execute(c64);
+        },
+        None => {
+            match matches.opt_str("binary") {
+                Some(binary_path) => {
+                    let offset = matches.opt_str("offset")
+                        .map(|s| s.parse::<u16>().unwrap())
+                        .unwrap_or(0);
+                    let path = Path::new(&binary_path);
+                    let loader = BinLoader::new(offset);
+                    let mut image = loader.load(path)
+                        .map_err(|err| format!("{}", err))?;
+                    image.mount(c64);
+                },
+                None => c64.reset(),
+            }
+        },
+    }
+    Ok(())
+}
+
 fn process_debug_options(c64: &mut C64, matches: &getopts::Matches) -> Result<(), String> {
     let bps_strs = matches.opt_strs("bp");
     let bps = bps_strs.iter()
         .map(|s| s.parse::<u16>().unwrap());
     for bp in bps {
         c64.add_breakpoint(bp);
-    }
-    Ok(())
-}
-
-fn process_file_options(c64: &mut C64, matches: &getopts::Matches) -> Result<(), String> {
-    let offset = matches.opt_str("offset")
-        .map(|s| s.parse::<u16>().unwrap())
-        .unwrap_or(0);
-    match matches.opt_str("program") {
-        Some(program) => {
-            let path = Path::new(&program);
-            let ext = path.extension()
-                .map(|s| s.to_str().unwrap_or(""));
-            let loader = Loaders::new(ext);
-            loader.load(c64, path, offset)
-                .map_err(|err| format!("{}", err))?;
-            // FIXME let cpu = c64.get_cpu();
-            //cpu.borrow_mut().set_pc(offset);
-            //cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0);
-            c64.reset();
-        },
-        None => {
-            c64.reset();
-        },
     }
     Ok(())
 }
@@ -162,7 +168,7 @@ fn run(args: Vec<String>) -> Result<i32, String> {
         let config = build_sys_config(&matches)?;
         let mut c64 = C64::new(config).unwrap();
         process_debug_options(&mut c64, &matches)?;
-        process_file_options(&mut c64, &matches)?;
+        process_autostart_options(&mut c64, &matches)?;
         if matches.opt_present("console") {
             loop {
                 let running = c64.run_frame();

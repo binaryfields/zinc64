@@ -14,27 +14,28 @@
  * limitations under the License.
  */
 
-mod autostart;
-mod bin;
-mod crt;
-//mod hex;
-mod loaders;
-mod prg;
-
-use std::io;
 use std::path::Path;
-use c64::C64;
 
-pub use self::autostart::Autostart;
-pub use self::bin::BinLoader;
-pub use self::loaders::Loaders;
+use loader::Loader;
+use loader::crt;
+use loader::prg;
 
-pub trait Image {
-    fn mount(&mut self, c64: &mut C64);
-    fn unmount(&mut self, c64: &mut C64);
+pub struct Loaders {}
+
+impl Loaders {
+    pub fn from_ext(ext: Option<&str>) -> Box<Loader> {
+        match ext {
+            Some("crt") => Box::new(crt::CrtLoader::new()),
+            //Some("hex") => Box::new(hex::HexLoader::new()),
+            Some("prg") => Box::new(prg::PrgLoader::new()),
+            _ => panic!("invalid loader {}", ext.unwrap_or(""))
+        }
+    }
+
+    pub fn from_path(path: &Path) -> Box<Loader> {
+        let ext = path.extension()
+            .map(|s| s.to_str().unwrap_or(""));
+        Loaders::from_ext(ext)
+    }
 }
 
-pub trait Loader {
-    fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error>;
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error>;
-}

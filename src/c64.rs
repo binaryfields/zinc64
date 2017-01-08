@@ -26,6 +26,7 @@ use device::joystick;
 use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
 use io::{ExpansionPort, ExpansionPortIo};
 use io::cia;
+use loader::Autostart;
 use video::{RenderTarget, Vic};
 
 // Design:
@@ -54,6 +55,8 @@ pub struct C64 {
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     rt: Rc<RefCell<RenderTarget>>,
+    // Autostart
+    autostart: Option<Autostart>,
     // Debug
     breakpoints: Vec<u16>,
 }
@@ -152,6 +155,7 @@ impl C64 {
                 joystick2: joystick2,
                 keyboard: keyboard.clone(),
                 rt: rt.clone(),
+                autostart: None,
                 breakpoints: vec![0; 4],
             }
         )
@@ -162,6 +166,9 @@ impl C64 {
     }
     pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> {
         self.cpu.clone()
+    }
+    pub fn get_cycles(&self) -> u32 {
+        self.cpu.borrow().get_cycles()
     }
     pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
         if let Some(ref joystick) = self.joystick1 {
@@ -191,15 +198,17 @@ impl C64 {
     pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
         self.rt.clone()
     }
+    pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
+        self.autostart = autostart;
+    }
 
-    pub fn load(&mut self, code: &Vec<u8>, offset: u16) {
+    pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
         let mut mem = self.mem.borrow_mut();
         let mut address = offset;
-        for byte in code {
+        for byte in data {
             mem.write_ram(address, *byte);
             address = address.wrapping_add(1);
         }
-        self.cpu.borrow_mut().set_pc(offset);
     }
 
     pub fn reset(&mut self) {
@@ -231,6 +240,13 @@ impl C64 {
         let prev_cycles = self.cpu.borrow().get_cycles();
         self.cpu.borrow_mut().execute();
         let elapsed = self.cpu.borrow().get_cycles() - prev_cycles;
+        if self.autostart.is_some() {
+            if self.cpu.borrow().get_pc() == 0xa65c {
+                if let Some(mut autostart) = self.autostart.take() {
+                    autostart.execute(self);
+                }
+            }
+        }
         for i in 0..(elapsed + 1) {
             self.cia1.borrow_mut().step();
             self.cia2.borrow_mut().step();

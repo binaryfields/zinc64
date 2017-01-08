@@ -58,6 +58,7 @@ pub struct AppWindow {
     // Runtime State
     state: State,
     last_frame_ts: u64,
+    next_keyboard_event: u32,
     warp_mode: bool,
 }
 
@@ -109,6 +110,7 @@ impl AppWindow {
                 joystick2: joystick2,
                 state: State::Running,
                 last_frame_ts: 0,
+                next_keyboard_event: 0,
                 warp_mode: false,
             }
         )
@@ -289,6 +291,11 @@ impl AppWindow {
                 },
                 _ => {}
             }
+        }
+        let keyboard = self.c64.get_keyboard();
+        if keyboard.borrow().has_events() && self.c64.get_cycles() >= self.next_keyboard_event {
+            keyboard.borrow_mut().drain_event();
+            self.next_keyboard_event = self.c64.get_cycles().wrapping_add(20000);
         }
     }
 }

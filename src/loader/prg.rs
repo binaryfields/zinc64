@@ -24,52 +24,45 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use c64::C64;
 use loader::{Autostart, Image, Loader};
 use loader::autostart;
-use mem::BaseAddr;
 
-pub struct BinImage {
+pub struct PrgImage {
     data: Vec<u8>,
     offset: u16,
 }
 
-impl Image for BinImage {
+impl Image for PrgImage {
     fn mount(&mut self, c64: &mut C64) {
-        let cpu = c64.get_cpu();
-        cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0);
         c64.load(&self.data, self.offset);
-        cpu.borrow_mut().set_pc(self.offset);
     }
-
     fn unmount(&mut self, c64: &mut C64) {}
 }
 
-pub struct BinLoader {
-    offset: u16,
-}
+pub struct PrgLoader {}
 
-impl BinLoader {
-    pub fn new(offset: u16) -> BinLoader {
-        BinLoader {
-            offset: offset,
-        }
+impl PrgLoader {
+    pub fn new() -> PrgLoader {
+        PrgLoader {}
     }
 }
 
-impl Loader for BinLoader {
+impl Loader for PrgLoader {
     fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error> {
         let image = self.load(path)?;
-        Ok(autostart::Method::WithBinImage(image))
+        let autostart = Autostart::new(autostart::Mode::Run, image);
+        Ok(autostart::Method::WithAutostart(Some(autostart)))
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
         let mut file = File::open(path)?;
         let mut reader = BufReader::new(file);
+        let offset = reader.read_u16::<LittleEndian>()?;
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         Ok(
             Box::new(
-                BinImage {
+                PrgImage {
                     data: data,
-                    offset: self.offset,
+                    offset: offset,
                 }
             )
         )

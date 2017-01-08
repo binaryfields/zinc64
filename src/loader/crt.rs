@@ -17,7 +17,7 @@
 use std::cell::RefCell;
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, Cursor, Error, ErrorKind, Read};
+use std::io::{BufReader, BufRead, Error, ErrorKind, Read};
 use std::path::Path;
 use std::rc::Rc;
 use std::result::Result;
@@ -26,11 +26,10 @@ use std::str;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use c64::C64;
 use device::{Cartridge, Chip, ChipType, HwType};
-use loader::Loader;
+use loader::{Image, Loader};
+use loader::autostart;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
-
-// TODO crt: add test cases
 
 static HEADER_SIG: &'static str = "C64 CARTRIDGE   ";
 static CHIP_SIG: &'static str = "CHIP";
@@ -53,6 +52,19 @@ struct ChipHeader {
     bank_number: u16,
     load_address: u16,
     image_size: u16,
+}
+
+pub struct CrtImage {
+    cartridge: Option<Cartridge>,
+}
+
+impl Image for CrtImage {
+    fn mount(&mut self, c64: &mut C64) {
+        c64.attach_cartridge(self.cartridge.take().unwrap());
+    }
+    fn unmount(&mut self, c64: &mut C64) {
+        c64.detach_cartridge();
+    }
 }
 
 pub struct CrtLoader {}
@@ -84,7 +96,7 @@ impl CrtLoader {
         }
     }
 
-    fn read_chip_header(&self, rdr: &mut Cursor<Vec<u8>>) -> io::Result<Option<ChipHeader>> {
+    fn read_chip_header(&self, rdr: &mut Read) -> io::Result<Option<ChipHeader>> {
         let mut signature = [0u8; 4];
         match rdr.read(&mut signature)? {
             0 => Ok(None),
@@ -106,13 +118,13 @@ impl CrtLoader {
         }
     }
 
-    fn read_data(&self, rdr: &mut Cursor<Vec<u8>>, length: usize) -> io::Result<Vec<u8>> {
+    fn read_data(&self, rdr: &mut Read, length: usize) -> io::Result<Vec<u8>> {
         let mut data = vec![0; length];
         rdr.read_exact(&mut data)?;
         Ok(data)
     }
 
-    fn read_header(&self, rdr: &mut Cursor<Vec<u8>>) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut Read) -> io::Result<Header> {
         let mut signature = [0u8; 16];
         let mut reserved = [0u8; 6];
         let mut name = [0u8; 32];
@@ -162,11 +174,14 @@ impl CrtLoader {
 }
 
 impl Loader for CrtLoader {
-    fn load(&self, c64: &mut C64, path: &Path, offset: u16) -> Result<(), io::Error> {
-        let mut data = Vec::new();
+    fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error> {
+        let image = self.load(path)?;
+        Ok(autostart::Method::WithImage(image))
+    }
+
+    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
         let mut file = File::open(path)?;
-        file.read_to_end(&mut data)?;
-        let mut rdr = Cursor::new(data);
+        let mut rdr = BufReader::new(file);
         let header = self.read_header(&mut rdr).map_err(|_| {
             Error::new(ErrorKind::InvalidData,
                        "invalid cartridge header")
@@ -194,7 +209,13 @@ impl Loader for CrtLoader {
                 },
             }
         }
-        c64.attach_cartridge(cartridge);
-        Ok(())
+        Ok(
+            Box::new(
+                CrtImage {
+                    cartridge: Some(cartridge),
+                }
+            )
+        )
     }
 }
+
