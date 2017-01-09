@@ -1,0 +1,39 @@
+# CHANGELOG
+
+### Week 1
+
+- landed cpu
+- landed mem with basic bank switching
+- landed skeleton c64
+- milestone 1: pass 6502 functional test
+
+### Week 2
+
+- landed cia
+- landed mem device i/o
+- landed keyboard
+- landed cli parsing
+- landed preliminary loaders
+- landed skeleton ui and event handling
+- milestone 2: run keyboard_wait_s.hex
+- landed vic device i/o
+- landed pal config
+- landed color ram and vic memory map
+- landed render target and linked it to ui rendering
+- landed vic text mode and vsync
+- fix ...
+- milestone 3: boot to basic
+
+### Week 3
+
+- landed ui options
+- landed expansion port and cartridge
+- revamped memory map
+- landed joystick
+- revamped cia port handling
+- revamped loader support
+- landed autostart
+- landed logging
+* hack up vic sprites
+- milestone 4: run frogger_ii.crt
+
