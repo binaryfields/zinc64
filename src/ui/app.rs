@@ -41,6 +41,7 @@ enum State {
 
 pub struct Options {
     pub fullscreen: bool,
+    pub speed: u8,
     pub height: u32,
     pub width: u32,
 }
@@ -57,6 +58,7 @@ pub struct AppWindow {
     joystick2: Option<Joystick>,
     // Runtime State
     state: State,
+    speed: u8,
     last_frame_ts: u64,
     next_keyboard_event: u32,
     warp_mode: bool,
@@ -112,6 +114,7 @@ impl AppWindow {
                 joystick1: joystick1,
                 joystick2: joystick2,
                 state: State::Running,
+                speed: options.speed,
                 last_frame_ts: 0,
                 next_keyboard_event: 0,
                 warp_mode: false,
@@ -213,9 +216,12 @@ impl AppWindow {
     }
 
     fn wait_vsync(&self) {
+        let speed = 100.0 / (self.speed as f64);
+        let refresh_rate = self.c64.get_config().refresh_rate;
+        let interval_ns = (speed * ((1.0 / refresh_rate) * 1_000_000_000.0)) as u64;
         let elapsed_ns = time::precise_time_ns() - self.last_frame_ts;
-        if elapsed_ns < self.c64.get_config().refrest_rate_ns {
-            let wait_ns = self.c64.get_config().refrest_rate_ns - elapsed_ns;
+        if elapsed_ns < interval_ns {
+            let wait_ns = interval_ns - elapsed_ns;
             let wait = Duration::from_millis(wait_ns / 1_000_000);
             thread::sleep(wait);
         }

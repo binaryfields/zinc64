@@ -74,6 +74,7 @@ fn build_cli_options() -> getopts::Options {
         // Ui
         .optflag("", "console", "start in console mode")
         .optflag("f", "fullscreen", "enable fullscreen")
+        .optopt("", "speed", "set speed of the emulator", "100")
         .optopt("", "width", "window width", "width")
         .optopt("", "height", "window height", "height")
         // Debug
@@ -100,6 +101,9 @@ fn build_sys_config(matches: &getopts::Matches) -> Result<Config, String> {
 fn build_ui_options(matches: &getopts::Matches) -> Result<ui::Options, String> {
     let options = ui::Options {
         fullscreen: matches.opt_present("fullscreen"),
+        speed: matches.opt_str("speed")
+            .map(|s| s.parse::<u8>().unwrap())
+            .unwrap_or(100),
         height: matches.opt_str("height")
             .map(|s| s.parse::<u32>().unwrap())
             .unwrap_or(600),

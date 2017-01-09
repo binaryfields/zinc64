@@ -136,7 +136,6 @@ pub struct Config {
     pub window: Rect,
     pub raster_line_cycles: u16,
     pub refresh_rate: f64,
-    pub refrest_rate_ns: u64,
     // Devices
     pub joystick1: joystick::Mode,
     pub joystick2: joystick::Mode,
@@ -163,7 +162,6 @@ impl Config {
             window: Rect::new_with_dim(WINDOW_FIRST_COL, WINDOW_FIRST_LINE, window_size),
             raster_line_cycles: RASTER_LINE_CYCLES_PAL,
             refresh_rate: RASTER_REFRESH_RATE_PAL,
-            refrest_rate_ns: ((1.0 / RASTER_REFRESH_RATE_PAL) * 1_000_000_000.0) as u64,
             joystick1: joystick::Mode::Numpad,
             joystick2: joystick::Mode::None,
         }
