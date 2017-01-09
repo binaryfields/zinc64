@@ -17,4 +17,3 @@
 pub mod app;
 
 pub use self::app::AppWindow;
-pub use self::app::Options;

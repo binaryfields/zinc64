@@ -22,11 +22,11 @@ use std::rc::Rc;
 use std::result::Result;
 
 use cpu::CpuIo;
-use io::{ExpansionPort, ExpansionPortIo};
-use io::cia::Cia;
-use mem::{Addressable, Bank, Configuration, DeviceIo, MemoryMap, Ram, Rom};
-use log::LogLevel::Trace;
+use io::{Cia, ExpansionPort, ExpansionPortIo};
+use log::LogLevel;
 use util::bit;
+
+use super::{Addressable, Bank, Configuration, DeviceIo, MemoryMap, Ram, Rom};
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
 // Design:
@@ -112,7 +112,7 @@ impl Memory {
         let game = bit::bit_set(3, self.expansion_port_io.borrow().game);
         let exrom = bit::bit_set(4, self.expansion_port_io.borrow().exrom);
         let mode = loram | hiram | charen | game | exrom;
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
             trace!(target: "mem::banks", "Switching to {}", mode);
         }
         self.configuration = self.map.get(mode);

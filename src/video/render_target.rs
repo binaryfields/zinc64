@@ -15,8 +15,10 @@
  */
 
 use std::mem;
-use video::color::Color;
+
 use util::Dimension;
+
+use super::color::Color;
 
 const PIXEL_BYTES: usize = 4;
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use cpu::Cpu;
+use super::Cpu;
 
 // Spec: INSTRUCTION ADDRESSING MODES AND RELATED EXECUTION TIMES (p. 255)
 // Design:

@@ -87,8 +87,8 @@ fn build_cli_options() -> getopts::Options {
     opts
 }
 
-fn build_app_options(matches: &getopts::Matches) -> Result<ui::Options, String> {
-    let options = ui::Options {
+fn build_app_options(matches: &getopts::Matches) -> Result<app::Options, String> {
+    let options = app::Options {
         fullscreen: matches.opt_present("fullscreen"),
         jam_action: matches.opt_str("jamaction")
             .map(|s| app::JamAction::from(&s))

@@ -17,4 +17,5 @@
 pub mod cia;
 mod expansion_port;
 
+pub use self::cia::Cia;
 pub use self::expansion_port::{ExpansionPort, ExpansionPortIo};

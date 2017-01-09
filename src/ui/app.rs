@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 use std::result::Result;
 use std::thread;
 use std::time::Duration;
 
 use c64::C64;
-
 use sdl2;
 use sdl2::{EventPump, Sdl};
 use sdl2::event::Event;

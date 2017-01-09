@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-use mem::Addressable;
 use std::iter::Iterator;
+
+use mem::Addressable;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 

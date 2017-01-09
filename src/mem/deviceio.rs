@@ -17,10 +17,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use io::ExpansionPort;
-use io::cia::Cia;
-use mem::{Addressable, ColorRam};
+use io::{Cia, ExpansionPort};
 use video::Vic;
+
+use super::{Addressable, ColorRam};
 
 pub struct DeviceIo {
     cia1: Rc<RefCell<Cia>>,

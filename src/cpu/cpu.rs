@@ -17,10 +17,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cpu::Instruction;
 use mem::{Addressable, Memory};
-use log::LogLevel::Trace;
+use log::LogLevel;
 use util::bit;
+
+use super::Instruction;
 
 // Spec: http://nesdev.com/6502.txt
 // Design:
@@ -165,7 +166,7 @@ impl Cpu {
         let pc = self.pc;
         let opcode = self.fetch_op();
         let op = Instruction::decode(self, opcode);
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::instr", "0x{:x}: {:?}", pc, op);
         }
         self.execute_instruction(&op);
@@ -598,7 +599,7 @@ impl Cpu {
     // -- Interrupt Ops
 
     fn interrupt(&mut self, interrupt: Interrupt) -> u8 {
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
         }
         let pc = self.pc;

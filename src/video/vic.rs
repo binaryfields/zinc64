@@ -19,10 +19,11 @@ use std::rc::Rc;
 
 use config::Config;
 use cpu::Cpu;
-use log::LogLevel::Trace;
+use log::LogLevel;
 use mem::{Addressable, ColorRam, Memory};
-use video::RenderTarget;
 use util::bit;
+
+use super::RenderTarget;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
@@ -681,14 +682,14 @@ impl Vic {
             Reg::M7C => self.sprites[7].color | 0xf0,
             Reg::IGNORE => 0xff,
         };
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
             trace!(target: "vic::reg", "Read 0x{:x} = 0x{:x}", reg, value);
         }
         value
     }
 
     pub fn write(&mut self, reg: u8, value: u8) {
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
             trace!(target: "vic::reg", "Write 0x{:x} = 0x{:x}", reg, value);
         }
         match Reg::from(reg) {

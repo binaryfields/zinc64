@@ -24,7 +24,7 @@ use config::Config;
 use device::{Cartridge, Joystick, Keyboard};
 use device::joystick;
 use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
-use io::{ExpansionPort, ExpansionPortIo};
+use io::{Cia, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
 use video::{RenderTarget, Vic};
@@ -44,8 +44,8 @@ pub struct C64 {
     cpu: Rc<RefCell<Cpu>>,
     mem: Rc<RefCell<Memory>>,
     color_ram: Rc<RefCell<ColorRam>>,
-    cia1: Rc<RefCell<cia::Cia>>,
-    cia2: Rc<RefCell<cia::Cia>>,
+    cia1: Rc<RefCell<Cia>>,
+    cia2: Rc<RefCell<Cia>>,
     vic: Rc<RefCell<Vic>>,
     // sid: Rc<RefCell<Sid>>,
     // I/O
@@ -106,14 +106,14 @@ impl C64 {
             Cpu::new(cpu_io.clone(), mem.clone())
         ));
         let cia1 = Rc::new(RefCell::new(
-            cia::Cia::new(cia::Mode::Cia1,
+            Cia::new(cia::Mode::Cia1,
                           cpu.clone(),
                           joystick1.clone(),
                           joystick2.clone(),
                           keyboard.clone())
         ));
         let cia2 = Rc::new(RefCell::new(
-            cia::Cia::new(cia::Mode::Cia2,
+            Cia::new(cia::Mode::Cia2,
                           cpu.clone(),
                           joystick1.clone(),
                           joystick2.clone(),

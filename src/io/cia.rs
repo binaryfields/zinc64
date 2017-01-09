@@ -18,8 +18,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cpu::Cpu;
-use device::{Joystick, Keyboard, Motion};
-use log::LogLevel::Trace;
+use device::{Joystick, Keyboard};
+use device::joystick;
+use log::LogLevel;
 use util::bit;
 
 // Spec: https://www.c64-wiki.com/index.php/CIA
@@ -296,10 +297,10 @@ impl Cia {
     fn scan_joystick(&self, joystick: &Option<Rc<RefCell<Joystick>>>) -> u8 {
         if let Some(ref joystick) = *joystick {
             let joy = joystick.borrow();
-            let joy_up = bit::bit_set(0, joy.get_y_axis() == Motion::Positive);
-            let joy_down = bit::bit_set(1, joy.get_y_axis() == Motion::Negative);
-            let joy_left = bit::bit_set(2, joy.get_x_axis() == Motion::Negative);
-            let joy_right = bit::bit_set(3, joy.get_x_axis() == Motion::Positive);
+            let joy_up = bit::bit_set(0, joy.get_y_axis() == joystick::Motion::Positive);
+            let joy_down = bit::bit_set(1, joy.get_y_axis() == joystick::Motion::Negative);
+            let joy_left = bit::bit_set(2, joy.get_x_axis() == joystick::Motion::Negative);
+            let joy_right = bit::bit_set(3, joy.get_x_axis() == joystick::Motion::Positive);
             let joy_fire = bit::bit_set(4, joy.get_button());
             !(joy_left | joy_right | joy_up | joy_down | joy_fire)
         } else {
@@ -383,7 +384,7 @@ impl Cia {
                 timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
             }
         };
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
           trace!(target: "cia::reg", "Read 0x{:x} = 0x{:x}", reg, value);
         }
         value
@@ -391,7 +392,7 @@ impl Cia {
 
     #[allow(dead_code, unused_variables)]
     pub fn write(&mut self, reg: u8, value: u8) {
-        if log_enabled!(Trace) {
+        if log_enabled!(LogLevel::Trace) {
             trace!(target: "cia::reg", "Write 0x{:x} = 0x{:x}", reg, value);
         }
         match Reg::from(reg) {

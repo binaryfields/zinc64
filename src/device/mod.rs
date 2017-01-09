@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-mod cartridge;
+pub mod cartridge;
 pub mod joystick;
 mod keyboard;
 
+// FIXME
 pub use self::cartridge::{Cartridge, Chip, ChipType, HwType};
-pub use self::joystick::{Joystick, Motion};
+pub use self::joystick::Joystick;
 pub use self::keyboard::Keyboard;

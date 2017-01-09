@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use cpu::Cpu;
-use cpu::Operand;
+use super::Cpu;
+use super::Operand;
 
 // Categories: Asm One Manual Sec 10.1
 // Spec: MCS6510 MICROPROCESSOR INSTRUCTION SET p.232

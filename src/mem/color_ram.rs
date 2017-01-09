@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use mem::Addressable;
+use super::Addressable;
 
 pub struct ColorRam {
     data: Vec<u8>

@@ -15,7 +15,6 @@
  */
 
 mod addressable;
-
 mod color_ram;
 mod deviceio;
 mod memory;
