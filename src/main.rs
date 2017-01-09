@@ -42,6 +42,7 @@ use c64::C64;
 use config::Config;
 use loader::{BinLoader, Loader, Loaders};
 use mem::BaseAddr;
+use ui::app;
 use util::Logger;
 
 static NAME: &'static str = "zinc64";
@@ -60,7 +61,7 @@ fn main() {
 
 fn build_cli_options() -> getopts::Options {
     let mut opts = getopts::Options::new();
-    opts.optopt("", "model", "set NTSC or PAL variants", "model")
+    opts.optopt("", "model", "set NTSC or PAL variants", "[ntsc|pal]")
         // Autostart
         .optopt("", "autostart", "attach and autostart image", "image")
         .optopt("", "binary", "load binary into memory", "path")
@@ -69,20 +70,40 @@ fn build_cli_options() -> getopts::Options {
         .optopt("", "joydev1", "set device for joystick 1", "numpad")
         .optopt("", "joydev2", "set device for joystick 2", "none")
         // Logging
-        .optopt("", "loglevel", "set log level", "level")
+        .optopt("", "loglevel", "set log level", "[error|warn|info|debug|trace]")
         .optmulti("", "logtarget", "set log level for a target", "target=level")
         // Ui
         .optflag("", "console", "start in console mode")
         .optflag("f", "fullscreen", "enable fullscreen")
-        .optopt("", "speed", "set speed of the emulator", "100")
+        .optopt("", "speed", "set speed of the emulator", "number")
         .optopt("", "width", "window width", "width")
         .optopt("", "height", "window height", "height")
         // Debug
         .optmulti("", "bp", "set breakpoint at this address", "address")
+        .optopt("", "jamaction", "set cpu jam handling", "[continue|quit|reset]")
         // Help
         .optflag("h", "help", "display this help")
         .optflag("V", "version", "display this version");
     opts
+}
+
+fn build_app_options(matches: &getopts::Matches) -> Result<ui::Options, String> {
+    let options = ui::Options {
+        fullscreen: matches.opt_present("fullscreen"),
+        jam_action: matches.opt_str("jamaction")
+            .map(|s| app::JamAction::from(&s))
+            .unwrap_or(app::JamAction::Quit),
+        speed: matches.opt_str("speed")
+            .map(|s| s.parse::<u8>().unwrap())
+            .unwrap_or(100),
+        height: matches.opt_str("height")
+            .map(|s| s.parse::<u32>().unwrap())
+            .unwrap_or(600),
+        width: matches.opt_str("width")
+            .map(|s| s.parse::<u32>().unwrap())
+            .unwrap_or(800),
+    };
+    Ok(options)
 }
 
 fn build_sys_config(matches: &getopts::Matches) -> Result<Config, String> {
@@ -96,22 +117,6 @@ fn build_sys_config(matches: &getopts::Matches) -> Result<Config, String> {
         config.joystick2 = device::joystick::Mode::from(&joydev);
     }
     Ok(config)
-}
-
-fn build_ui_options(matches: &getopts::Matches) -> Result<ui::Options, String> {
-    let options = ui::Options {
-        fullscreen: matches.opt_present("fullscreen"),
-        speed: matches.opt_str("speed")
-            .map(|s| s.parse::<u8>().unwrap())
-            .unwrap_or(100),
-        height: matches.opt_str("height")
-            .map(|s| s.parse::<u32>().unwrap())
-            .unwrap_or(600),
-        width: matches.opt_str("width")
-            .map(|s| s.parse::<u32>().unwrap())
-            .unwrap_or(800),
-    };
-    Ok(options)
 }
 
 fn init_logging(matches: &getopts::Matches) -> Result<(), String> {
@@ -205,7 +210,7 @@ fn run(args: Vec<String>) -> Result<i32, String> {
                 }
             }
         } else {
-            let options = build_ui_options(&matches)?;
+            let options = build_app_options(&matches)?;
             let mut app_window = ui::AppWindow::new(c64, options)?;
             app_window.run();
         }

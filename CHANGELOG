@@ -33,7 +33,11 @@
 - revamped cia port handling
 - revamped loader support
 - landed autostart
-- landed logging
 * hack up vic sprites
 - milestone 4: run frogger_ii.crt
 
+### Week 4
+
+- landed logging
+- landed app speed control
+- landed cpu jam

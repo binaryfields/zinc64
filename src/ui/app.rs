@@ -31,6 +31,23 @@ use sdl2::render::{Renderer, Texture};
 use sdl2::video::{FullscreenType, Window};
 use time;
 
+pub enum JamAction {
+    Continue,
+    Quit,
+    Reset,
+}
+
+impl JamAction {
+    pub fn from(action: &str) -> JamAction {
+        match action {
+            "continue" => JamAction::Continue,
+            "quit" => JamAction::Quit,
+            "reset" => JamAction::Reset,
+            _ => panic!("invalid jam action {}", action),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum State {
     Running,
@@ -41,6 +58,7 @@ enum State {
 
 pub struct Options {
     pub fullscreen: bool,
+    pub jam_action: JamAction,
     pub speed: u8,
     pub height: u32,
     pub width: u32,
@@ -50,12 +68,14 @@ pub struct AppWindow {
     // Dependencies
     c64: C64,
     // Renderer
-    sdl: Sdl,
     renderer: Renderer<'static>,
     texture: Texture,
+    sdl: Sdl,
     // Devices
     joystick1: Option<Joystick>,
     joystick2: Option<Joystick>,
+    // Options
+    jam_action: JamAction,
     // Runtime State
     state: State,
     speed: u8,
@@ -113,6 +133,7 @@ impl AppWindow {
                 texture: texture,
                 joystick1: joystick1,
                 joystick2: joystick2,
+                jam_action: options.jam_action,
                 state: State::Running,
                 speed: options.speed,
                 last_frame_ts: 0,
@@ -122,18 +143,8 @@ impl AppWindow {
         )
     }
 
-    fn render(&mut self) {
-        let rt = self.c64.get_render_target();
-        self.texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch());
-        self.renderer.clear();
-        self.renderer.copy(&self.texture, None, None).unwrap();
-        self.renderer.present();
-        rt.borrow_mut().set_sync(false);
-        self.last_frame_ts = time::precise_time_ns();
-    }
-
     pub fn run(&mut self) {
-        info!(target: "ui", "Running app main loop");
+        info!(target: "ui", "Running main loop");
         let mut events = self.sdl.event_pump().unwrap();
         'running: loop {
             match self.state {
@@ -159,6 +170,32 @@ impl AppWindow {
         }
     }
 
+    fn handle_cpu_jam(&mut self) -> bool {
+        let cpu = self.c64.get_cpu();
+        warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
+        match self.jam_action {
+            JamAction::Continue => true,
+            JamAction::Quit => {
+                self.state = State::Stopped;
+                false
+            },
+            JamAction::Reset => {
+                self.reset();
+                false
+            },
+        }
+    }
+
+    fn render(&mut self) {
+        let rt = self.c64.get_render_target();
+        self.texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch());
+        self.renderer.clear();
+        self.renderer.copy(&self.texture, None, None).unwrap();
+        self.renderer.present();
+        rt.borrow_mut().set_sync(false);
+        self.last_frame_ts = time::precise_time_ns();
+    }
+
     fn run_frame(&mut self) {
         let frame_cycles = (self.c64.get_config().cpu_frequency as f64
             / self.c64.get_config().refresh_rate) as u64;
@@ -166,24 +203,27 @@ impl AppWindow {
         let mut last_pc = 0x0000;
         for i in 0..frame_cycles {
             self.c64.step();
+            if self.c64.check_breakpoints() {
+                self.state = State::Trapped;
+                break;
+            }
+            if self.c64.is_cpu_jam() {
+                if !self.handle_cpu_jam() {
+                    break;
+                }
+            }
             if rt.borrow().get_sync() {
                 if !self.warp_mode {
                     self.wait_vsync();
                 }
                 self.render();
             }
-            if self.c64.check_breakpoints() {
-                self.state = State::Trapped;
-                break;
-            }
-            let cpu = self.c64.get_cpu();
-            let pc = cpu.borrow().get_pc();
-            if pc == last_pc {
-                self.state = State::Trapped;
-                break;
-            }
-            last_pc = pc;
         }
+    }
+
+    fn reset(&mut self) {
+        self.c64.reset();
+        self.next_keyboard_event = 0;
     }
 
     fn toggle_fullscreen(&mut self) {

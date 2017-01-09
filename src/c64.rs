@@ -55,10 +55,11 @@ pub struct C64 {
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     rt: Rc<RefCell<RenderTarget>>,
-    // Autostart
+    // TBD
     autostart: Option<Autostart>,
-    // Debug
     breakpoints: Vec<u16>,
+    // Runtime State
+    last_pc: u16,
 }
 
 impl C64 {
@@ -157,7 +158,8 @@ impl C64 {
                 keyboard: keyboard.clone(),
                 rt: rt.clone(),
                 autostart: None,
-                breakpoints: vec![0; 4],
+                breakpoints: Vec::new(),
+                last_pc: 0,
             }
         )
     }
@@ -199,6 +201,9 @@ impl C64 {
     pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
         self.rt.clone()
     }
+    pub fn is_cpu_jam(&self) -> bool {
+        self.last_pc == self.cpu.borrow().get_pc()
+    }
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
         self.autostart = autostart;
     }
@@ -215,6 +220,7 @@ impl C64 {
     pub fn reset(&mut self) {
         info!(target: "c64", "Resetting system");
         self.cpu.borrow_mut().reset();
+        self.last_pc = 0;
         //self.expansion_port.borrow_mut().reset();
     }
 
@@ -238,10 +244,11 @@ impl C64 {
         true
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> u32 {
+        self.last_pc = self.cpu.borrow().get_pc();
         let prev_cycles = self.cpu.borrow().get_cycles();
         self.cpu.borrow_mut().execute();
-        let elapsed = self.cpu.borrow().get_cycles() - prev_cycles;
+        let cycles = self.cpu.borrow().get_cycles() - prev_cycles;
         if self.autostart.is_some() {
             if self.cpu.borrow().get_pc() == 0xa65c {
                 if let Some(mut autostart) = self.autostart.take() {
@@ -249,11 +256,12 @@ impl C64 {
                 }
             }
         }
-        for i in 0..(elapsed + 1) {
+        for i in 0..(cycles + 1) {
             self.cia1.borrow_mut().step();
             self.cia2.borrow_mut().step();
             self.vic.borrow_mut().step();
         }
+        cycles
     }
 
     // -- Cartridge Ops
