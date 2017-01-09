@@ -246,6 +246,10 @@ pub struct Vic {
     vm_buffer: [u8; 40],
     vm_color_buffer: [u8; 40],
     vmli: u8,
+    // Sprite Ptrs
+    sprite_ptrs: [u16; 8],
+    sprite_mc: [u8; 8],
+    sprite_mcbase: [u8; 8],
 }
 
 impl Vic {
@@ -284,6 +288,9 @@ impl Vic {
             vm_buffer: [0; 40],
             vm_color_buffer: [0; 40],
             vmli: 0,
+            sprite_ptrs: [0; 8],
+            sprite_mc: [0; 8],
+            sprite_mcbase: [0; 8],
         }
     }
 
@@ -297,6 +304,14 @@ impl Vic {
         if self.is_bad_line(self.raster) {
             let vc = self.vc;
             //self.fetch_vm_line(vc); // FIXME vc_base
+        }
+        if self.x_pos == 0 {
+            self.fetch_sprite_pointers();
+            for i in 0..8 {
+                if self.sprites[i].y as u16 == self.raster {
+                    self.sprite_mc[i] = 0;
+                }
+            }
         }
         if self.is_visible(self.x_pos, self.raster) {
             // 2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
@@ -313,7 +328,19 @@ impl Vic {
                 let char_code = self.fetch_char_code(self.vc);
                 let char_color = self.fetch_char_color(self.vc);
                 let char_data = self.fetch_char_pixels(char_code, self.rc);
-                self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
+                match self.mode {
+                    Mode::Text => {
+                        self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
+                    },
+                    Mode::McText => {
+                        if bit::bit_test(char_color, 3) {
+                            self.draw_char_mc(self.x_pos, self.raster, char_data, char_color);
+                        } else {
+                            self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
+                        }
+                    },
+                    _ => panic!("unsupported graphics mode {}", self.mode.value()),
+                }
                 // 4. VC and VMLI are incremented after each g-access in display state.
                 self.vc += 1;
                 self.vmli += 1;
@@ -327,6 +354,25 @@ impl Vic {
                     self.vc_base = self.vc;
                 }
                 self.rc += 1;
+            }
+            // Draw Sprites
+            if self.x_pos == 464 {
+                for i in 0..8 {
+                    let n = 7 - i;
+                    if self.sprites[n].enabled {
+                        if self.is_sprite(n, self.raster) {
+                            for j in 0..3 {
+                                let sp_data = self.fetch_sprite_data(n, self.sprite_mc[n]);
+                                if !self.sprites[n].multicolor {
+                                    self.draw_sprite(24 + self.sprites[n].x + (j << 3), self.raster, sp_data, self.sprites[n].color);
+                                } else {
+                                    self.draw_sprite_mc(24 + self.sprites[n].x + (j << 3), self.raster, n, sp_data);
+                                }
+                                self.sprite_mc[n] += 1;
+                            }
+                        }
+                    }
+                }
             }
         }
         // Update raster counters
@@ -354,6 +400,16 @@ impl Vic {
             } else {
                 false
             }
+        } else {
+            false
+        }
+    }
+
+    #[inline(always)]
+    fn is_sprite(&self, n: usize, y: u16) -> bool {
+        let sprite = &self.sprites[n];
+        if y >= (sprite.y as u16) && y < (sprite.y as u16 + 21) {
+            true
         } else {
             false
         }
@@ -397,6 +453,55 @@ impl Vic {
         }
     }
 
+    fn draw_char_mc(&self, x: u16, y: u16, data: u8, color: u8) {
+        let mut rt = self.rt.borrow_mut();
+        let y_trans = y - self.config.visible.top;
+        let x_trans = x - self.config.visible.left;
+        for i in 0..4u16 {
+            let source = (data >> (i as u8 * 2)) & 0x03;
+            let color = match source {
+                0 => self.background_color[0],
+                1 => self.background_color[1],
+                2 => self.background_color[2],
+                3 => color & 0x07,
+                _ => panic!("invalid char color source {}", source),
+            };
+            rt.write(x_trans + 7 - (i * 2), y_trans, color);
+            rt.write(x_trans + 6 - (i * 2), y_trans, color);
+        }
+    }
+
+    fn draw_sprite(&self, x: u16, y: u16, data: u8, color: u8) {
+        let mut rt = self.rt.borrow_mut();
+        let y_trans = y - self.config.visible.top;
+        let x_trans = x;
+        for i in 0..8u16 {
+            if bit::bit_test(data, i as u8) {
+                rt.write(x_trans + 7 - i, y_trans, color);
+            }
+        }
+    }
+
+    fn draw_sprite_mc(&self, x: u16, y: u16, n: usize, data: u8) {
+        let mut rt = self.rt.borrow_mut();
+        let y_trans = y - self.config.visible.top;
+        let x_trans = x;
+        for i in 0..4u16 {
+            let source = (data >> (i as u8 * 2)) & 0x03;
+            let color = match source {
+                0 => 0,
+                1 => self.sprite_multicolor[0],
+                2 => self.sprites[n].color,
+                3 => self.sprite_multicolor[1],
+                _ => panic!("invalid sprite color source {}", source),
+            };
+            if color != 0 {
+                rt.write(x_trans + 7 - (i * 2), y_trans, color);
+                rt.write(x_trans + 6 - (i * 2), y_trans, color);
+            }
+        }
+    }
+
     // -- Memory Ops
 
     // c-access
@@ -415,6 +520,21 @@ impl Vic {
     #[inline(always)]
     fn fetch_char_pixels(&self, ch: u8, rc: u8) -> u8 {
         let address = self.char_base | ((ch as u16) << 3) | rc as u16;
+        self.mem.borrow().vic_read(address)
+    }
+
+    #[inline(always)]
+    fn fetch_sprite_pointers(&mut self) {
+        let mem = self.mem.borrow();
+        for i in 0..8u16 {
+            let address = self.video_matrix | 0x03f8 | i;
+            self.sprite_ptrs[i as usize] = (mem.vic_read(address) as u16) << 6;
+        }
+    }
+
+    #[inline(always)]
+    fn fetch_sprite_data(&self, n: usize, mc: u8) -> u8 {
+        let address = self.sprite_ptrs[n] | (mc as u16);
         self.mem.borrow().vic_read(address)
     }
 
