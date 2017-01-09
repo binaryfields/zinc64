@@ -22,6 +22,7 @@ pub struct Ram {
 
 impl Ram {
     pub fn new(capacity: usize) -> Ram {
+        info!(target: "mem", "Initializing RAM with capacity {}", capacity);
         Ram {
             data: vec![0; capacity]
         }

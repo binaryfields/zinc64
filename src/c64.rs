@@ -63,6 +63,7 @@ pub struct C64 {
 
 impl C64 {
     pub fn new(config: Config) -> Result<C64, io::Error> {
+        info!(target: "c64", "Initializing system");
         // I/O Lines
         let cpu_io = Rc::new(RefCell::new(
             CpuIo::new()
@@ -212,6 +213,7 @@ impl C64 {
     }
 
     pub fn reset(&mut self) {
+        info!(target: "c64", "Resetting system");
         self.cpu.borrow_mut().reset();
         //self.expansion_port.borrow_mut().reset();
     }

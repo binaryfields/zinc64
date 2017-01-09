@@ -36,6 +36,7 @@ impl DeviceIo {
                color_ram: Rc<RefCell<ColorRam>>,
                expansion_port: Rc<RefCell<ExpansionPort>>,
                vic: Rc<RefCell<Vic>>) -> DeviceIo {
+        info!(target: "mem", "Initializing Device I/O");
         DeviceIo {
             cia1: cia1,
             cia2: cia2,

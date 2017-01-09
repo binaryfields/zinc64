@@ -22,6 +22,7 @@ pub struct ColorRam {
 
 impl ColorRam {
     pub fn new(capacity: usize) -> ColorRam {
+        info!(target: "mem", "Initializing Color RAM with capacity {}", capacity);
         ColorRam {
             data: vec![0; capacity]
         }

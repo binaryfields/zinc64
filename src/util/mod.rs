@@ -15,6 +15,8 @@
  */
 
 pub mod bit;
+mod logger;
 mod rect;
 
+pub use self::logger::Logger;
 pub use self::rect::{Dimension, Rect};

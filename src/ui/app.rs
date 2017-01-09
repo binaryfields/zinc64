@@ -31,7 +31,7 @@ use sdl2::render::{Renderer, Texture};
 use sdl2::video::{FullscreenType, Window};
 use time;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum State {
     Running,
     Paused,
@@ -66,6 +66,7 @@ impl AppWindow {
     pub fn new(c64: C64, options: Options) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
         // Initialize renderer
+        info!(target: "ui", "Opening app window {}x{}", options.width, options.height);
         let video = sdl.video()?;
         let mut builder = video.window("zinc64", options.width, options.height);
         builder.position_centered();
@@ -88,6 +89,7 @@ impl AppWindow {
         joystick_subsystem.set_event_state(true);
         let joystick1 = c64.get_joystick1().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
+                info!(target: "ui", "Opening joystick {}", joystick.borrow().get_index());
                 joystick_subsystem.open(joystick.borrow().get_index() as u32).ok()
             } else {
                 None
@@ -95,6 +97,7 @@ impl AppWindow {
         });
         let joystick2 = c64.get_joystick2().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
+                info!(target: "ui", "Opening joystick {}", joystick.borrow().get_index());
                 joystick_subsystem.open(joystick.borrow().get_index() as u32).ok()
             } else {
                 None
@@ -127,8 +130,8 @@ impl AppWindow {
     }
 
     pub fn run(&mut self) {
-        let mut events = self.sdl.event_pump()
-            .unwrap();
+        info!(target: "ui", "Running app main loop");
+        let mut events = self.sdl.event_pump().unwrap();
         'running: loop {
             match self.state {
                 State::Running => {
@@ -141,11 +144,12 @@ impl AppWindow {
                     thread::sleep(wait);
                 },
                 State::Stopped => {
+                    info!(target: "ui", "State {:?}", self.state);
                     break 'running;
                 },
                 State::Trapped => {
                     let cpu = self.c64.get_cpu();
-                    println!("trapped at 0x{:x}", cpu.borrow().get_pc());
+                    info!(target: "ui", "State {:?} at 0x{:x}", self.state, cpu.borrow().get_pc());
                     break 'running;
                 },
             }

@@ -16,6 +16,8 @@
 
 extern crate byteorder;
 extern crate getopts;
+#[macro_use]
+extern crate log;
 extern crate sdl2;
 extern crate time;
 
@@ -32,6 +34,7 @@ mod video;
 
 use std::env;
 use std::ffi::OsStr;
+use std::path::Path;
 use std::process;
 use std::result::Result;
 
@@ -39,7 +42,7 @@ use c64::C64;
 use config::Config;
 use loader::{BinLoader, Loader, Loaders};
 use mem::BaseAddr;
-use std::path::Path;
+use util::Logger;
 
 static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -65,6 +68,9 @@ fn build_cli_options() -> getopts::Options {
         // Devices
         .optopt("", "joydev1", "set device for joystick 1", "numpad")
         .optopt("", "joydev2", "set device for joystick 2", "none")
+        // Logging
+        .optopt("", "loglevel", "set log level", "level")
+        .optmulti("", "logtarget", "set log level for a target", "target=level")
         // Ui
         .optflag("", "console", "start in console mode")
         .optflag("f", "fullscreen", "enable fullscreen")
@@ -102,6 +108,22 @@ fn build_ui_options(matches: &getopts::Matches) -> Result<ui::Options, String> {
             .unwrap_or(800),
     };
     Ok(options)
+}
+
+fn init_logging(matches: &getopts::Matches) -> Result<(), String> {
+    let loglevel = matches.opt_str("loglevel")
+        .unwrap_or("info".to_string());
+    let mut logger = Logger::new(&loglevel)?;
+    for target_level in matches.opt_strs("logtarget") {
+        if let Some(equals) = target_level.find('=') {
+            let (target, level) = target_level.split_at(equals);
+            logger.add_target(target.to_string(), level[1..].to_string())?;
+        } else {
+            return Err(format!("invalid log target pair {}", target_level));
+        }
+    }
+    Logger::enable(logger)?;
+    Ok(())
 }
 
 fn print_help(opts: &getopts::Options) {
@@ -165,6 +187,8 @@ fn run(args: Vec<String>) -> Result<i32, String> {
         print_version();
         Ok(0)
     } else {
+        init_logging(&matches)?;
+        info!("Staring {}", NAME);
         let config = build_sys_config(&matches)?;
         let mut c64 = C64::new(config).unwrap();
         process_debug_options(&mut c64, &matches)?;

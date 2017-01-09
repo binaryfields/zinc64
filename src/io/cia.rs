@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use cpu::Cpu;
 use device::{Joystick, Keyboard, Motion};
+use log::LogLevel::Trace;
 use util::bit;
 
 // Spec: https://www.c64-wiki.com/index.php/CIA
@@ -320,7 +321,7 @@ impl Cia {
 
     #[allow(dead_code)]
     pub fn read(&mut self, reg: u8) -> u8 {
-        match Reg::from(reg) {
+        let value = match Reg::from(reg) {
             Reg::PRA => {
                 match self.mode {
                     Mode::Cia1 => self.read_cia1_port_a(),
@@ -381,11 +382,18 @@ impl Cia {
                 };
                 timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
             }
+        };
+        if log_enabled!(Trace) {
+          trace!(target: "cia::reg", "Read 0x{:x} = 0x{:x}", reg, value);
         }
+        value
     }
 
     #[allow(dead_code, unused_variables)]
     pub fn write(&mut self, reg: u8, value: u8) {
+        if log_enabled!(Trace) {
+            trace!(target: "cia::reg", "Write 0x{:x} = 0x{:x}", reg, value);
+        }
         match Reg::from(reg) {
             Reg::PRA => {
                 self.port_a.set_value(value);

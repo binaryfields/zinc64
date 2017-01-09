@@ -29,6 +29,7 @@ pub struct Rom {
 
 impl Rom {
     pub fn load(path: &Path, offset: u16) -> Result<Rom, io::Error> {
+        info!(target: "mem", "Loading ROM {:?}", path.to_str().unwrap());
         let mut data = Vec::new();
         let mut file = fs::File::open(path)?;
         file.read_to_end(&mut data)?;

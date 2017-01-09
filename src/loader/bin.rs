@@ -33,6 +33,7 @@ pub struct BinImage {
 
 impl Image for BinImage {
     fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting BIN image");
         let cpu = c64.get_cpu();
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0);
         c64.load(&self.data, self.offset);
@@ -61,6 +62,7 @@ impl Loader for BinLoader {
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+        info!(target: "loader", "Loading BIN {}", path.to_str().unwrap());
         let mut file = File::open(path)?;
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();

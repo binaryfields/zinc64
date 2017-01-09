@@ -32,6 +32,7 @@ pub struct PrgImage {
 
 impl Image for PrgImage {
     fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting PRG image");
         c64.load(&self.data, self.offset);
     }
     fn unmount(&mut self, c64: &mut C64) {}
@@ -53,11 +54,13 @@ impl Loader for PrgLoader {
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+        info!(target: "loader", "Loading PRG {}", path.to_str().unwrap());
         let mut file = File::open(path)?;
         let mut reader = BufReader::new(file);
         let offset = reader.read_u16::<LittleEndian>()?;
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
+        info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
         Ok(
             Box::new(
                 PrgImage {

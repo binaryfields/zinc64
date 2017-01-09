@@ -60,6 +60,7 @@ pub struct CrtImage {
 
 impl Image for CrtImage {
     fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting CRT image");
         c64.attach_cartridge(self.cartridge.take().unwrap());
     }
     fn unmount(&mut self, c64: &mut C64) {
@@ -180,12 +181,18 @@ impl Loader for CrtLoader {
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+        info!(target: "loader", "Loading CRT {}", path.to_str().unwrap());
         let mut file = File::open(path)?;
         let mut rdr = BufReader::new(file);
         let header = self.read_header(&mut rdr).map_err(|_| {
             Error::new(ErrorKind::InvalidData,
                        "invalid cartridge header")
         })?;
+        info!(target: "loader", "Found cartridge {}, version {}.{}, type {}",
+        str::from_utf8(&header.name).unwrap_or(""),
+        header.version >> 8,
+        header.version & 0xff,
+        header.hw_type);
         self.validate_header(&header)?;
         rdr.consume((header.header_length - 0x40) as usize);
         let mut cartridge = self.build_cartridge(header);
@@ -196,6 +203,8 @@ impl Loader for CrtLoader {
             })?;
             match chip_header_opt {
                 Some(chip_header) => {
+                    info!(target: "loader", "Found chip {}, offset 0x{:x}, size {}",
+                    chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
                     self.validate_chip_header(&chip_header)?;
                     let chip_data = self.read_data(&mut rdr, (chip_header.length - 0x10) as usize).map_err(|_| {
                         Error::new(ErrorKind::InvalidData,

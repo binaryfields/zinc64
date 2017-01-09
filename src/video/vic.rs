@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use config::Config;
 use cpu::Cpu;
+use log::LogLevel::Trace;
 use mem::{Addressable, ColorRam, Memory};
 use video::RenderTarget;
 use util::bit;
@@ -427,7 +428,7 @@ impl Vic {
     // -- Device I/O
 
     pub fn read(&mut self, reg: u8) -> u8 {
-        match Reg::from(reg) {
+        let value = match Reg::from(reg) {
             Reg::M0X => (self.sprites[0].x & 0x00ff) as u8,
             Reg::M0Y => self.sprites[0].y,
             Reg::M1X => (self.sprites[1].x & 0x00ff) as u8,
@@ -559,10 +560,17 @@ impl Vic {
             Reg::M6C => self.sprites[6].color | 0xf0,
             Reg::M7C => self.sprites[7].color | 0xf0,
             Reg::IGNORE => 0xff,
+        };
+        if log_enabled!(Trace) {
+            trace!(target: "vic::reg", "Read 0x{:x} = 0x{:x}", reg, value);
         }
+        value
     }
 
     pub fn write(&mut self, reg: u8, value: u8) {
+        if log_enabled!(Trace) {
+            trace!(target: "vic::reg", "Write 0x{:x} = 0x{:x}", reg, value);
+        }
         match Reg::from(reg) {
             Reg::M0X => self.sprites[0].x = (self.sprites[0].x & 0xff00) | (value as u16),
             Reg::M0Y => self.sprites[0].y = value,

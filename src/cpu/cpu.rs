@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use cpu::Instruction;
 use mem::{Addressable, Memory};
+use log::LogLevel::Trace;
 use util::bit;
 
 // Spec: http://nesdev.com/6502.txt
@@ -161,11 +162,12 @@ impl Cpu {
         } else if self.io.borrow().irq && !self.test_flag(Flag::IntDisable) {
             self.interrupt(Interrupt::Irq);
         }
-        // let pc = self.pc;
+        let pc = self.pc;
         let opcode = self.fetch_op();
         let op = Instruction::decode(self, opcode);
-        // self.dump_registers();
-        // println!("exec 0x{:x}: {:?}", pc, op);
+        if log_enabled!(Trace) {
+            trace!(target: "cpu::instr", "0x{:x}: {:?}", pc, op);
+        }
         self.execute_instruction(&op);
     }
 
@@ -596,6 +598,9 @@ impl Cpu {
     // -- Interrupt Ops
 
     fn interrupt(&mut self, interrupt: Interrupt) -> u8 {
+        if log_enabled!(Trace) {
+            trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
+        }
         let pc = self.pc;
         let p = self.p;
         match interrupt {
