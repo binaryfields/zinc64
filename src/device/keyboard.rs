@@ -39,8 +39,14 @@ impl Keyboard {
         }
     }
 
-    pub fn get_row(&self, row: u8) -> u8 { self.matrix[row as usize] }
-    pub fn set_row(&mut self, row: u8, value: u8) { self.matrix[row as usize] = value; }
+    pub fn get_row(&self, row: u8) -> u8 {
+        self.matrix[row as usize]
+    }
+
+    #[allow(dead_code)]
+    pub fn set_row(&mut self, row: u8, value: u8) {
+        self.matrix[row as usize] = value;
+    }
 
     pub fn drain_event(&mut self) {
         if let Some((keycode, pressed)) = self.buffer.pop_front() {

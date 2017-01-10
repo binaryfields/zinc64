@@ -28,7 +28,7 @@ use cpu::{Cpu, CpuIo};
 use config::Config;
 use device::{Cartridge, Joystick, Keyboard};
 use device::joystick;
-use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
+use mem::{BaseAddr, ColorRam, DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
@@ -224,10 +224,6 @@ impl C64 {
         self.keyboard.clone()
     }
 
-    pub fn get_memory(&self) -> Rc<RefCell<Memory>> {
-        self.mem.clone()
-    }
-
     pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
         self.rt.clone()
     }
@@ -282,6 +278,7 @@ impl C64 {
         (-cycles) as u16
     }
 
+    #[allow(unused_variables)]
     pub fn step(&mut self) -> u8 {
         self.last_pc = self.cpu.borrow().get_pc();
         let cycles = self.cpu.borrow_mut().execute();
@@ -327,6 +324,7 @@ impl C64 {
         self.breakpoints.push(breakpoint);
     }
 
+    #[allow(dead_code)]
     pub fn check_breakpoints(&self) -> bool {
         let pc = self.cpu.borrow().get_pc();
         !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)

@@ -41,6 +41,7 @@ pub struct Rect {
 }
 
 impl Rect {
+    #[allow(dead_code)]
     pub fn new(left: u16, right: u16, top: u16, bottom: u16) -> Rect {
         Rect {
             left: left,
@@ -59,6 +60,7 @@ impl Rect {
         }
     }
 
+    #[allow(dead_code)]
     pub fn size(&self) -> Dimension {
         Dimension::new(self.right - self.left + 1, self.bottom - self.top + 1)
     }

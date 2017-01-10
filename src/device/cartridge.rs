@@ -98,6 +98,7 @@ impl Cartridge {
         self.banks.push(chip);
     }
 
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.switch_bank(0);
     }
@@ -123,6 +124,7 @@ impl Cartridge {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn read_io(&self, address: u16) -> u8 {
         0
     }

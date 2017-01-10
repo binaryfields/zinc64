@@ -19,14 +19,13 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::result::Result;
 use std::str::FromStr;
 
 use log;
-use log::{LogLevel, LogLevelFilter, LogMetadata, LogRecord, SetLoggerError};
+use log::{LogLevel, LogMetadata, LogRecord};
 
 pub struct Logger {
     level: LogLevel,

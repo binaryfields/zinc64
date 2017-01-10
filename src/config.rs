@@ -42,6 +42,7 @@ of the machine. That's why the VIC-II internally provides a clock divider which 
 
 const CLOCK_MASTER_PAL: u32 = 17734475;
 const CLOCK_CPU_PAL: u32 = CLOCK_MASTER_PAL / 18; // 985248 Hz
+#[allow(dead_code)]
 const CLOCK_VIC_PAL: u32 = CLOCK_CPU_PAL * 8; // 7881984 Hz
 
 /*
@@ -71,10 +72,12 @@ const DISPLAY_HEIGHT_PAL: u16 = 312;
 
 const VISIBLE_WIDTH_PAL: u16 = 403;
 const VISIBLE_HEIGHT_PAL: u16 = 284;
-const VISIBLE_FIRST_LINE_PAL: u16 = 16;
-const VISIBLE_LAST_LINE_PAL: u16 = 299;
 const VISIBLE_FIRST_COL_PAL: u16 = 80; // translated 76, original 480, but we offset x to beg of display
+const VISIBLE_FIRST_LINE_PAL: u16 = 16;
+#[allow(dead_code)]
 const VISIBLE_LAST_COL_PAL: u16 = 484; // translated 480, original 380, but we offset x to beg of display
+#[allow(dead_code)]
+const VISIBLE_LAST_LINE_PAL: u16 = 299;
 
 /*
 
@@ -117,9 +120,11 @@ And the vertical ones:
 
 const WINDOW_WIDTH: u16 = 320;
 const WINDOW_HEIGHT: u16 = 200;
-const WINDOW_FIRST_LINE: u16 = 51;
-const WINDOW_LAST_LINE: u16 = 250;
 const WINDOW_FIRST_COL: u16 = 128; // translated 124, original 24
+const WINDOW_FIRST_LINE: u16 = 51;
+#[allow(dead_code)]
+const WINDOW_LAST_LINE: u16 = 250;
+#[allow(dead_code)]
 const WINDOW_LAST_COL: u16 = 447; // translated 443, original 343
 
 const RASTER_TIME_BYTE_PAL: u16 = 1; // 8 pixels/cpu cycle

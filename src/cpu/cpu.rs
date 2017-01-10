@@ -133,28 +133,50 @@ impl Cpu {
         }
     }
 
-    pub fn get_a(&self) -> u8 { self.a }
-    pub fn get_pc(&self) -> u16 { self.pc }
-    pub fn get_x(&self) -> u8 { self.x }
-    pub fn get_y(&self) -> u8 { self.y }
+    pub fn get_a(&self) -> u8 {
+        self.a
+    }
 
-    pub fn set_a(&mut self, value: u8) { self.a = value; }
-    pub fn set_pc(&mut self, value: u16) { self.pc = value; }
-    pub fn set_x(&mut self, value: u8) { self.x = value; }
-    pub fn set_y(&mut self, value: u8) { self.y = value; }
+    pub fn get_pc(&self) -> u16 {
+        self.pc
+    }
+
+    #[allow(dead_code)]
+    pub fn get_x(&self) -> u8 {
+        self.x
+    }
+
+    #[allow(dead_code)]
+    pub fn get_y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn set_a(&mut self, value: u8) {
+        self.a = value;
+    }
+
+    pub fn set_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    #[allow(dead_code)]
+    pub fn set_x(&mut self, value: u8) {
+        self.x = value;
+    }
+
+    #[allow(dead_code)]
+    pub fn set_y(&mut self, value: u8) {
+        self.y = value;
+    }
 
     pub fn set_irq(&mut self) {
         self.io.borrow_mut().irq = true;
     }
 
-    pub fn set_nmi(&mut self) {
-        self.io.borrow_mut().nmi = true;
-    }
-
     #[allow(dead_code)]
     fn dump_registers(&self) {
         println!("A: {:x} X: {:x} Y: {:x} S: {:x} P: {:x}",
-                self.a, self.x, self.y, self.sp, self.p);
+                 self.a, self.x, self.y, self.sp, self.p);
     }
 
     pub fn execute(&mut self) -> u8 {

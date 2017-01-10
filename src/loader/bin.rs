@@ -23,9 +23,8 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::result::Result;
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use c64::C64;
-use loader::{Autostart, Image, Loader};
+use loader::{Image, Loader};
 use loader::autostart;
 use mem::BaseAddr;
 
@@ -43,6 +42,7 @@ impl Image for BinImage {
         cpu.borrow_mut().set_pc(self.offset);
     }
 
+    #[allow(unused_variables)]
     fn unmount(&mut self, c64: &mut C64) {}
 }
 
@@ -66,7 +66,7 @@ impl Loader for BinLoader {
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
         info!(target: "loader", "Loading BIN {}", path.to_str().unwrap());
-        let mut file = File::open(path)?;
+        let file = File::open(path)?;
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;

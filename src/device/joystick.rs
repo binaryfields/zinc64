@@ -103,10 +103,12 @@ impl Joystick {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn on_button_down(&mut self, button_idx: u8) {
         self.button = true;
     }
 
+    #[allow(unused_variables)]
     pub fn on_button_up(&mut self, button_idx: u8) {
         self.button = false;
     }

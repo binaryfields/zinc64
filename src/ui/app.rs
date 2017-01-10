@@ -29,9 +29,8 @@ use sdl2::joystick::Joystick;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::rect::Rect;
 use sdl2::render::{Renderer, Texture};
-use sdl2::video::{FullscreenType, Window};
+use sdl2::video::FullscreenType;
 use time;
 
 pub enum JamAction {
@@ -56,7 +55,6 @@ enum State {
     Running,
     Paused,
     Stopped,
-    Trapped,
 }
 
 pub struct Options {
@@ -74,7 +72,9 @@ pub struct AppWindow {
     texture: Texture,
     sdl: Sdl,
     // Devices
+    #[allow(dead_code)]
     joystick1: Option<Joystick>,
+    #[allow(dead_code)]
     joystick2: Option<Joystick>,
     // Configuration
     jam_action: JamAction,
@@ -141,7 +141,7 @@ impl AppWindow {
         )
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), String> {
         info!(target: "ui", "Running main loop");
         let mut events = self.sdl.event_pump().unwrap();
         let mut overflow_cycles = 0;
@@ -155,7 +155,7 @@ impl AppWindow {
                     }
                     let rt = self.c64.get_render_target();
                     if rt.borrow().get_sync() {
-                        self.render();
+                        self.render()?;
                     }
                 },
                 State::Paused => {
@@ -167,13 +167,9 @@ impl AppWindow {
                     info!(target: "ui", "State {:?}", self.state);
                     break 'running;
                 },
-                State::Trapped => {
-                    let cpu = self.c64.get_cpu();
-                    info!(target: "ui", "State {:?} at 0x{:x}", self.state, cpu.borrow().get_pc());
-                    break 'running;
-                },
             }
         }
+        Ok(())
     }
 
     fn handle_cpu_jam(&mut self) -> bool {
@@ -192,14 +188,17 @@ impl AppWindow {
         }
     }
 
-    fn render(&mut self) {
+    fn render(&mut self) -> Result<(), String> {
         let rt = self.c64.get_render_target();
-        self.texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch());
+        self.texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch()).map_err(|_| {
+            "failed to update texture"
+        })?;
         self.renderer.clear();
-        self.renderer.copy(&self.texture, None, None).unwrap();
+        self.renderer.copy(&self.texture, None, None)?;
         self.renderer.present();
         rt.borrow_mut().set_sync(false);
         self.last_frame_ts = time::precise_time_ns();
+        Ok(())
     }
 
     fn reset(&mut self) {
@@ -246,23 +245,23 @@ impl AppWindow {
                 | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     self.state = State::Stopped;
                 },
-                Event::KeyDown { keycode: Some(Keycode::P), keymod: keymod, repeat: false, .. }
+                Event::KeyDown { keycode: Some(Keycode::P), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_pause();
                 },
-                Event::KeyDown { keycode: Some(Keycode::Q), keymod: keymod, repeat: false, .. }
+                Event::KeyDown { keycode: Some(Keycode::Q), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.state = State::Stopped;
                 },
-                Event::KeyDown { keycode: Some(Keycode::W), keymod: keymod, repeat: false, .. }
+                Event::KeyDown { keycode: Some(Keycode::W), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_warp();
                 },
-                Event::KeyDown { keycode: Some(Keycode::Return), keymod: keymod, repeat: false, .. }
+                Event::KeyDown { keycode: Some(Keycode::Return), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_fullscreen();
                 },
-                Event::KeyDown { keycode: Some(Keycode::F9), keymod: keymod, repeat: false, .. }
+                Event::KeyDown { keycode: Some(Keycode::F9), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.c64.reset();
                 }
@@ -294,17 +293,17 @@ impl AppWindow {
                         }
                     }
                 },
-                Event::JoyAxisMotion { which: which, axis_idx: axis_idx, value: value, .. } => {
+                Event::JoyAxisMotion { which, axis_idx, value, .. } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_axis_motion(axis_idx, value);
                     }
                 },
-                Event::JoyButtonDown { which: which, button_idx: button_idx, .. } => {
+                Event::JoyButtonDown { which, button_idx, .. } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_button_down(button_idx);
                     }
                 },
-                Event::JoyButtonUp { which: which, button_idx: button_idx, .. } => {
+                Event::JoyButtonUp { which, button_idx, .. } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_button_up(button_idx);
                     }

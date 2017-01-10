@@ -63,10 +63,6 @@ impl ExpansionPort {
         }
     }
 
-    pub fn get_io(&self) -> Rc<RefCell<ExpansionPortIo>> {
-        self.io.clone()
-    }
-
     pub fn attach(&mut self, cartridge: Cartridge) {
         self.io.borrow_mut().update(cartridge.get_game(), cartridge.get_exrom());
         self.cartridge = Some(cartridge);
@@ -81,6 +77,7 @@ impl ExpansionPort {
         }
     }
 
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.reset();

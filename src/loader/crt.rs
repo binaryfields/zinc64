@@ -17,16 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::cell::RefCell;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufRead, Error, ErrorKind, Read};
 use std::path::Path;
-use std::rc::Rc;
 use std::result::Result;
 use std::str;
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use c64::C64;
 use device::{Cartridge, Chip, ChipType, HwType};
 use loader::{Image, Loader};
@@ -44,6 +42,7 @@ struct Header {
     hw_type: u16,
     exrom_line: u8,
     game_line: u8,
+    #[allow(dead_code)]
     reserved: [u8; 6],
     name: [u8; 32],
 }
@@ -185,7 +184,7 @@ impl Loader for CrtLoader {
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
         info!(target: "loader", "Loading CRT {}", path.to_str().unwrap());
-        let mut file = File::open(path)?;
+        let file = File::open(path)?;
         let mut rdr = BufReader::new(file);
         let header = self.read_header(&mut rdr).map_err(|_| {
             Error::new(ErrorKind::InvalidData,

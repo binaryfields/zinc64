@@ -125,11 +125,6 @@ impl Memory {
         self.ram.write(address, value);
     }
 
-    pub fn write_ram_u16(&mut self, address: u16, value: u16) {
-        self.ram.write(address, (value & 0xff) as u8);
-        self.ram.write(address, (value >> 8) as u8);
-    }
-
     // -- VIC Memory Ops
 
     pub fn vic_read(&self, address: u16) -> u8 {

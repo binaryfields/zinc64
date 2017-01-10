@@ -40,17 +40,30 @@ impl RenderTarget {
         }
     }
 
-    pub fn get_dimension(&self) -> Dimension { self.dim }
-    pub fn get_pitch(&self) -> usize { self.dim.width as usize * PIXEL_BYTES }
+    #[allow(dead_code)]
+    pub fn get_dimension(&self) -> Dimension {
+        self.dim
+    }
+
+    pub fn get_pitch(&self) -> usize {
+        self.dim.width as usize * PIXEL_BYTES
+    }
+
     pub fn get_pixel_data(&self) -> &[u8] {
         unsafe { mem::transmute::<&[u32], &[u8]>(self.pixels.as_ref()) }
     }
-    pub fn get_sync(&self) -> bool { self.sync }
-    pub fn set_sync(&mut self, value: bool) { self.sync = value; }
+
+    pub fn get_sync(&self) -> bool {
+        self.sync
+    }
+
+    pub fn set_sync(&mut self, value: bool) {
+        self.sync = value;
+    }
 
     pub fn write(&mut self, x: u16, y: u16, color: u8) {
         let index = self.index(x, y);
-        self.pixels[index] =  Color::from(color).rgb();
+        self.pixels[index] = Color::from(color).rgb();
     }
 
     // -- Internal Ops

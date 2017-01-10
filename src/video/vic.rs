@@ -212,6 +212,7 @@ impl Sprite {
     }
 }
 
+#[allow(dead_code)]
 pub struct Vic {
     // Dependencies
     config: Config,
@@ -306,7 +307,7 @@ impl Vic {
             }
         }
         if self.is_bad_line(self.raster) {
-            let vc = self.vc;
+            //let vc = self.vc;
             //self.fetch_vm_line(vc); // FIXME vc_base
         }
         if self.x_pos == 0 {
@@ -542,6 +543,7 @@ impl Vic {
         self.mem.borrow().vic_read(address)
     }
 
+    #[allow(dead_code)]
     fn fetch_vm_line(&mut self, vc: u16) {
         for i in 0..40u16 {
             self.vm_buffer[i as usize] = self.fetch_char_code(vc + i);
@@ -726,10 +728,9 @@ impl Vic {
                 self.raster_compare = bit::bit_update16(self.raster_compare, 8, bit::bit_test(value, 7));
                 let mode = bit::bit_update(self.mode.value(), 2, bit::bit_test(value, 6));
                 let mode2 = bit::bit_update(mode, 1, bit::bit_test(value, 5));
-                self.mode = Mode::from(mode);
+                self.mode = Mode::from(mode2);
                 self.den = bit::bit_test(value, 4);
                 self.rsel = bit::bit_test(value, 3);
-                let rsel = bit::bit_set(3, self.rsel);
                 self.scroll_y = value & 0x07;
             }
             Reg::RASTER => self.raster_compare = (self.raster_compare & 0xff00) | (value as u16),

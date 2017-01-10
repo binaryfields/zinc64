@@ -123,6 +123,7 @@ impl Reg {
         }
     }
 
+    #[allow(dead_code)]
     pub fn addr(&self) -> u8 {
         *self as u8
     }

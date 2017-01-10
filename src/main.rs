@@ -36,7 +36,6 @@ mod util;
 mod video;
 
 use std::env;
-use std::ffi::OsStr;
 use std::path::Path;
 use std::process;
 use std::result::Result;
@@ -44,7 +43,6 @@ use std::result::Result;
 use c64::C64;
 use config::Config;
 use loader::{BinLoader, Loader, Loaders};
-use mem::BaseAddr;
 use ui::app;
 use util::Logger;
 
@@ -52,9 +50,8 @@ static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 fn main() {
-    let result = run(env::args().collect());
-    match result {
-        Ok(rc) => process::exit(rc),
+    match run(env::args().collect()) {
+        Ok(_) => process::exit(0),
         Err(err) => {
             println!("Error: {}", err);
             process::exit(1)
@@ -188,17 +185,15 @@ fn process_debug_options(c64: &mut C64, matches: &getopts::Matches) -> Result<()
     Ok(())
 }
 
-fn run(args: Vec<String>) -> Result<i32, String> {
+fn run(args: Vec<String>) -> Result<(), String> {
     let opts = build_cli_options();
     let matches = opts.parse(&args[1..]).map_err(|f| {
         format!("Invalid options\n{}", f)
     })?;
     if matches.opt_present("help") {
         print_help(&opts);
-        Ok(0)
     } else if matches.opt_present("version") {
         print_version();
-        Ok(0)
     } else {
         init_logging(&matches)?;
         info!("Staring {}", NAME);
@@ -217,8 +212,8 @@ fn run(args: Vec<String>) -> Result<i32, String> {
         } else {
             let options = build_app_options(&matches)?;
             let mut app_window = ui::AppWindow::new(c64, options)?;
-            app_window.run();
+            app_window.run()?;
         }
-        Ok(0)
     }
+    Ok(())
 }
