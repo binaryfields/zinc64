@@ -27,7 +27,7 @@ use config::Config;
 use device::{Cartridge, Joystick, Keyboard};
 use device::joystick;
 use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
-use io::{Cia, ExpansionPort, ExpansionPortIo};
+use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
 use video::{RenderTarget, Vic};
@@ -69,6 +69,12 @@ impl C64 {
     pub fn new(config: Config) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
         // I/O Lines
+        let cia1_io = Rc::new(RefCell::new(
+            CiaIo::new()
+        ));
+        let cia2_io = Rc::new(RefCell::new(
+            CiaIo::new()
+        ));
         let cpu_io = Rc::new(RefCell::new(
             CpuIo::new()
         ));
@@ -110,17 +116,19 @@ impl C64 {
         ));
         let cia1 = Rc::new(RefCell::new(
             Cia::new(cia::Mode::Cia1,
-                          cpu.clone(),
-                          joystick1.clone(),
-                          joystick2.clone(),
-                          keyboard.clone())
+                     cia1_io.clone(),
+                     cpu_io.clone(),
+                     joystick1.clone(),
+                     joystick2.clone(),
+                     keyboard.clone())
         ));
         let cia2 = Rc::new(RefCell::new(
             Cia::new(cia::Mode::Cia2,
-                          cpu.clone(),
-                          joystick1.clone(),
-                          joystick2.clone(),
-                          keyboard.clone())
+                     cia2_io.clone(),
+                     cpu_io.clone(),
+                     joystick1.clone(),
+                     joystick2.clone(),
+                     keyboard.clone())
         ));
         let vic = Rc::new(RefCell::new(
             Vic::new(config.clone(),

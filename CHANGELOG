@@ -41,3 +41,4 @@
 - landed logging
 - landed app speed control
 - landed cpu jam
+- rework cia interrupt and step logic

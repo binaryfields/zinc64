@@ -20,7 +20,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cpu::Cpu;
+use cpu::CpuIo;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
@@ -34,23 +34,16 @@ use util::bit;
 // TODO cia: test cia read regs 0d-of
 // TODO cia: test timers
 
-#[allow(dead_code)]
-pub struct Cia {
-    // Dependencies
-    cpu: Rc<RefCell<Cpu>>,
-    joystick1: Option<Rc<RefCell<Joystick>>>,
-    joystick2: Option<Rc<RefCell<Joystick>>>,
-    keyboard: Rc<RefCell<Keyboard>>,
-    mode: Mode,
-    // Functional Units
-    port_a: Port,
-    port_b: Port,
-    rtc: Rtc,
-    timer_a: Timer,
-    timer_b: Timer,
-    // I/O
-    cnt_line: bool,
-    cnt_last: bool,
+pub struct CiaIo {
+    pub cnt: bool,
+}
+
+impl CiaIo {
+    pub fn new() -> CiaIo {
+        CiaIo {
+            cnt: false,
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -88,7 +81,7 @@ impl Port {
 }
 
 #[derive(Copy, Clone)]
-pub enum Reg {
+enum Reg {
     PRA = 0x00,
     PRB = 0x01,
     DDRA = 0x02,
@@ -163,10 +156,8 @@ struct Timer {
     input: TimerInput,
     output: TimerOutput,
     output_enabled: bool,
-    int_enabled: bool,
     latch: u16,
     value: u16,
-    triggered: bool,
 }
 
 impl Timer {
@@ -177,10 +168,8 @@ impl Timer {
             input: TimerInput::SystemClock,
             output: TimerOutput::Pulse,
             output_enabled: false,
-            int_enabled: false,
             latch: 0,
             value: 0,
-            triggered: false,
         }
     }
 
@@ -195,27 +184,53 @@ impl Timer {
         }
     }
 
-    pub fn update(&mut self, pulses: u16) {
+    pub fn update(&mut self, pulse: u16) -> bool {
         if self.enabled {
-            self.value = if pulses <= self.value { self.value - pulses } else { 0 };
             if self.value == 0 {
-                if self.int_enabled {
-                    self.triggered = true;
-                }
                 self.reset();
+                true
+            } else {
+                self.value -= pulse;
+                false
             }
+        } else {
+            false
         }
     }
 }
 
+#[allow(dead_code)]
+pub struct Cia {
+    // Dependencies
+    cpu_io: Rc<RefCell<CpuIo>>,
+    joystick1: Option<Rc<RefCell<Joystick>>>,
+    joystick2: Option<Rc<RefCell<Joystick>>>,
+    keyboard: Rc<RefCell<Keyboard>>,
+    mode: Mode,
+    // Functional Units
+    port_a: Port,
+    port_b: Port,
+    rtc: Rtc,
+    timer_a: Timer,
+    timer_b: Timer,
+    // Interrupts
+    int_data: u8,
+    int_mask: u8,
+    int_triggered: bool,
+    // I/O
+    cia_io: Rc<RefCell<CiaIo>>,
+    cnt_last: bool,
+}
+
 impl Cia {
     pub fn new(mode: Mode,
-               cpu: Rc<RefCell<Cpu>>,
+               cia_io: Rc<RefCell<CiaIo>>,
+               cpu_io: Rc<RefCell<CpuIo>>,
                joystick1: Option<Rc<RefCell<Joystick>>>,
                joystick2: Option<Rc<RefCell<Joystick>>>,
                keyboard: Rc<RefCell<Keyboard>>) -> Cia {
         Cia {
-            cpu: cpu,
+            cpu_io: cpu_io,
             joystick1: joystick1,
             joystick2: joystick2,
             keyboard: keyboard,
@@ -225,48 +240,49 @@ impl Cia {
             rtc: Rtc {},
             timer_a: Timer::new(),
             timer_b: Timer::new(),
-            cnt_line: false,
+            int_data: 0,
+            int_mask: 0,
+            int_triggered: false,
+            cia_io: cia_io,
             cnt_last: false,
         }
     }
 
-    pub fn set_cnt(&mut self, value: bool) {
-        self.cnt_line = value;
-    }
-
     pub fn step(&mut self) {
-        let timer_a_int = if self.timer_a.enabled {
-            let pulses = match self.timer_a.input {
+        // Process timers
+        let timer_a_output = if self.timer_a.enabled {
+            let pulse = match self.timer_a.input {
                 TimerInput::SystemClock => 1,
-                TimerInput::External => if !self.cnt_last && self.cnt_line { 1 } else { 0 },
+                TimerInput::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
                 _ => panic!("invalid input source {:?}", self.timer_a.input),
             };
-            let prev_triggered = self.timer_a.triggered;
-            self.timer_a.update(pulses);
-            self.timer_a.triggered && !prev_triggered
+            self.timer_a.update(pulse)
         } else {
             false
         };
-        let timer_b_int = if self.timer_b.enabled {
-            let pulses = match self.timer_b.input {
+        let timer_b_output = if self.timer_b.enabled {
+            let pulse = match self.timer_b.input {
                 TimerInput::SystemClock => 1,
-                TimerInput::External => if !self.cnt_last && self.cnt_line { 1 } else { 0 },
-                TimerInput::TimerA => if timer_a_int { 1 } else { 0 },
-                TimerInput::TimerAWithCNT => if timer_a_int && self.cnt_line { 1 } else { 0 },
+                TimerInput::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
+                TimerInput::TimerA => if timer_a_output { 1 } else { 0 },
+                TimerInput::TimerAWithCNT => if timer_a_output && self.cia_io.borrow().cnt { 1 } else { 0 },
             };
-            let prev_triggered = self.timer_b.triggered;
-            self.timer_b.update(pulses);
-            self.timer_b.triggered && !prev_triggered
+            self.timer_b.update(pulse)
         } else {
             false
         };
-        if timer_a_int || timer_b_int {
-            match self.mode {
-                Mode::Cia1 => self.cpu.borrow_mut().set_irq(),
-                Mode::Cia2 => self.cpu.borrow_mut().set_nmi(),
-            }
+        // Process interrupts
+        if timer_a_output {
+            self.int_data |= 1 << 0;
         }
-        self.cnt_last = self.cnt_line;
+        if timer_b_output {
+            self.int_data |= 1 << 1;
+        }
+        if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
+            self.trigger_interrupt();
+        }
+        // Update internal state
+        self.cnt_last = self.cia_io.borrow().cnt;
     }
 
     // -- Internal Ops
@@ -321,6 +337,14 @@ impl Cia {
         result
     }
 
+    fn trigger_interrupt(&mut self) {
+        match self.mode {
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq = true,
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi = true,
+        }
+        self.int_triggered = true;
+    }
+
     // -- Device I/O
 
     #[allow(dead_code)]
@@ -350,14 +374,10 @@ impl Cia {
             Reg::TODHR => 0,
             Reg::SDR => 0,
             Reg::ICR => {
-                let timer_a_int = if self.timer_a.triggered { 1 << 0 } else { 0 };
-                let timer_b_int = if self.timer_b.triggered { 1 << 1 } else { 0 };
-                let int_data = timer_a_int | timer_b_int;
-                let int_occurred = if int_data > 0 { 1 << 7 } else { 0 };
-                // Clear int data
-                self.timer_a.triggered = false;
-                self.timer_b.triggered = false;
-                int_data | int_occurred
+                let result = bit::bit_update(self.int_data, 7, (self.int_mask & self.int_data) != 0);
+                self.int_data = 0;
+                self.int_triggered = false;
+                result
             },
             Reg::CRA => {
                 let timer = &self.timer_a;
@@ -439,12 +459,13 @@ impl Cia {
             Reg::TODHR => {},
             Reg::SDR => {},
             Reg::ICR => {
-                let fill = bit::bit_test(value, 7);
-                if bit::bit_test(value, 0) {
-                    self.timer_a.int_enabled = fill;
+                if bit::bit_test(value, 7) {
+                    self.int_mask |= value & 0x1f;
+                } else {
+                    self.int_mask &= !(value & 0x1f);
                 }
-                if bit::bit_test(value, 1) {
-                    self.timer_b.int_enabled = fill;
+                if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
+                    self.trigger_interrupt();
                 }
             },
             Reg::CRA => {
