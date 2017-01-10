@@ -317,10 +317,10 @@ impl Cia {
     fn scan_joystick(&self, joystick: &Option<Rc<RefCell<Joystick>>>) -> u8 {
         if let Some(ref joystick) = *joystick {
             let joy = joystick.borrow();
-            let joy_up = bit::bit_set(0, joy.get_y_axis() == joystick::Motion::Positive);
-            let joy_down = bit::bit_set(1, joy.get_y_axis() == joystick::Motion::Negative);
-            let joy_left = bit::bit_set(2, joy.get_x_axis() == joystick::Motion::Negative);
-            let joy_right = bit::bit_set(3, joy.get_x_axis() == joystick::Motion::Positive);
+            let joy_up = bit::bit_set(0, joy.get_y_axis() == joystick::AxisMotion::Positive);
+            let joy_down = bit::bit_set(1, joy.get_y_axis() == joystick::AxisMotion::Negative);
+            let joy_left = bit::bit_set(2, joy.get_x_axis() == joystick::AxisMotion::Negative);
+            let joy_right = bit::bit_set(3, joy.get_x_axis() == joystick::AxisMotion::Positive);
             let joy_fire = bit::bit_set(4, joy.get_button());
             !(joy_left | joy_right | joy_up | joy_down | joy_fire)
         } else {

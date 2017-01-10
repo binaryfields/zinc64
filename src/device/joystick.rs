@@ -44,17 +44,17 @@ impl Mode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Motion {
+pub enum AxisMotion {
     Negative,
-    Off,
+    Neutral,
     Positive,
 }
 
 pub struct Joystick {
     mode: Mode,
     threshold: i16,
-    x_axis: Motion,
-    y_axis: Motion,
+    x_axis: AxisMotion,
+    y_axis: AxisMotion,
     button: bool,
 }
 
@@ -63,8 +63,8 @@ impl Joystick {
         Joystick {
             mode: mode,
             threshold: threshold,
-            x_axis: Motion::Off,
-            y_axis: Motion::Off,
+            x_axis: AxisMotion::Neutral,
+            y_axis: AxisMotion::Neutral,
             button: false,
         }
     }
@@ -77,11 +77,11 @@ impl Joystick {
         self.mode.index()
     }
 
-    pub fn get_x_axis(&self) -> Motion {
+    pub fn get_x_axis(&self) -> AxisMotion {
         self.x_axis
     }
 
-    pub fn get_y_axis(&self) -> Motion {
+    pub fn get_y_axis(&self) -> AxisMotion {
         self.y_axis
     }
 
@@ -93,12 +93,12 @@ impl Joystick {
 
     pub fn on_axis_motion(&mut self, axis_idx: u8, value: i16) {
         match axis_idx {
-            0 if value < -self.threshold => self.x_axis = Motion::Negative,
-            0 if value > self.threshold => self.x_axis = Motion::Positive,
-            0 => self.x_axis = Motion::Off,
-            1 if value < -self.threshold => self.y_axis = Motion::Negative,
-            1 if value > self.threshold => self.y_axis = Motion::Positive,
-            1 => self.y_axis = Motion::Off,
+            0 if value < -self.threshold => self.x_axis = AxisMotion::Negative,
+            0 if value > self.threshold => self.x_axis = AxisMotion::Positive,
+            0 => self.x_axis = AxisMotion::Neutral,
+            1 if value < -self.threshold => self.y_axis = AxisMotion::Negative,
+            1 if value > self.threshold => self.y_axis = AxisMotion::Positive,
+            1 => self.y_axis = AxisMotion::Neutral,
             _ => panic!("invalid axis {}", axis_idx),
         }
     }
@@ -115,10 +115,10 @@ impl Joystick {
 
     pub fn on_key_down(&mut self, keycode: Keycode) {
         match keycode {
-            Keycode::Kp4 => self.x_axis = Motion::Negative,
-            Keycode::Kp6 => self.x_axis = Motion::Positive,
-            Keycode::Kp2 => self.y_axis = Motion::Negative,
-            Keycode::Kp8 => self.y_axis = Motion::Positive,
+            Keycode::Kp4 => self.x_axis = AxisMotion::Negative,
+            Keycode::Kp6 => self.x_axis = AxisMotion::Positive,
+            Keycode::Kp2 => self.y_axis = AxisMotion::Negative,
+            Keycode::Kp8 => self.y_axis = AxisMotion::Positive,
             Keycode::KpEnter => self.button = true,
             _ => {},
         }
@@ -126,10 +126,10 @@ impl Joystick {
 
     pub fn on_key_up(&mut self, keycode: Keycode) {
         match keycode {
-            Keycode::Kp4 => self.x_axis = Motion::Off,
-            Keycode::Kp6 => self.x_axis = Motion::Off,
-            Keycode::Kp2 => self.y_axis = Motion::Off,
-            Keycode::Kp8 => self.y_axis = Motion::Off,
+            Keycode::Kp4 => self.x_axis = AxisMotion::Neutral,
+            Keycode::Kp6 => self.x_axis = AxisMotion::Neutral,
+            Keycode::Kp2 => self.y_axis = AxisMotion::Neutral,
+            Keycode::Kp8 => self.y_axis = AxisMotion::Neutral,
             Keycode::KpEnter => self.button = false,
             _ => {},
         }
