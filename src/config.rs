@@ -137,6 +137,8 @@ pub struct Config {
     pub visible: Rect,
     pub window_size: Dimension,
     pub window: Rect,
+    pub frame_cycles: u16,
+    pub frame_duration_ns: u32,
     pub raster_line_cycles: u16,
     pub refresh_rate: f64,
     // Devices
@@ -163,6 +165,8 @@ impl Config {
             visible: Rect::new_with_dim(VISIBLE_FIRST_COL_PAL, VISIBLE_FIRST_LINE_PAL, visible_size),
             window_size: window_size,
             window: Rect::new_with_dim(WINDOW_FIRST_COL, WINDOW_FIRST_LINE, window_size),
+            frame_cycles: RASTER_FRAME_CYCLES_PAL,
+            frame_duration_ns: ((1.0 / RASTER_REFRESH_RATE_PAL) * 1_000_000_000.0) as u32,
             raster_line_cycles: RASTER_LINE_CYCLES_PAL,
             refresh_rate: RASTER_REFRESH_RATE_PAL,
             joystick1: joystick::Mode::Numpad,

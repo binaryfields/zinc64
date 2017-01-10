@@ -78,12 +78,12 @@ fn build_cli_options() -> getopts::Options {
         // Ui
         .optflag("", "console", "start in console mode")
         .optflag("f", "fullscreen", "enable fullscreen")
-        .optopt("", "speed", "set speed of the emulator", "number")
         .optopt("", "width", "window width", "width")
         .optopt("", "height", "window height", "height")
         // Debug
         .optmulti("", "bp", "set breakpoint at this address", "address")
         .optopt("", "jamaction", "set cpu jam handling", "[continue|quit|reset]")
+        .optopt("", "speed", "set speed of the emulator", "number")
         // Help
         .optflag("h", "help", "display this help")
         .optflag("V", "version", "display this version");
@@ -96,9 +96,6 @@ fn build_app_options(matches: &getopts::Matches) -> Result<app::Options, String>
         jam_action: matches.opt_str("jamaction")
             .map(|s| app::JamAction::from(&s))
             .unwrap_or(app::JamAction::Quit),
-        speed: matches.opt_str("speed")
-            .map(|s| s.parse::<u8>().unwrap())
-            .unwrap_or(100),
         height: matches.opt_str("height")
             .map(|s| s.parse::<u32>().unwrap())
             .unwrap_or(600),
@@ -184,6 +181,10 @@ fn process_debug_options(c64: &mut C64, matches: &getopts::Matches) -> Result<()
     for bp in bps {
         c64.add_breakpoint(bp);
     }
+    let speed = matches.opt_str("speed")
+        .map(|s| s.parse::<u8>().unwrap())
+        .unwrap_or(100);
+    c64.set_speed(speed);
     Ok(())
 }
 
@@ -206,9 +207,10 @@ fn run(args: Vec<String>) -> Result<i32, String> {
         process_debug_options(&mut c64, &matches)?;
         process_autostart_options(&mut c64, &matches)?;
         if matches.opt_present("console") {
+            let mut overflow_cycles = 0;
             loop {
-                let running = c64.run_frame();
-                if !running {
+                overflow_cycles = c64.run_frame(overflow_cycles);
+                if c64.is_cpu_jam() {
                     break;
                 }
             }

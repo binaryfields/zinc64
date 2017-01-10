@@ -21,6 +21,8 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 use std::result::Result;
+use std::thread;
+use std::time::Duration;
 
 use cpu::{Cpu, CpuIo};
 use config::Config;
@@ -30,6 +32,7 @@ use mem::{Addressable, BaseAddr, ColorRam, DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
+use time;
 use video::{RenderTarget, Vic};
 
 // Design:
@@ -58,11 +61,15 @@ pub struct C64 {
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     rt: Rc<RefCell<RenderTarget>>,
-    // TBD
+    // Configuration
     autostart: Option<Autostart>,
     breakpoints: Vec<u16>,
+    speed: u8,
+    warp_mode: bool,
     // Runtime State
+    cycles: u64,
     last_pc: u16,
+    next_frame_ns: u64,
 }
 
 impl C64 {
@@ -170,7 +177,11 @@ impl C64 {
                 rt: rt.clone(),
                 autostart: None,
                 breakpoints: Vec::new(),
+                speed: 100,
+                warp_mode: false,
+                cycles: 0,
                 last_pc: 0,
+                next_frame_ns: 0,
             }
         )
     }
@@ -178,12 +189,15 @@ impl C64 {
     pub fn get_config(&self) -> &Config {
         &self.config
     }
+
     pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> {
         self.cpu.clone()
     }
-    pub fn get_cycles(&self) -> u32 {
-        self.cpu.borrow().get_cycles()
+
+    pub fn get_cycles(&self) -> u64 {
+        self.cycles
     }
+
     pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
         if let Some(ref joystick) = self.joystick1 {
             if joystick.borrow().get_index() == index {
@@ -197,26 +211,45 @@ impl C64 {
         }
         None
     }
+
     pub fn get_joystick1(&self) -> Option<Rc<RefCell<Joystick>>> {
         self.joystick1.clone()
     }
+
     pub fn get_joystick2(&self) -> Option<Rc<RefCell<Joystick>>> {
         self.joystick2.clone()
     }
+
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> {
         self.keyboard.clone()
     }
+
     pub fn get_memory(&self) -> Rc<RefCell<Memory>> {
         self.mem.clone()
     }
+
     pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
         self.rt.clone()
     }
+
+    pub fn get_warp_mode(&self) -> bool {
+        self.warp_mode
+    }
+
     pub fn is_cpu_jam(&self) -> bool {
         self.last_pc == self.cpu.borrow().get_pc()
     }
+
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
         self.autostart = autostart;
+    }
+
+    pub fn set_speed(&mut self, value: u8) {
+        self.speed = value;
+    }
+
+    pub fn set_warp_mode(&mut self, enabled: bool) {
+        self.warp_mode = enabled;
     }
 
     pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
@@ -231,35 +264,32 @@ impl C64 {
     pub fn reset(&mut self) {
         info!(target: "c64", "Resetting system");
         self.cpu.borrow_mut().reset();
+        self.cycles = 0;
         self.last_pc = 0;
+        self.next_frame_ns = 0;
         //self.expansion_port.borrow_mut().reset();
     }
 
-    pub fn run_frame(&mut self) -> bool {
-        let frame_cycles = (self.config.cpu_frequency as f64
-            / self.config.refresh_rate) as u64;
-        let mut last_pc = 0x0000;
-        for i in 0..frame_cycles {
-            self.step();
-            let pc = self.cpu.borrow().get_pc();
-            if self.check_breakpoints() {
-                println!("trap at 0x{:x}", pc);
-                return false;
-            }
-            if pc == last_pc {
-                println!("infinite loop at 0x{:x}", pc);
-                return false;
-            }
-            last_pc = pc;
+    pub fn run_frame(&mut self, overflow_cycles: u16) -> u16 {
+        let mut cycles = (self.config.frame_cycles - overflow_cycles) as i16;
+        while cycles > 0 {
+            let completed = self.step();
+            cycles -= completed as i16;
         }
-        true
+        if !self.warp_mode {
+            self.sync_frame();
+        }
+        (-cycles) as u16
     }
 
-    pub fn step(&mut self) -> u32 {
+    pub fn step(&mut self) -> u8 {
         self.last_pc = self.cpu.borrow().get_pc();
-        let prev_cycles = self.cpu.borrow().get_cycles();
-        self.cpu.borrow_mut().execute();
-        let cycles = self.cpu.borrow().get_cycles() - prev_cycles;
+        let cycles = self.cpu.borrow_mut().execute();
+        for i in 0..cycles {
+            self.vic.borrow_mut().step();
+            self.cia1.borrow_mut().step();
+            self.cia2.borrow_mut().step();
+        }
         if self.autostart.is_some() {
             if self.cpu.borrow().get_pc() == 0xa65c {
                 if let Some(mut autostart) = self.autostart.take() {
@@ -267,12 +297,17 @@ impl C64 {
                 }
             }
         }
-        for i in 0..(cycles + 1) {
-            self.cia1.borrow_mut().step();
-            self.cia2.borrow_mut().step();
-            self.vic.borrow_mut().step();
-        }
+        self.cycles += cycles as u64;
         cycles
+    }
+
+    fn sync_frame(&mut self) {
+        let frame_duration_scaled_ns = self.config.frame_duration_ns * 100 / self.speed as u32;
+        let wait_ns = (self.next_frame_ns - time::precise_time_ns()) as u32;
+        if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
+            thread::sleep(Duration::new(0, wait_ns));
+        }
+        self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
     }
 
     // -- Cartridge Ops

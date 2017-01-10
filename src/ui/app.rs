@@ -62,7 +62,6 @@ enum State {
 pub struct Options {
     pub fullscreen: bool,
     pub jam_action: JamAction,
-    pub speed: u8,
     pub height: u32,
     pub width: u32,
 }
@@ -77,14 +76,12 @@ pub struct AppWindow {
     // Devices
     joystick1: Option<Joystick>,
     joystick2: Option<Joystick>,
-    // Options
+    // Configuration
     jam_action: JamAction,
     // Runtime State
     state: State,
-    speed: u8,
     last_frame_ts: u64,
-    next_keyboard_event: u32,
-    warp_mode: bool,
+    next_keyboard_event: u64,
 }
 
 impl AppWindow {
@@ -138,10 +135,8 @@ impl AppWindow {
                 joystick2: joystick2,
                 jam_action: options.jam_action,
                 state: State::Running,
-                speed: options.speed,
                 last_frame_ts: 0,
                 next_keyboard_event: 0,
-                warp_mode: false,
             }
         )
     }
@@ -149,11 +144,19 @@ impl AppWindow {
     pub fn run(&mut self) {
         info!(target: "ui", "Running main loop");
         let mut events = self.sdl.event_pump().unwrap();
+        let mut overflow_cycles = 0;
         'running: loop {
             match self.state {
                 State::Running => {
                     self.handle_events(&mut events);
-                    self.run_frame();
+                    overflow_cycles = self.c64.run_frame(overflow_cycles);
+                    if self.c64.is_cpu_jam() {
+                        self.handle_cpu_jam();
+                    }
+                    let rt = self.c64.get_render_target();
+                    if rt.borrow().get_sync() {
+                        self.render();
+                    }
                 },
                 State::Paused => {
                     self.handle_events(&mut events);
@@ -199,31 +202,6 @@ impl AppWindow {
         self.last_frame_ts = time::precise_time_ns();
     }
 
-    fn run_frame(&mut self) {
-        let frame_cycles = (self.c64.get_config().cpu_frequency as f64
-            / self.c64.get_config().refresh_rate) as u64;
-        let rt = self.c64.get_render_target();
-        let mut last_pc = 0x0000;
-        for i in 0..frame_cycles {
-            self.c64.step();
-            if self.c64.check_breakpoints() {
-                self.state = State::Trapped;
-                break;
-            }
-            if self.c64.is_cpu_jam() {
-                if !self.handle_cpu_jam() {
-                    break;
-                }
-            }
-            if rt.borrow().get_sync() {
-                if !self.warp_mode {
-                    self.wait_vsync();
-                }
-                self.render();
-            }
-        }
-    }
-
     fn reset(&mut self) {
         self.c64.reset();
         self.next_keyboard_event = 0;
@@ -255,19 +233,8 @@ impl AppWindow {
     }
 
     fn toggle_warp(&mut self) {
-        self.warp_mode = !self.warp_mode;
-    }
-
-    fn wait_vsync(&self) {
-        let speed = 100.0 / (self.speed as f64);
-        let refresh_rate = self.c64.get_config().refresh_rate;
-        let interval_ns = (speed * ((1.0 / refresh_rate) * 1_000_000_000.0)) as u64;
-        let elapsed_ns = time::precise_time_ns() - self.last_frame_ts;
-        if elapsed_ns < interval_ns {
-            let wait_ns = interval_ns - elapsed_ns;
-            let wait = Duration::from_millis(wait_ns / 1_000_000);
-            thread::sleep(wait);
-        }
+        let warp_mode = self.c64.get_warp_mode();
+        self.c64.set_warp_mode(!warp_mode);
     }
 
     // -- Event Handling
