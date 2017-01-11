@@ -218,7 +218,7 @@ pub struct Cia {
     int_data: u8,
     int_mask: u8,
     int_triggered: bool,
-    // I/O
+    // I/O Lines
     cia_io: Rc<RefCell<CiaIo>>,
     cnt_last: bool,
 }

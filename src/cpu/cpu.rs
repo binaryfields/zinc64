@@ -77,7 +77,7 @@ pub struct Cpu {
     y: u8,
     sp: u8,
     p: u8,
-    // I/O
+    // I/O Lines
     io: Rc<RefCell<CpuIo>>,
 }
 
