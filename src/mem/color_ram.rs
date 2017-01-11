@@ -27,7 +27,13 @@ impl ColorRam {
     pub fn new(capacity: usize) -> ColorRam {
         info!(target: "mem", "Initializing Color RAM with capacity {}", capacity);
         ColorRam {
-            data: vec![0; capacity]
+            data: vec![0x00; capacity]
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for i in 0..self.data.len() {
+            self.data[i] = 0x00;
         }
     }
 }

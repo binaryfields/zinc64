@@ -54,14 +54,11 @@ pub struct Memory {
     basic: Box<Addressable>,
     charset: Box<Addressable>,
     kernal: Box<Addressable>,
-    ram: Box<Addressable>,
+    ram: Ram,
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone)]
-pub enum BaseAddr {
-    IoPortDdr = 0x0000,
-    IoPort = 0x0001,
+enum BaseAddr {
     Basic = 0xa000,
     Charset = 0xd000,
     Kernal = 0xe000,
@@ -82,7 +79,7 @@ impl Memory {
         let basic = Box::new(Rom::load(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?);
         let charset = Box::new(Rom::load(Path::new("res/rom/characters.rom"), 0)?);
         let kernal = Box::new(Rom::load(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?);
-        let ram = Box::new(Ram::new(capacity));
+        let ram = Ram::new(capacity);
         Ok(Memory {
             cpu_io: cpu_io,
             expansion_port_io: expansion_port_io,
@@ -106,6 +103,10 @@ impl Memory {
     }
     pub fn set_expansion_port(&mut self, expansion_port: Rc<RefCell<ExpansionPort>>) {
         self.expansion_port = Some(expansion_port);
+    }
+
+    pub fn reset(&mut self) {
+        self.ram.reset();
     }
 
     pub fn switch_banks(&mut self) {

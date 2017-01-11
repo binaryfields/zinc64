@@ -26,7 +26,6 @@ use std::result::Result;
 use c64::C64;
 use loader::{Image, Loader};
 use loader::autostart;
-use mem::BaseAddr;
 
 pub struct BinImage {
     data: Vec<u8>,
@@ -37,7 +36,7 @@ impl Image for BinImage {
     fn mount(&mut self, c64: &mut C64) {
         info!(target: "loader", "Mounting BIN image");
         let cpu = c64.get_cpu();
-        cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0);
+        cpu.borrow_mut().write(0x0001, 0);
         c64.load(&self.data, self.offset);
         cpu.borrow_mut().set_pc(self.offset);
     }

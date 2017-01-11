@@ -29,7 +29,6 @@ pub use self::addressable::Addressable;
 pub use self::color_ram::ColorRam;
 pub use self::deviceio::DeviceIo;
 pub use self::memory::Memory;
-pub use self::memory::BaseAddr;
 pub use self::memory_map::{Bank, Configuration, MemoryMap};
 pub use self::ram::Ram;
 pub use self::rom::Rom;

@@ -27,7 +27,13 @@ impl Ram {
     pub fn new(capacity: usize) -> Ram {
         info!(target: "mem", "Initializing RAM with capacity {}", capacity);
         Ram {
-            data: vec![0; capacity]
+            data: vec![0x00; capacity]
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for i in 0..self.data.len() {
+            self.data[i] = 0x00;
         }
     }
 }

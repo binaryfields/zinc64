@@ -61,6 +61,13 @@ impl RenderTarget {
         self.sync = value;
     }
 
+    pub fn reset(&mut self) {
+        for i in 0..self.pixels.len() {
+            self.pixels[i] = 0x00;
+        }
+        self.sync = false;
+    }
+
     pub fn write(&mut self, x: u16, y: u16, color: u8) {
         let index = self.index(x, y);
         self.pixels[index] = Color::from(color).rgb();

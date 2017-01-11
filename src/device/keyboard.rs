@@ -34,7 +34,7 @@ pub struct Keyboard {
 impl Keyboard {
     pub fn new() -> Keyboard {
         Keyboard {
-            matrix: [0xff; 8],
+            matrix: [0; 8],
             buffer: VecDeque::new(),
         }
     }
@@ -68,6 +68,13 @@ impl Keyboard {
     pub fn has_events(&self) -> bool {
         !self.buffer.is_empty()
     }
+
+    pub fn reset(&mut self) {
+        self.matrix = [0xff; 8];
+        self.buffer.clear();
+    }
+
+    // -- Event Handlers
 
     pub fn on_key_down(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);

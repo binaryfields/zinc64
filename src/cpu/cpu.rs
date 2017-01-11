@@ -58,9 +58,9 @@ impl CpuIo {
     }
 
     pub fn reset(&mut self) {
-        self.loram = false;
-        self.hiram = false;
-        self.charen = false;
+        self.loram = true;
+        self.hiram = true;
+        self.charen = true;
         self.irq = false;
         self.nmi = false;
     }
@@ -562,16 +562,17 @@ impl Cpu {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn reset(&mut self) -> u8 {
-        self.io.borrow_mut().reset();
+    pub fn reset(&mut self) {
         self.pc = 0;
         self.a = 0;
         self.x = 0;
         self.y = 0;
         self.sp = 0;
         self.p = 0;
-        self.interrupt(Interrupt::Reset)
+        self.io.borrow_mut().reset();
+        self.write(0x0000, 0x2f);
+        self.write(0x0001, 31);
+        self.interrupt(Interrupt::Reset);
     }
 
     #[inline(always)]
@@ -687,7 +688,7 @@ impl Cpu {
                     io.charen = bit::bit_test(value, 2);
                 }
                 self.mem.borrow_mut().switch_banks();
-                self.mem.borrow_mut().write(address, value); // FIXME
+                self.mem.borrow_mut().write(address, value);
             },
             _ => self.mem.borrow_mut().write(address, value),
         }

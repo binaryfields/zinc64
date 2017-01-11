@@ -44,6 +44,10 @@ impl CiaIo {
             cnt: false,
         }
     }
+
+    pub fn reset(&mut self) {
+        self.cnt = true;
+    }
 }
 
 #[derive(PartialEq)]
@@ -77,6 +81,12 @@ impl Port {
         self.direction = direction;
         // set input pins to 1
         self.value = self.latch | !self.direction;
+    }
+
+    pub fn reset(&mut self) {
+        self.direction = 0x00;
+        self.latch = 0x00;
+        self.set_value(0x00);
     }
 }
 
@@ -174,7 +184,17 @@ impl Timer {
         }
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.mode = TimerMode::OneShot;
+        self.input = TimerInput::SystemClock;
+        self.output = TimerOutput::Pulse;
+        self.output_enabled = false;
+        self.latch = 0xffff;
+        self.value = 0x0000;
+    }
+
+    fn reload(&mut self) {
         match self.mode {
             TimerMode::Continuous => {
                 self.value = self.latch;
@@ -188,7 +208,7 @@ impl Timer {
     pub fn update(&mut self, pulse: u16) -> bool {
         if self.enabled {
             if self.value == 0 {
-                self.reset();
+                self.reload();
                 true
             } else {
                 self.value -= pulse;
@@ -236,7 +256,7 @@ impl Cia {
             joystick2: joystick2,
             keyboard: keyboard,
             mode: mode,
-            port_a: Port::new(0xff),
+            port_a: Port::new(0x00),
             port_b: Port::new(0x00),
             rtc: Rtc {},
             timer_a: Timer::new(),
@@ -247,6 +267,26 @@ impl Cia {
             cia_io: cia_io,
             cnt_last: false,
         }
+    }
+
+    pub fn reset(&mut self) {
+        /*
+        A low on the RES pin resets all internal registers.The
+        port pins are set as inputs and port registers to zero
+        (although a read of the ports will return all highs
+        because of passive pullups).The timer control registers
+        are set to zero and the timer latches to all ones. All other
+        registers are reset to zero.
+        */
+        self.port_a.reset();
+        self.port_b.reset();
+        self.timer_a.reset();
+        self.timer_b.reset();
+        self.int_data = 0x00;
+        self.int_mask = 0x00;
+        self.int_triggered = false;
+        self.cia_io.borrow_mut().reset();
+        self.cnt_last = false;
     }
 
     pub fn step(&mut self) {

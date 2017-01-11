@@ -51,8 +51,10 @@ pub enum AxisMotion {
 }
 
 pub struct Joystick {
+    // Configuration
     mode: Mode,
     threshold: i16,
+    // State
     x_axis: AxisMotion,
     y_axis: AxisMotion,
     button: bool,
@@ -89,7 +91,13 @@ impl Joystick {
         self.mode == Mode::Numpad
     }
 
-    // -- Events
+    pub fn reset(&mut self) {
+        self.x_axis = AxisMotion::Neutral;
+        self.y_axis = AxisMotion::Neutral;
+        self.button = false;
+    }
+
+    // -- Event Handlers
 
     pub fn on_axis_motion(&mut self, axis_idx: u8, value: i16) {
         match axis_idx {

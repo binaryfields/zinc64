@@ -202,7 +202,7 @@ impl AppWindow {
     }
 
     fn reset(&mut self) {
-        self.c64.reset();
+        self.c64.reset(false);
         self.next_keyboard_event = 0;
     }
 
@@ -263,7 +263,7 @@ impl AppWindow {
                 },
                 Event::KeyDown { keycode: Some(Keycode::F9), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
-                    self.c64.reset();
+                    self.reset();
                 }
                 Event::KeyDown { keycode: Some(key), .. } => {
                     let keyboard = self.c64.get_keyboard();

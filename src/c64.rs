@@ -28,7 +28,7 @@ use cpu::{Cpu, CpuIo};
 use config::Config;
 use device::{Cartridge, Joystick, Keyboard};
 use device::joystick;
-use mem::{BaseAddr, ColorRam, DeviceIo, Memory};
+use mem::{ColorRam, DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
@@ -39,7 +39,6 @@ use video::{RenderTarget, Vic};
 //   C64 represents the machine itself and all of its components. Connections between different
 //   components are managed as component dependencies.
 
-// TODO c64: move ioport configuration to reset
 // TODO c64: update test cases to use loader
 
 #[allow(dead_code)]
@@ -158,9 +157,6 @@ impl C64 {
         mem.borrow_mut().set_cia2(cia2.clone());
         mem.borrow_mut().set_device_io(device_io.clone());
         mem.borrow_mut().set_expansion_port(expansion_port.clone());
-        // Initialization
-        cpu.borrow_mut().write(BaseAddr::IoPortDdr.addr(), 0x2f);
-        cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 31);
         Ok(
             C64 {
                 config: config,
@@ -257,13 +253,30 @@ impl C64 {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, hard: bool) {
         info!(target: "c64", "Resetting system");
+        if hard {
+            self.mem.borrow_mut().reset();
+            self.color_ram.borrow_mut().reset();
+        }
+        // Chipset
         self.cpu.borrow_mut().reset();
+        self.cia1.borrow_mut().reset();
+        self.cia2.borrow_mut().reset();
+        self.vic.borrow_mut().reset();
+        // Peripherals
+        if let Some(ref joystick) = self.joystick1 {
+            joystick.borrow_mut().reset();
+        }
+        if let Some(ref joystick) = self.joystick2 {
+            joystick.borrow_mut().reset();
+        }
+        self.keyboard.borrow_mut().reset();
+        self.rt.borrow_mut().reset();
+        // Runtime State
         self.cycles = 0;
         self.last_pc = 0;
         self.next_frame_ns = 0;
-        //self.expansion_port.borrow_mut().reset();
     }
 
     pub fn run_frame(&mut self, overflow_cycles: u16) -> u16 {
@@ -300,7 +313,12 @@ impl C64 {
 
     fn sync_frame(&mut self) {
         let frame_duration_scaled_ns = self.config.frame_duration_ns * 100 / self.speed as u32;
-        let wait_ns = (self.next_frame_ns - time::precise_time_ns()) as u32;
+        let time_ns = time::precise_time_ns();
+        let wait_ns = if self.next_frame_ns > time_ns {
+            (self.next_frame_ns - time_ns) as u32
+        } else {
+            0
+        };
         if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
             thread::sleep(Duration::new(0, wait_ns));
         }
@@ -315,7 +333,7 @@ impl C64 {
 
     pub fn detach_cartridge(&mut self) {
         self.expansion_port.borrow_mut().detach();
-        self.reset();
+        self.reset(false);
     }
 
     // -- Debug Ops

@@ -164,7 +164,7 @@ fn process_autostart_options(c64: &mut C64, matches: &getopts::Matches) -> Resul
                         .map_err(|err| format!("{}", err))?;
                     image.mount(c64);
                 },
-                None => c64.reset(),
+                None => {},
             }
         },
     }
@@ -199,6 +199,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         info!("Staring {}", NAME);
         let config = build_sys_config(&matches)?;
         let mut c64 = C64::new(config).unwrap();
+        c64.reset(true);
         process_debug_options(&mut c64, &matches)?;
         process_autostart_options(&mut c64, &matches)?;
         if matches.opt_present("console") {
@@ -206,6 +207,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
             loop {
                 overflow_cycles = c64.run_frame(overflow_cycles);
                 if c64.is_cpu_jam() {
+                    let cpu = c64.get_cpu();
+                    warn!(target: "main", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
                     break;
                 }
             }

@@ -299,6 +299,10 @@ impl Vic {
         }
     }
 
+    pub fn reset(&mut self) {
+        // FIXME
+    }
+
     pub fn step(&mut self) {
         if bit::bit_test(self.int_enable, 0) && self.x_pos == 0 {
             if self.raster == self.raster_compare  {
@@ -395,7 +399,7 @@ impl Vic {
         }
     }
 
-    // Raster Queries
+    // -- Raster Queries
 
     #[inline(always)]
     fn is_bad_line(&self, y: u16) -> bool {

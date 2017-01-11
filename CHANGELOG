@@ -42,3 +42,5 @@
 - landed app speed control
 - landed cpu jam
 - rework cia interrupt and step logic
+- rework c64 frame execution logic
+- rework c64 reset logic
