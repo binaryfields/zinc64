@@ -26,6 +26,7 @@ use device::joystick;
 use log::LogLevel;
 use util::bit;
 
+// Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
 
@@ -195,11 +196,20 @@ impl Timer {
     }
 
     fn reload(&mut self) {
+        /*
+        A control bit selects either timer mode. In one-shot
+        mode, the timer will count down from the latched value
+        to zero, generate an interrupt, reload the latched value,
+        then stop. In continuous mode, the timer will count from
+        the latched value to zero, generate an interrupt, reload
+        the latched value and repeatthe procedure continuously
+        */
         match self.mode {
             TimerMode::Continuous => {
                 self.value = self.latch;
             },
             TimerMode::OneShot => {
+                self.value = self.latch;
                 self.enabled = false;
             }
         }
@@ -313,6 +323,12 @@ impl Cia {
             false
         };
         // Process interrupts
+        /*
+        Any interrupt will set the corresponding bit in the DATA
+        register. Any interrupt which is enabled by the MASK
+        register will set the IR bit (MSB) of the DATA register
+        and bring the IRQ pin low.
+        */
         if timer_a_output {
             self.int_data |= 1 << 0;
         }
@@ -415,6 +431,12 @@ impl Cia {
             Reg::TODHR => 0,
             Reg::SDR => 0,
             Reg::ICR => {
+                /*
+                In a multi-chip system, the IR bit can be polled to detect which chip has generated
+                an interrupt request. The interrupt DATA register
+                is cleared and the IRQ line returns high following a
+                read of the DATA register.
+                */
                 let result = bit::bit_update(self.int_data, 7, (self.int_mask & self.int_data) != 0);
                 self.int_data = 0;
                 self.int_triggered = false;
@@ -500,6 +522,18 @@ impl Cia {
             Reg::TODHR => {},
             Reg::SDR => {},
             Reg::ICR => {
+                /*
+                The MASK register provides convenient control of
+                individual mask bits. When writing to the MASK register,
+                if bit 7 (SET/CLEAR) of the data written is a ZERO,
+                any mask bit written with a one will be cleared, while
+                those mask bits written with a zero will be unaffected. If
+                bit 7 of the data written is a ONE, any mask bit written
+                with a one will be set, while those mask bits written with
+                a zero will be unaffected. In order for an interrupt flag to
+                set IR and generate an Interrupt Request, the corresponding
+                MASK bit must be set.
+s                */
                 if bit::bit_test(value, 7) {
                     self.int_mask |= value & 0x1f;
                 } else {
