@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::fmt;
+
 use super::Cpu;
 use super::Operand;
 
@@ -28,7 +30,6 @@ use super::Operand;
 //   C64 instructions have zero or one operand so we encode them using Instruction(Operand)
 //   variants.
 
-#[derive(Debug)]
 pub enum Instruction {
     // Data Movement (12)
     LDA(Operand, u8),
@@ -404,6 +405,77 @@ impl Instruction {
             0xfe => Instruction::INC(Operand::AbsoluteX(cpu.fetch_word()), 7),
             // catch all
             _ => panic!("invalid opcode 0x{:x} at 0x{:x}", opcode, cpu.get_pc())
+        }
+    }
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Instruction::LDA(ref operand, _) => write!(f, "lda {}", operand),
+            &Instruction::LDX(ref operand, _) => write!(f, "ldx {}", operand),
+            &Instruction::LDY(ref operand, _) => write!(f, "ldy {}", operand),
+            &Instruction::STA(ref operand, _) => write!(f, "sta {}", operand),
+            &Instruction::STX(ref operand, _) => write!(f, "stx {}", operand),
+            &Instruction::STY(ref operand, _) => write!(f, "sty {}", operand),
+            &Instruction::TAX(_) => write!(f, "tax"),
+            &Instruction::TAY(_) => write!(f, "tay"),
+            &Instruction::TSX(_) => write!(f, "tsx"),
+            &Instruction::TXA(_) => write!(f, "txa"),
+            &Instruction::TXS(_) => write!(f, "txs"),
+            &Instruction::TYA(_) => write!(f, "tya"),
+            // Stack (4)
+            &Instruction::PHA(_) => write!(f, "pha"),
+            &Instruction::PHP(_) => write!(f, "php"),
+            &Instruction::PLA(_) => write!(f, "pla"),
+            &Instruction::PLP(_) => write!(f, "plp"),
+            // Arithmetic (11)
+            &Instruction::ADC(ref operand, _) => write!(f, "adc {}", operand),
+            &Instruction::SBC(ref operand, _) => write!(f, "sbc {}", operand),
+            &Instruction::DEC(ref operand, _) => write!(f, "dec {}", operand),
+            &Instruction::DEX(_) => write!(f, "dex"),
+            &Instruction::DEY(_) => write!(f, "dey"),
+            &Instruction::INC(ref operand, _) => write!(f, "inc {}", operand),
+            &Instruction::INX(_) => write!(f, "inx"),
+            &Instruction::INY(_) => write!(f, "iny"),
+            &Instruction::CMP(ref operand, _) => write!(f, "cmp {}", operand),
+            &Instruction::CPX(ref operand, _) => write!(f, "cpx {}", operand),
+            &Instruction::CPY(ref operand, _) => write!(f, "cpy {}", operand),
+            // Logical (3)
+            &Instruction::AND(ref operand, _) => write!(f, "and {}", operand),
+            &Instruction::EOR(ref operand, _) => write!(f, "eor {}", operand),
+            &Instruction::ORA(ref operand, _) => write!(f, "ora {}", operand),
+            // Shift and Rotate (4)
+            &Instruction::ASL(ref operand, _) => write!(f, "asl {}", operand),
+            &Instruction::LSR(ref operand, _) => write!(f, "lsr {}", operand),
+            &Instruction::ROL(ref operand, _) => write!(f, "rol {}", operand),
+            &Instruction::ROR(ref operand, _) => write!(f, "ror {}", operand),
+            // Control Flow (11)
+            &Instruction::BCC(ref operand, _) => write!(f, "bcc {}", operand),
+            &Instruction::BCS(ref operand, _) => write!(f, "bcs {}", operand),
+            &Instruction::BEQ(ref operand, _) => write!(f, "beq {}", operand),
+            &Instruction::BMI(ref operand, _) => write!(f, "bmi {}", operand),
+            &Instruction::BNE(ref operand, _) => write!(f, "bne {}", operand),
+            &Instruction::BPL(ref operand, _) => write!(f, "bpl {}", operand),
+            &Instruction::BVC(ref operand, _) => write!(f, "bvc {}", operand),
+            &Instruction::BVS(ref operand, _) => write!(f, "bvs {}", operand),
+            &Instruction::JMP(ref operand, _) => write!(f, "jmp {}", operand),
+            &Instruction::JSR(ref operand, _) => write!(f, "jsr {}", operand),
+            &Instruction::RTS(_) => write!(f, "rts"),
+            // Flag (7)
+            &Instruction::CLC(_) => write!(f, "clc"),
+            &Instruction::CLD(_) => write!(f, "cld"),
+            &Instruction::CLI(_) => write!(f, "cli"),
+            &Instruction::CLV(_) => write!(f, "clv"),
+            &Instruction::SEC(_) => write!(f, "sec"),
+            &Instruction::SED(_) => write!(f, "sed"),
+            &Instruction::SEI(_) => write!(f, "sei"),
+            // System (2)
+            &Instruction::BRK(_) => write!(f, "brk"),
+            &Instruction::RTI(_) => write!(f, "rti"),
+            // Misc (1)
+            &Instruction::BIT(ref operand, _) => write!(f, "bit {}", operand),
+            &Instruction::NOP(_) => write!(f, "nop"),
         }
     }
 }

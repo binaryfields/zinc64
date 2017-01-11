@@ -18,6 +18,7 @@
  */
 
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::Rc;
 
 use mem::{Addressable, Memory};
@@ -66,7 +67,6 @@ impl CpuIo {
     }
 }
 
-#[allow(dead_code)]
 pub struct Cpu {
     // Dependencies
     mem: Rc<RefCell<Memory>>,
@@ -173,12 +173,6 @@ impl Cpu {
         self.io.borrow_mut().irq = true;
     }
 
-    #[allow(dead_code)]
-    fn dump_registers(&self) {
-        println!("A: {:x} X: {:x} Y: {:x} S: {:x} P: {:x}",
-                 self.a, self.x, self.y, self.sp, self.p);
-    }
-
     pub fn execute(&mut self) -> u8 {
         if self.io.borrow().nmi {
             self.interrupt(Interrupt::Nmi);
@@ -189,7 +183,8 @@ impl Cpu {
         let opcode = self.fetch_op();
         let op = Instruction::decode(self, opcode);
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::instr", "0x{:x}: {:?}", pc, op);
+            let op_value = format!("{}", op);
+            trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
         }
         self.execute_instruction(&op)
     }
@@ -706,6 +701,24 @@ impl Cpu {
         let addr = 0x0100 + self.sp as u16;
         self.write(addr, value);
         self.sp = self.sp.wrapping_sub(1);
+    }
+}
+
+impl fmt::Display for Cpu {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:02x} {:02x} {:02x} {:02x} {}{}{}{}{}{}{}",
+               self.a,
+               self.x,
+               self.y,
+               self.sp,
+               if (self.p & Flag::Negative as u8) != 0 { "N" } else { "n" },
+               if (self.p & Flag::Overflow as u8) != 0 { "V" } else { "v" },
+               if (self.p & Flag::Decimal as u8) != 0 { "B" } else { "b" },
+               if (self.p & Flag::Decimal as u8) != 0 { "D" } else { "d" },
+               if (self.p & Flag::IntDisable as u8) != 0 { "I" } else { "i" },
+               if (self.p & Flag::Zero as u8) != 0 { "Z" } else { "z" },
+               if (self.p & Flag::Carry as u8) != 0 { "C" } else { "c" }
+        )
     }
 }
 

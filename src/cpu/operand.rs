@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::fmt;
+
 use super::Cpu;
 
 // Spec: INSTRUCTION ADDRESSING MODES AND RELATED EXECUTION TIMES (p. 255)
@@ -25,7 +27,6 @@ use super::Cpu;
 //    GetEA, GetFromEA, StoreToEA. Use Operand variants to specify addressing mode
 //    and applicable parameter
 
-#[derive(Debug)]
 pub enum Operand {
     Accumulator,
     Immediate(u8),
@@ -83,6 +84,25 @@ impl Operand {
                 let address = self.ea(cpu);
                 cpu.write(address, value)
             },
+        }
+    }
+}
+
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Operand::Accumulator => write!(f, "acc"),
+            Operand::Immediate(value) => write!(f, "#{:02x}", value),
+            Operand::ZeroPage(address) => write!(f, "${:02x}", address),
+            Operand::ZeroPageX(address) => write!(f, "${:02x},x", address),
+            Operand::ZeroPageY(address) => write!(f, "${:02x},y", address),
+            Operand::Absolute(address) => write!(f, "${:04x}", address),
+            Operand::AbsoluteX(address) => write!(f, "${:04x},x", address),
+            Operand::AbsoluteY(address) => write!(f, "${:04x},y", address),
+            Operand::IndirectX(address) => write!(f, "$({:02x},x)", address),
+            Operand::IndirectY(address) => write!(f, "$({:02x},y)", address),
+            Operand::Indirect(address) => write!(f, "$({:04x})", address),
+            Operand::Relative(offset) => write!(f, "${:02x}", offset),
         }
     }
 }

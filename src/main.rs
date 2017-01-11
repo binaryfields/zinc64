@@ -71,7 +71,7 @@ fn build_cli_options() -> getopts::Options {
         .optopt("", "joydev2", "set device for joystick 2", "none")
         // Logging
         .optopt("", "loglevel", "set log level", "[error|warn|info|debug|trace]")
-        .optmulti("", "logtarget", "set log level for a target", "target=level")
+        .optmulti("", "log", "set log level for a target", "target=level")
         // Ui
         .optflag("", "console", "start in console mode")
         .optflag("f", "fullscreen", "enable fullscreen")
@@ -120,7 +120,7 @@ fn init_logging(matches: &getopts::Matches) -> Result<(), String> {
     let loglevel = matches.opt_str("loglevel")
         .unwrap_or("info".to_string());
     let mut logger = Logger::new(&loglevel)?;
-    for target_level in matches.opt_strs("logtarget") {
+    for target_level in matches.opt_strs("log") {
         if let Some(equals) = target_level.find('=') {
             let (target, level) = target_level.split_at(equals);
             logger.add_target(target.to_string(), level[1..].to_string())?;

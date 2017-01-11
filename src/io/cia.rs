@@ -471,7 +471,7 @@ impl Cia {
             }
         };
         if log_enabled!(LogLevel::Trace) {
-          trace!(target: "cia::reg", "Read 0x{:x} = 0x{:x}", reg, value);
+          trace!(target: "cia::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
         }
         value
     }
@@ -479,7 +479,7 @@ impl Cia {
     #[allow(dead_code, unused_variables)]
     pub fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cia::reg", "Write 0x{:x} = 0x{:x}", reg, value);
+            trace!(target: "cia::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
         match Reg::from(reg) {
             Reg::PRA => {

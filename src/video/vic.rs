@@ -692,14 +692,14 @@ impl Vic {
             Reg::IGNORE => 0xff,
         };
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "vic::reg", "Read 0x{:x} = 0x{:x}", reg, value);
+            trace!(target: "vic::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
         }
         value
     }
 
     pub fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "vic::reg", "Write 0x{:x} = 0x{:x}", reg, value);
+            trace!(target: "vic::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
         match Reg::from(reg) {
             Reg::M0X => self.sprites[0].x = (self.sprites[0].x & 0xff00) | (value as u16),
