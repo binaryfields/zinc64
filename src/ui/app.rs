@@ -92,6 +92,7 @@ impl AppWindow {
         let video = sdl.video()?;
         let mut builder = video.window("zinc64", options.width, options.height);
         builder.position_centered();
+        builder.resizable();
         builder.opengl();
         if options.fullscreen {
             builder.fullscreen();
