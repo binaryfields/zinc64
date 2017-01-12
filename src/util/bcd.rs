@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod bcd;
-pub mod bit;
-mod logger;
-mod rect;
+pub fn from_bcd(decimal: u8) -> u8 {
+    (decimal >> 4) * 10 + (decimal & 0x0f)
+}
 
-pub use self::logger::Logger;
-pub use self::rect::{Dimension, Rect};
+pub fn to_bcd(num: u8) -> u8 {
+    ((num / 10) << 4) | (num % 10)
+}

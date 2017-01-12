@@ -67,6 +67,7 @@ pub struct C64 {
     warp_mode: bool,
     // Runtime State
     cycles: u64,
+    frames: u32,
     last_pc: u16,
     next_frame_ns: u64,
 }
@@ -176,6 +177,7 @@ impl C64 {
                 speed: 100,
                 warp_mode: false,
                 cycles: 0,
+                frames: 0,
                 last_pc: 0,
                 next_frame_ns: 0,
             }
@@ -275,6 +277,7 @@ impl C64 {
         self.rt.borrow_mut().reset();
         // Runtime State
         self.cycles = 0;
+        self.frames = 0;
         self.last_pc = 0;
         self.next_frame_ns = 0;
     }
@@ -284,6 +287,11 @@ impl C64 {
         while cycles > 0 {
             let completed = self.step();
             cycles -= completed as i16;
+        }
+        self.frames += 1;
+        if self.frames % (self.config.refresh_rate as u32 / 10) == 0 {
+            self.cia1.borrow_mut().tod_tick();
+            self.cia2.borrow_mut().tod_tick();
         }
         if !self.warp_mode {
             self.sync_frame();

@@ -25,19 +25,18 @@ use cpu::interrupt;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
+use util::bcd;
 use util::bit;
 
 use super::timer;
 use super::timer::Timer;
+use super::tod::Tod;
 
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
 
 // TODO cia: add timer output logic
-// TODO cia: add rtc
-// TODO cia: test cia read regs 0d-of
-// TODO cia: test timers
 
 pub struct CiaIo {
     pub cnt: bool,
@@ -144,8 +143,6 @@ impl Reg {
     }
 }
 
-struct Rtc {}
-
 #[allow(dead_code)]
 pub struct Cia {
     // Dependencies
@@ -157,9 +154,11 @@ pub struct Cia {
     // Functional Units
     port_a: Port,
     port_b: Port,
-    rtc: Rtc,
     timer_a: Timer,
     timer_b: Timer,
+    tod_alarm: Tod,
+    tod_clock: Tod,
+    tod_set_alarm: bool,
     // Interrupts
     int_data: u8,
     int_mask: u8,
@@ -184,9 +183,11 @@ impl Cia {
             mode: mode,
             port_a: Port::new(0x00),
             port_b: Port::new(0x00),
-            rtc: Rtc {},
             timer_a: Timer::new(),
             timer_b: Timer::new(),
+            tod_alarm: Tod::new(),
+            tod_clock: Tod::new(),
+            tod_set_alarm: false,
             int_data: 0,
             int_mask: 0,
             int_triggered: false,
@@ -258,6 +259,16 @@ impl Cia {
         self.cnt_last = self.cia_io.borrow().cnt;
     }
 
+    pub fn tod_tick(&mut self) {
+        self.tod_clock.tick();
+        if self.tod_clock == self.tod_alarm {
+            self.int_data |= 1 << 2;
+            if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
+                self.trigger_interrupt();
+            }
+        }
+    }
+
     // -- Internal Ops
 
     fn read_cia1_port_a(&self) -> u8 {
@@ -318,7 +329,6 @@ impl Cia {
             Mode::Cia2 => self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
         }
         self.int_triggered = false;
-
     }
 
     fn trigger_interrupt(&mut self) {
@@ -352,10 +362,13 @@ impl Cia {
             Reg::TAHI => (self.timer_a.value >> 8) as u8,
             Reg::TBLO => (self.timer_b.value & 0xff) as u8,
             Reg::TBHI => (self.timer_b.value >> 8) as u8,
-            Reg::TODTS => 0,
-            Reg::TODSEC => 0,
-            Reg::TODMIN => 0,
-            Reg::TODHR => 0,
+            Reg::TODTS => {
+                self.tod_clock.set_enabled(true);
+                bcd::to_bcd(self.tod_clock.get_tenth())
+            },
+            Reg::TODSEC => bcd::to_bcd(self.tod_clock.get_seconds()),
+            Reg::TODMIN => bcd::to_bcd(self.tod_clock.get_minutes()),
+            Reg::TODHR => bit::bit_update(bcd::to_bcd(self.tod_clock.get_hours()), 7, self.tod_clock.get_pm()),
             Reg::SDR => 0,
             Reg::ICR => {
                 /*
@@ -394,11 +407,12 @@ impl Cia {
                     timer::Input::TimerA => bit::bit_set(6, true),
                     timer::Input::TimerAWithCNT => bit::bit_set(6, true) | bit::bit_set(7, true),
                 };
-                timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
+                let tod_set = bit::bit_set(7, self.tod_set_alarm);
+                timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input | tod_set
             }
         };
         if log_enabled!(LogLevel::Trace) {
-          trace!(target: "cia::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
+            trace!(target: "cia::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
         }
         value
     }
@@ -443,10 +457,24 @@ impl Cia {
                     self.timer_b.value = value;
                 }
             },
-            Reg::TODTS => {},
-            Reg::TODSEC => {},
-            Reg::TODMIN => {},
-            Reg::TODHR => {},
+            Reg::TODTS => {
+                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                tod.set_tenth(bcd::from_bcd(value & 0x0f));
+            },
+            Reg::TODSEC => {
+                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                tod.set_seconds(bcd::from_bcd(value & 0x7f));
+            },
+            Reg::TODMIN => {
+                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                tod.set_minutes(bcd::from_bcd(value & 0x7f));
+            },
+            Reg::TODHR => {
+                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                tod.set_enabled(false);
+                tod.set_hours(bcd::from_bcd(value & 0x7f));
+                tod.set_pm(bit::bit_test(value, 7));
+            },
             Reg::SDR => {},
             Reg::ICR => {
                 /*
@@ -504,6 +532,7 @@ s                */
                     3 => timer::Input::TimerAWithCNT,
                     _ => panic!("invalid timer input"),
                 };
+                self.tod_set_alarm = bit::bit_test(value, 7);
             },
         }
     }
