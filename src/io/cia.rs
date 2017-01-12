@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cpu::CpuIo;
+use cpu::interrupt;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
@@ -394,10 +395,21 @@ impl Cia {
         result
     }
 
+    // -- Interrupt Ops
+
+    fn clear_interrupt(&mut self) {
+        match self.mode {
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Cia),
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
+        }
+        self.int_triggered = false;
+
+    }
+
     fn trigger_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_io.borrow_mut().irq = true,
-            Mode::Cia2 => self.cpu_io.borrow_mut().nmi = true,
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq.set(interrupt::Source::Cia),
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.set(interrupt::Source::Cia),
         }
         self.int_triggered = true;
     }
@@ -439,7 +451,7 @@ impl Cia {
                 */
                 let result = bit::bit_update(self.int_data, 7, (self.int_mask & self.int_data) != 0);
                 self.int_data = 0;
-                self.int_triggered = false;
+                self.clear_interrupt();
                 result
             },
             Reg::CRA => {

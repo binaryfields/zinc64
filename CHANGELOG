@@ -45,3 +45,4 @@
 - rework c64 frame execution logic
 - rework c64 reset logic
 - revamp cpu instruction tracing
+- revamp cpu interrupt tracking, fixes frogger freeze

@@ -21,7 +21,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use config::Config;
-use cpu::Cpu;
+use cpu::CpuIo;
+use cpu::interrupt;
 use log::LogLevel;
 use mem::{Addressable, ColorRam, Memory};
 use util::bit;
@@ -216,7 +217,7 @@ impl Sprite {
 pub struct Vic {
     // Dependencies
     config: Config,
-    cpu: Rc<RefCell<Cpu>>,
+    cpu_io: Rc<RefCell<CpuIo>>,
     mem: Rc<RefCell<Memory>>,
     color_ram: Rc<RefCell<ColorRam>>,
     rt: Rc<RefCell<RenderTarget>>,
@@ -234,9 +235,9 @@ pub struct Vic {
     scroll_x: u8,
     scroll_y: u8,
     // Interrupt
-    int_enable: u8,
+    int_data: u8,
+    int_mask: u8,
     raster_compare: u16,
-    raster_int: bool,
     // I/O
     light_pen_pos: [u8; 2],
     // Memory Pointers
@@ -259,13 +260,13 @@ pub struct Vic {
 
 impl Vic {
     pub fn new(config: Config,
-               cpu: Rc<RefCell<Cpu>>,
+               cpu_io: Rc<RefCell<CpuIo>>,
                mem: Rc<RefCell<Memory>>,
                color_ram: Rc<RefCell<ColorRam>>,
                rt: Rc<RefCell<RenderTarget>>) -> Vic {
         Vic {
             config: config,
-            cpu: cpu,
+            cpu_io: cpu_io,
             mem: mem,
             color_ram: color_ram,
             rt: rt,
@@ -280,8 +281,8 @@ impl Vic {
             csel: true,
             scroll_x: 0,
             scroll_y: 0, // FIXME default 3
-            int_enable: 0x00,
-            raster_int: false,
+            int_data: 0x00,
+            int_mask: 0x00,
             raster_compare: 0x00,
             light_pen_pos: [0; 2],
             char_base: 4096,
@@ -304,10 +305,10 @@ impl Vic {
     }
 
     pub fn step(&mut self) {
-        if bit::bit_test(self.int_enable, 0) && self.x_pos == 0 {
-            if self.raster == self.raster_compare  {
-                self.raster_int = true;
-                self.cpu.borrow_mut().set_irq();
+        if self.raster == self.raster_compare  && self.x_pos == 0 { // FIXME this can be any point
+            self.int_data |= 1 << 0;
+            if (self.int_mask & self.int_data) != 0 {
+                self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
             }
         }
         if self.is_bad_line(self.raster) {
@@ -633,12 +634,10 @@ impl Vic {
                 vm | cb | 0x01
             },
             Reg::IRR => {
-                let raster_int = if self.raster_int { 1 << 0 } else { 0 };
-                let int_data = raster_int;
-                let int_occurred = if int_data > 0 { 1 << 7 } else { 0 };
-                int_data | int_occurred | 0x70
+                let result = bit::bit_update(self.int_data, 7, (self.int_mask & self.int_data) != 0);
+                result | 0x70
             },
-            Reg::IMR => self.int_enable | 0xf0,
+            Reg::IMR => self.int_mask | 0xf0,
             Reg::MDP => {
                 let m0dp = bit::bit_set(0, self.sprites[0].priority);
                 let m1dp = bit::bit_set(1, self.sprites[1].priority);
@@ -771,11 +770,17 @@ impl Vic {
                 self.char_base = (((value & 0x0f) >> 1) as u16) << 11;
             },
             Reg::IRR => {
-                if bit::bit_test(value, 0) {
-                    self.raster_int = false;
+                self.int_data &= !value;
+                if (self.int_mask & self.int_data) == 0 {
+                    self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Vic);
                 }
             },
-            Reg::IMR => self.int_enable = value & 0x0f,
+            Reg::IMR => {
+                self.int_mask = value & 0x0f;
+                if (self.int_mask & self.int_data) != 0 {
+                    self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
+                }
+            },
             Reg::MDP => {
                 self.sprites[0].priority = bit::bit_test(value, 0);
                 self.sprites[1].priority = bit::bit_test(value, 1);

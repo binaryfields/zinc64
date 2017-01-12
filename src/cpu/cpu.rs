@@ -25,7 +25,9 @@ use mem::{Addressable, Memory};
 use log::LogLevel;
 use util::bit;
 
-use super::Instruction;
+use super::instruction::Instruction;
+use super::interrupt;
+use super::interrupt::Interrupt;
 
 // Spec: http://nesdev.com/6502.txt
 // Design:
@@ -43,8 +45,8 @@ pub struct CpuIo {
     pub loram: bool,
     pub hiram: bool,
     pub charen: bool,
-    pub irq: bool,
-    pub nmi: bool,
+    pub irq: Interrupt,
+    pub nmi: Interrupt,
 }
 
 impl CpuIo {
@@ -53,8 +55,8 @@ impl CpuIo {
             loram: false,
             hiram: false,
             charen: false,
-            irq: false,
-            nmi: false,
+            irq: Interrupt::new(interrupt::Type::Irq),
+            nmi: Interrupt::new(interrupt::Type::Nmi),
         }
     }
 
@@ -62,9 +64,20 @@ impl CpuIo {
         self.loram = true;
         self.hiram = true;
         self.charen = true;
-        self.irq = false;
-        self.nmi = false;
+        self.irq.reset();
+        self.nmi.reset();
     }
+}
+
+pub enum Flag {
+    Carry = 1 << 0,
+    Zero = 1 << 1,
+    IntDisable = 1 << 2,
+    Decimal = 1 << 3,
+    Break = 1 << 4,
+    Reserved = 1 << 5,
+    Overflow = 1 << 6,
+    Negative = 1 << 7,
 }
 
 pub struct Cpu {
@@ -79,43 +92,6 @@ pub struct Cpu {
     p: u8,
     // I/O Lines
     io: Rc<RefCell<CpuIo>>,
-}
-
-#[allow(dead_code)]
-pub enum Flag {
-    Carry = 1 << 0,
-    Zero = 1 << 1,
-    IntDisable = 1 << 2,
-    Decimal = 1 << 3,
-    Break = 1 << 4,
-    Reserved = 1 << 5,
-    Overflow = 1 << 6,
-    Negative = 1 << 7,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Interrupt {
-    Break = 1 << 0,
-    Irq = 1 << 1,
-    Nmi = 1 << 2,
-    Reset = 1 << 3,
-}
-
-impl Interrupt {
-    pub fn vector(&self) -> u16 {
-        match *self {
-            Interrupt::Break => InterruptVector::Irq as u16,
-            Interrupt::Irq => InterruptVector::Irq as u16,
-            Interrupt::Nmi => InterruptVector::Nmi as u16,
-            Interrupt::Reset => InterruptVector::Reset as u16,
-        }
-    }
-}
-
-enum InterruptVector {
-    Nmi = 0xfffa,
-    Reset = 0xfffc,
-    Irq = 0xfffe,
 }
 
 impl Cpu {
@@ -169,15 +145,11 @@ impl Cpu {
         self.y = value;
     }
 
-    pub fn set_irq(&mut self) {
-        self.io.borrow_mut().irq = true;
-    }
-
     pub fn execute(&mut self) -> u8 {
-        if self.io.borrow().nmi {
-            self.interrupt(Interrupt::Nmi);
-        } else if self.io.borrow().irq && !self.test_flag(Flag::IntDisable) {
-            self.interrupt(Interrupt::Irq);
+        if self.io.borrow().nmi.is_low() {
+            self.interrupt(interrupt::Type::Nmi);
+        } else if self.io.borrow().irq.is_low() && !self.test_flag(Flag::IntDisable) {
+            self.interrupt(interrupt::Type::Irq);
         }
         let pc = self.pc;
         let opcode = self.fetch_op();
@@ -534,7 +506,7 @@ impl Cpu {
             },
             // -- System
             Instruction::BRK(cycles) => {
-                self.interrupt(Interrupt::Break);
+                self.interrupt(interrupt::Type::Break);
                 self.tick(cycles)
             },
             Instruction::RTI(cycles) => {
@@ -567,7 +539,7 @@ impl Cpu {
         self.io.borrow_mut().reset();
         self.write(0x0000, 0x2f);
         self.write(0x0001, 31);
-        self.interrupt(Interrupt::Reset);
+        self.interrupt(interrupt::Type::Reset);
     }
 
     #[inline(always)]
@@ -616,34 +588,33 @@ impl Cpu {
 
     // -- Interrupt Ops
 
-    fn interrupt(&mut self, interrupt: Interrupt) -> u8 {
+    fn interrupt(&mut self, interrupt: interrupt::Type) -> u8 {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
         }
         let pc = self.pc;
         let p = self.p;
         match interrupt {
-            Interrupt::Irq => {
+            interrupt::Type::Irq => {
                 self.push(((pc >> 8) & 0xff) as u8);
                 self.push((pc & 0xff) as u8);
                 self.push(p & 0xef);
                 self.set_flag(Flag::IntDisable);
-                self.io.borrow_mut().irq = false;
             },
-            Interrupt::Nmi => {
+            interrupt::Type::Nmi => {
                 self.push(((pc >> 8) & 0xff) as u8);
                 self.push((pc & 0xff) as u8);
                 self.push(p & 0xef);
                 self.set_flag(Flag::IntDisable);
-                self.io.borrow_mut().nmi = false;
+                self.io.borrow_mut().nmi.reset();
             },
-            Interrupt::Break => {
+            interrupt::Type::Break => {
                 self.push((((pc + 1) >> 8) & 0xff) as u8);
                 self.push(((pc + 1) & 0xff) as u8);
                 self.push(p | (Flag::Break as u8) | (Flag::Reserved as u8));
                 self.set_flag(Flag::IntDisable);
             },
-            Interrupt::Reset => {},
+            interrupt::Type::Reset => {},
         }
         self.pc = self.read_word(interrupt.vector());
         7

@@ -138,7 +138,7 @@ impl C64 {
         ));
         let vic = Rc::new(RefCell::new(
             Vic::new(config.clone(),
-                     cpu.clone(),
+                     cpu_io.clone(),
                      mem.clone(),
                      color_ram.clone(),
                      rt.clone())

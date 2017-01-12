@@ -18,9 +18,8 @@
  */
 
 mod cpu;
-mod instruction;
-mod operand;
+pub mod instruction;
+pub mod interrupt;
+pub mod operand;
 
 pub use self::cpu::{Cpu, CpuIo};
-pub use self::instruction::Instruction;
-pub use self::operand::Operand;

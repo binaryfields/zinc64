@@ -20,7 +20,7 @@
 use std::fmt;
 
 use super::Cpu;
-use super::Operand;
+use super::operand::Operand;
 
 // Categories: Asm One Manual Sec 10.1
 // Spec: MCS6510 MICROPROCESSOR INSTRUCTION SET p.232
