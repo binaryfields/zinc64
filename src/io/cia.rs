@@ -27,6 +27,9 @@ use device::joystick;
 use log::LogLevel;
 use util::bit;
 
+use super::timer;
+use super::timer::Timer;
+
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
@@ -143,94 +146,6 @@ impl Reg {
 
 struct Rtc {}
 
-#[derive(Debug, PartialEq)]
-pub enum TimerMode {
-    OneShot,
-    Continuous,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum TimerInput {
-    SystemClock = 0,
-    External = 1,
-    TimerA = 2,
-    TimerAWithCNT = 3,
-}
-
-#[derive(Debug, PartialEq)]
-enum TimerOutput {
-    Toggle,
-    Pulse,
-}
-
-struct Timer {
-    enabled: bool,
-    mode: TimerMode,
-    input: TimerInput,
-    output: TimerOutput,
-    output_enabled: bool,
-    latch: u16,
-    value: u16,
-}
-
-impl Timer {
-    pub fn new() -> Timer {
-        Timer {
-            enabled: false,
-            mode: TimerMode::OneShot,
-            input: TimerInput::SystemClock,
-            output: TimerOutput::Pulse,
-            output_enabled: false,
-            latch: 0,
-            value: 0,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.enabled = false;
-        self.mode = TimerMode::OneShot;
-        self.input = TimerInput::SystemClock;
-        self.output = TimerOutput::Pulse;
-        self.output_enabled = false;
-        self.latch = 0xffff;
-        self.value = 0x0000;
-    }
-
-    fn reload(&mut self) {
-        /*
-        A control bit selects either timer mode. In one-shot
-        mode, the timer will count down from the latched value
-        to zero, generate an interrupt, reload the latched value,
-        then stop. In continuous mode, the timer will count from
-        the latched value to zero, generate an interrupt, reload
-        the latched value and repeatthe procedure continuously
-        */
-        match self.mode {
-            TimerMode::Continuous => {
-                self.value = self.latch;
-            },
-            TimerMode::OneShot => {
-                self.value = self.latch;
-                self.enabled = false;
-            }
-        }
-    }
-
-    pub fn update(&mut self, pulse: u16) -> bool {
-        if self.enabled {
-            if self.value == 0 {
-                self.reload();
-                true
-            } else {
-                self.value -= pulse;
-                false
-            }
-        } else {
-            false
-        }
-    }
-}
-
 #[allow(dead_code)]
 pub struct Cia {
     // Dependencies
@@ -304,8 +219,8 @@ impl Cia {
         // Process timers
         let timer_a_output = if self.timer_a.enabled {
             let pulse = match self.timer_a.input {
-                TimerInput::SystemClock => 1,
-                TimerInput::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
+                timer::Input::SystemClock => 1,
+                timer::Input::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
                 _ => panic!("invalid input source {:?}", self.timer_a.input),
             };
             self.timer_a.update(pulse)
@@ -314,10 +229,10 @@ impl Cia {
         };
         let timer_b_output = if self.timer_b.enabled {
             let pulse = match self.timer_b.input {
-                TimerInput::SystemClock => 1,
-                TimerInput::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
-                TimerInput::TimerA => if timer_a_output { 1 } else { 0 },
-                TimerInput::TimerAWithCNT => if timer_a_output && self.cia_io.borrow().cnt { 1 } else { 0 },
+                timer::Input::SystemClock => 1,
+                timer::Input::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
+                timer::Input::TimerA => if timer_a_output { 1 } else { 0 },
+                timer::Input::TimerAWithCNT => if timer_a_output && self.cia_io.borrow().cnt { 1 } else { 0 },
             };
             self.timer_b.update(pulse)
         } else {
@@ -458,11 +373,11 @@ impl Cia {
                 let timer = &self.timer_a;
                 let timer_enabled = bit::bit_set(0, timer.enabled);
                 let timer_output = bit::bit_set(1, timer.output_enabled);
-                let timer_output_mode = bit::bit_set(2, timer.output == TimerOutput::Toggle);
-                let timer_mode = bit::bit_set(3, timer.mode == TimerMode::OneShot);
+                let timer_output_mode = bit::bit_set(2, timer.output == timer::Output::Toggle);
+                let timer_mode = bit::bit_set(3, timer.mode == timer::Mode::OneShot);
                 let timer_input = match timer.input {
-                    TimerInput::SystemClock => 0,
-                    TimerInput::External => bit::bit_set(5, true),
+                    timer::Input::SystemClock => 0,
+                    timer::Input::External => bit::bit_set(5, true),
                     _ => panic!("invalid timer input"),
                 };
                 timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
@@ -471,13 +386,13 @@ impl Cia {
                 let timer = &self.timer_b;
                 let timer_enabled = bit::bit_set(0, timer.enabled);
                 let timer_output = bit::bit_set(1, timer.output_enabled);
-                let timer_output_mode = bit::bit_set(2, timer.output == TimerOutput::Toggle);
-                let timer_mode = bit::bit_set(3, timer.mode == TimerMode::OneShot);
+                let timer_output_mode = bit::bit_set(2, timer.output == timer::Output::Toggle);
+                let timer_mode = bit::bit_set(3, timer.mode == timer::Mode::OneShot);
                 let timer_input = match timer.input {
-                    TimerInput::SystemClock => 0,
-                    TimerInput::External => bit::bit_set(5, true),
-                    TimerInput::TimerA => bit::bit_set(6, true),
-                    TimerInput::TimerAWithCNT => bit::bit_set(6, true) | bit::bit_set(7, true),
+                    timer::Input::SystemClock => 0,
+                    timer::Input::External => bit::bit_set(5, true),
+                    timer::Input::TimerA => bit::bit_set(6, true),
+                    timer::Input::TimerAWithCNT => bit::bit_set(6, true) | bit::bit_set(7, true),
                 };
                 timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
             }
@@ -558,35 +473,35 @@ s                */
             Reg::CRA => {
                 self.timer_a.enabled = bit::bit_test(value, 0);
                 self.timer_a.mode = if bit::bit_test(value, 3) {
-                    TimerMode::OneShot
+                    timer::Mode::OneShot
                 } else {
-                    TimerMode::Continuous
+                    timer::Mode::Continuous
                 };
                 if bit::bit_test(value, 4) {
                     self.timer_a.value = self.timer_a.latch;
                 }
                 self.timer_a.input = if bit::bit_test(value, 5) {
-                    TimerInput::External
+                    timer::Input::External
                 } else {
-                    TimerInput::SystemClock
+                    timer::Input::SystemClock
                 };
             },
             Reg::CRB => {
                 self.timer_b.enabled = bit::bit_test(value, 0);
                 self.timer_b.mode = if bit::bit_test(value, 3) {
-                    TimerMode::OneShot
+                    timer::Mode::OneShot
                 } else {
-                    TimerMode::Continuous
+                    timer::Mode::Continuous
                 };
                 if bit::bit_test(value, 4) {
                     self.timer_b.value = self.timer_b.latch;
                 }
                 let input = (value & 0x60) >> 5;
                 self.timer_b.input = match input {
-                    0 => TimerInput::SystemClock,
-                    1 => TimerInput::External,
-                    2 => TimerInput::TimerA,
-                    3 => TimerInput::TimerAWithCNT,
+                    0 => timer::Input::SystemClock,
+                    1 => timer::Input::External,
+                    2 => timer::Input::TimerA,
+                    3 => timer::Input::TimerAWithCNT,
                     _ => panic!("invalid timer input"),
                 };
             },
@@ -743,8 +658,8 @@ mod tests {
         let mut cia = setup_cia().unwrap();
         cia.write(Reg::CRA.addr(), (1 << 0) | (1 << 3) | (1 << 5));
         assert_eq!(true, cia.timer_a.enabled);
-        assert_eq!(TimerMode::OneShot, cia.timer_a.mode);
-        assert_eq!(TimerInput::External, cia.timer_a.input);
+        assert_eq!(timer::Mode::OneShot, cia.timer_a.mode);
+        assert_eq!(timer::Input::External, cia.timer_a.input);
     }
 
     #[test]
@@ -752,8 +667,8 @@ mod tests {
         let mut cia = setup_cia().unwrap();
         cia.write(Reg::CRB.addr(), (1 << 0) | (1 << 3) | (1 << 5));
         assert_eq!(true, cia.timer_b.enabled);
-        assert_eq!(TimerMode::OneShot, cia.timer_b.mode);
-        assert_eq!(TimerInput::External, cia.timer_b.input);
+        assert_eq!(timer::Mode::OneShot, cia.timer_b.mode);
+        assert_eq!(timer::Input::External, cia.timer_b.input);
     }
 
     #[test]
