@@ -19,7 +19,7 @@
 
 use std::cmp::PartialEq;
 
-pub struct Tod {
+pub struct Rtc {
     enabled: bool,
     hours: u8,
     minutes: u8,
@@ -28,9 +28,9 @@ pub struct Tod {
     pm: bool,
 }
 
-impl Tod {
-    pub fn new() -> Tod {
-        Tod {
+impl Rtc {
+    pub fn new() -> Rtc {
+        Rtc {
             enabled: true,
             hours: 0,
             minutes: 0,
@@ -109,8 +109,8 @@ impl Tod {
     }
 }
 
-impl PartialEq for Tod {
-    fn eq(&self, other: &Tod) -> bool {
+impl PartialEq for Rtc {
+    fn eq(&self, other: &Rtc) -> bool {
         self.hours == other.hours
             && self.minutes == other.minutes
             && self.seconds == other.seconds
