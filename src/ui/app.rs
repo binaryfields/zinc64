@@ -207,6 +207,15 @@ impl AppWindow {
         self.next_keyboard_event = 0;
     }
 
+    fn toggle_datassette_play(&mut self) {
+        let datassette = self.c64.get_datasette();
+        if !datassette.borrow().is_playing() {
+            datassette.borrow_mut().play();
+        } else {
+            datassette.borrow_mut().stop();
+        }
+    }
+
     fn toggle_fullscreen(&mut self) {
         match self.renderer.window_mut() {
             Some(ref mut window) => {
@@ -258,14 +267,18 @@ impl AppWindow {
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_warp();
                 },
-                Event::KeyDown { keycode: Some(Keycode::Return), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_fullscreen();
-                },
                 Event::KeyDown { keycode: Some(Keycode::F9), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.reset();
                 }
+                Event::KeyDown { keycode: Some(Keycode::F1), keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LCTRLMOD) => {
+                    self.toggle_datassette_play();
+                },
+                Event::KeyDown { keycode: Some(Keycode::Return), keymod, repeat: false, .. }
+                if keymod.contains(keyboard::LALTMOD) => {
+                    self.toggle_fullscreen();
+                },
                 Event::KeyDown { keycode: Some(key), .. } => {
                     let keyboard = self.c64.get_keyboard();
                     keyboard.borrow_mut().on_key_down(key);

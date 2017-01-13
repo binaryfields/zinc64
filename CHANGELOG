@@ -47,3 +47,4 @@
 - revamp cpu instruction tracing
 - revamp cpu interrupt tracking, fixes frogger freeze
 - landed cia tod
+- landed datassette and tap loader

@@ -23,6 +23,7 @@ mod crt;
 //mod hex;
 mod loaders;
 mod prg;
+mod tap;
 
 use std::io;
 use std::path::Path;

@@ -25,6 +25,7 @@ use cpu::interrupt;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
+use util::Pin;
 use util::bcd;
 use util::bit;
 
@@ -39,18 +40,21 @@ use super::tod::Tod;
 // TODO cia: add timer output logic
 
 pub struct CiaIo {
-    pub cnt: bool,
+    pub cnt: Pin,
+    pub flag: Pin,
 }
 
 impl CiaIo {
     pub fn new() -> CiaIo {
         CiaIo {
-            cnt: false,
+            cnt: Pin::new_high(),
+            flag: Pin::new_low(),
         }
     }
 
     pub fn reset(&mut self) {
-        self.cnt = true;
+        self.cnt = Pin::new_high();
+        self.flag = Pin::new_low();
     }
 }
 
@@ -165,7 +169,6 @@ pub struct Cia {
     int_triggered: bool,
     // I/O Lines
     cia_io: Rc<RefCell<CiaIo>>,
-    cnt_last: bool,
 }
 
 impl Cia {
@@ -192,7 +195,6 @@ impl Cia {
             int_mask: 0,
             int_triggered: false,
             cia_io: cia_io,
-            cnt_last: false,
         }
     }
 
@@ -213,7 +215,6 @@ impl Cia {
         self.int_mask = 0x00;
         self.int_triggered = false;
         self.cia_io.borrow_mut().reset();
-        self.cnt_last = false;
     }
 
     pub fn step(&mut self) {
@@ -221,7 +222,7 @@ impl Cia {
         let timer_a_output = if self.timer_a.enabled {
             let pulse = match self.timer_a.input {
                 timer::Input::SystemClock => 1,
-                timer::Input::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
+                timer::Input::External => if self.cia_io.borrow().cnt.is_rising() { 1 } else { 0 },
                 _ => panic!("invalid input source {:?}", self.timer_a.input),
             };
             self.timer_a.update(pulse)
@@ -231,9 +232,9 @@ impl Cia {
         let timer_b_output = if self.timer_b.enabled {
             let pulse = match self.timer_b.input {
                 timer::Input::SystemClock => 1,
-                timer::Input::External => if !self.cnt_last && self.cia_io.borrow().cnt { 1 } else { 0 },
+                timer::Input::External => if self.cia_io.borrow().cnt.is_rising() { 1 } else { 0 },
                 timer::Input::TimerA => if timer_a_output { 1 } else { 0 },
-                timer::Input::TimerAWithCNT => if timer_a_output && self.cia_io.borrow().cnt { 1 } else { 0 },
+                timer::Input::TimerAWithCNT => if timer_a_output && self.cia_io.borrow().cnt.is_high() { 1 } else { 0 },
             };
             self.timer_b.update(pulse)
         } else {
@@ -252,11 +253,12 @@ impl Cia {
         if timer_b_output {
             self.int_data |= 1 << 1;
         }
+        if self.cia_io.borrow().flag.is_falling() {
+            self.int_data |= 1 << 4;
+        }
         if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
             self.trigger_interrupt();
         }
-        // Update internal state
-        self.cnt_last = self.cia_io.borrow().cnt;
     }
 
     pub fn tod_tick(&mut self) {

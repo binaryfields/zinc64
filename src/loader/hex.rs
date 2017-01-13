@@ -28,8 +28,6 @@ use std::result::Result;
 use c64::C64;
 use loader::Loader;
 
-// TODO loader: add hexloader test cases
-
 pub struct HexLoader {}
 
 impl HexLoader {

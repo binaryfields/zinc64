@@ -18,10 +18,14 @@
  */
 
 pub mod cartridge;
+mod datassette;
 pub mod joystick;
 mod keyboard;
+mod tape;
 
 // FIXME
 pub use self::cartridge::{Cartridge, Chip, ChipType, HwType};
+pub use self::datassette::Datassette;
 pub use self::joystick::Joystick;
 pub use self::keyboard::Keyboard;
+pub use self::tape::Tape;

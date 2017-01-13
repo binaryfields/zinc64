@@ -305,7 +305,8 @@ impl Vic {
     }
 
     pub fn step(&mut self) {
-        if self.raster == self.raster_compare  && self.x_pos == 0 { // FIXME this can be any point
+        if self.raster == self.raster_compare && self.x_pos == 0 {
+            // FIXME this can be any point
             self.int_data |= 1 << 0;
             if (self.int_mask & self.int_data) != 0 {
                 self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
@@ -335,20 +336,34 @@ impl Vic {
                 }
             }
             if self.is_window(self.x_pos, self.raster) {
-                let char_code = self.fetch_char_code(self.vc);
-                let char_color = self.fetch_char_color(self.vc);
-                let char_data = self.fetch_char_pixels(char_code, self.rc);
                 match self.mode {
                     Mode::Text => {
+                        let char_code = self.fetch_char_code(self.vc);
+                        let char_color = self.fetch_char_color(self.vc);
+                        let char_data = self.fetch_char_pixels(char_code, self.rc);
                         self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
                     },
                     Mode::McText => {
+                        let char_code = self.fetch_char_code(self.vc);
+                        let char_color = self.fetch_char_color(self.vc);
+                        let char_data = self.fetch_char_pixels(char_code, self.rc);
                         if bit::bit_test(char_color, 3) {
                             self.draw_char_mc(self.x_pos, self.raster, char_data, char_color);
                         } else {
                             self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
                         }
                     },
+                    Mode::Bitmap => {
+                        let bitmap_color = self.fetch_bitmap_color(self.vc);
+                        let bitmap_data = self.fetch_bitmap_pixels(self.vc, self.rc);
+                        self.draw_bitmap(self.x_pos, self.raster, bitmap_data, bitmap_color >> 4, bitmap_color & 0x0f);
+                    }
+                    Mode::McBitmap | Mode::InvalidBitmap2 => {
+                        let bitmap_color = self.fetch_bitmap_color(self.vc);
+                        let bitmap_data = self.fetch_bitmap_pixels(self.vc, self.rc);
+                        let char_color = self.fetch_char_color(self.vc);
+                        self.draw_bitmap_mc(self.x_pos, self.raster, bitmap_data, bitmap_color >> 4, bitmap_color & 0x0f, char_color);
+                    }
                     _ => panic!("unsupported graphics mode {}", self.mode.value()),
                 }
                 // 4. VC and VMLI are incremented after each g-access in display state.
@@ -439,6 +454,37 @@ impl Vic {
 
     // -- Draw Ops
 
+    fn draw_bitmap(&self, x: u16, y: u16, data: u8, fg_color: u8, bg_color: u8) {
+        let mut rt = self.rt.borrow_mut();
+        let y_trans = y - self.config.visible.top;
+        for i in 0..8u16 {
+            let x_trans = x - self.config.visible.left + 7 - i;
+            if bit::bit_test(data, i as u8) {
+                rt.write(x_trans, y_trans, fg_color);
+            } else {
+                rt.write(x_trans, y_trans, bg_color)
+            }
+        }
+    }
+
+    fn draw_bitmap_mc(&self, x: u16, y: u16, data: u8, fg_color: u8, bg_color: u8, color_11: u8) {
+        let mut rt = self.rt.borrow_mut();
+        let y_trans = y - self.config.visible.top;
+        let x_trans = x - self.config.visible.left;
+        for i in 0..4u16 {
+            let source = (data >> (i as u8 * 2)) & 0x03;
+            let color = match source {
+                0 => self.background_color[0],
+                1 => fg_color,
+                2 => bg_color,
+                3 => color_11,
+                _ => panic!("invalid char color source {}", source),
+            };
+            rt.write(x_trans + 7 - (i * 2), y_trans, color);
+            rt.write(x_trans + 6 - (i * 2), y_trans, color);
+        }
+    }
+
     fn draw_border(&self, x: u16, y: u16) {
         let mut rt = self.rt.borrow_mut();
         let x_trans = x - self.config.visible.left;
@@ -513,6 +559,20 @@ impl Vic {
     }
 
     // -- Memory Ops
+
+    // c-access
+    #[inline(always)]
+    fn fetch_bitmap_color(&self, vc: u16) -> u8 {
+        let address = self.video_matrix | vc;
+        self.mem.borrow().vic_read(address)
+    }
+
+    // g-access
+    #[inline(always)]
+    fn fetch_bitmap_pixels(&self, vc: u16, rc: u8) -> u8 {
+        let address = self.char_base & 0x2000 | (vc << 3) | rc as u16;
+        self.mem.borrow().vic_read(address)
+    }
 
     // c-access
     #[inline(always)]

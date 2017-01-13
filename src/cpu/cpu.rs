@@ -45,6 +45,8 @@ pub struct CpuIo {
     pub loram: bool,
     pub hiram: bool,
     pub charen: bool,
+    pub cassette_switch: bool,
+    pub cassette_motor: bool,
     pub irq: Interrupt,
     pub nmi: Interrupt,
 }
@@ -55,6 +57,8 @@ impl CpuIo {
             loram: false,
             hiram: false,
             charen: false,
+            cassette_switch: true,
+            cassette_motor: true,
             irq: Interrupt::new(interrupt::Type::Irq),
             nmi: Interrupt::new(interrupt::Type::Nmi),
         }
@@ -64,6 +68,8 @@ impl CpuIo {
         self.loram = true;
         self.hiram = true;
         self.charen = true;
+        self.cassette_switch = true;
+        self.cassette_motor = true;
         self.irq.reset();
         self.nmi.reset();
     }
@@ -635,7 +641,18 @@ impl Cpu {
     }
 
     pub fn read(&self, address: u16) -> u8 {
-        self.mem.borrow().read(address)
+        match address {
+            0x0001 => {
+                let io = self.io.borrow();
+                let loram = bit::bit_set(0, io.loram);
+                let hiram = bit::bit_set(1, io.hiram);
+                let charen = bit::bit_set(2, io.charen);
+                let cassette_switch = bit::bit_set(4, io.cassette_switch);
+                let cassette_motor = bit::bit_set(5, io.cassette_motor);
+                loram | hiram | charen | cassette_switch | cassette_motor
+            }
+            _ => self.mem.borrow().read(address),
+        }
     }
 
     pub fn read_word(&self, address: u16) -> u16 {
@@ -652,6 +669,7 @@ impl Cpu {
                     io.loram = bit::bit_test(value, 0);
                     io.hiram = bit::bit_test(value, 1);
                     io.charen = bit::bit_test(value, 2);
+                    io.cassette_motor = bit::bit_test(value, 5);
                 }
                 self.mem.borrow_mut().switch_banks();
                 self.mem.borrow_mut().write(address, value);

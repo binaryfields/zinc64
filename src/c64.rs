@@ -26,7 +26,7 @@ use std::time::Duration;
 
 use cpu::{Cpu, CpuIo};
 use config::Config;
-use device::{Cartridge, Joystick, Keyboard};
+use device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
 use device::joystick;
 use mem::{ColorRam, DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
@@ -38,8 +38,6 @@ use video::{RenderTarget, Vic};
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
 //   components are managed as component dependencies.
-
-// TODO c64: update test cases to use loader
 
 #[allow(dead_code)]
 pub struct C64 {
@@ -56,6 +54,7 @@ pub struct C64 {
     // I/O
     expansion_port: Rc<RefCell<ExpansionPort>>,
     // Peripherals
+    datassette: Rc<RefCell<Datassette>>,
     joystick1: Option<Rc<RefCell<Joystick>>>,
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
@@ -89,6 +88,9 @@ impl C64 {
             ExpansionPortIo::new()
         ));
         // Peripherals
+        let datassette = Rc::new(RefCell::new(
+            Datassette::new(cia1_io.clone(), cpu_io.clone())
+        ));
         let joystick1 = if config.joystick1 != joystick::Mode::None {
             Some(Rc::new(RefCell::new(
                 Joystick::new(config.joystick1, 3200)))
@@ -168,6 +170,7 @@ impl C64 {
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
                 expansion_port: expansion_port.clone(),
+                datassette: datassette,
                 joystick1: joystick1,
                 joystick2: joystick2,
                 keyboard: keyboard.clone(),
@@ -194,6 +197,10 @@ impl C64 {
 
     pub fn get_cycles(&self) -> u64 {
         self.cycles
+    }
+
+    pub fn get_datasette(&self) -> Rc<RefCell<Datassette>> {
+        self.datassette.clone()
     }
 
     pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
@@ -267,6 +274,7 @@ impl C64 {
         self.cia2.borrow_mut().reset();
         self.vic.borrow_mut().reset();
         // Peripherals
+        self.datassette.borrow_mut().reset();
         if let Some(ref joystick) = self.joystick1 {
             joystick.borrow_mut().reset();
         }
@@ -307,6 +315,7 @@ impl C64 {
             self.vic.borrow_mut().step();
             self.cia1.borrow_mut().step();
             self.cia2.borrow_mut().step();
+            self.datassette.borrow_mut().step();
         }
         if self.autostart.is_some() {
             if self.cpu.borrow().get_pc() == 0xa65c {
@@ -342,6 +351,16 @@ impl C64 {
     pub fn detach_cartridge(&mut self) {
         self.expansion_port.borrow_mut().detach();
         self.reset(false);
+    }
+
+    // -- Tape Ops
+
+    pub fn attach_tape(&mut self, tape: Box<Tape>) {
+        self.datassette.borrow_mut().attach(tape);
+    }
+
+    pub fn detach_tape(&mut self) {
+        self.datassette.borrow_mut().detach();
     }
 
     // -- Debug Ops

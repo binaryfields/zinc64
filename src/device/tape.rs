@@ -17,30 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path::Path;
-
-use loader::Loader;
-use loader::crt;
-use loader::prg;
-use loader::tap;
-
-pub struct Loaders {}
-
-impl Loaders {
-    pub fn from_ext(ext: Option<&str>) -> Box<Loader> {
-        match ext {
-            Some("crt") => Box::new(crt::CrtLoader::new()),
-            //Some("hex") => Box::new(hex::HexLoader::new()),
-            Some("prg") => Box::new(prg::PrgLoader::new()),
-            Some("tap") => Box::new(tap::TapLoader::new()),
-            _ => panic!("invalid loader {}", ext.unwrap_or(""))
-        }
-    }
-
-    pub fn from_path(path: &Path) -> Box<Loader> {
-        let ext = path.extension()
-            .map(|s| s.to_str().unwrap_or(""));
-        Loaders::from_ext(ext)
-    }
+pub trait Tape {
+    fn read_pulse(&mut self) -> Option<u32>;
+    fn seek(&mut self, pos: usize) -> bool;
 }
-
