@@ -25,7 +25,7 @@ use cpu::interrupt;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
-use util::{IoPort, Pin};
+use util::{InterruptControl, IoPort, Pin};
 use util::bcd;
 use util::bit;
 
@@ -130,8 +130,7 @@ pub struct Cia {
     tod_clock: Rtc,
     tod_set_alarm: bool,
     // Interrupts
-    int_data: u8,
-    int_mask: u8,
+    int_control: InterruptControl,
     int_triggered: bool,
     // I/O Lines
     cia_io: Rc<RefCell<CiaIo>>,
@@ -157,8 +156,7 @@ impl Cia {
             tod_alarm: Rtc::new(),
             tod_clock: Rtc::new(),
             tod_set_alarm: false,
-            int_data: 0,
-            int_mask: 0,
+            int_control: InterruptControl::new(),
             int_triggered: false,
             cia_io: cia_io,
         }
@@ -177,8 +175,7 @@ impl Cia {
         self.port_b.reset();
         self.timer_a.reset();
         self.timer_b.reset();
-        self.int_data = 0x00;
-        self.int_mask = 0x00;
+        self.int_control.reset();
         self.int_triggered = false;
         self.cia_io.borrow_mut().reset();
     }
@@ -214,15 +211,15 @@ impl Cia {
         and bring the IRQ pin low.
         */
         if timer_a_output {
-            self.int_data |= 1 << 0;
+            self.int_control.set_event(0);
         }
         if timer_b_output {
-            self.int_data |= 1 << 1;
+            self.int_control.set_event(1);
         }
         if self.cia_io.borrow().flag.is_falling() {
-            self.int_data |= 1 << 4;
+            self.int_control.set_event(4);
         }
-        if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
+        if self.int_control.get_interrupt_request() && !self.int_triggered {
             self.trigger_interrupt();
         }
     }
@@ -230,8 +227,8 @@ impl Cia {
     pub fn tod_tick(&mut self) {
         self.tod_clock.tick();
         if self.tod_clock == self.tod_alarm {
-            self.int_data |= 1 << 2;
-            if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
+            self.int_control.set_event(2);
+            if self.int_control.get_interrupt_request() && !self.int_triggered {
                 self.trigger_interrupt();
             }
         }
@@ -345,10 +342,10 @@ impl Cia {
                 is cleared and the IRQ line returns high following a
                 read of the DATA register.
                 */
-                let result = bit::bit_update(self.int_data, 7, (self.int_mask & self.int_data) != 0);
-                self.int_data = 0;
+                let data = self.int_control.get_data();
+                self.int_control.clear();
                 self.clear_interrupt();
-                result
+                data
             },
             Reg::CRA => {
                 let timer = &self.timer_a;
@@ -457,12 +454,8 @@ impl Cia {
                 set IR and generate an Interrupt Request, the corresponding
                 MASK bit must be set.
 s                */
-                if bit::bit_test(value, 7) {
-                    self.int_mask |= value & 0x1f;
-                } else {
-                    self.int_mask &= !(value & 0x1f);
-                }
-                if (self.int_mask & self.int_data) != 0 && !self.int_triggered {
+                self.int_control.update_mask(value);
+                if self.int_control.get_interrupt_request() && !self.int_triggered {
                     self.trigger_interrupt();
                 }
             },
