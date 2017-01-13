@@ -25,13 +25,13 @@ use cpu::interrupt;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
-use util::Pin;
+use util::{IoPort, Pin};
 use util::bcd;
 use util::bit;
 
 use super::timer;
 use super::timer::Timer;
-use super::tod::Tod;
+use super::rtc::Rtc;
 
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
@@ -62,40 +62,6 @@ impl CiaIo {
 pub enum Mode {
     Cia1,
     Cia2,
-}
-
-struct Port {
-    latch: u8,
-    value: u8,
-    direction: u8,
-}
-
-impl Port {
-    pub fn new(direction: u8) -> Port {
-        Port {
-            latch: 0,
-            value: 0,
-            direction: direction,
-        }
-    }
-
-    pub fn set_value(&mut self, value: u8) {
-        self.latch = value;
-        // set input pins to 1
-        self.value = self.latch | !self.direction;
-    }
-
-    pub fn set_direction(&mut self, direction: u8) {
-        self.direction = direction;
-        // set input pins to 1
-        self.value = self.latch | !self.direction;
-    }
-
-    pub fn reset(&mut self) {
-        self.direction = 0x00;
-        self.latch = 0x00;
-        self.set_value(0x00);
-    }
 }
 
 #[derive(Copy, Clone)]
@@ -156,12 +122,12 @@ pub struct Cia {
     keyboard: Rc<RefCell<Keyboard>>,
     mode: Mode,
     // Functional Units
-    port_a: Port,
-    port_b: Port,
+    port_a: IoPort,
+    port_b: IoPort,
     timer_a: Timer,
     timer_b: Timer,
-    tod_alarm: Tod,
-    tod_clock: Tod,
+    tod_alarm: Rtc,
+    tod_clock: Rtc,
     tod_set_alarm: bool,
     // Interrupts
     int_data: u8,
@@ -184,12 +150,12 @@ impl Cia {
             joystick2: joystick2,
             keyboard: keyboard,
             mode: mode,
-            port_a: Port::new(0x00),
-            port_b: Port::new(0x00),
+            port_a: IoPort::new(0x00),
+            port_b: IoPort::new(0x00),
             timer_a: Timer::new(),
             timer_b: Timer::new(),
-            tod_alarm: Tod::new(),
-            tod_clock: Tod::new(),
+            tod_alarm: Rtc::new(),
+            tod_clock: Rtc::new(),
             tod_set_alarm: false,
             int_data: 0,
             int_mask: 0,
@@ -275,28 +241,28 @@ impl Cia {
 
     fn read_cia1_port_a(&self) -> u8 {
         let joystick = self.scan_joystick(&self.joystick2);
-        self.port_a.value & joystick
+        self.port_a.get_value() & joystick
     }
 
     fn read_cia1_port_b(&self) -> u8 {
         // let timer_a_out = 1u8 << 6;
         // let timer_b_out = 1u8 << 7;
-        let keyboard = match self.port_a.value {
+        let keyboard = match self.port_a.get_value() {
             0x00 => 0x00,
             0xff => 0xff,
-            _ => self.scan_keyboard(!self.port_a.value),
+            _ => self.scan_keyboard(!self.port_a.get_value()),
         };
         let joystick = self.scan_joystick(&self.joystick1);
-        self.port_b.value & keyboard & joystick
+        self.port_b.get_value() & keyboard & joystick
     }
 
     fn read_cia2_port_a(&self) -> u8 {
         // iec inputs
-        self.port_a.value
+        self.port_a.get_value()
     }
 
     fn read_cia2_port_b(&self) -> u8 {
-        self.port_b.value
+        self.port_b.get_value()
     }
 
     fn scan_joystick(&self, joystick: &Option<Rc<RefCell<Joystick>>>) -> u8 {
@@ -358,8 +324,8 @@ impl Cia {
                     Mode::Cia2 => self.read_cia2_port_b(),
                 }
             },
-            Reg::DDRA => self.port_a.direction,
-            Reg::DDRB => self.port_b.direction,
+            Reg::DDRA => self.port_a.get_direction(),
+            Reg::DDRB => self.port_b.get_direction(),
             Reg::TALO => (self.timer_a.value & 0xff) as u8,
             Reg::TAHI => (self.timer_a.value >> 8) as u8,
             Reg::TBLO => (self.timer_b.value & 0xff) as u8,

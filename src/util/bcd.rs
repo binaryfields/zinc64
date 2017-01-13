@@ -17,10 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#[inline(always)]
 pub fn from_bcd(decimal: u8) -> u8 {
     (decimal >> 4) * 10 + (decimal & 0x0f)
 }
 
+#[inline(always)]
 pub fn to_bcd(num: u8) -> u8 {
     ((num / 10) << 4) | (num % 10)
 }

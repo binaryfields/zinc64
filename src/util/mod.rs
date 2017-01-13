@@ -19,11 +19,13 @@
 
 pub mod bcd;
 pub mod bit;
+mod ioport;
 mod logger;
 mod pin;
 mod pulse;
 mod rect;
 
+pub use self::ioport::IoPort;
 pub use self::logger::Logger;
 pub use self::pin::Pin;
 pub use self::pulse::Pulse;
