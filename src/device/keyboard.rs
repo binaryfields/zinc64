@@ -24,8 +24,6 @@ use util::bit;
 
 // SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
 
-// TODO keyboard: add test cases
-
 pub struct Keyboard {
     matrix: [u8; 8],
     buffer: VecDeque<(Keycode, bool)>,
@@ -156,12 +154,12 @@ impl Keyboard {
             // Row 0
             Keycode::Backspace => (0, 0),
             Keycode::Return => (0, 1),
-            // Keycode::F7 => (0, 2),
+            Keycode::Right => (0, 2),
             Keycode::F7 => (0, 3),
             Keycode::F1 => (0, 4),
             Keycode::F3 => (0, 5),
             Keycode::F5 => (0, 6),
-            // Keycode::F7 => (0, 7),
+            Keycode::Down => (0, 7),
             // Row 1
             Keycode::Num3 => (1, 0),
             Keycode::W => (1, 1),
@@ -199,27 +197,28 @@ impl Keyboard {
             Keycode::O => (4, 6),
             Keycode::N => (4, 7),
             // Row 5
-            Keycode::Plus => (5, 0),
+            Keycode::Backslash => (5, 0),   // Plus
             Keycode::P => (5, 1),
             Keycode::L => (5, 2),
             Keycode::Minus => (5, 3),
             Keycode::Period => (5, 4),
-            Keycode::Colon => (5, 5),
-            Keycode::At => (5, 6),
+            Keycode::Quote => (5, 5),       // Colon
+            Keycode::LeftBracket => (5, 6), // At
             Keycode::Comma => (5, 7),
             // Row 6
             Keycode::Dollar => (6, 0),
-            Keycode::Asterisk => (6, 1),
+            Keycode::RightBracket => (6, 1), // Asterisk
             Keycode::Semicolon => (6, 2),
             Keycode::Home => (6, 3),
             Keycode::RShift => (6, 4),
             Keycode::Equals => (6, 5),
-            Keycode::Up => (6, 6),
+            Keycode::Caret => (6, 6), // FIXME
             Keycode::Slash => (6, 7),
             // Row 7
             Keycode::Num1 => (7, 0),
             Keycode::Left => (7, 1),
             Keycode::LCtrl => (7, 2),
+            Keycode::RCtrl => (7, 2),
             Keycode::Num2 => (7, 3),
             Keycode::Space => (7, 4),
             Keycode::LGui => (7, 5),

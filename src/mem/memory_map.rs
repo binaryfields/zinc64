@@ -19,8 +19,6 @@
 
 // SPEC: https://www.c64-wiki.com/index.php/Bank_Switching
 
-// TODO memory_map: add test cases
-
 #[derive(Clone, Copy)]
 pub enum Bank {
     Basic,

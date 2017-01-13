@@ -38,8 +38,6 @@ use super::{Addressable, Bank, Configuration, DeviceIo, MemoryMap, Ram, Rom};
 //   based on zones that can be mapped to different banks. CPU uses IoPort @ 0x0001 to reconfigure
 //   memory layout.
 
-// TODO memory: update test cases
-
 pub struct Memory {
     // Dependencies
     cpu_io: Rc<RefCell<CpuIo>>,

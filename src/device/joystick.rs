@@ -127,7 +127,7 @@ impl Joystick {
             Keycode::Kp6 => self.x_axis = AxisMotion::Positive,
             Keycode::Kp2 => self.y_axis = AxisMotion::Negative,
             Keycode::Kp8 => self.y_axis = AxisMotion::Positive,
-            Keycode::KpEnter => self.button = true,
+            Keycode::Kp5 => self.button = true,
             _ => {},
         }
     }
@@ -138,7 +138,7 @@ impl Joystick {
             Keycode::Kp6 => self.x_axis = AxisMotion::Neutral,
             Keycode::Kp2 => self.y_axis = AxisMotion::Neutral,
             Keycode::Kp8 => self.y_axis = AxisMotion::Neutral,
-            Keycode::KpEnter => self.button = false,
+            Keycode::Kp5 => self.button = false,
             _ => {},
         }
     }
