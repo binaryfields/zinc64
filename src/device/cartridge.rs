@@ -124,6 +124,8 @@ impl Cartridge {
         }
     }
 
+    // -- Device I/O
+
     #[allow(unused_variables)]
     pub fn read_io(&self, address: u16) -> u8 {
         0

@@ -175,6 +175,7 @@ impl Cia {
         self.port_b.reset();
         self.timer_a.reset();
         self.timer_b.reset();
+        self.tod_set_alarm = false;
         self.int_control.reset();
         self.int_triggered = false;
         self.cia_io.borrow_mut().reset();
