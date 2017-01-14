@@ -137,10 +137,11 @@ pub struct Config {
     // Cpu
     pub cpu_frequency: u32,
     // Video
-    pub display_size: Dimension,
-    pub visible_size: Dimension,
-    pub visible: Rect,
+    pub raster_size: Dimension,
+    pub screen_size: Dimension,
+    pub screen: Rect,
     pub window_size: Dimension,
+    pub graphics: Rect,
     pub window: Rect,
     pub frame_cycles: u16,
     pub frame_duration_ns: u32,
@@ -163,13 +164,18 @@ impl Config {
         let display_size = Dimension::new(DISPLAY_WIDTH_PAL, DISPLAY_HEIGHT_PAL);
         let visible_size = Dimension::new(VISIBLE_WIDTH_PAL, VISIBLE_HEIGHT_PAL);
         let window_size = Dimension::new(WINDOW_WIDTH, WINDOW_HEIGHT);
+        let graphics = Rect::new_with_dim(WINDOW_FIRST_COL, WINDOW_FIRST_LINE - 3, window_size);
+        let window = Rect::new_with_dim(WINDOW_FIRST_COL - VISIBLE_FIRST_COL_PAL,
+                                        WINDOW_FIRST_LINE - VISIBLE_FIRST_LINE_PAL,
+                                        window_size);
         Config {
             cpu_frequency: CLOCK_CPU_PAL,
-            display_size: display_size,
-            visible_size: visible_size,
-            visible: Rect::new_with_dim(VISIBLE_FIRST_COL_PAL, VISIBLE_FIRST_LINE_PAL, visible_size),
+            raster_size: display_size,
+            screen_size: visible_size,
+            screen: Rect::new_with_dim(VISIBLE_FIRST_COL_PAL, VISIBLE_FIRST_LINE_PAL, visible_size),
+            graphics: graphics,
             window_size: window_size,
-            window: Rect::new_with_dim(WINDOW_FIRST_COL, WINDOW_FIRST_LINE, window_size),
+            window: window,
             frame_cycles: RASTER_FRAME_CYCLES_PAL,
             frame_duration_ns: ((1.0 / RASTER_REFRESH_RATE_PAL) * 1_000_000_000.0) as u32,
             raster_line_cycles: RASTER_LINE_CYCLES_PAL,

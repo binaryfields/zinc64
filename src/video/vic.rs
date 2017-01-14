@@ -25,17 +25,14 @@ use cpu::CpuIo;
 use cpu::interrupt;
 use log::LogLevel;
 use mem::{Addressable, ColorRam, Memory};
+use util::{Dimension, Rect};
 use util::bit;
 
 use super::RenderTarget;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
-// TODO impl bad line logic
-// TODO vic: implement cpu stalling
-// TODO vic: implement den/rsel/csel
-// TODO vic: implement scroll
-// TODO vic: implement remaining modes
+// TODO vic: impl bad line logic
 // TODO vic: implement sprites
 
 #[derive(Copy, Clone)]
@@ -208,8 +205,19 @@ impl Sprite {
             expand_x: false,
             expand_y: false,
             multicolor: false,
-            priority: true,
+            priority: false,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.x = 0;
+        self.y = 0;
+        self.color = 0;
+        self.expand_x = false;
+        self.expand_y = false;
+        self.multicolor = false;
+        self.priority = true;
     }
 }
 
@@ -217,42 +225,40 @@ impl Sprite {
 pub struct Vic {
     // Dependencies
     config: Config,
+    color_ram: Rc<RefCell<ColorRam>>,
     cpu_io: Rc<RefCell<CpuIo>>,
     mem: Rc<RefCell<Memory>>,
-    color_ram: Rc<RefCell<ColorRam>>,
     rt: Rc<RefCell<RenderTarget>>,
-    // Counters
-    raster: u16,
-    x_pos: u16,
-    vc_base: u16,
-    vc: u16,
-    rc: u8,
-    // Display Options
+    // Configuration
     mode: Mode,
     den: bool,
     rsel: bool,
     csel: bool,
     scroll_x: u8,
     scroll_y: u8,
-    // Interrupt
+    // Dimensions
+    graphics: Rect,
+    screen: Rect,
+    window: Rect,
+    // Interrupts
     int_data: u8,
     int_mask: u8,
     raster_compare: u16,
-    // I/O
-    light_pen_pos: [u8; 2],
     // Memory Pointers
     char_base: u16,
     video_matrix: u16,
     // Sprite and Color Data
     background_color: [u8; 4],
     border_color: u8,
+    light_pen_pos: [u8; 2],
     sprites: [Sprite; 8],
     sprite_multicolor: [u8; 2],
-    // Video Matrix Line Buffer
-    vm_buffer: [u8; 40],
-    vm_color_buffer: [u8; 40],
-    vmli: u8,
-    // Sprite Ptrs
+    // Runtime State
+    raster: u16,
+    cycle: u16,
+    vc_base: u16,
+    vc: u16,
+    rc: u8,
     sprite_ptrs: [u16; 8],
     sprite_mc: [u8; 8],
     sprite_mcbase: [u8; 8],
@@ -260,63 +266,89 @@ pub struct Vic {
 
 impl Vic {
     pub fn new(config: Config,
+               color_ram: Rc<RefCell<ColorRam>>,
                cpu_io: Rc<RefCell<CpuIo>>,
                mem: Rc<RefCell<Memory>>,
-               color_ram: Rc<RefCell<ColorRam>>,
                rt: Rc<RefCell<RenderTarget>>) -> Vic {
-        Vic {
+        let mut vic = Vic {
             config: config,
+            color_ram: color_ram,
             cpu_io: cpu_io,
             mem: mem,
-            color_ram: color_ram,
             rt: rt,
-            raster: 0x0100,
-            x_pos: 0,
-            vc_base: 0,
-            vc: 0,
-            rc: 0,
             mode: Mode::Text,
-            den: true,
-            rsel: true,
-            csel: true,
+            den: false,
+            rsel: false,
+            csel: false,
             scroll_x: 0,
-            scroll_y: 0, // FIXME default 3
+            scroll_y: 0,
+            graphics: Rect::new(0, 0, 0, 0),
+            screen: config.screen,
+            window: Rect::new(0, 0, 0, 0),
             int_data: 0x00,
             int_mask: 0x00,
             raster_compare: 0x00,
+            char_base: 0,
+            video_matrix: 0,
+            border_color: 0,
+            background_color: [0, 0, 0, 0],
             light_pen_pos: [0; 2],
-            char_base: 4096,
-            video_matrix: 1024,
-            border_color: 0x0e,
-            background_color: [0x06, 0, 0, 0],
             sprites: [Sprite::new(); 8],
             sprite_multicolor: [0; 2],
-            vm_buffer: [0; 40],
-            vm_color_buffer: [0; 40],
-            vmli: 0,
+            raster: 0,
+            cycle: 0,
+            vc_base: 0,
+            vc: 0,
+            rc: 0,
             sprite_ptrs: [0; 8],
             sprite_mc: [0; 8],
             sprite_mcbase: [0; 8],
-        }
+        };
+        vic.update_display_dims();
+        vic
     }
 
     pub fn reset(&mut self) {
-        // FIXME
+        self.mode = Mode::Text;
+        self.den = true;
+        self.rsel = true;
+        self.csel = true;
+        self.scroll_x = 0;
+        self.scroll_y = 3;
+        self.int_data = 0;
+        self.int_mask = 0;
+        self.raster_compare = 0;
+        self.char_base = 4096;
+        self.video_matrix = 1024;
+        self.border_color = 0x0e;
+        self.background_color = [0x06, 0, 0, 0];
+        self.light_pen_pos = [0; 2];
+        for i in 0..8 {
+            self.sprites[i].reset();
+        }
+        self.sprite_multicolor = [0; 2];
+        self.raster = 0x0100;
+        self.cycle = 0;
+        self.vc_base = 0;
+        self.vc = 0;
+        self.rc = 0;
     }
 
     pub fn step(&mut self) {
-        if self.raster == self.raster_compare && self.x_pos == 0 {
-            // FIXME this can be any point
+        // Process interrupts
+        let rst_int = match self.cycle {
+            0 if self.raster != 0 && self.raster == self.raster_compare => true,
+            1 if self.raster == 0 && self.raster == self.raster_compare => true,
+            _ => false,
+        };
+        if rst_int {
             self.int_data |= 1 << 0;
             if (self.int_mask & self.int_data) != 0 {
                 self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
             }
         }
-        if self.is_bad_line(self.raster) {
-            //let vc = self.vc;
-            //self.fetch_vm_line(vc); // FIXME vc_base
-        }
-        if self.x_pos == 0 {
+        // Prepare sprite data
+        if self.cycle == 0 {
             self.fetch_sprite_pointers();
             for i in 0..8 {
                 if self.sprites[i].y as u16 == self.raster {
@@ -324,90 +356,53 @@ impl Vic {
                 }
             }
         }
-        if self.is_visible(self.x_pos, self.raster) {
-            // 2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
-            // (VCBASE->VC) and VMLI is cleared. f there is a Bad Line Condition in
-            // this phase, RC is also reset to zero.
-            if self.x_pos == 112 {
-                self.vc = self.vc_base;
-                self.vmli = 0;
-                if self.is_bad_line(self.raster) {
-                    self.rc = 0;
-                }
-            }
-            if self.is_window(self.x_pos, self.raster) {
-                match self.mode {
-                    Mode::Text => {
-                        let char_code = self.fetch_char_code(self.vc);
-                        let char_color = self.fetch_char_color(self.vc);
-                        let char_data = self.fetch_char_pixels(char_code, self.rc);
-                        self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
-                    },
-                    Mode::McText => {
-                        let char_code = self.fetch_char_code(self.vc);
-                        let char_color = self.fetch_char_color(self.vc);
-                        let char_data = self.fetch_char_pixels(char_code, self.rc);
-                        if bit::bit_test(char_color, 3) {
-                            self.draw_char_mc(self.x_pos, self.raster, char_data, char_color);
-                        } else {
-                            self.draw_text_char(self.x_pos, self.raster, char_data, char_color);
-                        }
-                    },
-                    Mode::Bitmap => {
-                        let bitmap_color = self.fetch_bitmap_color(self.vc);
-                        let bitmap_data = self.fetch_bitmap_pixels(self.vc, self.rc);
-                        self.draw_bitmap(self.x_pos, self.raster, bitmap_data, bitmap_color >> 4, bitmap_color & 0x0f);
-                    }
-                    Mode::McBitmap | Mode::InvalidBitmap2 => {
-                        let bitmap_color = self.fetch_bitmap_color(self.vc);
-                        let bitmap_data = self.fetch_bitmap_pixels(self.vc, self.rc);
-                        let char_color = self.fetch_char_color(self.vc);
-                        self.draw_bitmap_mc(self.x_pos, self.raster, bitmap_data, bitmap_color >> 4, bitmap_color & 0x0f, char_color);
-                    }
-                    _ => panic!("unsupported graphics mode {}", self.mode.value()),
-                }
-                // 4. VC and VMLI are incremented after each g-access in display state.
-                self.vc += 1;
-                self.vmli += 1;
-            } else {
-                self.draw_border(self.x_pos, self.raster);
-            }
-            // 5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
-            // logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE).
-            if self.x_pos == 464 {
-                if self.rc == 7 {
-                    self.vc_base = self.vc;
-                }
-                self.rc += 1;
-            }
-            // Draw Sprites
-            if self.x_pos == 464 {
-                for i in 0..8 {
-                    let n = 7 - i;
-                    if self.sprites[n].enabled {
-                        if self.is_sprite(n, self.raster) {
-                            for j in 0..3 {
-                                let sp_data = self.fetch_sprite_data(n, self.sprite_mc[n]);
-                                if !self.sprites[n].multicolor {
-                                    self.draw_sprite(24 + self.sprites[n].x + (j << 3), self.raster, sp_data, self.sprites[n].color);
-                                } else {
-                                    self.draw_sprite_mc(24 + self.sprites[n].x + (j << 3), self.raster, n, sp_data);
-                                }
-                                self.sprite_mc[n] += 1;
-                            }
-                        }
-                    }
-                }
+        // 2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
+        // (VCBASE->VC) and VMLI is cleared. f there is a Bad Line Condition in
+        // this phase, RC is also reset to zero.
+        if self.cycle == 14 {
+            self.vc = self.vc_base;
+            if self.is_bad_line(self.raster) {
+                self.rc = 0;
             }
         }
-        // Update raster counters
-        self.x_pos += 8;
-        if self.x_pos >= self.config.display_size.width {
-            self.x_pos = 0;
+        let x_pos = self.cycle << 3;
+        let y_pos = self.raster;
+        if self.screen.contains(x_pos, y_pos) {
+            let x_screen = x_pos - self.screen.left;
+            let y_screen = self.raster - self.screen.top;
+            if self.graphics.contains(x_pos, y_pos) {
+                if self.window.contains(x_screen, y_screen) {
+                    self.draw(x_screen, y_screen, self.vc, self.rc);
+                    // 4. VC and VMLI are incremented after each g-access in display state.
+                } else {
+                    self.draw_border(x_screen, y_screen);
+                }
+                self.vc += 1;
+            } else {
+                self.draw_border(x_screen, y_screen);
+            }
+            // Draw Sprites
+            if self.cycle == 58 {
+                self.draw_sprites(y_pos);
+            }
+        }
+        // 5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
+        // logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE).
+        if self.cycle == 58 {
+            if self.rc == 7 {
+                self.vc_base = self.vc;
+            }
+            self.rc += 1;
+        }
+        // Update counters/runtime state
+        self.cycle += 1;
+        if self.cycle >= self.config.raster_line_cycles {
+            self.cycle = 0;
             self.raster += 1;
-            if self.raster >= self.config.display_size.height {
+            if self.raster >= self.config.raster_size.height {
                 self.raster = 0;
-                // 1. Once somewhere outside of the range of raster lines $30-$f7, VCBASE is reset to zero.
+                // 1. Once somewhere outside of the range of raster lines $30-$f7, VCBASE is reset
+                // to zero.
                 self.vc_base = 0;
                 let mut rt = self.rt.borrow_mut();
                 rt.set_sync(true);
@@ -415,121 +410,229 @@ impl Vic {
         }
     }
 
-    // -- Raster Queries
+    fn update_display_dims(&mut self) {
+        self.graphics = self.config.graphics.offset(self.scroll_x as i16, self.scroll_y as i16);
+        let window_x = if self.csel { 128 } else { 128 + 7 };
+        let window_width = if self.csel { 320 } else { 304 };
+        let window_y = if self.rsel { 51 } else { 55 };
+        let window_height = if self.rsel { 200 } else { 192 };
+        self.window = Rect::new_with_dim(window_x - self.screen.left,
+                                         window_y - self.screen.top,
+                                         Dimension::new(window_width, window_height));
+    }
 
     #[inline(always)]
-    fn is_bad_line(&self, y: u16) -> bool {
-        if y >= 0x30 && y <= 0xf7 {
-            if y >= self.config.window.top {
-                (y - self.config.window.top) % 8 == 0
-            } else {
-                false
-            }
+    fn is_bad_line(&self, raster: u16) -> bool {
+        if raster >= self.graphics.top {
+            (raster - self.graphics.top) % 8 == 0
         } else {
             false
         }
-    }
-
-    #[inline(always)]
-    fn is_sprite(&self, n: usize, y: u16) -> bool {
-        let sprite = &self.sprites[n];
-        if y >= (sprite.y as u16) && y < (sprite.y as u16 + 21) {
-            true
-        } else {
-            false
-        }
-    }
-
-    #[inline(always)]
-    fn is_visible(&self, x: u16, y: u16) -> bool {
-        let vis = &self.config.visible;
-        y >= vis.top && y <= vis.bottom && x >= vis.left && x <= vis.right
-    }
-
-    #[inline(always)]
-    fn is_window(&self, x: u16, y: u16) -> bool {
-        let win = &self.config.window;
-        y >= win.top && y <= win.bottom && x >= win.left && x <= win.right
     }
 
     // -- Draw Ops
 
-    fn draw_bitmap(&self, x: u16, y: u16, data: u8, fg_color: u8, bg_color: u8) {
+    fn draw(&self, x: u16, y: u16, vc: u16, rc: u8) {
+        match self.mode {
+            Mode::Text => {
+                let char_code = self.fetch_char_code(vc);
+                let char_color = self.fetch_char_color(vc);
+                let char_data = self.fetch_char_pixels(char_code, rc);
+                self.draw_char_text(x, y, char_data, char_color);
+            },
+            Mode::McText => {
+                let char_code = self.fetch_char_code(vc);
+                let char_color = self.fetch_char_color(vc);
+                let char_data = self.fetch_char_pixels(char_code, rc);
+                if bit::bit_test(char_color, 3) {
+                    self.draw_char_mctext(x, y, char_data, char_color);
+                } else {
+                    self.draw_char_text(x, y, char_data, char_color);
+                }
+            },
+            Mode::EcmText => {
+                let c_data = self.fetch_char_code(vc);
+                let char_code = c_data & 0x3f;
+                let char_color_0_src = c_data >> 6;
+                let char_color = self.fetch_char_color(vc);
+                let char_data = self.fetch_char_pixels(char_code, rc);
+                self.draw_char_ecm(x, y, char_data, char_color, char_color_0_src);
+            },
+            Mode::Bitmap => {
+                let bitmap_color = self.fetch_bitmap_color(vc);
+                let bitmap_data = self.fetch_bitmap_pixels(vc, rc);
+                let color_1 = bitmap_color >> 4;
+                let color_0 = bitmap_color & 0x0f;
+                self.draw_bitmap(x, y, bitmap_data, color_1, color_0);
+            },
+            Mode::McBitmap => {
+                let bitmap_color = self.fetch_bitmap_color(vc);
+                let bitmap_data = self.fetch_bitmap_pixels(vc, rc);
+                let color_01 = bitmap_color >> 4;
+                let color_10 = bitmap_color & 0x0f;
+                let color_11 = self.fetch_char_color(vc);
+                self.draw_bitmap_mc(x, y, bitmap_data, color_01, color_10, color_11);
+            },
+            Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => {
+                self.draw_blank(x, y);
+            }
+            _ => panic!("unsupported graphics mode {}", self.mode.value()),
+        }
+    }
+
+    fn draw_bitmap(&self, x: u16, y: u16, data: u8, color_1: u8, color_0: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.visible.top;
         for i in 0..8u16 {
-            let x_trans = x - self.config.visible.left + 7 - i;
-            if bit::bit_test(data, i as u8) {
-                rt.write(x_trans, y_trans, fg_color);
+            let x_pos = x + 7 - i;
+            if x_pos < self.window.right {
+                let color = if bit::bit_test(data, i as u8) {
+                    color_1
+                } else {
+                    color_0
+                };
+                rt.write(x_pos, y, color);
             } else {
-                rt.write(x_trans, y_trans, bg_color)
+                rt.write(x_pos, y, self.border_color);
             }
         }
     }
 
-    fn draw_bitmap_mc(&self, x: u16, y: u16, data: u8, fg_color: u8, bg_color: u8, color_11: u8) {
+    fn draw_bitmap_mc(&self, x: u16, y: u16, data: u8, color_01: u8, color_10: u8, color_11: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.visible.top;
-        let x_trans = x - self.config.visible.left;
         for i in 0..4u16 {
-            let source = (data >> (i as u8 * 2)) & 0x03;
-            let color = match source {
-                0 => self.background_color[0],
-                1 => fg_color,
-                2 => bg_color,
-                3 => color_11,
-                _ => panic!("invalid char color source {}", source),
-            };
-            rt.write(x_trans + 7 - (i * 2), y_trans, color);
-            rt.write(x_trans + 6 - (i * 2), y_trans, color);
+            let x_pos = x + 6 - (i << 1);
+            if x_pos <= self.config.window.right {
+                let source = (data >> (i as u8 * 2)) & 0x03;
+                let color = match source {
+                    0 => self.background_color[0],
+                    1 => color_01,
+                    2 => color_10,
+                    3 => color_11,
+                    _ => panic!("invalid color source {}", source),
+                };
+                rt.write(x_pos, y, color);
+                if x_pos + 1 <= self.config.window.right {
+                    rt.write(x_pos + 1, y, color);
+                }
+            } else {
+                rt.write(x_pos, y, self.border_color);
+            }
+        }
+    }
+
+    fn draw_blank(&self, x: u16, y: u16) {
+        let mut rt = self.rt.borrow_mut();
+        for i in 0..8u16 {
+            let x_pos = x + 7 - i;
+            if x_pos < self.config.window.right {
+                rt.write(x_pos, y, 0);
+            }
         }
     }
 
     fn draw_border(&self, x: u16, y: u16) {
-        let mut rt = self.rt.borrow_mut();
-        let x_trans = x - self.config.visible.left;
-        let y_trans = y - self.config.visible.top;
-        for i in 0..8u16 {
-            if x_trans + i < self.config.visible_size.width {
-                rt.write(x_trans + i, y_trans, self.border_color);
+        if y < self.config.screen_size.height {
+            let mut rt = self.rt.borrow_mut();
+            for i in 0..8u16 {
+                let x_pos = x + 7 - i;
+                if x_pos < self.config.screen_size.width {
+                    rt.write(x_pos, y, self.border_color);
+                }
             }
         }
     }
 
-    fn draw_text_char(&self, x: u16, y: u16, data: u8, color: u8) {
+    fn draw_char_text(&self, x: u16, y: u16, data: u8, color_1: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.visible.top;
         for i in 0..8u16 {
-            let x_trans = x - self.config.visible.left + 7 - i;
-            if bit::bit_test(data, i as u8) {
-                rt.write(x_trans, y_trans, color);
+            let x_pos = x + 7 - i;
+            if x_pos <= self.config.window.right {
+                let color = if bit::bit_test(data, i as u8) {
+                    color_1
+                } else {
+                    self.background_color[0]
+                };
+                rt.write(x_pos, y, color);
             } else {
-                rt.write(x_trans, y_trans, self.background_color[0])
+                rt.write(x_pos, y, self.border_color);
             }
         }
     }
 
-    fn draw_char_mc(&self, x: u16, y: u16, data: u8, color: u8) {
+    fn draw_char_ecm(&self, x: u16, y: u16, data: u8, color_1: u8, color_0_src: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.visible.top;
-        let x_trans = x - self.config.visible.left;
+        for i in 0..8u16 {
+            let x_pos = x + 7 - i;
+            if x_pos <= self.config.window.right {
+                let color = if bit::bit_test(data, i as u8) {
+                    color_1
+                } else {
+                    match color_0_src {
+                        0 => self.background_color[0],
+                        1 => self.background_color[1],
+                        2 => self.background_color[2],
+                        3 => self.background_color[3],
+                        _ => panic!("invalid color source {}", color_0_src),
+                    }
+                };
+                rt.write(x_pos, y, color);
+            } else {
+                rt.write(x_pos, y, self.border_color);
+            }
+        }
+    }
+
+    fn draw_char_mctext(&self, x: u16, y: u16, data: u8, color_1: u8) {
+        let mut rt = self.rt.borrow_mut();
         for i in 0..4u16 {
-            let source = (data >> (i as u8 * 2)) & 0x03;
-            let color = match source {
-                0 => self.background_color[0],
-                1 => self.background_color[1],
-                2 => self.background_color[2],
-                3 => color & 0x07,
-                _ => panic!("invalid char color source {}", source),
-            };
-            rt.write(x_trans + 7 - (i * 2), y_trans, color);
-            rt.write(x_trans + 6 - (i * 2), y_trans, color);
+            let x_pos = x + 6 - (i << 1);
+            if x_pos <= self.config.window.right {
+                let source = (data >> ((i as u8) << 1)) & 0x03;
+                let color = match source {
+                    0 => self.background_color[0],
+                    1 => self.background_color[1],
+                    2 => self.background_color[2],
+                    3 => color_1 & 0x07,
+                    _ => panic!("invalid color source {}", source),
+                };
+                rt.write(x_pos, y, color);
+                if x_pos + 1 <= self.config.window.right {
+                    rt.write(x_pos + 1, y, color);
+                }
+            } else {
+                rt.write(x_pos, y, self.border_color);
+            }
+        }
+    }
+
+    fn draw_sprites(&mut self, raster: u16) {
+        for i in 0..8 {
+            let n = 7 - i;
+            if self.sprites[n].enabled {
+                if self.is_sprite(n, raster) {
+                    for j in 0..3 {
+                        let sp_data = self.fetch_sprite_pixels(n, self.sprite_mc[n]);
+                        if !self.sprites[n].multicolor {
+                            self.draw_sprite(24 + self.sprites[n].x + (j << 3),
+                                             raster,
+                                             sp_data,
+                                             self.sprites[n].color);
+                        } else {
+                            self.draw_sprite_mc(24 + self.sprites[n].x + (j << 3),
+                                                raster,
+                                                n,
+                                                sp_data);
+                        }
+                        self.sprite_mc[n] += 1;
+                    }
+                }
+            }
         }
     }
 
     fn draw_sprite(&self, x: u16, y: u16, data: u8, color: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.visible.top;
+        let y_trans = y - self.config.screen.top;
         let x_trans = x;
         for i in 0..8u16 {
             if bit::bit_test(data, i as u8) {
@@ -540,7 +643,7 @@ impl Vic {
 
     fn draw_sprite_mc(&self, x: u16, y: u16, n: usize, data: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.visible.top;
+        let y_trans = y - self.config.screen.top;
         let x_trans = x;
         for i in 0..4u16 {
             let source = (data >> (i as u8 * 2)) & 0x03;
@@ -560,21 +663,18 @@ impl Vic {
 
     // -- Memory Ops
 
-    // c-access
     #[inline(always)]
     fn fetch_bitmap_color(&self, vc: u16) -> u8 {
         let address = self.video_matrix | vc;
         self.mem.borrow().vic_read(address)
     }
 
-    // g-access
     #[inline(always)]
     fn fetch_bitmap_pixels(&self, vc: u16, rc: u8) -> u8 {
         let address = self.char_base & 0x2000 | (vc << 3) | rc as u16;
         self.mem.borrow().vic_read(address)
     }
 
-    // c-access
     #[inline(always)]
     fn fetch_char_code(&self, vc: u16) -> u8 {
         let address = self.video_matrix | vc;
@@ -586,7 +686,6 @@ impl Vic {
         self.color_ram.borrow().read(vc)
     }
 
-    // g-access
     #[inline(always)]
     fn fetch_char_pixels(&self, ch: u8, rc: u8) -> u8 {
         let address = self.char_base | ((ch as u16) << 3) | rc as u16;
@@ -603,16 +702,20 @@ impl Vic {
     }
 
     #[inline(always)]
-    fn fetch_sprite_data(&self, n: usize, mc: u8) -> u8 {
+    fn fetch_sprite_pixels(&self, n: usize, mc: u8) -> u8 {
         let address = self.sprite_ptrs[n] | (mc as u16);
         self.mem.borrow().vic_read(address)
     }
 
-    #[allow(dead_code)]
-    fn fetch_vm_line(&mut self, vc: u16) {
-        for i in 0..40u16 {
-            self.vm_buffer[i as usize] = self.fetch_char_code(vc + i);
-            self.vm_color_buffer[i as usize] = self.fetch_char_color(vc + i);
+    // -- Raster Queries
+
+    #[inline(always)]
+    fn is_sprite(&self, n: usize, y: u16) -> bool {
+        let sprite = &self.sprites[n];
+        if y >= (sprite.y as u16) && y < (sprite.y as u16 + 21) {
+            true
+        } else {
+            false
         }
     }
 
@@ -795,6 +898,7 @@ impl Vic {
                 self.den = bit::bit_test(value, 4);
                 self.rsel = bit::bit_test(value, 3);
                 self.scroll_y = value & 0x07;
+                self.update_display_dims();
             }
             Reg::RASTER => self.raster_compare = (self.raster_compare & 0xff00) | (value as u16),
             Reg::LPX => self.light_pen_pos[0] = value,
@@ -814,6 +918,7 @@ impl Vic {
                 self.mode = Mode::from(mode);
                 self.csel = bit::bit_test(value, 3);
                 self.scroll_x = value & 0x07;
+                self.update_display_dims();
             }
             Reg::MYE => {
                 self.sprites[0].expand_y = bit::bit_test(value, 0);

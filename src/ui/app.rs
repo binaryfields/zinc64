@@ -102,7 +102,7 @@ impl AppWindow {
             .accelerated()
             .build()
             .unwrap();
-        let screen_size = c64.get_config().visible_size;
+        let screen_size = c64.get_config().screen_size;
         let texture = renderer.create_texture_streaming(PixelFormatEnum::ARGB8888,
                                                         screen_size.width as u32,
                                                         screen_size.height as u32)

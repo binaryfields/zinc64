@@ -37,6 +37,12 @@ impl InterruptControl {
         self.data = 0;
     }
 
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub fn clear_events(&mut self, events: u8) {
+        self.data &= !events;
+    }
+
     #[inline(always)]
     pub fn get_data(&self) -> u8 {
         bit::bit_update(self.data, 7, self.get_interrupt_request())
@@ -47,11 +53,16 @@ impl InterruptControl {
         (self.mask & self.data) != 0
     }
 
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub fn get_mask(&self) -> u8 {
+        self.mask
+    }
+
     #[inline(always)]
     pub fn set_event(&mut self, bit: u8) {
         self.data |= 1 << bit;
     }
-
 
     #[inline(always)]
     pub fn reset(&mut self) {

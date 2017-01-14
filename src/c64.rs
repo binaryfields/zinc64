@@ -109,7 +109,7 @@ impl C64 {
             Keyboard::new()
         ));
         let rt = Rc::new(RefCell::new(
-            RenderTarget::new(config.visible_size)
+            RenderTarget::new(config.screen_size)
         ));
         // Chipset
         let mem = Rc::new(RefCell::new(
@@ -141,9 +141,9 @@ impl C64 {
         ));
         let vic = Rc::new(RefCell::new(
             Vic::new(config.clone(),
+                     color_ram.clone(),
                      cpu_io.clone(),
                      mem.clone(),
-                     color_ram.clone(),
                      rt.clone())
         ));
         // I/O
