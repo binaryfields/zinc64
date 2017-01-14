@@ -48,3 +48,6 @@
 - revamp cpu interrupt tracking, fixes frogger freeze
 - landed cia tod
 - landed datassette and tap loader
+- rework vic drawing and add scrolling support
+- mileston 5: run commando.tap
+
