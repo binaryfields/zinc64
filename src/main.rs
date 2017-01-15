@@ -31,6 +31,7 @@ mod device;
 mod io;
 mod loader;
 mod mem;
+mod sound;
 mod ui;
 mod util;
 mod video;

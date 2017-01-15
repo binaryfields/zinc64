@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use io::{Cia, ExpansionPort};
+use sound::Sid;
 use video::Vic;
 
 use super::{Addressable, ColorRam};
@@ -30,6 +31,7 @@ pub struct DeviceIo {
     cia2: Rc<RefCell<Cia>>,
     color_ram: Rc<RefCell<ColorRam>>,
     expansion_port: Rc<RefCell<ExpansionPort>>,
+    sid: Rc<RefCell<Sid>>,
     vic: Rc<RefCell<Vic>>,
 }
 
@@ -38,6 +40,7 @@ impl DeviceIo {
                cia2: Rc<RefCell<Cia>>,
                color_ram: Rc<RefCell<ColorRam>>,
                expansion_port: Rc<RefCell<ExpansionPort>>,
+               sid: Rc<RefCell<Sid>>,
                vic: Rc<RefCell<Vic>>) -> DeviceIo {
         info!(target: "mem", "Initializing Device I/O");
         DeviceIo {
@@ -45,6 +48,7 @@ impl DeviceIo {
             cia2: cia2,
             color_ram: color_ram,
             expansion_port: expansion_port,
+            sid: sid,
             vic: vic,
         }
     }
@@ -54,7 +58,7 @@ impl Addressable for DeviceIo {
     fn read(&self, address: u16) -> u8 {
         match address {
             0xd000 ... 0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
-            0xd400 ... 0xd7ff => 0x00, // sid
+            0xd400 ... 0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
             0xd800 ... 0xdbff => self.color_ram.borrow().read((address - 0xd800)),
             0xdc00 ... 0xdcff => self.cia1.borrow_mut().read((address & 0x000f) as u8),
             0xdd00 ... 0xddff => self.cia2.borrow_mut().read((address & 0x000f) as u8),
@@ -66,7 +70,7 @@ impl Addressable for DeviceIo {
     fn write(&mut self, address: u16, value: u8) {
         match address {
             0xd000 ... 0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
-            0xd400 ... 0xd7ff => {}, // sid
+            0xd400 ... 0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
             0xd800 ... 0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
             0xdc00 ... 0xdcff => self.cia1.borrow_mut().write((address & 0x000f) as u8, value),
             0xdd00 ... 0xddff => self.cia2.borrow_mut().write((address & 0x000f) as u8, value),

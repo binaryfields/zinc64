@@ -32,6 +32,7 @@ use mem::{ColorRam, DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
+use sound::Sid;
 use time;
 use video::{RenderTarget, Vic};
 
@@ -49,6 +50,7 @@ pub struct C64 {
     color_ram: Rc<RefCell<ColorRam>>,
     cia1: Rc<RefCell<Cia>>,
     cia2: Rc<RefCell<Cia>>,
+    sid: Rc<RefCell<Sid>>,
     vic: Rc<RefCell<Vic>>,
     // sid: Rc<RefCell<Sid>>,
     // I/O
@@ -139,6 +141,9 @@ impl C64 {
                      joystick2.clone(),
                      keyboard.clone())
         ));
+        let sid = Rc::new(RefCell::new(
+            Sid::new()
+        ));
         let vic = Rc::new(RefCell::new(
             Vic::new(config.clone(),
                      color_ram.clone(),
@@ -155,6 +160,7 @@ impl C64 {
                           cia2.clone(),
                           color_ram.clone(),
                           expansion_port.clone(),
+                          sid.clone(),
                           vic.clone())
         ));
         mem.borrow_mut().set_cia2(cia2.clone());
@@ -166,6 +172,7 @@ impl C64 {
                 mem: mem.clone(),
                 color_ram: color_ram.clone(),
                 cpu: cpu.clone(),
+                sid: sid.clone(),
                 vic: vic.clone(),
                 cia1: cia1.clone(),
                 cia2: cia2.clone(),
