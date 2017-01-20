@@ -17,22 +17,57 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// SPEC: http://www.oxyron.de/html/registers_sid.html
+use std::sync::{Arc, Mutex};
 
-pub struct Sid {}
+use resid;
+
+use super::SoundBuffer;
+
+pub struct Sid {
+    resid: resid::Sid,
+    // I/O
+    buffer: Arc<Mutex<SoundBuffer>>,
+}
 
 impl Sid {
-    pub fn new() -> Sid {
-        Sid {}
+    pub fn new(buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
+        Sid {
+            resid: resid::Sid::new(resid::ChipModel::Mos6581),
+            buffer: buffer,
+        }
     }
 
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        self.resid.reset();
+    }
+
+    pub fn step_delta(&mut self, cycles: u32) {
+        let mut buffer = [0i16; 4096]; // FIXME magic value
+        let buffer_length = buffer.len();
+        let mut samples = 0;
+        let mut delta = cycles;
+        while delta > 0 {
+            let (read, next_delta) = self.resid.sample(delta,
+                                                       &mut buffer[samples..],
+                                                       buffer_length - samples,
+                                                       1);
+            samples += read as usize;
+            delta = next_delta;
+        }
+        // println!("AUDIO in cyc {} samples {}", cycles, samples);
+        let mut output = self.buffer.lock().unwrap();
+        for i in 0..samples {
+            output.push(buffer[i]);
+        }
+    }
 
     // -- Device I/O
 
-    pub fn read(&mut self, reg: u8) -> u8 {
-        0
+    pub fn read(&self, reg: u8) -> u8 {
+        self.resid.read(reg)
     }
 
-    pub fn write(&mut self, reg: u8, value: u8) {}
+    pub fn write(&mut self, reg: u8, value: u8) {
+        self.resid.write(reg, value);
+    }
 }

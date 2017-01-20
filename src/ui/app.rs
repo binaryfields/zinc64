@@ -18,12 +18,14 @@
  */
 
 use std::result::Result;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use c64::C64;
 use sdl2;
 use sdl2::{EventPump, Sdl};
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::joystick::Joystick;
 use sdl2::keyboard;
@@ -31,6 +33,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Renderer, Texture};
 use sdl2::video::FullscreenType;
+use sound::SoundBuffer;
 use time;
 
 pub enum JamAction {
@@ -64,13 +67,33 @@ pub struct Options {
     pub width: u32,
 }
 
+struct AppAudio {
+    buffer: Arc<Mutex<SoundBuffer>>,
+}
+
+impl AudioCallback for AppAudio {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        let mut input = self.buffer.lock().unwrap();
+        for x in out.iter_mut() {
+            let sample = input.pop();
+            *x = sample as f32 * 0.000015; // FIXME magic value
+        }
+    }
+}
+
+// TODO ui/audio: play/resume/volume
+
 pub struct AppWindow {
     // Dependencies
     c64: C64,
-    // Renderer
+    // Audio
+    audio_device: AudioDevice<AppAudio>,
+    // Video
+    sdl: Sdl,
     renderer: Renderer<'static>,
     texture: Texture,
-    sdl: Sdl,
     // Devices
     #[allow(dead_code)]
     joystick1: Option<Joystick>,
@@ -87,7 +110,7 @@ pub struct AppWindow {
 impl AppWindow {
     pub fn new(c64: C64, options: Options) -> Result<AppWindow, String> {
         let sdl = sdl2::init()?;
-        // Initialize renderer
+        // Initialize video
         info!(target: "ui", "Opening app window {}x{}", options.width, options.height);
         let video = sdl.video()?;
         let mut builder = video.window("zinc64", options.width, options.height);
@@ -107,6 +130,19 @@ impl AppWindow {
                                                         screen_size.width as u32,
                                                         screen_size.height as u32)
             .unwrap();
+        // Initialize audio
+        let audio = sdl.audio()?;
+        let audio_spec = AudioSpecDesired {
+            freq: Some(44100),
+            channels: Some(1),
+            samples: None
+        };
+        let audio_device = audio.open_playback(None, &audio_spec, |spec| {
+            info!(target: "audio", "{:?}", spec);
+            AppAudio {
+                buffer: c64.get_sound_buffer(),
+            }
+        })?;
         // Initialize devices
         let joystick_subsystem = sdl.joystick()?;
         joystick_subsystem.set_event_state(true);
@@ -130,6 +166,7 @@ impl AppWindow {
             AppWindow {
                 c64: c64,
                 sdl: sdl,
+                audio_device: audio_device,
                 renderer: renderer,
                 texture: texture,
                 joystick1: joystick1,
@@ -144,6 +181,7 @@ impl AppWindow {
 
     pub fn run(&mut self) -> Result<(), String> {
         info!(target: "ui", "Running main loop");
+        self.audio_device.resume();
         let mut events = self.sdl.event_pump().unwrap();
         let mut overflow_cycles = 0;
         'running: loop {
@@ -175,14 +213,15 @@ impl AppWindow {
 
     fn handle_cpu_jam(&mut self) -> bool {
         let cpu = self.c64.get_cpu();
-        warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
         match self.jam_action {
             JamAction::Continue => true,
             JamAction::Quit => {
+                warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
                 self.state = State::Stopped;
                 false
             },
             JamAction::Reset => {
+                warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
                 self.reset();
                 false
             },

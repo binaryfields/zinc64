@@ -49,5 +49,11 @@
 - landed cia tod
 - landed datassette and tap loader
 - rework vic drawing and add scrolling support
-- mileston 5: run commando.tap
+- milestone 5: run commando.tap
+
+### Week 5
+
+- ported resid
+- landed sid
+- milestone 6: run musicirq.prg
 

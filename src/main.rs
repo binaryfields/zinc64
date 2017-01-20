@@ -21,6 +21,7 @@ extern crate byteorder;
 extern crate getopts;
 #[macro_use]
 extern crate log;
+extern crate resid;
 extern crate sdl2;
 extern crate time;
 
@@ -93,7 +94,7 @@ fn build_app_options(matches: &getopts::Matches) -> Result<app::Options, String>
         fullscreen: matches.opt_present("fullscreen"),
         jam_action: matches.opt_str("jamaction")
             .map(|s| app::JamAction::from(&s))
-            .unwrap_or(app::JamAction::Quit),
+            .unwrap_or(app::JamAction::Continue),
         height: matches.opt_str("height")
             .map(|s| s.parse::<u32>().unwrap())
             .unwrap_or(600),

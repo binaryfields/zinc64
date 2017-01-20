@@ -8,5 +8,6 @@ byteorder = "1.0.0"
 getopts = "*"
 gl = "0.6.0"
 log = "*"
+resid-rs = { git = "https://github.com/digitalstreamio/resid-rs" }
 sdl2 = "0.27.2"
 time = "*"

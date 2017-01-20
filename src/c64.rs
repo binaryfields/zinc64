@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 use std::result::Result;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -32,7 +33,7 @@ use mem::{ColorRam, DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
-use sound::Sid;
+use sound::{Sid, SoundBuffer};
 use time;
 use video::{RenderTarget, Vic};
 
@@ -52,7 +53,6 @@ pub struct C64 {
     cia2: Rc<RefCell<Cia>>,
     sid: Rc<RefCell<Sid>>,
     vic: Rc<RefCell<Vic>>,
-    // sid: Rc<RefCell<Sid>>,
     // I/O
     expansion_port: Rc<RefCell<ExpansionPort>>,
     // Peripherals
@@ -61,6 +61,7 @@ pub struct C64 {
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     rt: Rc<RefCell<RenderTarget>>,
+    sound_buffer: Arc<Mutex<SoundBuffer>>,
     // Configuration
     autostart: Option<Autostart>,
     breakpoints: Vec<u16>,
@@ -89,6 +90,12 @@ impl C64 {
         let expansion_port_io = Rc::new(RefCell::new(
             ExpansionPortIo::new()
         ));
+        let rt = Rc::new(RefCell::new(
+            RenderTarget::new(config.screen_size)
+        ));
+        let sound_buffer = Arc::new(Mutex::new(
+            SoundBuffer::new(4096) // FIXME magic value
+        ));
         // Peripherals
         let datassette = Rc::new(RefCell::new(
             Datassette::new(cia1_io.clone(), cpu_io.clone())
@@ -109,9 +116,6 @@ impl C64 {
         };
         let keyboard = Rc::new(RefCell::new(
             Keyboard::new()
-        ));
-        let rt = Rc::new(RefCell::new(
-            RenderTarget::new(config.screen_size)
         ));
         // Chipset
         let mem = Rc::new(RefCell::new(
@@ -142,7 +146,7 @@ impl C64 {
                      keyboard.clone())
         ));
         let sid = Rc::new(RefCell::new(
-            Sid::new()
+            Sid::new(sound_buffer.clone())
         ));
         let vic = Rc::new(RefCell::new(
             Vic::new(config.clone(),
@@ -182,6 +186,7 @@ impl C64 {
                 joystick2: joystick2,
                 keyboard: keyboard.clone(),
                 rt: rt.clone(),
+                sound_buffer: sound_buffer.clone(),
                 autostart: None,
                 breakpoints: Vec::new(),
                 speed: 100,
@@ -240,6 +245,10 @@ impl C64 {
         self.rt.clone()
     }
 
+    pub fn get_sound_buffer(&self) -> Arc<Mutex<SoundBuffer>> {
+        self.sound_buffer.clone()
+    }
+
     pub fn get_warp_mode(&self) -> bool {
         self.warp_mode
     }
@@ -279,6 +288,7 @@ impl C64 {
         self.cpu.borrow_mut().reset();
         self.cia1.borrow_mut().reset();
         self.cia2.borrow_mut().reset();
+        self.sid.borrow_mut().reset();
         self.vic.borrow_mut().reset();
         // Peripherals
         self.datassette.borrow_mut().reset();
@@ -290,6 +300,7 @@ impl C64 {
         }
         self.keyboard.borrow_mut().reset();
         self.rt.borrow_mut().reset();
+        self.sound_buffer.lock().unwrap().clear();
         // Runtime State
         self.cycles = 0;
         self.frames = 0;
@@ -299,15 +310,18 @@ impl C64 {
 
     pub fn run_frame(&mut self, overflow_cycles: u16) -> u16 {
         let mut cycles = (self.config.frame_cycles - overflow_cycles) as i16;
+        let mut elapsed = 0;
         while cycles > 0 {
             let completed = self.step();
             cycles -= completed as i16;
+            elapsed += completed as u32;
         }
         self.frames += 1;
         if self.frames % (self.config.refresh_rate as u32 / 10) == 0 {
             self.cia1.borrow_mut().tod_tick();
             self.cia2.borrow_mut().tod_tick();
         }
+        self.sid.borrow_mut().step_delta(elapsed);
         if !self.warp_mode {
             self.sync_frame();
         }
