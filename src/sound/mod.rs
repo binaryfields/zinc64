@@ -17,10 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod envelope;
-mod filter;
 mod sid;
-mod voice;
-mod wave;
 
 pub use self::sid::Sid;
