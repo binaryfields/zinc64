@@ -116,11 +116,11 @@ impl Reg {
 #[allow(dead_code)]
 pub struct Cia {
     // Dependencies
+    mode: Mode,
     cpu_io: Rc<RefCell<CpuIo>>,
     joystick1: Option<Rc<RefCell<Joystick>>>,
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
-    mode: Mode,
     // Functional Units
     port_a: IoPort,
     port_b: IoPort,
@@ -144,11 +144,11 @@ impl Cia {
                joystick2: Option<Rc<RefCell<Joystick>>>,
                keyboard: Rc<RefCell<Keyboard>>) -> Cia {
         Cia {
+            mode: mode,
             cpu_io: cpu_io,
             joystick1: joystick1,
             joystick2: joystick2,
             keyboard: keyboard,
-            mode: mode,
             port_a: IoPort::new(0x00),
             port_b: IoPort::new(0x00),
             timer_a: Timer::new(),
@@ -291,23 +291,26 @@ impl Cia {
 
     fn clear_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Cia),
-            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
+            Mode::Cia1 =>
+                self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Cia),
+            Mode::Cia2 =>
+                self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
         }
         self.int_triggered = false;
     }
 
     fn trigger_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_io.borrow_mut().irq.set(interrupt::Source::Cia),
-            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.set(interrupt::Source::Cia),
+            Mode::Cia1 =>
+                self.cpu_io.borrow_mut().irq.set(interrupt::Source::Cia),
+            Mode::Cia2 =>
+                self.cpu_io.borrow_mut().nmi.set(interrupt::Source::Cia),
         }
         self.int_triggered = true;
     }
 
     // -- Device I/O
 
-    #[allow(dead_code)]
     pub fn read(&mut self, reg: u8) -> u8 {
         let value = match Reg::from(reg) {
             Reg::PRA => {

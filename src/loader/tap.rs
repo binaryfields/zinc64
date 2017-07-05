@@ -150,7 +150,7 @@ impl Tape for TapTape {
                         let byte3 = self.data[self.pos + 2] as u32;
                         self.pos += 3;
                         (byte3 << 16) | (byte2 << 8) | byte1
-                    },
+                    }
                     _ => panic!("invalid version {}", self.version),
                 };
                 Some(pulse)

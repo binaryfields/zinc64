@@ -196,16 +196,16 @@ impl AppWindow {
                     if rt.borrow().get_sync() {
                         self.render()?;
                     }
-                },
+                }
                 State::Paused => {
                     self.handle_events(&mut events);
                     let wait = Duration::from_millis(20);
                     thread::sleep(wait);
-                },
+                }
                 State::Stopped => {
                     info!(target: "ui", "State {:?}", self.state);
                     break 'running;
-                },
+                }
             }
         }
         Ok(())
@@ -219,12 +219,12 @@ impl AppWindow {
                 warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
                 self.state = State::Stopped;
                 false
-            },
+            }
             JamAction::Reset => {
                 warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
                 self.reset();
                 false
-            },
+            }
         }
     }
 
@@ -261,13 +261,13 @@ impl AppWindow {
                 match window.fullscreen_state() {
                     FullscreenType::Off => {
                         window.set_fullscreen(FullscreenType::True).unwrap();
-                    },
+                    }
                     FullscreenType::True => {
                         window.set_fullscreen(FullscreenType::Off).unwrap();
-                    },
+                    }
                     _ => panic!("invalid fullscreen mode"),
                 }
-            },
+            }
             None => panic!("invalid window"),
         }
     }
@@ -276,7 +276,7 @@ impl AppWindow {
         match self.state {
             State::Running => self.state = State::Paused,
             State::Paused => self.state = State::Running,
-            _ => {},
+            _ => {}
         }
     }
 
@@ -293,19 +293,19 @@ impl AppWindow {
                 Event::Quit { .. }
                 | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     self.state = State::Stopped;
-                },
+                }
                 Event::KeyDown { keycode: Some(Keycode::P), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_pause();
-                },
+                }
                 Event::KeyDown { keycode: Some(Keycode::Q), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.state = State::Stopped;
-                },
+                }
                 Event::KeyDown { keycode: Some(Keycode::W), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_warp();
-                },
+                }
                 Event::KeyDown { keycode: Some(Keycode::F9), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.reset();
@@ -313,11 +313,11 @@ impl AppWindow {
                 Event::KeyDown { keycode: Some(Keycode::F1), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LCTRLMOD) => {
                     self.toggle_datassette_play();
-                },
+                }
                 Event::KeyDown { keycode: Some(Keycode::Return), keymod, repeat: false, .. }
                 if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_fullscreen();
-                },
+                }
                 Event::KeyDown { keycode: Some(key), .. } => {
                     let keyboard = self.c64.get_keyboard();
                     keyboard.borrow_mut().on_key_down(key);
@@ -345,22 +345,22 @@ impl AppWindow {
                             joystick.borrow_mut().on_key_up(key);
                         }
                     }
-                },
+                }
                 Event::JoyAxisMotion { which, axis_idx, value, .. } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_axis_motion(axis_idx, value);
                     }
-                },
+                }
                 Event::JoyButtonDown { which, button_idx, .. } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_button_down(button_idx);
                     }
-                },
+                }
                 Event::JoyButtonUp { which, button_idx, .. } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_button_up(button_idx);
                     }
-                },
+                }
                 _ => {}
             }
         }

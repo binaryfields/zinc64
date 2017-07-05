@@ -20,7 +20,7 @@
 // Spec: http://unusedino.de/ec64/technical/misc/vic656x/colors/
 
 #[derive(Copy, Clone)]
- pub enum Color {
+pub enum Color {
     Black = 0x000000,
     White = 0xffffff,
     Red = 0x68372b,

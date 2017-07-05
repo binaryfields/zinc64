@@ -48,7 +48,7 @@ pub struct Memory {
     // Configuration
     map: MemoryMap,
     configuration: Configuration,
-    // Private Addressable
+    // Addressable
     basic: Box<Addressable>,
     charset: Box<Addressable>,
     kernal: Box<Addressable>,
@@ -96,9 +96,11 @@ impl Memory {
     pub fn set_cia2(&mut self, cia: Rc<RefCell<Cia>>) {
         self.cia2 = Some(cia);
     }
+
     pub fn set_device_io(&mut self, device_io: Rc<RefCell<DeviceIo>>) {
         self.device_io = Some(device_io);
     }
+
     pub fn set_expansion_port(&mut self, expansion_port: Rc<RefCell<ExpansionPort>>) {
         self.expansion_port = Some(expansion_port);
     }
@@ -142,7 +144,6 @@ impl Memory {
     }
 }
 
-
 impl Addressable for Memory {
     fn read(&self, address: u16) -> u8 {
         let zone = address >> 12;
@@ -184,7 +185,7 @@ impl Addressable for Memory {
             } else {
                 panic!("device io not set")
             },
-            Bank::Disabled => {},
+            Bank::Disabled => {}
         }
     }
 }

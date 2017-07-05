@@ -82,7 +82,7 @@ impl Timer {
         match self.mode {
             Mode::Continuous => {
                 self.value = self.latch;
-            },
+            }
             Mode::OneShot => {
                 self.value = self.latch;
                 self.enabled = false;

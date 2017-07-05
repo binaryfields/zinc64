@@ -43,7 +43,6 @@ impl Pin {
         }
     }
 
-    #[allow(dead_code)]
     #[inline(always)]
     pub fn is_falling(&self) -> bool {
         self.last == State::High && self.state == State::Low
@@ -65,6 +64,7 @@ impl Pin {
         self.last == State::Low && self.state == State::High
     }
 
+    #[inline(always)]
     pub fn set(&mut self, state: State) {
         self.last = self.state;
         self.state = state;

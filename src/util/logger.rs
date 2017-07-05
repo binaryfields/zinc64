@@ -37,7 +37,7 @@ impl Logger {
         let loglevel = LogLevel::from_str(&level).map_err(|_| {
             format!("invalid log level {}", level)
         })?;
-        let mut logger =  Logger {
+        let mut logger = Logger {
             level: loglevel,
             targets: HashMap::new(),
         };
@@ -57,7 +57,7 @@ impl Logger {
         let loglevel = LogLevel::from_str(&level).map_err(|_| {
             format!("invalid log level {} for target {}", level, &target)
         })?;
-        self.targets.insert(target,  loglevel);
+        self.targets.insert(target, loglevel);
         Ok(())
     }
 

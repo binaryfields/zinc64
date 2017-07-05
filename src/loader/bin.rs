@@ -27,7 +27,7 @@ use c64::C64;
 use loader::{Image, Loader};
 use loader::autostart;
 
-pub struct BinImage {
+struct BinImage {
     data: Vec<u8>,
     offset: u16,
 }

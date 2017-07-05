@@ -56,7 +56,7 @@ struct ChipHeader {
     image_size: u16,
 }
 
-pub struct CrtImage {
+struct CrtImage {
     cartridge: Option<Cartridge>,
 }
 
@@ -113,11 +113,11 @@ impl CrtLoader {
                     image_size: rdr.read_u16::<BigEndian>()?,
                 };
                 Ok(Some(header))
-            },
+            }
             size => {
                 Err(Error::new(ErrorKind::UnexpectedEof,
                                format!("chip header error, expected {} got {}", 4, size)))
-            },
+            }
         }
     }
 
@@ -214,10 +214,10 @@ impl Loader for CrtLoader {
                     })?;
                     let chip = self.build_chip(chip_header, chip_data);
                     cartridge.add(chip);
-                },
+                }
                 None => {
                     break;
-                },
+                }
             }
         }
         Ok(

@@ -290,6 +290,8 @@ impl C64 {
         self.cia2.borrow_mut().reset();
         self.sid.borrow_mut().reset();
         self.vic.borrow_mut().reset();
+        // I/O
+        self.expansion_port.borrow_mut().reset();
         // Peripherals
         self.datassette.borrow_mut().reset();
         if let Some(ref joystick) = self.joystick1 {
@@ -363,21 +365,19 @@ impl C64 {
         self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
     }
 
-    // -- Cartridge Ops
+    // -- Peripherals Ops
 
     pub fn attach_cartridge(&mut self, cartridge: Cartridge) {
         self.expansion_port.borrow_mut().attach(cartridge);
     }
 
+    pub fn attach_tape(&mut self, tape: Box<Tape>) {
+        self.datassette.borrow_mut().attach(tape);
+    }
+
     pub fn detach_cartridge(&mut self) {
         self.expansion_port.borrow_mut().detach();
         self.reset(false);
-    }
-
-    // -- Tape Ops
-
-    pub fn attach_tape(&mut self, tape: Box<Tape>) {
-        self.datassette.borrow_mut().attach(tape);
     }
 
     pub fn detach_tape(&mut self) {

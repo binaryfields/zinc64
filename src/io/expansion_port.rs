@@ -77,7 +77,6 @@ impl ExpansionPort {
         }
     }
 
-    #[allow(dead_code)]
     pub fn reset(&mut self) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.reset();
