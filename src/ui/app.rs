@@ -31,8 +31,8 @@ use sdl2::joystick::Joystick;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::render::{Renderer, Texture};
-use sdl2::video::FullscreenType;
+use sdl2::render::{Canvas, TextureCreator, Texture};
+use sdl2::video::{Window, FullscreenType};
 use sound::SoundBuffer;
 use time;
 
@@ -92,8 +92,7 @@ pub struct AppWindow {
     audio_device: AudioDevice<AppAudio>,
     // Video
     sdl: Sdl,
-    renderer: Renderer<'static>,
-    texture: Texture,
+    canvas: Canvas<Window>,
     // Devices
     #[allow(dead_code)]
     joystick1: Option<Joystick>,
@@ -121,14 +120,8 @@ impl AppWindow {
             builder.fullscreen();
         }
         let window = builder.build().unwrap();
-        let renderer = window.renderer()
-            .accelerated()
+        let canvas = window.into_canvas()
             .build()
-            .unwrap();
-        let screen_size = c64.get_config().screen_size;
-        let texture = renderer.create_texture_streaming(PixelFormatEnum::ARGB8888,
-                                                        screen_size.width as u32,
-                                                        screen_size.height as u32)
             .unwrap();
         // Initialize audio
         let audio = sdl.audio()?;
@@ -167,8 +160,7 @@ impl AppWindow {
                 c64: c64,
                 sdl: sdl,
                 audio_device: audio_device,
-                renderer: renderer,
-                texture: texture,
+                canvas: canvas,
                 joystick1: joystick1,
                 joystick2: joystick2,
                 jam_action: options.jam_action,
@@ -182,6 +174,12 @@ impl AppWindow {
     pub fn run(&mut self) -> Result<(), String> {
         info!(target: "ui", "Running main loop");
         self.audio_device.resume();
+        let screen_size = self.c64.get_config().screen_size;
+        let texture_creator: TextureCreator<_> = self.canvas.texture_creator();
+        let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::ARGB8888,
+                                                                   screen_size.width as u32,
+                                                                   screen_size.height as u32)
+            .unwrap();
         let mut events = self.sdl.event_pump().unwrap();
         let mut overflow_cycles = 0;
         'running: loop {
@@ -194,7 +192,7 @@ impl AppWindow {
                     }
                     let rt = self.c64.get_render_target();
                     if rt.borrow().get_sync() {
-                        self.render()?;
+                        self.render(&mut texture)?;
                     }
                 }
                 State::Paused => {
@@ -228,14 +226,14 @@ impl AppWindow {
         }
     }
 
-    fn render(&mut self) -> Result<(), String> {
+    fn render(&mut self, texture: &mut Texture) -> Result<(), String> {
         let rt = self.c64.get_render_target();
-        self.texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch()).map_err(|_| {
+        texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch()).map_err(|_| {
             "failed to update texture"
         })?;
-        self.renderer.clear();
-        self.renderer.copy(&self.texture, None, None)?;
-        self.renderer.present();
+        self.canvas.clear();
+        self.canvas.copy(texture, None, None)?;
+        self.canvas.present();
         rt.borrow_mut().set_sync(false);
         self.last_frame_ts = time::precise_time_ns();
         Ok(())
@@ -256,19 +254,15 @@ impl AppWindow {
     }
 
     fn toggle_fullscreen(&mut self) {
-        match self.renderer.window_mut() {
-            Some(ref mut window) => {
-                match window.fullscreen_state() {
-                    FullscreenType::Off => {
-                        window.set_fullscreen(FullscreenType::True).unwrap();
-                    }
-                    FullscreenType::True => {
-                        window.set_fullscreen(FullscreenType::Off).unwrap();
-                    }
-                    _ => panic!("invalid fullscreen mode"),
-                }
+        let window = self.canvas.window_mut();
+        match window.fullscreen_state() {
+            FullscreenType::Off => {
+                window.set_fullscreen(FullscreenType::True).unwrap();
             }
-            None => panic!("invalid window"),
+            FullscreenType::True => {
+                window.set_fullscreen(FullscreenType::Off).unwrap();
+            }
+            _ => panic!("invalid fullscreen mode"),
         }
     }
 

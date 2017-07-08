@@ -2,12 +2,15 @@
 name = "zinc64"
 version = "0.1.0"
 authors = ["Sebastian Jastrzebski <sebby@digitalstream.io>"]
+description = "Commodore 64 rustified"
+repository = "https://github.com/digitalstreamio/zinc64"
+categories = ["emulator"]
 
 [dependencies]
-byteorder = "1.0.0"
-getopts = "*"
-gl = "0.6.0"
-log = "*"
+byteorder = "1.0"
+getopts = "0.2"
+gl = "0.6"
+log = "0.3"
+sdl2 = "0.30"
+time = "0.1"
 resid-rs = { git = "https://github.com/digitalstreamio/resid-rs" }
-sdl2 = "0.27.2"
-time = "*"
