@@ -266,11 +266,11 @@ impl Cia {
     fn scan_joystick(&self, joystick: &Option<Rc<RefCell<Joystick>>>) -> u8 {
         if let Some(ref joystick) = *joystick {
             let joy = joystick.borrow();
-            let joy_up = bit::bit_set(0, joy.get_y_axis() == joystick::AxisMotion::Positive);
-            let joy_down = bit::bit_set(1, joy.get_y_axis() == joystick::AxisMotion::Negative);
-            let joy_left = bit::bit_set(2, joy.get_x_axis() == joystick::AxisMotion::Negative);
-            let joy_right = bit::bit_set(3, joy.get_x_axis() == joystick::AxisMotion::Positive);
-            let joy_fire = bit::bit_set(4, joy.get_button());
+            let joy_up = bit::value(0, joy.get_y_axis() == joystick::AxisMotion::Positive);
+            let joy_down = bit::value(1, joy.get_y_axis() == joystick::AxisMotion::Negative);
+            let joy_left = bit::value(2, joy.get_x_axis() == joystick::AxisMotion::Negative);
+            let joy_right = bit::value(3, joy.get_x_axis() == joystick::AxisMotion::Positive);
+            let joy_fire = bit::value(4, joy.get_button());
             !(joy_left | joy_right | joy_up | joy_down | joy_fire)
         } else {
             0xff
@@ -280,7 +280,7 @@ impl Cia {
     fn scan_keyboard(&self, columns: u8) -> u8 {
         let mut result = 0;
         for i in 0..8 {
-            if bit::bit_test(columns, i) {
+            if bit::test(columns, i) {
                 result |= self.keyboard.borrow().get_row(i);
             }
         }
@@ -337,7 +337,7 @@ impl Cia {
             },
             Reg::TODSEC => bcd::to_bcd(self.tod_clock.get_seconds()),
             Reg::TODMIN => bcd::to_bcd(self.tod_clock.get_minutes()),
-            Reg::TODHR => bit::bit_update(bcd::to_bcd(self.tod_clock.get_hours()), 7, self.tod_clock.get_pm()),
+            Reg::TODHR => bit::set(bcd::to_bcd(self.tod_clock.get_hours()), 7, self.tod_clock.get_pm()),
             Reg::SDR => 0,
             Reg::ICR => {
                 /*
@@ -353,30 +353,30 @@ impl Cia {
             },
             Reg::CRA => {
                 let timer = &self.timer_a;
-                let timer_enabled = bit::bit_set(0, timer.enabled);
-                let timer_output = bit::bit_set(1, timer.output_enabled);
-                let timer_output_mode = bit::bit_set(2, timer.output == timer::Output::Toggle);
-                let timer_mode = bit::bit_set(3, timer.mode == timer::Mode::OneShot);
+                let timer_enabled = bit::value(0, timer.enabled);
+                let timer_output = bit::value(1, timer.output_enabled);
+                let timer_output_mode = bit::value(2, timer.output == timer::Output::Toggle);
+                let timer_mode = bit::value(3, timer.mode == timer::Mode::OneShot);
                 let timer_input = match timer.input {
                     timer::Input::SystemClock => 0,
-                    timer::Input::External => bit::bit_set(5, true),
+                    timer::Input::External => bit::value(5, true),
                     _ => panic!("invalid timer input"),
                 };
                 timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
             }
             Reg::CRB => {
                 let timer = &self.timer_b;
-                let timer_enabled = bit::bit_set(0, timer.enabled);
-                let timer_output = bit::bit_set(1, timer.output_enabled);
-                let timer_output_mode = bit::bit_set(2, timer.output == timer::Output::Toggle);
-                let timer_mode = bit::bit_set(3, timer.mode == timer::Mode::OneShot);
+                let timer_enabled = bit::value(0, timer.enabled);
+                let timer_output = bit::value(1, timer.output_enabled);
+                let timer_output_mode = bit::value(2, timer.output == timer::Output::Toggle);
+                let timer_mode = bit::value(3, timer.mode == timer::Mode::OneShot);
                 let timer_input = match timer.input {
                     timer::Input::SystemClock => 0,
-                    timer::Input::External => bit::bit_set(5, true),
-                    timer::Input::TimerA => bit::bit_set(6, true),
-                    timer::Input::TimerAWithCNT => bit::bit_set(6, true) | bit::bit_set(7, true),
+                    timer::Input::External => bit::value(5, true),
+                    timer::Input::TimerA => bit::value(6, true),
+                    timer::Input::TimerAWithCNT => bit::value(6, true) | bit::value(7, true),
                 };
-                let tod_set = bit::bit_set(7, self.tod_set_alarm);
+                let tod_set = bit::value(7, self.tod_set_alarm);
                 timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input | tod_set
             }
         };
@@ -442,7 +442,7 @@ impl Cia {
                 let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
                 tod.set_enabled(false);
                 tod.set_hours(bcd::from_bcd(value & 0x7f));
-                tod.set_pm(bit::bit_test(value, 7));
+                tod.set_pm(bit::test(value, 7));
             },
             Reg::SDR => {},
             Reg::ICR => {
@@ -464,29 +464,29 @@ s                */
                 }
             },
             Reg::CRA => {
-                self.timer_a.enabled = bit::bit_test(value, 0);
-                self.timer_a.mode = if bit::bit_test(value, 3) {
+                self.timer_a.enabled = bit::test(value, 0);
+                self.timer_a.mode = if bit::test(value, 3) {
                     timer::Mode::OneShot
                 } else {
                     timer::Mode::Continuous
                 };
-                if bit::bit_test(value, 4) {
+                if bit::test(value, 4) {
                     self.timer_a.value = self.timer_a.latch;
                 }
-                self.timer_a.input = if bit::bit_test(value, 5) {
+                self.timer_a.input = if bit::test(value, 5) {
                     timer::Input::External
                 } else {
                     timer::Input::SystemClock
                 };
             },
             Reg::CRB => {
-                self.timer_b.enabled = bit::bit_test(value, 0);
-                self.timer_b.mode = if bit::bit_test(value, 3) {
+                self.timer_b.enabled = bit::test(value, 0);
+                self.timer_b.mode = if bit::test(value, 3) {
                     timer::Mode::OneShot
                 } else {
                     timer::Mode::Continuous
                 };
-                if bit::bit_test(value, 4) {
+                if bit::test(value, 4) {
                     self.timer_b.value = self.timer_b.latch;
                 }
                 let input = (value & 0x60) >> 5;
@@ -497,7 +497,7 @@ s                */
                     3 => timer::Input::TimerAWithCNT,
                     _ => panic!("invalid timer input"),
                 };
-                self.tod_set_alarm = bit::bit_test(value, 7);
+                self.tod_set_alarm = bit::test(value, 7);
             },
         }
     }

@@ -45,7 +45,7 @@ impl InterruptControl {
 
     #[inline(always)]
     pub fn get_data(&self) -> u8 {
-        bit::bit_update(self.data, 7, self.get_interrupt_request())
+        bit::set(self.data, 7, self.get_interrupt_request())
     }
 
     #[inline(always)]
@@ -84,7 +84,7 @@ impl InterruptControl {
         set IR and generate an Interrupt Request, the corresponding
         MASK bit must be set.
         */
-        if bit::bit_test(mask, 7) {
+        if bit::test(mask, 7) {
             self.mask |= mask & 0x1f;
         } else {
             self.mask &= !(mask & 0x1f);

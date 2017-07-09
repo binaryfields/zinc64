@@ -77,18 +77,18 @@ impl Keyboard {
     pub fn on_key_down(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);
         if mapping.0 != 0xff {
-            self.matrix[mapping.0 as usize] = bit::bit_update(self.matrix[mapping.0 as usize],
-                                                              mapping.1,
-                                                              false);
+            self.matrix[mapping.0 as usize] = bit::set(self.matrix[mapping.0 as usize],
+                                                       mapping.1,
+                                                       false);
         }
     }
 
     pub fn on_key_up(&mut self, keycode: Keycode) {
         let mapping = self.map_keycode(keycode);
         if mapping.0 != 0xff {
-            self.matrix[mapping.0 as usize] = bit::bit_update(self.matrix[mapping.0 as usize],
-                                                              mapping.1,
-                                                              true);
+            self.matrix[mapping.0 as usize] = bit::set(self.matrix[mapping.0 as usize],
+                                                       mapping.1,
+                                                       true);
         }
     }
 

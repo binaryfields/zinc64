@@ -18,32 +18,31 @@
  */
 
 #[inline(always)]
-pub fn bit_set(bit: u8, enabled: bool) -> u8 {
-    if enabled { 1 << bit } else { 0 }
+pub fn get(value: u8, pos: u8) -> u8 {
+    if (value & (1 << pos)) != 0 { 1 } else { 0 }
 }
 
 #[inline(always)]
-pub fn bit_test(value: u8, bit: u8) -> bool {
-    value & (1 << bit) != 0
+pub fn set(value: u8, pos: u8, enabled: bool) -> u8 {
+    if enabled { value | (1 << pos) } else { value & !(1 << pos) }
 }
 
 #[inline(always)]
-pub fn bit_val(value: u8, bit: u8) -> u8 {
-    if (value & (1 << bit)) != 0 { 1 } else { 0 }
+pub fn test(value: u8, pos: u8) -> bool {
+    value & (1 << pos) != 0
 }
 
 #[inline(always)]
-pub fn bit_val16(value: u16, bit: u8) -> u8 {
-    if (value & (1 << bit)) != 0 { 1 } else { 0 }
+pub fn value(pos: u8, enabled: bool) -> u8 {
+    if enabled { 1 << pos } else { 0 }
 }
 
 #[inline(always)]
-pub fn bit_update(value: u8, bit: u8, enabled: bool) -> u8 {
-    if enabled { value | (1 << bit) } else { value & !(1 << bit) }
+pub fn get_u16(value: u16, pos: u8) -> u8 {
+    if (value & (1 << pos)) != 0 { 1 } else { 0 }
 }
 
 #[inline(always)]
-pub fn bit_update16(value: u16, bit: u8, enabled: bool) -> u16 {
-    if enabled { value | ((1 << bit) as u16) } else { value & !((1 << bit) as u16) }
+pub fn set_u16(value: u16, pos: u8, enabled: bool) -> u16 {
+    if enabled { value | ((1 << pos) as u16) } else { value & !((1 << pos) as u16) }
 }
-

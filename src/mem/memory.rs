@@ -110,11 +110,11 @@ impl Memory {
     }
 
     pub fn switch_banks(&mut self) {
-        let loram = bit::bit_set(0, self.cpu_io.borrow().loram);
-        let hiram = bit::bit_set(1, self.cpu_io.borrow().hiram);
-        let charen = bit::bit_set(2, self.cpu_io.borrow().charen);
-        let game = bit::bit_set(3, self.expansion_port_io.borrow().game);
-        let exrom = bit::bit_set(4, self.expansion_port_io.borrow().exrom);
+        let loram = bit::value(0, self.cpu_io.borrow().loram);
+        let hiram = bit::value(1, self.cpu_io.borrow().hiram);
+        let charen = bit::value(2, self.cpu_io.borrow().charen);
+        let game = bit::value(3, self.expansion_port_io.borrow().game);
+        let exrom = bit::value(4, self.expansion_port_io.borrow().exrom);
         let mode = loram | hiram | charen | game | exrom;
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "mem::banks", "Switching to {}", mode);

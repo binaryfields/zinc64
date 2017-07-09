@@ -644,11 +644,11 @@ impl Cpu {
         match address {
             0x0001 => {
                 let io = self.io.borrow();
-                let loram = bit::bit_set(0, io.loram);
-                let hiram = bit::bit_set(1, io.hiram);
-                let charen = bit::bit_set(2, io.charen);
-                let cassette_switch = bit::bit_set(4, io.cassette_switch);
-                let cassette_motor = bit::bit_set(5, io.cassette_motor);
+                let loram = bit::value(0, io.loram);
+                let hiram = bit::value(1, io.hiram);
+                let charen = bit::value(2, io.charen);
+                let cassette_switch = bit::value(4, io.cassette_switch);
+                let cassette_motor = bit::value(5, io.cassette_motor);
                 loram | hiram | charen | cassette_switch | cassette_motor
             }
             _ => self.mem.borrow().read(address),
@@ -666,10 +666,10 @@ impl Cpu {
             0x0001 => {
                 {
                     let mut io = self.io.borrow_mut();
-                    io.loram = bit::bit_test(value, 0);
-                    io.hiram = bit::bit_test(value, 1);
-                    io.charen = bit::bit_test(value, 2);
-                    io.cassette_motor = bit::bit_test(value, 5);
+                    io.loram = bit::test(value, 0);
+                    io.hiram = bit::test(value, 1);
+                    io.charen = bit::test(value, 2);
+                    io.cassette_motor = bit::test(value, 5);
                 }
                 self.mem.borrow_mut().switch_banks();
                 self.mem.borrow_mut().write(address, value);
