@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use super::Addressable;
+use mem::Addressable;
 
 pub struct ColorRam {
     data: Vec<u8>
@@ -25,7 +25,7 @@ pub struct ColorRam {
 
 impl ColorRam {
     pub fn new(capacity: usize) -> ColorRam {
-        info!(target: "mem", "Initializing Color RAM with capacity {}", capacity);
+        info!(target: "video", "Initializing Color RAM with capacity {}", capacity);
         ColorRam {
             data: vec![0x00; capacity]
         }

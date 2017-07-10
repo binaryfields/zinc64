@@ -24,7 +24,8 @@ use config::Config;
 use cpu::CpuIo;
 use cpu::interrupt;
 use log::LogLevel;
-use mem::{Addressable, ColorRam, Memory};
+use mem::{Addressable, Memory};
+use video::{ColorRam};
 use util::{Dimension, Rect};
 use util::bit;
 

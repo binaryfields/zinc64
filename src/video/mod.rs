@@ -18,8 +18,10 @@
  */
 
 mod color;
+mod color_ram;
 mod render_target;
 mod vic;
 
+pub use self::color_ram::ColorRam;
 pub use self::render_target::RenderTarget;
 pub use self::vic::Vic;

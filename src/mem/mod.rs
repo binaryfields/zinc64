@@ -18,7 +18,6 @@
  */
 
 mod addressable;
-mod color_ram;
 mod deviceio;
 mod memory;
 mod memory_map;
@@ -26,7 +25,6 @@ mod ram;
 mod rom;
 
 pub use self::addressable::Addressable;
-pub use self::color_ram::ColorRam;
 pub use self::deviceio::DeviceIo;
 pub use self::memory::Memory;
 pub use self::memory_map::{Bank, Configuration, MemoryMap};

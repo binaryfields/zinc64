@@ -22,9 +22,9 @@ use std::rc::Rc;
 
 use io::{Cia, ExpansionPort};
 use sound::Sid;
-use video::Vic;
+use video::{ColorRam, Vic};
 
-use super::{Addressable, ColorRam};
+use super::Addressable;
 
 pub struct DeviceIo {
     cia1: Rc<RefCell<Cia>>,

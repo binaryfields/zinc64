@@ -29,13 +29,13 @@ use cpu::{Cpu, CpuIo};
 use config::Config;
 use device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
 use device::joystick;
-use mem::{ColorRam, DeviceIo, Memory};
+use mem::{DeviceIo, Memory};
 use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
 use io::cia;
 use loader::Autostart;
 use sound::{Sid, SoundBuffer};
 use time;
-use video::{RenderTarget, Vic};
+use video::{ColorRam, RenderTarget, Vic};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
