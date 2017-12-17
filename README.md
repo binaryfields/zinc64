@@ -46,7 +46,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 | Chipset | 6510 CPU      | Done
 | Chipset | Memory        | Done
 | Chipset | 6526 CIA      | Done
-| Chipset | 6581 SID      | In-Progress
+| Chipset | 6581 SID      | Done
 | Chipset | 6567 VIC      | Done
 | Device  | Cartridge     | Done
 | Device  | Floppy        | Not Started
@@ -64,7 +64,6 @@ I've included a number of examples from Kick Assembler that I've used to test va
 
 - VIC sprite implementation is currently hacked up and needs more work
 - VIC bad line handling needs work
-- SID sampling is WIP
 
 ## Keyboard Shortcuts
 

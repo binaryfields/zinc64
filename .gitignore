@@ -1,4 +1,5 @@
-/.idea/
-/target/
-/wip/
+.idea
+crt
+target
+wip
 Cargo.lock

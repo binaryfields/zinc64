@@ -78,7 +78,7 @@ impl AudioCallback for AppAudio {
         let mut input = self.buffer.lock().unwrap();
         for x in out.iter_mut() {
             let sample = input.pop();
-            *x = sample as f32 * 0.000015; // FIXME magic value
+            *x = sample as f32 * 0.000020; // FIXME magic value
         }
     }
 }

@@ -1,0 +1,290 @@
+/*
+ * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ *
+ * This file is part of zinc64.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+use std::sync::{Arc, Mutex};
+
+use resid;
+use super::resid_c;
+
+use super::SoundBuffer;
+
+pub struct Sid {
+    resid: resid::Sid,
+    resid_wrapper: *mut resid_c::SID,
+    // I/O
+    buffer: Arc<Mutex<SoundBuffer>>,
+    trap: bool,
+    debug_counter: u32,
+}
+
+impl Sid {
+    pub fn new(buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
+        let mut sid = Sid {
+            resid: resid::Sid::new(resid::ChipModel::Mos6581),
+            resid_wrapper: unsafe { resid_c::sid_new() },
+            buffer: buffer,
+            trap: false,
+            debug_counter: 0
+        };
+        sid.resid.set_sampling_parameters(resid::SamplingMethod::ResampleFast, 985248, 44100);
+        sid
+    }
+
+    pub fn reset(&mut self) {
+        self.resid.reset();
+        unsafe {
+            resid_c::sid_reset(self.resid_wrapper)
+        }
+    }
+
+    pub fn step_delta(&mut self, cycles: u32) {
+        self.debug_counter += 1;
+        let mut buffer = [0i16; 4096]; // FIXME magic value
+        let mut buffer2 = [0i16; 4096]; // FIXME magic value
+        let buffer_length = buffer.len();
+        let mut samples = 0;
+        let mut samples2 = 0;
+        let mut delta = cycles;
+        let mut delta2 = cycles;
+        if self.debug_counter == 333332159 {
+            println!("XXX debug start");
+            self.dump_state();
+            println!("XXX debug loop");
+            for i in 0..893 {
+                println!("XXX clock start {}", i);
+                unsafe {
+                    resid_c::sid_clock_delta(self.resid_wrapper, 22);
+                }
+                self.resid.clock_delta(22);
+                if !self.check_state() {
+                    self.dump_state();
+                    panic!("XXX clock end {}", i)
+                }
+            }
+            self.dump_state();
+            println!("XXX debug done");
+        }
+        while delta > 0 {
+            unsafe {
+                //let read2 = resid_c::sid_clock_sample(self.resid_wrapper, &mut delta2, buffer2[samples2..].as_mut_ptr(), (buffer_length - samples2) as u32);
+                //samples2 += read2 as usize;
+                //samples += read2 as usize;
+                //delta = delta2;
+            }
+            let (read, next_delta) = self.resid.sample(delta,
+                                                       &mut buffer[samples..],
+                                                       buffer_length - samples,
+                                                       1);
+            samples += read as usize;
+            delta = next_delta;
+        }
+        //println!("AUDIO in cyc {} {} samples {} {}", self.debug_counter, cycles, samples, samples2);
+        //let valid = self.check_buffers(&buffer[..], &buffer2[..]);
+        //if !valid {
+            //println!("XXX BUFFER1");
+            //self.dump_buffer(&buffer[..]);
+            //println!("XXX BUFFER2");
+            //self.dump_buffer(&buffer2[..]);
+            //self.dump_state();
+            //panic!("done");
+        //}
+        let mut output = self.buffer.lock().unwrap();
+        for i in 0..samples {
+            output.push(buffer[i]);
+        }
+    }
+
+    // -- Device I/O
+
+    pub fn read(&self, reg: u8) -> u8 {
+        self.resid.read(reg);
+        unsafe {
+            resid_c::sid_read(self.resid_wrapper, reg)
+        }
+    }
+
+    pub fn write(&mut self, reg: u8, value: u8) {
+        self.resid.write(reg, value);
+        unsafe {
+            resid_c::sid_write(self.resid_wrapper, reg, value)
+        }
+    }
+
+    // -- Debug
+
+    fn check_buffers(&self, buffer: &[i16], buffer2: &[i16]) -> bool {
+        let length = buffer.len();
+        let mut i = 0;
+        while i < length {
+            if buffer[i] != buffer2[i] {
+                return false;
+            }
+            i += 1;
+        }
+        return true;
+    }
+
+    fn check_buffer_empty(&self, buffer: &[i16]) -> bool {
+        let mut empty = true;
+        for sample in buffer {
+            if *sample != 0 {
+                empty = false;
+            }
+        }
+        empty
+    }
+
+    fn check_state(&mut self) -> bool {
+        let state = self.resid.read_state();
+        let mut state2 = resid_c::SIDState::new();
+        unsafe {
+            resid_c::sid_dump(self.resid_wrapper, &mut state2);
+        }
+        for i in 0..3 {
+            if !(state.envelope_counter[i] == state2.envelope_counter[i] &&
+                state.exponential_counter[i] == state2.exponential_counter[i] as u8 &&
+                state.exponential_counter_period[i]== state2.exponential_counter_period[i] as u8 &&
+                state.rate_counter[i] == state2.rate_counter[i] &&
+                state.rate_counter_period[i] == state2.rate_counter_period[i] &&
+                state.hold_zero[i] == state2.hold_zero[i]) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn dump_buffer(&self, buffer: &[i16]) {
+        let mut counter = 0;
+        for sample in buffer {
+            if counter == 0 {
+                print!("    ");
+            }
+            print!("{}, ", sample);
+            counter += 1;
+            if counter == 16 {
+                counter = 0;
+                println!()
+            }
+        }
+        println!()
+    }
+
+    fn dump_state(&mut self) {
+        let state = self.resid.read_state();
+        let mut state2 = resid_c::SIDState::new();
+        unsafe {
+            resid_c::sid_dump(self.resid_wrapper, &mut state2);
+        }
+        println!("{:?}", state);
+        println!("{:?}", state2);
+    }
+}
+
+
+
+
+
+
+
+
+
+use libc;
+
+pub enum SID {}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct SIDState {
+    pub sid_register: [u8; 32],
+    pub bus_value: u8,
+    pub bus_value_ttl: u32,
+    pub accumulator: [u32; 3],
+    pub shift_register: [u32; 3],
+    pub rate_counter: [u16; 3],
+    pub rate_counter_period: [u16; 3],
+    pub exponential_counter: [u16; 3],
+    pub exponential_counter_period: [u16; 3],
+    pub envelope_counter: [u8; 3],
+    pub hold_zero: [u8; 3],
+    pub ext_in: i32,
+    pub fc: u16,
+    pub res: u8,
+    pub filt: u8,
+    pub voice3off: u8,
+    pub hp_bp_lp: u8,
+    pub vol: u8,
+    pub mixer_dc: i32,
+    pub vhp: i32,
+    pub vbp: i32,
+    pub vlp: i32,
+    pub vnf: i32,
+    pub w0: i32,
+    pub w0_ceil_1: i32,
+    pub w0_ceil_dt: i32,
+    pub c_1024_div_q: i32,
+}
+
+impl SIDState {
+    pub fn new() -> SIDState {
+        SIDState {
+            sid_register: [0; 32],
+            bus_value: 0,
+            bus_value_ttl: 0,
+            accumulator: [0; 3],
+            shift_register: [0; 3],
+            rate_counter: [0; 3],
+            rate_counter_period: [0; 3],
+            exponential_counter: [0; 3],
+            exponential_counter_period: [0; 3],
+            envelope_counter: [0; 3],
+            hold_zero: [0; 3],
+            ext_in: 0,
+            fc: 0,
+            res: 0,
+            filt: 0,
+            voice3off: 0,
+            hp_bp_lp: 0,
+            vol: 0,
+            mixer_dc: 0,
+            vhp: 0,
+            vbp: 0,
+            vlp: 0,
+            vnf: 0,
+            w0: 0,
+            w0_ceil_1: 0,
+            w0_ceil_dt: 0,
+            c_1024_div_q: 0,
+        }
+    }
+}
+#[link(name = "resid")]
+extern "C" {
+    pub fn sid_new() -> *mut SID;
+    pub fn sid_free(sid: *mut SID);
+    pub fn sid_reset(sid: *mut SID);
+    pub fn sid_clock(sid: *mut SID);
+    pub fn sid_clock_delta(sid: *mut SID, delta: libc::uint32_t);
+    pub fn sid_enable_debug(sid: *mut SID, enable: libc::int8_t);
+    pub fn sid_output(sid: *mut SID) -> libc::int32_t;
+    pub fn sid_read(sid: *mut SID, offset: libc::uint8_t) -> libc::uint8_t;
+    pub fn sid_write(sid: *mut SID, offset: libc::uint8_t, value: libc::uint8_t);
+    pub fn sid_clock_sample(sid: *mut SID, delta: *mut libc::uint32_t, buf: *mut libc::int16_t, n: libc::uint32_t) -> libc::uint32_t;
+    pub fn sid_dump(sid: *mut SID, state: *mut SIDState);
+}
+

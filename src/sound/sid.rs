@@ -31,10 +31,12 @@ pub struct Sid {
 
 impl Sid {
     pub fn new(buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
-        Sid {
+        let mut sid = Sid {
             resid: resid::Sid::new(resid::ChipModel::Mos6581),
             buffer: buffer,
-        }
+        };
+        sid.resid.set_sampling_parameters(resid::SamplingMethod::ResampleFast, 985248, 44100);
+        sid
     }
 
     pub fn reset(&mut self) {
@@ -54,7 +56,7 @@ impl Sid {
             samples += read as usize;
             delta = next_delta;
         }
-        // println!("AUDIO in cyc {} samples {}", cycles, samples);
+        // println!("SID cyc {} samples {}", cycles, samples);
         let mut output = self.buffer.lock().unwrap();
         for i in 0..samples {
             output.push(buffer[i]);
