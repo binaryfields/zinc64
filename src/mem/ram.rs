@@ -20,14 +20,14 @@
 use super::Addressable;
 
 pub struct Ram {
-    data: Vec<u8>
+    data: Vec<u8>,
 }
 
 impl Ram {
     pub fn new(capacity: usize) -> Ram {
         info!(target: "mem", "Initializing RAM with capacity {}", capacity);
         Ram {
-            data: vec![0x00; capacity]
+            data: vec![0x00; capacity],
         }
     }
 

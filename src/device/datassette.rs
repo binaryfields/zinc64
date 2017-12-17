@@ -39,8 +39,7 @@ pub struct Datassette {
 }
 
 impl Datassette {
-    pub fn new(cia_io: Rc<RefCell<CiaIo>>,
-               cpu_io: Rc<RefCell<CpuIo>>) -> Datassette {
+    pub fn new(cia_io: Rc<RefCell<CiaIo>>, cpu_io: Rc<RefCell<CpuIo>>) -> Datassette {
         Datassette {
             cia_io: cia_io,
             cpu_io: cpu_io,
@@ -95,7 +94,10 @@ impl Datassette {
                 }
             }
             if !self.current_pulse.is_done() {
-                self.cia_io.borrow_mut().flag.set_active(self.current_pulse.advance());
+                self.cia_io
+                    .borrow_mut()
+                    .flag
+                    .set_active(self.current_pulse.advance());
             }
         }
     }

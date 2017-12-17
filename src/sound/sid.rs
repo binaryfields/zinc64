@@ -35,7 +35,8 @@ impl Sid {
             resid: resid::Sid::new(resid::ChipModel::Mos6581),
             buffer: buffer,
         };
-        sid.resid.set_sampling_parameters(resid::SamplingMethod::ResampleFast, 985248, 44100);
+        sid.resid
+            .set_sampling_parameters(resid::SamplingMethod::ResampleFast, 985248, 44100);
         sid
     }
 
@@ -49,10 +50,9 @@ impl Sid {
         let mut samples = 0;
         let mut delta = cycles;
         while delta > 0 {
-            let (read, next_delta) = self.resid.sample(delta,
-                                                       &mut buffer[samples..],
-                                                       buffer_length - samples,
-                                                       1);
+            let (read, next_delta) =
+                self.resid
+                    .sample(delta, &mut buffer[samples..], buffer_length - samples, 1);
             samples += read as usize;
             delta = next_delta;
         }

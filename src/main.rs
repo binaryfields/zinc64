@@ -57,7 +57,7 @@ fn main() {
         Err(err) => {
             println!("Error: {}", err);
             process::exit(1)
-        },
+        }
     };
 }
 
@@ -92,13 +92,16 @@ fn build_cli_options() -> getopts::Options {
 fn build_app_options(matches: &getopts::Matches) -> Result<app::Options, String> {
     let options = app::Options {
         fullscreen: matches.opt_present("fullscreen"),
-        jam_action: matches.opt_str("jamaction")
+        jam_action: matches
+            .opt_str("jamaction")
             .map(|s| app::JamAction::from(&s))
             .unwrap_or(app::JamAction::Continue),
-        height: matches.opt_str("height")
+        height: matches
+            .opt_str("height")
             .map(|s| s.parse::<u32>().unwrap())
             .unwrap_or(600),
-        width: matches.opt_str("width")
+        width: matches
+            .opt_str("width")
             .map(|s| s.parse::<u32>().unwrap())
             .unwrap_or(800),
     };
@@ -106,8 +109,7 @@ fn build_app_options(matches: &getopts::Matches) -> Result<app::Options, String>
 }
 
 fn build_sys_config(matches: &getopts::Matches) -> Result<Config, String> {
-    let model = matches.opt_str("model")
-        .unwrap_or(String::from("pal"));
+    let model = matches.opt_str("model").unwrap_or(String::from("pal"));
     let mut config = Config::new(&model);
     if let Some(joydev) = matches.opt_str("joydev1") {
         config.joystick1 = device::joystick::Mode::from(&joydev);
@@ -119,8 +121,7 @@ fn build_sys_config(matches: &getopts::Matches) -> Result<Config, String> {
 }
 
 fn init_logging(matches: &getopts::Matches) -> Result<(), String> {
-    let loglevel = matches.opt_str("loglevel")
-        .unwrap_or("info".to_string());
+    let loglevel = matches.opt_str("loglevel").unwrap_or("info".to_string());
     let mut logger = Logger::new(&loglevel)?;
     for target_level in matches.opt_strs("log") {
         if let Some(equals) = target_level.find('=') {
@@ -150,24 +151,21 @@ fn process_autostart_options(c64: &mut C64, matches: &getopts::Matches) -> Resul
         Some(image_path) => {
             let path = Path::new(&image_path);
             let loader = Loaders::from_path(path);
-            let mut autostart = loader.autostart(path)
-                .map_err(|err| format!("{}", err))?;
+            let mut autostart = loader.autostart(path).map_err(|err| format!("{}", err))?;
             autostart.execute(c64);
-        },
-        None => {
-            match matches.opt_str("binary") {
-                Some(binary_path) => {
-                    let offset = matches.opt_str("offset")
-                        .map(|s| s.parse::<u16>().unwrap())
-                        .unwrap_or(0);
-                    let path = Path::new(&binary_path);
-                    let loader = BinLoader::new(offset);
-                    let mut image = loader.load(path)
-                        .map_err(|err| format!("{}", err))?;
-                    image.mount(c64);
-                },
-                None => {},
+        }
+        None => match matches.opt_str("binary") {
+            Some(binary_path) => {
+                let offset = matches
+                    .opt_str("offset")
+                    .map(|s| s.parse::<u16>().unwrap())
+                    .unwrap_or(0);
+                let path = Path::new(&binary_path);
+                let loader = BinLoader::new(offset);
+                let mut image = loader.load(path).map_err(|err| format!("{}", err))?;
+                image.mount(c64);
             }
+            None => {}
         },
     }
     Ok(())
@@ -175,12 +173,12 @@ fn process_autostart_options(c64: &mut C64, matches: &getopts::Matches) -> Resul
 
 fn process_debug_options(c64: &mut C64, matches: &getopts::Matches) -> Result<(), String> {
     let bps_strs = matches.opt_strs("bp");
-    let bps = bps_strs.iter()
-        .map(|s| s.parse::<u16>().unwrap());
+    let bps = bps_strs.iter().map(|s| s.parse::<u16>().unwrap());
     for bp in bps {
         c64.add_breakpoint(bp);
     }
-    let speed = matches.opt_str("speed")
+    let speed = matches
+        .opt_str("speed")
         .map(|s| s.parse::<u8>().unwrap())
         .unwrap_or(100);
     c64.set_speed(speed);
@@ -189,9 +187,8 @@ fn process_debug_options(c64: &mut C64, matches: &getopts::Matches) -> Result<()
 
 fn run(args: Vec<String>) -> Result<(), String> {
     let opts = build_cli_options();
-    let matches = opts.parse(&args[1..]).map_err(|f| {
-        format!("Invalid options\n{}", f)
-    })?;
+    let matches = opts.parse(&args[1..])
+        .map_err(|f| format!("Invalid options\n{}", f))?;
     if matches.opt_present("help") {
         print_help(&opts);
     } else if matches.opt_present("version") {

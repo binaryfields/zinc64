@@ -25,7 +25,7 @@ use cpu::CpuIo;
 use cpu::interrupt;
 use log::LogLevel;
 use mem::{Addressable, Memory};
-use video::{ColorRam};
+use video::ColorRam;
 use util::{Dimension, Rect};
 use util::bit;
 
@@ -178,7 +178,7 @@ impl Reg {
             0x2c => Reg::M5C,
             0x2d => Reg::M6C,
             0x2e => Reg::M7C,
-            0x2f ... 0x3f => Reg::IGNORE,
+            0x2f...0x3f => Reg::IGNORE,
             _ => panic!("invalid reg {}", reg),
         }
     }
@@ -266,11 +266,13 @@ pub struct Vic {
 }
 
 impl Vic {
-    pub fn new(config: Config,
-               color_ram: Rc<RefCell<ColorRam>>,
-               cpu_io: Rc<RefCell<CpuIo>>,
-               mem: Rc<RefCell<Memory>>,
-               rt: Rc<RefCell<RenderTarget>>) -> Vic {
+    pub fn new(
+        config: Config,
+        color_ram: Rc<RefCell<ColorRam>>,
+        cpu_io: Rc<RefCell<CpuIo>>,
+        mem: Rc<RefCell<Memory>>,
+        rt: Rc<RefCell<RenderTarget>>,
+    ) -> Vic {
         let mut vic = Vic {
             config: config,
             color_ram: color_ram,
@@ -374,7 +376,7 @@ impl Vic {
             if self.graphics.contains(x_pos, y_pos) {
                 if self.window.contains(x_screen, y_screen) {
                     self.draw(x_screen, y_screen, self.vc, self.rc);
-                    // 4. VC and VMLI are incremented after each g-access in display state.
+                // 4. VC and VMLI are incremented after each g-access in display state.
                 } else {
                     self.draw_border(x_screen, y_screen);
                 }
@@ -412,14 +414,18 @@ impl Vic {
     }
 
     fn update_display_dims(&mut self) {
-        self.graphics = self.config.graphics.offset(self.scroll_x as i16, self.scroll_y as i16);
+        self.graphics = self.config
+            .graphics
+            .offset(self.scroll_x as i16, self.scroll_y as i16);
         let window_x = if self.csel { 128 } else { 128 + 7 };
         let window_width = if self.csel { 320 } else { 304 };
         let window_y = if self.rsel { 51 } else { 55 };
         let window_height = if self.rsel { 200 } else { 192 };
-        self.window = Rect::new_with_dim(window_x - self.screen.left,
-                                         window_y - self.screen.top,
-                                         Dimension::new(window_width, window_height));
+        self.window = Rect::new_with_dim(
+            window_x - self.screen.left,
+            window_y - self.screen.top,
+            Dimension::new(window_width, window_height),
+        );
     }
 
     #[inline(always)]
@@ -440,7 +446,7 @@ impl Vic {
                 let char_color = self.fetch_char_color(vc);
                 let char_data = self.fetch_char_pixels(char_code, rc);
                 self.draw_char_text(x, y, char_data, char_color);
-            },
+            }
             Mode::McText => {
                 let char_code = self.fetch_char_code(vc);
                 let char_color = self.fetch_char_color(vc);
@@ -450,7 +456,7 @@ impl Vic {
                 } else {
                     self.draw_char_text(x, y, char_data, char_color);
                 }
-            },
+            }
             Mode::EcmText => {
                 let c_data = self.fetch_char_code(vc);
                 let char_code = c_data & 0x3f;
@@ -458,14 +464,14 @@ impl Vic {
                 let char_color = self.fetch_char_color(vc);
                 let char_data = self.fetch_char_pixels(char_code, rc);
                 self.draw_char_ecm(x, y, char_data, char_color, char_color_0_src);
-            },
+            }
             Mode::Bitmap => {
                 let bitmap_color = self.fetch_bitmap_color(vc);
                 let bitmap_data = self.fetch_bitmap_pixels(vc, rc);
                 let color_1 = bitmap_color >> 4;
                 let color_0 = bitmap_color & 0x0f;
                 self.draw_bitmap(x, y, bitmap_data, color_1, color_0);
-            },
+            }
             Mode::McBitmap => {
                 let bitmap_color = self.fetch_bitmap_color(vc);
                 let bitmap_data = self.fetch_bitmap_pixels(vc, rc);
@@ -473,7 +479,7 @@ impl Vic {
                 let color_10 = bitmap_color & 0x0f;
                 let color_11 = self.fetch_char_color(vc);
                 self.draw_bitmap_mc(x, y, bitmap_data, color_01, color_10, color_11);
-            },
+            }
             Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => {
                 self.draw_blank(x, y);
             }
@@ -614,15 +620,19 @@ impl Vic {
                     for j in 0..3 {
                         let sp_data = self.fetch_sprite_pixels(n, self.sprite_mc[n]);
                         if !self.sprites[n].multicolor {
-                            self.draw_sprite(24 + self.sprites[n].x + (j << 3),
-                                             raster,
-                                             sp_data,
-                                             self.sprites[n].color);
+                            self.draw_sprite(
+                                24 + self.sprites[n].x + (j << 3),
+                                raster,
+                                sp_data,
+                                self.sprites[n].color,
+                            );
                         } else {
-                            self.draw_sprite_mc(24 + self.sprites[n].x + (j << 3),
-                                                raster,
-                                                n,
-                                                sp_data);
+                            self.draw_sprite_mc(
+                                24 + self.sprites[n].x + (j << 3),
+                                raster,
+                                n,
+                                sp_data,
+                            );
                         }
                         self.sprite_mc[n] += 1;
                     }
@@ -750,7 +760,7 @@ impl Vic {
                 let m6x8 = bit::get_u16(self.sprites[6].x, 8) << 6;
                 let m7x8 = bit::get_u16(self.sprites[7].x, 8) << 7;
                 m0x8 | m1x8 | m2x8 | m3x8 | m4x8 | m5x8 | m6x8 | m7x8
-            },
+            }
             Reg::CR1 => {
                 let rst8 = bit::get_u16(self.raster, 8) << 7;
                 let ecm = bit::get(self.mode.value(), 2) << 6;
@@ -773,7 +783,7 @@ impl Vic {
                 let m6e = bit::value(6, self.sprites[6].enabled);
                 let m7e = bit::value(7, self.sprites[7].enabled);
                 m0e | m1e | m2e | m3e | m4e | m5e | m6e | m7e
-            },
+            }
             Reg::CR2 => {
                 let res = 1 << 5;
                 let mcm = bit::get(self.mode.value(), 0) << 4;
@@ -791,16 +801,16 @@ impl Vic {
                 let m6ye = bit::value(6, self.sprites[6].expand_y);
                 let m7ye = bit::value(7, self.sprites[7].expand_y);
                 m0ye | m1ye | m2ye | m3ye | m4ye | m5ye | m6ye | m7ye
-            },
+            }
             Reg::MEMPTR => {
                 let vm = (((self.video_matrix & 0x3c00) >> 10) as u8) << 4;
                 let cb = (((self.char_base & 0x3800) >> 11) as u8) << 1;
                 vm | cb | 0x01
-            },
+            }
             Reg::IRR => {
                 let result = bit::set(self.int_data, 7, (self.int_mask & self.int_data) != 0);
                 result | 0x70
-            },
+            }
             Reg::IMR => self.int_mask | 0xf0,
             Reg::MDP => {
                 let m0dp = bit::value(0, self.sprites[0].priority);
@@ -812,7 +822,7 @@ impl Vic {
                 let m6dp = bit::value(6, self.sprites[6].priority);
                 let m7dp = bit::value(7, self.sprites[7].priority);
                 m0dp | m1dp | m2dp | m3dp | m4dp | m5dp | m6dp | m7dp
-            },
+            }
             Reg::MMC => {
                 let m0mc = bit::value(0, self.sprites[0].multicolor);
                 let m1mc = bit::value(1, self.sprites[1].multicolor);
@@ -823,7 +833,7 @@ impl Vic {
                 let m6mc = bit::value(6, self.sprites[6].multicolor);
                 let m7mc = bit::value(7, self.sprites[7].multicolor);
                 m0mc | m1mc | m2mc | m3mc | m4mc | m5mc | m6mc | m7mc
-            },
+            }
             Reg::MXE => {
                 let m0xe = bit::value(0, self.sprites[0].expand_x);
                 let m1xe = bit::value(1, self.sprites[1].expand_x);
@@ -834,7 +844,7 @@ impl Vic {
                 let m6xe = bit::value(6, self.sprites[6].expand_x);
                 let m7xe = bit::value(7, self.sprites[7].expand_x);
                 m0xe | m1xe | m2xe | m3xe | m4xe | m5xe | m6xe | m7xe
-            },
+            }
             Reg::MM => 0xff, // DEFERRED collision
             Reg::MD => 0xff, // DEFERRED collision
             Reg::EC => self.border_color | 0xf0,
@@ -890,7 +900,7 @@ impl Vic {
                 self.sprites[5].x = bit::set_u16(self.sprites[5].x, 8, bit::test(value, 5));
                 self.sprites[6].x = bit::set_u16(self.sprites[6].x, 8, bit::test(value, 6));
                 self.sprites[7].x = bit::set_u16(self.sprites[7].x, 8, bit::test(value, 7));
-            },
+            }
             Reg::CR1 => {
                 self.raster_compare = bit::set_u16(self.raster_compare, 8, bit::test(value, 7));
                 let mode = bit::set(self.mode.value(), 2, bit::test(value, 6));
@@ -913,7 +923,7 @@ impl Vic {
                 self.sprites[5].enabled = bit::test(value, 5);
                 self.sprites[6].enabled = bit::test(value, 6);
                 self.sprites[7].enabled = bit::test(value, 7);
-            },
+            }
             Reg::CR2 => {
                 let mode = bit::set(self.mode.value(), 0, bit::test(value, 4));
                 self.mode = Mode::from(mode);
@@ -930,23 +940,23 @@ impl Vic {
                 self.sprites[5].expand_y = bit::test(value, 5);
                 self.sprites[6].expand_y = bit::test(value, 6);
                 self.sprites[7].expand_y = bit::test(value, 7);
-            },
+            }
             Reg::MEMPTR => {
                 self.video_matrix = (((value & 0xf0) >> 4) as u16) << 10;
                 self.char_base = (((value & 0x0f) >> 1) as u16) << 11;
-            },
+            }
             Reg::IRR => {
                 self.int_data &= !value;
                 if (self.int_mask & self.int_data) == 0 {
                     self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Vic);
                 }
-            },
+            }
             Reg::IMR => {
                 self.int_mask = value & 0x0f;
                 if (self.int_mask & self.int_data) != 0 {
                     self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
                 }
-            },
+            }
             Reg::MDP => {
                 self.sprites[0].priority = bit::test(value, 0);
                 self.sprites[1].priority = bit::test(value, 1);
@@ -956,7 +966,7 @@ impl Vic {
                 self.sprites[5].priority = bit::test(value, 5);
                 self.sprites[6].priority = bit::test(value, 6);
                 self.sprites[7].priority = bit::test(value, 7);
-            },
+            }
             Reg::MMC => {
                 self.sprites[0].multicolor = bit::test(value, 0);
                 self.sprites[1].multicolor = bit::test(value, 1);
@@ -966,7 +976,7 @@ impl Vic {
                 self.sprites[5].multicolor = bit::test(value, 5);
                 self.sprites[6].multicolor = bit::test(value, 6);
                 self.sprites[7].multicolor = bit::test(value, 7);
-            },
+            }
             Reg::MXE => {
                 self.sprites[0].expand_x = bit::test(value, 0);
                 self.sprites[1].expand_x = bit::test(value, 1);
@@ -976,9 +986,9 @@ impl Vic {
                 self.sprites[5].expand_x = bit::test(value, 5);
                 self.sprites[6].expand_x = bit::test(value, 6);
                 self.sprites[7].expand_x = bit::test(value, 7);
-            },
-            Reg::MM => {},
-            Reg::MD => {},
+            }
+            Reg::MM => {}
+            Reg::MD => {}
             Reg::EC => self.border_color = value & 0x0f,
             Reg::B0C => self.background_color[0] = value & 0x0f,
             Reg::B1C => self.background_color[1] = value & 0x0f,
@@ -994,8 +1004,7 @@ impl Vic {
             Reg::M5C => self.sprites[5].color = value & 0x0f,
             Reg::M6C => self.sprites[6].color = value & 0x0f,
             Reg::M7C => self.sprites[7].color = value & 0x0f,
-            Reg::IGNORE => {},
+            Reg::IGNORE => {}
         }
     }
 }
-

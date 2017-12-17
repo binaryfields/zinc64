@@ -102,9 +102,11 @@ impl Cartridge {
     }
 
     fn switch_bank(&mut self, bank_number: u8) {
-        let bank_lo = self.banks.iter()
+        let bank_lo = self.banks
+            .iter()
             .find(|&bank| bank.bank_number == bank_number && bank.offset < 0xa000);
-        let bank_hi = self.banks.iter()
+        let bank_hi = self.banks
+            .iter()
             .find(|&bank| bank.bank_number == bank_number && bank.offset >= 0xa000);
         match bank_lo {
             Some(ref bank) => self.bank_lo = bank.bank_number as usize,
@@ -149,22 +151,22 @@ impl Cartridge {
 impl Addressable for Cartridge {
     fn read(&self, address: u16) -> u8 {
         match address {
-            0x8000 ... 0x9fff => {
+            0x8000...0x9fff => {
                 let bank = &self.banks[self.bank_lo];
                 bank.data[(address - bank.offset) as usize]
             }
-            0xa000 ... 0xbfff => {
+            0xa000...0xbfff => {
                 let bank = &self.banks[self.bank_hi];
                 bank.data[(address - bank.offset) as usize]
             }
-            0xde00 ... 0xdfff => self.read_io(address),
+            0xde00...0xdfff => self.read_io(address),
             _ => panic!("invalid address {}", address),
         }
     }
 
     fn write(&mut self, address: u16, value: u8) {
         match address {
-            0xde00 ... 0xdfff => self.write_io(address, value),
+            0xde00...0xdfff => self.write_io(address, value),
             _ => panic!("writes to cartridge are not supported"),
         }
     }

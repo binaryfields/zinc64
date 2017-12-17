@@ -65,7 +65,6 @@ impl Rect {
         y >= self.top && y <= self.bottom && x >= self.left && x <= self.right
     }
 
-
     pub fn offset(&self, dx: i16, dy: i16) -> Rect {
         Rect {
             left: (self.left as i16 + dx) as u16,

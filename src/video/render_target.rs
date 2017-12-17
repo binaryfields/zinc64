@@ -28,7 +28,7 @@ const PIXEL_BYTES: usize = 4;
 pub struct RenderTarget {
     dim: Dimension,
     pixels: Vec<u32>,
-    sync: bool
+    sync: bool,
 }
 
 impl RenderTarget {

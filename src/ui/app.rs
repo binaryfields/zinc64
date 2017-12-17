@@ -31,8 +31,8 @@ use sdl2::joystick::Joystick;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::render::{Canvas, TextureCreator, Texture};
-use sdl2::video::{Window, FullscreenType};
+use sdl2::render::{Canvas, Texture, TextureCreator};
+use sdl2::video::{FullscreenType, Window};
 use sound::SoundBuffer;
 use time;
 
@@ -94,10 +94,8 @@ pub struct AppWindow {
     sdl: Sdl,
     canvas: Canvas<Window>,
     // Devices
-    #[allow(dead_code)]
-    joystick1: Option<Joystick>,
-    #[allow(dead_code)]
-    joystick2: Option<Joystick>,
+    #[allow(dead_code)] joystick1: Option<Joystick>,
+    #[allow(dead_code)] joystick2: Option<Joystick>,
     // Configuration
     jam_action: JamAction,
     // Runtime State
@@ -120,15 +118,13 @@ impl AppWindow {
             builder.fullscreen();
         }
         let window = builder.build().unwrap();
-        let canvas = window.into_canvas()
-            .build()
-            .unwrap();
+        let canvas = window.into_canvas().build().unwrap();
         // Initialize audio
         let audio = sdl.audio()?;
         let audio_spec = AudioSpecDesired {
             freq: Some(44100),
             channels: Some(1),
-            samples: None
+            samples: None,
         };
         let audio_device = audio.open_playback(None, &audio_spec, |spec| {
             info!(target: "audio", "{:?}", spec);
@@ -142,7 +138,9 @@ impl AppWindow {
         let joystick1 = c64.get_joystick1().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
                 info!(target: "ui", "Opening joystick {}", joystick.borrow().get_index());
-                joystick_subsystem.open(joystick.borrow().get_index() as u32).ok()
+                joystick_subsystem
+                    .open(joystick.borrow().get_index() as u32)
+                    .ok()
             } else {
                 None
             }
@@ -150,25 +148,25 @@ impl AppWindow {
         let joystick2 = c64.get_joystick2().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
                 info!(target: "ui", "Opening joystick {}", joystick.borrow().get_index());
-                joystick_subsystem.open(joystick.borrow().get_index() as u32).ok()
+                joystick_subsystem
+                    .open(joystick.borrow().get_index() as u32)
+                    .ok()
             } else {
                 None
             }
         });
-        Ok(
-            AppWindow {
-                c64: c64,
-                sdl: sdl,
-                audio_device: audio_device,
-                canvas: canvas,
-                joystick1: joystick1,
-                joystick2: joystick2,
-                jam_action: options.jam_action,
-                state: State::Running,
-                last_frame_ts: 0,
-                next_keyboard_event: 0,
-            }
-        )
+        Ok(AppWindow {
+            c64: c64,
+            sdl: sdl,
+            audio_device: audio_device,
+            canvas: canvas,
+            joystick1: joystick1,
+            joystick2: joystick2,
+            jam_action: options.jam_action,
+            state: State::Running,
+            last_frame_ts: 0,
+            next_keyboard_event: 0,
+        })
     }
 
     pub fn run(&mut self) -> Result<(), String> {
@@ -176,9 +174,12 @@ impl AppWindow {
         self.audio_device.resume();
         let screen_size = self.c64.get_config().screen_size;
         let texture_creator: TextureCreator<_> = self.canvas.texture_creator();
-        let mut texture = texture_creator.create_texture_streaming(PixelFormatEnum::ARGB8888,
-                                                                   screen_size.width as u32,
-                                                                   screen_size.height as u32)
+        let mut texture = texture_creator
+            .create_texture_streaming(
+                PixelFormatEnum::ARGB8888,
+                screen_size.width as u32,
+                screen_size.height as u32,
+            )
             .unwrap();
         let mut events = self.sdl.event_pump().unwrap();
         let mut overflow_cycles = 0;
@@ -228,9 +229,9 @@ impl AppWindow {
 
     fn render(&mut self, texture: &mut Texture) -> Result<(), String> {
         let rt = self.c64.get_render_target();
-        texture.update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch()).map_err(|_| {
-            "failed to update texture"
-        })?;
+        texture
+            .update(None, rt.borrow().get_pixel_data(), rt.borrow().get_pitch())
+            .map_err(|_| "failed to update texture")?;
         self.canvas.clear();
         self.canvas.copy(texture, None, None)?;
         self.canvas.present();
@@ -285,34 +286,69 @@ impl AppWindow {
         for event in events.poll_iter() {
             match event {
                 Event::Quit { .. }
-                | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
                     self.state = State::Stopped;
                 }
-                Event::KeyDown { keycode: Some(Keycode::P), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
+                Event::KeyDown {
+                    keycode: Some(Keycode::P),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                {
                     self.toggle_pause();
                 }
-                Event::KeyDown { keycode: Some(Keycode::Q), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
+                Event::KeyDown {
+                    keycode: Some(Keycode::Q),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                {
                     self.state = State::Stopped;
                 }
-                Event::KeyDown { keycode: Some(Keycode::W), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
+                Event::KeyDown {
+                    keycode: Some(Keycode::W),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                {
                     self.toggle_warp();
                 }
-                Event::KeyDown { keycode: Some(Keycode::F9), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
+                Event::KeyDown {
+                    keycode: Some(Keycode::F9),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                {
                     self.reset();
                 }
-                Event::KeyDown { keycode: Some(Keycode::F1), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LCTRLMOD) => {
+                Event::KeyDown {
+                    keycode: Some(Keycode::F1),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LCTRLMOD) =>
+                {
                     self.toggle_datassette_play();
                 }
-                Event::KeyDown { keycode: Some(Keycode::Return), keymod, repeat: false, .. }
-                if keymod.contains(keyboard::LALTMOD) => {
+                Event::KeyDown {
+                    keycode: Some(Keycode::Return),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                {
                     self.toggle_fullscreen();
                 }
-                Event::KeyDown { keycode: Some(key), .. } => {
+                Event::KeyDown {
+                    keycode: Some(key), ..
+                } => {
                     let keyboard = self.c64.get_keyboard();
                     keyboard.borrow_mut().on_key_down(key);
                     if let Some(ref mut joystick) = self.c64.get_joystick1() {
@@ -326,7 +362,9 @@ impl AppWindow {
                         }
                     }
                 }
-                Event::KeyUp { keycode: Some(key), .. } => {
+                Event::KeyUp {
+                    keycode: Some(key), ..
+                } => {
                     let keyboard = self.c64.get_keyboard();
                     keyboard.borrow_mut().on_key_up(key);
                     if let Some(ref mut joystick) = self.c64.get_joystick1() {
@@ -340,17 +378,26 @@ impl AppWindow {
                         }
                     }
                 }
-                Event::JoyAxisMotion { which, axis_idx, value, .. } => {
+                Event::JoyAxisMotion {
+                    which,
+                    axis_idx,
+                    value,
+                    ..
+                } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_axis_motion(axis_idx, value);
                     }
                 }
-                Event::JoyButtonDown { which, button_idx, .. } => {
+                Event::JoyButtonDown {
+                    which, button_idx, ..
+                } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_button_down(button_idx);
                     }
                 }
-                Event::JoyButtonUp { which, button_idx, .. } => {
+                Event::JoyButtonUp {
+                    which, button_idx, ..
+                } => {
                     if let Some(ref mut joystick) = self.c64.get_joystick(which as u8) {
                         joystick.borrow_mut().on_button_up(button_idx);
                     }

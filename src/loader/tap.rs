@@ -37,8 +37,7 @@ static HEADER_SIG: &'static str = "C64-TAPE-RAW";
 struct Header {
     signature: [u8; 12],
     version: u8,
-    #[allow(dead_code)]
-    reserved: [u8; 3],
+    #[allow(dead_code)] reserved: [u8; 3],
     size: u32,
 }
 
@@ -83,13 +82,15 @@ impl TapLoader {
     }
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
-        let sig = str::from_utf8(&header.signature).map_err(|_| {
-            Error::new(ErrorKind::InvalidData, "invalid cartridge signature")
-        })?;
+        let sig = str::from_utf8(&header.signature)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge signature"))?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::InvalidData, "invalid cartridge signature"))
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "invalid cartridge signature",
+            ))
         }
     }
 }
@@ -105,10 +106,8 @@ impl Loader for TapLoader {
         info!(target: "loader", "Loading TAP {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut rdr = BufReader::new(file);
-        let header = self.read_header(&mut rdr).map_err(|_| {
-            Error::new(ErrorKind::InvalidData,
-                       "invalid tape header")
-        })?;
+        let header = self.read_header(&mut rdr)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid tape header"))?;
         info!(target: "loader", "Found tape, version {}, size {}", header.version, header.size);
         self.validate_header(&header)?;
         let mut data = vec![0; header.size as usize];
@@ -118,13 +117,9 @@ impl Loader for TapLoader {
             data: data,
             pos: 0,
         };
-        Ok(
-            Box::new(
-                TapImage {
-                    tape: Some(Box::new(tape)),
-                }
-            )
-        )
+        Ok(Box::new(TapImage {
+            tape: Some(Box::new(tape)),
+        }))
     }
 }
 

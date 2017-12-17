@@ -22,4 +22,3 @@ mod sound_buffer;
 
 pub use self::sid::Sid;
 pub use self::sound_buffer::SoundBuffer;
-

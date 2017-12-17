@@ -404,7 +404,7 @@ impl Instruction {
             // INC Oper,X
             0xfe => Instruction::INC(Operand::AbsoluteX(cpu.fetch_word()), 7),
             // catch all
-            _ => panic!("invalid opcode 0x{:x} at 0x{:x}", opcode, cpu.get_pc())
+            _ => panic!("invalid opcode 0x{:x} at 0x{:x}", opcode, cpu.get_pc()),
         }
     }
 }

@@ -58,7 +58,7 @@ impl Color {
             13 => Color::LightGreen,
             14 => Color::LightBlue,
             15 => Color::LightGray,
-            _ => panic!("invalid color {}", color)
+            _ => panic!("invalid color {}", color),
         }
     }
 

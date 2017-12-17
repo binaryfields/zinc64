@@ -111,10 +111,7 @@ impl Rtc {
 
 impl PartialEq for Rtc {
     fn eq(&self, other: &Rtc) -> bool {
-        self.hours == other.hours
-            && self.minutes == other.minutes
-            && self.seconds == other.seconds
+        self.hours == other.hours && self.minutes == other.minutes && self.seconds == other.seconds
             && self.tenth == other.tenth
     }
 }
-

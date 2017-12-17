@@ -103,7 +103,7 @@ impl Reg {
             0x0d => Reg::ICR,
             0x0e => Reg::CRA,
             0x0f => Reg::CRB,
-            _ => panic!("invalid reg {}", reg)
+            _ => panic!("invalid reg {}", reg),
         }
     }
 
@@ -137,12 +137,14 @@ pub struct Cia {
 }
 
 impl Cia {
-    pub fn new(mode: Mode,
-               cia_io: Rc<RefCell<CiaIo>>,
-               cpu_io: Rc<RefCell<CpuIo>>,
-               joystick1: Option<Rc<RefCell<Joystick>>>,
-               joystick2: Option<Rc<RefCell<Joystick>>>,
-               keyboard: Rc<RefCell<Keyboard>>) -> Cia {
+    pub fn new(
+        mode: Mode,
+        cia_io: Rc<RefCell<CiaIo>>,
+        cpu_io: Rc<RefCell<CpuIo>>,
+        joystick1: Option<Rc<RefCell<Joystick>>>,
+        joystick2: Option<Rc<RefCell<Joystick>>>,
+        keyboard: Rc<RefCell<Keyboard>>,
+    ) -> Cia {
         Cia {
             mode: mode,
             cpu_io: cpu_io,
@@ -186,7 +188,11 @@ impl Cia {
         let timer_a_output = if self.timer_a.enabled {
             let pulse = match self.timer_a.input {
                 timer::Input::SystemClock => 1,
-                timer::Input::External => if self.cia_io.borrow().cnt.is_rising() { 1 } else { 0 },
+                timer::Input::External => if self.cia_io.borrow().cnt.is_rising() {
+                    1
+                } else {
+                    0
+                },
                 _ => panic!("invalid input source {:?}", self.timer_a.input),
             };
             self.timer_a.update(pulse)
@@ -196,9 +202,23 @@ impl Cia {
         let timer_b_output = if self.timer_b.enabled {
             let pulse = match self.timer_b.input {
                 timer::Input::SystemClock => 1,
-                timer::Input::External => if self.cia_io.borrow().cnt.is_rising() { 1 } else { 0 },
-                timer::Input::TimerA => if timer_a_output { 1 } else { 0 },
-                timer::Input::TimerAWithCNT => if timer_a_output && self.cia_io.borrow().cnt.is_high() { 1 } else { 0 },
+                timer::Input::External => if self.cia_io.borrow().cnt.is_rising() {
+                    1
+                } else {
+                    0
+                },
+                timer::Input::TimerA => if timer_a_output {
+                    1
+                } else {
+                    0
+                },
+                timer::Input::TimerAWithCNT => {
+                    if timer_a_output && self.cia_io.borrow().cnt.is_high() {
+                        1
+                    } else {
+                        0
+                    }
+                }
             };
             self.timer_b.update(pulse)
         } else {
@@ -291,20 +311,16 @@ impl Cia {
 
     fn clear_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 =>
-                self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Cia),
-            Mode::Cia2 =>
-                self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Cia),
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
         }
         self.int_triggered = false;
     }
 
     fn trigger_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 =>
-                self.cpu_io.borrow_mut().irq.set(interrupt::Source::Cia),
-            Mode::Cia2 =>
-                self.cpu_io.borrow_mut().nmi.set(interrupt::Source::Cia),
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq.set(interrupt::Source::Cia),
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.set(interrupt::Source::Cia),
         }
         self.int_triggered = true;
     }
@@ -313,17 +329,13 @@ impl Cia {
 
     pub fn read(&mut self, reg: u8) -> u8 {
         let value = match Reg::from(reg) {
-            Reg::PRA => {
-                match self.mode {
-                    Mode::Cia1 => self.read_cia1_port_a(),
-                    Mode::Cia2 => self.read_cia2_port_a(),
-                }
+            Reg::PRA => match self.mode {
+                Mode::Cia1 => self.read_cia1_port_a(),
+                Mode::Cia2 => self.read_cia2_port_a(),
             },
-            Reg::PRB => {
-                match self.mode {
-                    Mode::Cia1 => self.read_cia1_port_b(),
-                    Mode::Cia2 => self.read_cia2_port_b(),
-                }
+            Reg::PRB => match self.mode {
+                Mode::Cia1 => self.read_cia1_port_b(),
+                Mode::Cia2 => self.read_cia2_port_b(),
             },
             Reg::DDRA => self.port_a.get_direction(),
             Reg::DDRB => self.port_b.get_direction(),
@@ -334,10 +346,14 @@ impl Cia {
             Reg::TODTS => {
                 self.tod_clock.set_enabled(true);
                 bcd::to_bcd(self.tod_clock.get_tenth())
-            },
+            }
             Reg::TODSEC => bcd::to_bcd(self.tod_clock.get_seconds()),
             Reg::TODMIN => bcd::to_bcd(self.tod_clock.get_minutes()),
-            Reg::TODHR => bit::set(bcd::to_bcd(self.tod_clock.get_hours()), 7, self.tod_clock.get_pm()),
+            Reg::TODHR => bit::set(
+                bcd::to_bcd(self.tod_clock.get_hours()),
+                7,
+                self.tod_clock.get_pm(),
+            ),
             Reg::SDR => 0,
             Reg::ICR => {
                 /*
@@ -350,7 +366,7 @@ impl Cia {
                 self.int_control.clear();
                 self.clear_interrupt();
                 data
-            },
+            }
             Reg::CRA => {
                 let timer = &self.timer_a;
                 let timer_enabled = bit::value(0, timer.enabled);
@@ -377,7 +393,8 @@ impl Cia {
                     timer::Input::TimerAWithCNT => bit::value(6, true) | bit::value(7, true),
                 };
                 let tod_set = bit::value(7, self.tod_set_alarm);
-                timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input | tod_set
+                timer_enabled | timer_output | timer_output_mode | timer_mode | timer_input
+                    | tod_set
             }
         };
         if log_enabled!(LogLevel::Trace) {
@@ -394,57 +411,73 @@ impl Cia {
         match Reg::from(reg) {
             Reg::PRA => {
                 self.port_a.set_value(value);
-            },
+            }
             Reg::PRB => {
                 self.port_b.set_value(value);
-            },
+            }
             Reg::DDRA => {
                 self.port_a.set_direction(value);
-            },
+            }
             Reg::DDRB => {
                 self.port_b.set_direction(value);
-            },
+            }
             Reg::TALO => {
                 let value = (self.timer_a.latch & 0xff00) | (value as u16);
                 self.timer_a.latch = value;
-            },
+            }
             Reg::TAHI => {
                 let value = (self.timer_a.latch & 0x00ff) | ((value as u16) << 8);
                 self.timer_a.latch = value;
                 if !self.timer_a.enabled {
                     self.timer_a.value = value;
                 }
-            },
+            }
             Reg::TBLO => {
                 let value = (self.timer_b.latch & 0xff00) | (value as u16);
                 self.timer_b.latch = value;
-            },
+            }
             Reg::TBHI => {
                 let value = (self.timer_b.latch & 0x00ff) | ((value as u16) << 8);
                 self.timer_b.latch = value;
                 if !self.timer_b.enabled {
                     self.timer_b.value = value;
                 }
-            },
+            }
             Reg::TODTS => {
-                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                let mut tod = if !self.tod_set_alarm {
+                    &mut self.tod_clock
+                } else {
+                    &mut self.tod_alarm
+                };
                 tod.set_tenth(bcd::from_bcd(value & 0x0f));
-            },
+            }
             Reg::TODSEC => {
-                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                let mut tod = if !self.tod_set_alarm {
+                    &mut self.tod_clock
+                } else {
+                    &mut self.tod_alarm
+                };
                 tod.set_seconds(bcd::from_bcd(value & 0x7f));
-            },
+            }
             Reg::TODMIN => {
-                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                let mut tod = if !self.tod_set_alarm {
+                    &mut self.tod_clock
+                } else {
+                    &mut self.tod_alarm
+                };
                 tod.set_minutes(bcd::from_bcd(value & 0x7f));
-            },
+            }
             Reg::TODHR => {
-                let mut tod = if !self.tod_set_alarm { &mut self.tod_clock } else { &mut self.tod_alarm };
+                let mut tod = if !self.tod_set_alarm {
+                    &mut self.tod_clock
+                } else {
+                    &mut self.tod_alarm
+                };
                 tod.set_enabled(false);
                 tod.set_hours(bcd::from_bcd(value & 0x7f));
                 tod.set_pm(bit::test(value, 7));
-            },
-            Reg::SDR => {},
+            }
+            Reg::SDR => {}
             Reg::ICR => {
                 /*
                 The MASK register provides convenient control of
@@ -462,7 +495,7 @@ s                */
                 if self.int_control.get_interrupt_request() && !self.int_triggered {
                     self.trigger_interrupt();
                 }
-            },
+            }
             Reg::CRA => {
                 self.timer_a.enabled = bit::test(value, 0);
                 self.timer_a.mode = if bit::test(value, 3) {
@@ -478,7 +511,7 @@ s                */
                 } else {
                     timer::Input::SystemClock
                 };
-            },
+            }
             Reg::CRB => {
                 self.timer_b.enabled = bit::test(value, 0);
                 self.timer_b.mode = if bit::test(value, 3) {
@@ -498,7 +531,7 @@ s                */
                     _ => panic!("invalid timer input"),
                 };
                 self.tod_set_alarm = bit::test(value, 7);
-            },
+            }
         }
     }
 }
@@ -515,18 +548,18 @@ mod tests {
     use std::result::Result;
 
     fn setup_cpu() -> Result<Cpu, io::Error> {
-        let mem = Rc::new(RefCell::new(
-            Memory::new()?
-        ));
+        let mem = Rc::new(RefCell::new(Memory::new()?));
         Ok(Cpu::new(mem))
     }
 
     fn setup_cia() -> Result<Cia, io::Error> {
         let cpu = setup_cpu()?;
         let keyboard = Keyboard::new();
-        let mut cia = Cia::new(Mode::Cia1,
-                               Rc::new(RefCell::new(cpu)),
-                               Rc::new(RefCell::new(keyboard)));
+        let mut cia = Cia::new(
+            Mode::Cia1,
+            Rc::new(RefCell::new(cpu)),
+            Rc::new(RefCell::new(keyboard)),
+        );
         Ok(cia)
     }
 
@@ -571,9 +604,11 @@ mod tests {
         let cpu = setup_cpu().unwrap();
         let mut keyboard = Keyboard::new();
         keyboard.set_row(1, !(1 << 5));
-        let mut cia = Cia::new(Mode::Cia1,
-                               Rc::new(RefCell::new(cpu)),
-                               Rc::new(RefCell::new(keyboard)));
+        let mut cia = Cia::new(
+            Mode::Cia1,
+            Rc::new(RefCell::new(cpu)),
+            Rc::new(RefCell::new(keyboard)),
+        );
         cia.write(Reg::DDRA.addr(), 0xff);
         cia.write(Reg::DDRB.addr(), 0x00);
         cia.write(Reg::PRA.addr(), 0xfd);

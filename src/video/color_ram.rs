@@ -20,14 +20,14 @@
 use mem::Addressable;
 
 pub struct ColorRam {
-    data: Vec<u8>
+    data: Vec<u8>,
 }
 
 impl ColorRam {
     pub fn new(capacity: usize) -> ColorRam {
         info!(target: "video", "Initializing Color RAM with capacity {}", capacity);
         ColorRam {
-            data: vec![0x00; capacity]
+            data: vec![0x00; capacity],
         }
     }
 

@@ -33,14 +33,12 @@ impl Loaders {
             //Some("hex") => Box::new(hex::HexLoader::new()),
             Some("prg") => Box::new(prg::PrgLoader::new()),
             Some("tap") => Box::new(tap::TapLoader::new()),
-            _ => panic!("invalid loader {}", ext.unwrap_or(""))
+            _ => panic!("invalid loader {}", ext.unwrap_or("")),
         }
     }
 
     pub fn from_path(path: &Path) -> Box<Loader> {
-        let ext = path.extension()
-            .map(|s| s.to_str().unwrap_or(""));
+        let ext = path.extension().map(|s| s.to_str().unwrap_or(""));
         Loaders::from_ext(ext)
     }
 }
-

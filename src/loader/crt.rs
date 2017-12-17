@@ -19,7 +19,7 @@
 
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, BufRead, Error, ErrorKind, Read};
+use std::io::{BufRead, BufReader, Error, ErrorKind, Read};
 use std::path::Path;
 use std::result::Result;
 use std::str;
@@ -42,8 +42,7 @@ struct Header {
     hw_type: u16,
     exrom_line: u8,
     game_line: u8,
-    #[allow(dead_code)]
-    reserved: [u8; 6],
+    #[allow(dead_code)] reserved: [u8; 6],
     name: [u8; 32],
 }
 
@@ -114,10 +113,10 @@ impl CrtLoader {
                 };
                 Ok(Some(header))
             }
-            size => {
-                Err(Error::new(ErrorKind::UnexpectedEof,
-                               format!("chip header error, expected {} got {}", 4, size)))
-            }
+            size => Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                format!("chip header error, expected {} got {}", 4, size),
+            )),
         }
     }
 
@@ -154,9 +153,8 @@ impl CrtLoader {
     }
 
     fn validate_chip_header(&self, header: &ChipHeader) -> io::Result<()> {
-        let sig = str::from_utf8(&header.signature).map_err(|_| {
-            Error::new(ErrorKind::InvalidData, "invalid chip signature")
-        })?;
+        let sig = str::from_utf8(&header.signature)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid chip signature"))?;
         if sig == CHIP_SIG {
             Ok(())
         } else {
@@ -165,13 +163,15 @@ impl CrtLoader {
     }
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
-        let sig = str::from_utf8(&header.signature).map_err(|_| {
-            Error::new(ErrorKind::InvalidData, "invalid cartridge signature")
-        })?;
+        let sig = str::from_utf8(&header.signature)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge signature"))?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::InvalidData, "invalid cartridge signature"))
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "invalid cartridge signature",
+            ))
         }
     }
 }
@@ -186,10 +186,8 @@ impl Loader for CrtLoader {
         info!(target: "loader", "Loading CRT {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut rdr = BufReader::new(file);
-        let header = self.read_header(&mut rdr).map_err(|_| {
-            Error::new(ErrorKind::InvalidData,
-                       "invalid cartridge header")
-        })?;
+        let header = self.read_header(&mut rdr)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge header"))?;
         info!(target: "loader", "Found cartridge {}, version {}.{}, type {}",
         str::from_utf8(&header.name).unwrap_or(""),
         header.version >> 8,
@@ -199,19 +197,20 @@ impl Loader for CrtLoader {
         rdr.consume((header.header_length - 0x40) as usize);
         let mut cartridge = self.build_cartridge(header);
         loop {
-            let chip_header_opt = self.read_chip_header(&mut rdr).map_err(|_| {
-                Error::new(ErrorKind::InvalidData,
-                           "invalid cartridge chip header")
-            })?;
+            let chip_header_opt = self.read_chip_header(&mut rdr)
+                .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge chip header"))?;
             match chip_header_opt {
                 Some(chip_header) => {
                     info!(target: "loader", "Found chip {}, offset 0x{:x}, size {}",
                     chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
                     self.validate_chip_header(&chip_header)?;
-                    let chip_data = self.read_data(&mut rdr, (chip_header.length - 0x10) as usize).map_err(|_| {
-                        Error::new(ErrorKind::InvalidData,
-                                   format!("invalid cartridge chip {} data", chip_header.bank_number))
-                    })?;
+                    let chip_data = self.read_data(&mut rdr, (chip_header.length - 0x10) as usize)
+                        .map_err(|_| {
+                            Error::new(
+                                ErrorKind::InvalidData,
+                                format!("invalid cartridge chip {} data", chip_header.bank_number),
+                            )
+                        })?;
                     let chip = self.build_chip(chip_header, chip_data);
                     cartridge.add(chip);
                 }
@@ -220,13 +219,8 @@ impl Loader for CrtLoader {
                 }
             }
         }
-        Ok(
-            Box::new(
-                CrtImage {
-                    cartridge: Some(cartridge),
-                }
-            )
-        )
+        Ok(Box::new(CrtImage {
+            cartridge: Some(cartridge),
+        }))
     }
 }
-

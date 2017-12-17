@@ -25,7 +25,6 @@ pub struct Interrupt {
 }
 
 impl Interrupt {
-
     pub fn new(kind: Type) -> Interrupt {
         Interrupt {
             kind: kind,

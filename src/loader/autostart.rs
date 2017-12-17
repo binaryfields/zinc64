@@ -63,14 +63,14 @@ impl Method {
             Method::WithImage(ref mut image) => {
                 image.mount(c64);
                 c64.reset(false);
-            },
+            }
             Method::WithBinImage(ref mut image) => {
                 image.mount(c64);
-            },
+            }
             Method::WithAutostart(ref mut autostart) => {
                 c64.set_autostart(autostart.take());
                 c64.reset(false);
-            },
+            }
         }
     }
 }

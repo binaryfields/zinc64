@@ -54,8 +54,10 @@ pub struct ExpansionPort {
 }
 
 impl ExpansionPort {
-    pub fn new(expansion_port_io: Rc<RefCell<ExpansionPortIo>>,
-               mem: Rc<RefCell<Memory>>) -> ExpansionPort {
+    pub fn new(
+        expansion_port_io: Rc<RefCell<ExpansionPortIo>>,
+        mem: Rc<RefCell<Memory>>,
+    ) -> ExpansionPort {
         ExpansionPort {
             mem: mem,
             cartridge: None,
@@ -64,7 +66,9 @@ impl ExpansionPort {
     }
 
     pub fn attach(&mut self, cartridge: Cartridge) {
-        self.io.borrow_mut().update(cartridge.get_game(), cartridge.get_exrom());
+        self.io
+            .borrow_mut()
+            .update(cartridge.get_game(), cartridge.get_exrom());
         self.cartridge = Some(cartridge);
         self.mem.borrow_mut().switch_banks();
     }
@@ -80,7 +84,9 @@ impl ExpansionPort {
     pub fn reset(&mut self) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.reset();
-            self.io.borrow_mut().update(cartridge.get_game(), cartridge.get_exrom());
+            self.io
+                .borrow_mut()
+                .update(cartridge.get_game(), cartridge.get_exrom());
             self.mem.borrow_mut().switch_banks();
         }
     }

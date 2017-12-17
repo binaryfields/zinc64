@@ -19,12 +19,20 @@
 
 #[inline(always)]
 pub fn get(value: u8, pos: u8) -> u8 {
-    if (value & (1 << pos)) != 0 { 1 } else { 0 }
+    if (value & (1 << pos)) != 0 {
+        1
+    } else {
+        0
+    }
 }
 
 #[inline(always)]
 pub fn set(value: u8, pos: u8, enabled: bool) -> u8 {
-    if enabled { value | (1 << pos) } else { value & !(1 << pos) }
+    if enabled {
+        value | (1 << pos)
+    } else {
+        value & !(1 << pos)
+    }
 }
 
 #[inline(always)]
@@ -34,15 +42,27 @@ pub fn test(value: u8, pos: u8) -> bool {
 
 #[inline(always)]
 pub fn value(pos: u8, enabled: bool) -> u8 {
-    if enabled { 1 << pos } else { 0 }
+    if enabled {
+        1 << pos
+    } else {
+        0
+    }
 }
 
 #[inline(always)]
 pub fn get_u16(value: u16, pos: u8) -> u8 {
-    if (value & (1 << pos)) != 0 { 1 } else { 0 }
+    if (value & (1 << pos)) != 0 {
+        1
+    } else {
+        0
+    }
 }
 
 #[inline(always)]
 pub fn set_u16(value: u16, pos: u8, enabled: bool) -> u16 {
-    if enabled { value | ((1 << pos) as u16) } else { value & !((1 << pos) as u16) }
+    if enabled {
+        value | ((1 << pos) as u16)
+    } else {
+        value & !((1 << pos) as u16)
+    }
 }

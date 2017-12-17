@@ -54,9 +54,12 @@ impl Operand {
             Operand::AbsoluteX(address) => address.wrapping_add(cpu.get_x() as u16),
             Operand::AbsoluteY(address) => address.wrapping_add(cpu.get_y() as u16),
             Operand::IndirectX(address) => cpu.read_word(address.wrapping_add(cpu.get_x()) as u16),
-            Operand::IndirectY(address) => cpu.read_word(address as u16).wrapping_add(cpu.get_y() as u16),
+            Operand::IndirectY(address) => cpu.read_word(address as u16)
+                .wrapping_add(cpu.get_y() as u16),
             Operand::Indirect(address) => cpu.read_word(address),
-            Operand::Relative(offset) if offset < 0 => cpu.get_pc().wrapping_sub((offset as i16).abs() as u16),
+            Operand::Relative(offset) if offset < 0 => {
+                cpu.get_pc().wrapping_sub((offset as i16).abs() as u16)
+            }
             Operand::Relative(offset) => cpu.get_pc().wrapping_add(offset as u16),
         }
     }
@@ -70,7 +73,7 @@ impl Operand {
             _ => {
                 let address = self.ea(cpu);
                 cpu.read(address)
-            },
+            }
         }
     }
 
@@ -83,7 +86,7 @@ impl Operand {
             _ => {
                 let address = self.ea(cpu);
                 cpu.write(address, value)
-            },
+            }
         }
     }
 }
@@ -118,9 +121,7 @@ mod tests {
     use std::result::Result;
 
     fn setup_cpu() -> Result<Cpu, io::Error> {
-        let mem = Rc::new(RefCell::new(
-            Memory::new()?
-        ));
+        let mem = Rc::new(RefCell::new(Memory::new()?));
         Ok(Cpu::new(mem))
     }
 

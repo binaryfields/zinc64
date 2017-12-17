@@ -78,125 +78,103 @@ impl C64 {
     pub fn new(config: Config) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
         // I/O Lines
-        let cia1_io = Rc::new(RefCell::new(
-            CiaIo::new()
-        ));
-        let cia2_io = Rc::new(RefCell::new(
-            CiaIo::new()
-        ));
-        let cpu_io = Rc::new(RefCell::new(
-            CpuIo::new()
-        ));
-        let expansion_port_io = Rc::new(RefCell::new(
-            ExpansionPortIo::new()
-        ));
-        let rt = Rc::new(RefCell::new(
-            RenderTarget::new(config.screen_size)
-        ));
+        let cia1_io = Rc::new(RefCell::new(CiaIo::new()));
+        let cia2_io = Rc::new(RefCell::new(CiaIo::new()));
+        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let expansion_port_io = Rc::new(RefCell::new(ExpansionPortIo::new()));
+        let rt = Rc::new(RefCell::new(RenderTarget::new(config.screen_size)));
         let sound_buffer = Arc::new(Mutex::new(
-            SoundBuffer::new(4096) // FIXME magic value
+            SoundBuffer::new(4096), // FIXME magic value
         ));
         // Peripherals
-        let datassette = Rc::new(RefCell::new(
-            Datassette::new(cia1_io.clone(), cpu_io.clone())
-        ));
+        let datassette = Rc::new(RefCell::new(Datassette::new(
+            cia1_io.clone(),
+            cpu_io.clone(),
+        )));
         let joystick1 = if config.joystick1 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(
-                Joystick::new(config.joystick1, 3200)))
-            )
+            Some(Rc::new(RefCell::new(Joystick::new(config.joystick1, 3200))))
         } else {
             None
         };
         let joystick2 = if config.joystick2 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(
-                Joystick::new(config.joystick2, 3200)))
-            )
+            Some(Rc::new(RefCell::new(Joystick::new(config.joystick2, 3200))))
         } else {
             None
         };
-        let keyboard = Rc::new(RefCell::new(
-            Keyboard::new()
-        ));
+        let keyboard = Rc::new(RefCell::new(Keyboard::new()));
         // Chipset
-        let mem = Rc::new(RefCell::new(
-            Memory::new(0x10000,
-                        cpu_io.clone(),
-                        expansion_port_io.clone())?
-        ));
-        let color_ram = Rc::new(RefCell::new(
-            ColorRam::new(1024)
-        ));
-        let cpu = Rc::new(RefCell::new(
-            Cpu::new(cpu_io.clone(), mem.clone())
-        ));
-        let cia1 = Rc::new(RefCell::new(
-            Cia::new(cia::Mode::Cia1,
-                     cia1_io.clone(),
-                     cpu_io.clone(),
-                     joystick1.clone(),
-                     joystick2.clone(),
-                     keyboard.clone())
-        ));
-        let cia2 = Rc::new(RefCell::new(
-            Cia::new(cia::Mode::Cia2,
-                     cia2_io.clone(),
-                     cpu_io.clone(),
-                     joystick1.clone(),
-                     joystick2.clone(),
-                     keyboard.clone())
-        ));
-        let sid = Rc::new(RefCell::new(
-            Sid::new(sound_buffer.clone())
-        ));
-        let vic = Rc::new(RefCell::new(
-            Vic::new(config.clone(),
-                     color_ram.clone(),
-                     cpu_io.clone(),
-                     mem.clone(),
-                     rt.clone())
-        ));
+        let mem = Rc::new(RefCell::new(Memory::new(
+            0x10000,
+            cpu_io.clone(),
+            expansion_port_io.clone(),
+        )?));
+        let color_ram = Rc::new(RefCell::new(ColorRam::new(1024)));
+        let cpu = Rc::new(RefCell::new(Cpu::new(cpu_io.clone(), mem.clone())));
+        let cia1 = Rc::new(RefCell::new(Cia::new(
+            cia::Mode::Cia1,
+            cia1_io.clone(),
+            cpu_io.clone(),
+            joystick1.clone(),
+            joystick2.clone(),
+            keyboard.clone(),
+        )));
+        let cia2 = Rc::new(RefCell::new(Cia::new(
+            cia::Mode::Cia2,
+            cia2_io.clone(),
+            cpu_io.clone(),
+            joystick1.clone(),
+            joystick2.clone(),
+            keyboard.clone(),
+        )));
+        let sid = Rc::new(RefCell::new(Sid::new(sound_buffer.clone())));
+        let vic = Rc::new(RefCell::new(Vic::new(
+            config.clone(),
+            color_ram.clone(),
+            cpu_io.clone(),
+            mem.clone(),
+            rt.clone(),
+        )));
         // I/O
-        let expansion_port = Rc::new(RefCell::new(
-            ExpansionPort::new(expansion_port_io.clone(), mem.clone())
-        ));
-        let device_io = Rc::new(RefCell::new(
-            DeviceIo::new(cia1.clone(),
-                          cia2.clone(),
-                          color_ram.clone(),
-                          expansion_port.clone(),
-                          sid.clone(),
-                          vic.clone())
-        ));
+        let expansion_port = Rc::new(RefCell::new(ExpansionPort::new(
+            expansion_port_io.clone(),
+            mem.clone(),
+        )));
+        let device_io = Rc::new(RefCell::new(DeviceIo::new(
+            cia1.clone(),
+            cia2.clone(),
+            color_ram.clone(),
+            expansion_port.clone(),
+            sid.clone(),
+            vic.clone(),
+        )));
         mem.borrow_mut().set_cia2(cia2.clone());
         mem.borrow_mut().set_device_io(device_io.clone());
         mem.borrow_mut().set_expansion_port(expansion_port.clone());
-        Ok(
-            C64 {
-                config: config,
-                mem: mem.clone(),
-                color_ram: color_ram.clone(),
-                cpu: cpu.clone(),
-                sid: sid.clone(),
-                vic: vic.clone(),
-                cia1: cia1.clone(),
-                cia2: cia2.clone(),
-                expansion_port: expansion_port.clone(),
-                datassette: datassette,
-                joystick1: joystick1,
-                joystick2: joystick2,
-                keyboard: keyboard.clone(),
-                rt: rt.clone(),
-                sound_buffer: sound_buffer.clone(),
-                autostart: None,
-                breakpoints: Vec::new(),
-                speed: 100,
-                warp_mode: false,
-                cycles: 0,
-                frames: 0,
-                last_pc: 0,
-                next_frame_ns: 0,
-            }
-        )
+        Ok(C64 {
+            config: config,
+            mem: mem.clone(),
+            color_ram: color_ram.clone(),
+            cpu: cpu.clone(),
+            sid: sid.clone(),
+            vic: vic.clone(),
+            cia1: cia1.clone(),
+            cia2: cia2.clone(),
+            expansion_port: expansion_port.clone(),
+            datassette: datassette,
+            joystick1: joystick1,
+            joystick2: joystick2,
+            keyboard: keyboard.clone(),
+            rt: rt.clone(),
+            sound_buffer: sound_buffer.clone(),
+            autostart: None,
+            breakpoints: Vec::new(),
+            speed: 100,
+            warp_mode: false,
+            cycles: 0,
+            frames: 0,
+            last_pc: 0,
+            next_frame_ns: 0,
+        })
     }
 
     pub fn get_config(&self) -> &Config {
@@ -409,7 +387,8 @@ mod tests {
         let mut c64 = C64::new(Config::pal()).unwrap();
         let cpu = c64.get_cpu();
         cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0x00);
-        c64.load(Path::new("rom/6502_functional_test.bin"), 0x0400).unwrap();
+        c64.load(Path::new("rom/6502_functional_test.bin"), 0x0400)
+            .unwrap();
         cpu.borrow_mut().set_pc(0x0400);
         let mut last_pc = 0x0000;
         loop {
@@ -447,17 +426,8 @@ mod tests {
         .c017  58         cli
         */
         let code = [
-            0x78u8,
-            0xa9, 0xff,
-            0x8d, 0x02, 0xdc,
-            0xa9, 0x00,
-            0x8d, 0x03, 0xdc,
-            0xa9, 0xfd,
-            0x8d, 0x00, 0xdc,
-            0xad, 0x01, 0xdc,
-            0x29, 0x20,
-            0xd0, 0xf9,
-            0x58
+            0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d,
+            0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
         ];
         let mut c64 = C64::new(Config::pal()).unwrap();
         let cpu = c64.get_cpu();

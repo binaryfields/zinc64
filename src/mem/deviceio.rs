@@ -36,12 +36,14 @@ pub struct DeviceIo {
 }
 
 impl DeviceIo {
-    pub fn new(cia1: Rc<RefCell<Cia>>,
-               cia2: Rc<RefCell<Cia>>,
-               color_ram: Rc<RefCell<ColorRam>>,
-               expansion_port: Rc<RefCell<ExpansionPort>>,
-               sid: Rc<RefCell<Sid>>,
-               vic: Rc<RefCell<Vic>>) -> DeviceIo {
+    pub fn new(
+        cia1: Rc<RefCell<Cia>>,
+        cia2: Rc<RefCell<Cia>>,
+        color_ram: Rc<RefCell<ColorRam>>,
+        expansion_port: Rc<RefCell<ExpansionPort>>,
+        sid: Rc<RefCell<Sid>>,
+        vic: Rc<RefCell<Vic>>,
+    ) -> DeviceIo {
         info!(target: "mem", "Initializing Device I/O");
         DeviceIo {
             cia1: cia1,
@@ -57,25 +59,29 @@ impl DeviceIo {
 impl Addressable for DeviceIo {
     fn read(&self, address: u16) -> u8 {
         match address {
-            0xd000 ... 0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
-            0xd400 ... 0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
-            0xd800 ... 0xdbff => self.color_ram.borrow().read((address - 0xd800)),
-            0xdc00 ... 0xdcff => self.cia1.borrow_mut().read((address & 0x000f) as u8),
-            0xdd00 ... 0xddff => self.cia2.borrow_mut().read((address & 0x000f) as u8),
-            0xde00 ... 0xdfff => self.expansion_port.borrow().read(address),
-            _ => panic!("invalid address 0x{:x}", address)
+            0xd000...0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
+            0xd400...0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
+            0xd800...0xdbff => self.color_ram.borrow().read((address - 0xd800)),
+            0xdc00...0xdcff => self.cia1.borrow_mut().read((address & 0x000f) as u8),
+            0xdd00...0xddff => self.cia2.borrow_mut().read((address & 0x000f) as u8),
+            0xde00...0xdfff => self.expansion_port.borrow().read(address),
+            _ => panic!("invalid address 0x{:x}", address),
         }
     }
 
     fn write(&mut self, address: u16, value: u8) {
         match address {
-            0xd000 ... 0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
-            0xd400 ... 0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
-            0xd800 ... 0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
-            0xdc00 ... 0xdcff => self.cia1.borrow_mut().write((address & 0x000f) as u8, value),
-            0xdd00 ... 0xddff => self.cia2.borrow_mut().write((address & 0x000f) as u8, value),
-            0xde00 ... 0xdfff => self.expansion_port.borrow_mut().write(address, value),
-            _ => panic!("invalid address 0x{:x}", address)
+            0xd000...0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
+            0xd400...0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
+            0xd800...0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
+            0xdc00...0xdcff => self.cia1
+                .borrow_mut()
+                .write((address & 0x000f) as u8, value),
+            0xdd00...0xddff => self.cia2
+                .borrow_mut()
+                .write((address & 0x000f) as u8, value),
+            0xde00...0xdfff => self.expansion_port.borrow_mut().write(address, value),
+            _ => panic!("invalid address 0x{:x}", address),
         }
     }
 }

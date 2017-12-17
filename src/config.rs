@@ -165,9 +165,11 @@ impl Config {
         let visible_size = Dimension::new(VISIBLE_WIDTH_PAL, VISIBLE_HEIGHT_PAL);
         let window_size = Dimension::new(WINDOW_WIDTH, WINDOW_HEIGHT);
         let graphics = Rect::new_with_dim(WINDOW_FIRST_COL, WINDOW_FIRST_LINE - 3, window_size);
-        let window = Rect::new_with_dim(WINDOW_FIRST_COL - VISIBLE_FIRST_COL_PAL,
-                                        WINDOW_FIRST_LINE - VISIBLE_FIRST_LINE_PAL,
-                                        window_size);
+        let window = Rect::new_with_dim(
+            WINDOW_FIRST_COL - VISIBLE_FIRST_COL_PAL,
+            WINDOW_FIRST_LINE - VISIBLE_FIRST_LINE_PAL,
+            window_size,
+        );
         Config {
             cpu_frequency: CLOCK_CPU_PAL,
             raster_size: display_size,

@@ -26,10 +26,7 @@ pub struct InterruptControl {
 
 impl InterruptControl {
     pub fn new() -> InterruptControl {
-        InterruptControl {
-            data: 0,
-            mask: 0,
-        }
+        InterruptControl { data: 0, mask: 0 }
     }
 
     #[inline(always)]

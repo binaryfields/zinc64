@@ -34,9 +34,8 @@ pub struct Logger {
 
 impl Logger {
     pub fn new(level: &str) -> Result<Logger, String> {
-        let loglevel = LogLevel::from_str(&level).map_err(|_| {
-            format!("invalid log level {}", level)
-        })?;
+        let loglevel =
+            LogLevel::from_str(&level).map_err(|_| format!("invalid log level {}", level))?;
         let mut logger = Logger {
             level: loglevel,
             targets: HashMap::new(),
@@ -54,9 +53,8 @@ impl Logger {
     }
 
     pub fn add_target(&mut self, target: String, level: String) -> Result<(), String> {
-        let loglevel = LogLevel::from_str(&level).map_err(|_| {
-            format!("invalid log level {} for target {}", level, &target)
-        })?;
+        let loglevel = LogLevel::from_str(&level)
+            .map_err(|_| format!("invalid log level {} for target {}", level, &target))?;
         self.targets.insert(target, loglevel);
         Ok(())
     }
@@ -66,9 +64,8 @@ impl Logger {
     }
 
     pub fn load_config(&mut self, path: &Path) -> Result<(), String> {
-        let file = File::open(path).map_err(|_| {
-            format!("failed to open file {}", path.to_str().unwrap())
-        })?;
+        let file = File::open(path)
+            .map_err(|_| format!("failed to open file {}", path.to_str().unwrap()))?;
         let reader = BufReader::new(file);
         let lines: Vec<_> = reader.lines().collect();
         let mut line_num = 0;
@@ -97,7 +94,12 @@ impl log::Log for Logger {
 
     fn log(&self, record: &LogRecord) {
         if self.enabled(record.metadata()) {
-            println!("{} [{}] - {}", record.level(), record.target(), record.args());
+            println!(
+                "{} [{}] - {}",
+                record.level(),
+                record.target(),
+                record.args()
+            );
         }
     }
 }
