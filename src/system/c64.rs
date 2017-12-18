@@ -163,7 +163,7 @@ impl C64 {
         let mem_clone_1 = mem.clone();
         cpu_io
             .borrow_mut()
-            .port
+            .port_1
             .set_observer(Box::new(move |cpu_port| {
                 let expansion_port_io = expansion_port_clone_1.borrow().get_io_line_value();
                 let mode = cpu_port & 0x07 | expansion_port_io & 0x18;
@@ -176,7 +176,7 @@ impl C64 {
             .borrow_mut()
             .get_io_line_mut()
             .set_observer(Box::new(move |expansion_port_io| {
-                let cpu_port_io = cpu_io_clone_2.borrow().port.get_value();
+                let cpu_port_io = cpu_io_clone_2.borrow().port_1.get_value();
                 let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
                 mem_clone_2.borrow_mut().switch_banks(mode);
             }));

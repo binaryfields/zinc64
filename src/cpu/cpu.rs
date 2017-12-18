@@ -45,7 +45,7 @@ pub struct CpuIo {
     pub cassette_switch: bool,
     pub irq: Interrupt,
     pub nmi: Interrupt,
-    pub port: IoLine,
+    pub port_1: IoLine,
 }
 
 impl CpuIo {
@@ -54,7 +54,7 @@ impl CpuIo {
             cassette_switch: true,
             irq: Interrupt::new(interrupt::Type::Irq),
             nmi: Interrupt::new(interrupt::Type::Nmi),
-            port: IoLine::new(0xff),
+            port_1: IoLine::new(0xff),
         }
     }
 
@@ -62,7 +62,7 @@ impl CpuIo {
         self.cassette_switch = true;
         self.irq.reset();
         self.nmi.reset();
-        self.port.set_value(0xff);
+        self.port_1.set_value(0xff);
     }
 }
 
@@ -81,12 +81,12 @@ pub struct Cpu {
     // Dependencies
     mem: Rc<RefCell<Addressable>>,
     // Registers
-    pc: u16,
     a: u8,
     x: u8,
     y: u8,
-    sp: u8,
     p: u8,
+    pc: u16,
+    sp: u8,
     // I/O Lines
     io: Rc<RefCell<CpuIo>>,
 }
@@ -95,12 +95,12 @@ impl Cpu {
     pub fn new(cpu_io: Rc<RefCell<CpuIo>>, mem: Rc<RefCell<Addressable>>) -> Cpu {
         Cpu {
             mem,
-            pc: 0,
             a: 0,
             x: 0,
             y: 0,
-            sp: 0,
             p: 0,
+            pc: 0,
+            sp: 0,
             io: cpu_io,
         }
     }
@@ -133,6 +133,15 @@ impl Cpu {
     }
 
     #[inline(always)]
+    fn set_flag(&mut self, flag: Flag, value: bool) {
+        if value {
+            self.p |= flag as u8;
+        } else {
+            self.p &= !(flag as u8);
+        }
+    }
+
+    #[inline(always)]
     pub fn set_pc(&mut self, value: u16) {
         self.pc = value;
     }
@@ -150,12 +159,12 @@ impl Cpu {
     }
 
     pub fn reset(&mut self) {
-        self.pc = 0;
         self.a = 0;
         self.x = 0;
         self.y = 0;
-        self.sp = 0;
         self.p = 0;
+        self.pc = 0;
+        self.sp = 0;
         self.io.borrow_mut().reset();
         self.write(0x0000, 0x2f);
         self.write(0x0001, 31);
@@ -170,19 +179,19 @@ impl Cpu {
             self.interrupt(interrupt::Type::Irq);
         }
         let pc = self.pc;
-        let opcode = self.fetch_op();
-        let op = Instruction::decode(self, opcode);
+        let opcode = self.fetch_byte();
+        let instr = Instruction::decode(self, opcode);
         if log_enabled!(LogLevel::Trace) {
-            let op_value = format!("{}", op);
+            let op_value = format!("{}", instr);
             trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
         }
-        self.execute_instruction(&op)
+        self.execute(&instr)
     }
 
     #[inline(always)]
-    fn execute_instruction(&mut self, instr: &Instruction) -> u32 {
+    fn execute(&mut self, instr: &Instruction) -> u32 {
         match *instr {
-            // -- Data Movement
+            //  Data Movement
             Instruction::LDA(ref op, cycles) => {
                 let value = op.get(self);
                 self.update_nz(value);
@@ -199,6 +208,28 @@ impl Cpu {
                 let value = op.get(self);
                 self.update_nz(value);
                 self.y = value;
+                self.tick(cycles)
+            }
+            Instruction::PHA(cycles) => {
+                let value = self.a;
+                self.push(value);
+                self.tick(cycles)
+            }
+            Instruction::PHP(cycles) => {
+                // NOTE undocumented behavior
+                let value = self.p | (Flag::Break as u8) | (Flag::Reserved as u8);
+                self.push(value);
+                self.tick(cycles)
+            }
+            Instruction::PLA(cycles) => {
+                let value = self.pop();
+                self.update_nz(value);
+                self.a = value;
+                self.tick(cycles)
+            }
+            Instruction::PLP(cycles) => {
+                let value = self.pop();
+                self.p = value;
                 self.tick(cycles)
             }
             Instruction::STA(ref op, cycles) => {
@@ -252,30 +283,7 @@ impl Cpu {
                 self.a = value;
                 self.tick(cycles)
             }
-            // -- Stack
-            Instruction::PHA(cycles) => {
-                let value = self.a;
-                self.push(value);
-                self.tick(cycles)
-            }
-            Instruction::PHP(cycles) => {
-                // NOTE undocumented behavior
-                let value = self.p | (Flag::Break as u8) | (Flag::Reserved as u8);
-                self.push(value);
-                self.tick(cycles)
-            }
-            Instruction::PLA(cycles) => {
-                let value = self.pop();
-                self.update_nz(value);
-                self.a = value;
-                self.tick(cycles)
-            }
-            Instruction::PLP(cycles) => {
-                let value = self.pop();
-                self.p = value;
-                self.tick(cycles)
-            }
-            // -- Arithmetic
+            // Arithmetic
             Instruction::ADC(ref op, cycles) => {
                 let ac = self.a as u16;
                 let value = op.get(self) as u16;
@@ -293,11 +301,11 @@ impl Cpu {
                     }
                     t
                 };
-                self.update_f(
+                self.set_flag(
                     Flag::Overflow,
                     (ac ^ value) & 0x80 == 0 && (ac ^ temp) & 0x80 == 0x80,
                 );
-                self.update_f(Flag::Carry, temp > 0xff);
+                self.set_flag(Flag::Carry, temp > 0xff);
                 let result = (temp & 0xff) as u8;
                 self.update_nz(result);
                 self.a = result;
@@ -322,14 +330,32 @@ impl Cpu {
                     }
                     t
                 };
-                self.update_f(
+                self.set_flag(
                     Flag::Overflow,
                     (ac ^ temp) & 0x80 != 0 && (ac ^ value) & 0x80 == 0x80,
                 );
-                self.update_f(Flag::Carry, temp < 0x100);
+                self.set_flag(Flag::Carry, temp < 0x100);
                 let result = (temp & 0xff) as u8;
                 self.update_nz(result);
                 self.a = result;
+                self.tick(cycles)
+            }
+            Instruction::CMP(ref op, cycles) => {
+                let result = (self.a as u16).wrapping_sub(op.get(self) as u16);
+                self.set_flag(Flag::Carry, result < 0x100);
+                self.update_nz((result & 0xff) as u8);
+                self.tick(cycles)
+            }
+            Instruction::CPX(ref op, cycles) => {
+                let result = (self.x as u16).wrapping_sub(op.get(self) as u16);
+                self.set_flag(Flag::Carry, result < 0x100);
+                self.update_nz((result & 0xff) as u8);
+                self.tick(cycles)
+            }
+            Instruction::CPY(ref op, cycles) => {
+                let result = (self.y as u16).wrapping_sub(op.get(self) as u16);
+                self.set_flag(Flag::Carry, result < 0x100);
+                self.update_nz((result & 0xff) as u8);
                 self.tick(cycles)
             }
             Instruction::DEC(ref op, cycles) => {
@@ -368,25 +394,7 @@ impl Cpu {
                 self.y = result;
                 self.tick(cycles)
             }
-            Instruction::CMP(ref op, cycles) => {
-                let result = (self.a as u16).wrapping_sub(op.get(self) as u16);
-                self.update_f(Flag::Carry, result < 0x100);
-                self.update_nz((result & 0xff) as u8);
-                self.tick(cycles)
-            }
-            Instruction::CPX(ref op, cycles) => {
-                let result = (self.x as u16).wrapping_sub(op.get(self) as u16);
-                self.update_f(Flag::Carry, result < 0x100);
-                self.update_nz((result & 0xff) as u8);
-                self.tick(cycles)
-            }
-            Instruction::CPY(ref op, cycles) => {
-                let result = (self.y as u16).wrapping_sub(op.get(self) as u16);
-                self.update_f(Flag::Carry, result < 0x100);
-                self.update_nz((result & 0xff) as u8);
-                self.tick(cycles)
-            }
-            // -- Logical
+            // Logical
             Instruction::AND(ref op, cycles) => {
                 let result = op.get(self) & self.a;
                 self.update_nz(result);
@@ -405,19 +413,19 @@ impl Cpu {
                 self.a = result;
                 self.tick(cycles)
             }
-            // -- Shift and Rotate
+            // Shift and Rotate
             Instruction::ASL(ref op, cycles) => {
                 let value = op.get(self);
+                self.set_flag(Flag::Carry, (value & 0x80) != 0);
                 let result = value << 1;
-                self.update_f(Flag::Carry, (value & 0x80) != 0);
                 self.update_nz(result);
                 op.set(self, result);
                 self.tick(cycles)
             }
             Instruction::LSR(ref op, cycles) => {
                 let value = op.get(self);
+                self.set_flag(Flag::Carry, (value & 0x01) != 0);
                 let result = value >> 1;
-                self.update_f(Flag::Carry, (value & 0x01) != 0);
                 self.update_nz(result);
                 op.set(self, result);
                 self.tick(cycles)
@@ -428,7 +436,7 @@ impl Cpu {
                 if self.test_flag(Flag::Carry) {
                     temp |= 0x01
                 };
-                self.update_f(Flag::Carry, temp > 0xff);
+                self.set_flag(Flag::Carry, temp > 0xff);
                 let result = (temp & 0xff) as u8;
                 self.update_nz(result);
                 op.set(self, result);
@@ -441,14 +449,14 @@ impl Cpu {
                 } else {
                     value
                 };
-                self.update_f(Flag::Carry, temp & 0x01 != 0);
+                self.set_flag(Flag::Carry, temp & 0x01 != 0);
                 temp >>= 1;
                 let result = (temp & 0xff) as u8;
                 self.update_nz(result);
                 op.set(self, result);
                 self.tick(cycles)
             }
-            // -- Control Flow
+            // Control Flow
             Instruction::BCC(ref op, cycles) => {
                 if !self.test_flag(Flag::Carry) {
                     self.pc = op.ea(self);
@@ -513,38 +521,46 @@ impl Cpu {
                 self.pc = address.wrapping_add(1);
                 self.tick(cycles)
             }
-            // -- Flag
+            // Misc
+            Instruction::BIT(ref op, cycles) => {
+                let value = op.get(self);
+                let a = self.a;
+                self.set_flag(Flag::Negative, value & 0x80 != 0);
+                self.set_flag(Flag::Overflow, 0x40 & value != 0);
+                self.set_flag(Flag::Zero, value & a == 0);
+                self.tick(cycles)
+            }
+            Instruction::BRK(cycles) => {
+                self.interrupt(interrupt::Type::Break);
+                self.tick(cycles)
+            }
             Instruction::CLC(cycles) => {
-                self.clear_flag(Flag::Carry);
+                self.set_flag(Flag::Carry, false);
                 self.tick(cycles)
             }
             Instruction::CLD(cycles) => {
-                self.clear_flag(Flag::Decimal);
+                self.set_flag(Flag::Decimal, false);
                 self.tick(cycles)
             }
             Instruction::CLI(cycles) => {
-                self.clear_flag(Flag::IntDisable);
+                self.set_flag(Flag::IntDisable, false);
                 self.tick(cycles)
             }
             Instruction::CLV(cycles) => {
-                self.clear_flag(Flag::Overflow);
+                self.set_flag(Flag::Overflow, false);
                 self.tick(cycles)
             }
+            Instruction::NOP(cycles) => self.tick(cycles),
             Instruction::SEC(cycles) => {
-                self.set_flag(Flag::Carry);
+                self.set_flag(Flag::Carry, true);
                 self.tick(cycles)
             }
             Instruction::SED(cycles) => {
-                self.set_flag(Flag::Decimal);
+                self.set_flag(Flag::Decimal, true);
                 self.tick(cycles)
             }
             Instruction::SEI(cycles) => {
-                self.set_flag(Flag::IntDisable);
-                self.tick(cycles)
-            }
-            // -- System
-            Instruction::BRK(cycles) => {
-                self.interrupt(interrupt::Type::Break);
+                self.set_flag(Flag::IntDisable, true);
                 self.tick(cycles)
             }
             Instruction::RTI(cycles) => {
@@ -552,27 +568,67 @@ impl Cpu {
                 self.pc = (self.pop() as u16) | ((self.pop() as u16) << 8);
                 self.tick(cycles)
             }
-            // -- Misc
-            Instruction::NOP(cycles) => self.tick(cycles),
-            Instruction::BIT(ref op, cycles) => {
-                let value = op.get(self);
-                let a = self.a;
-                self.update_f(Flag::Negative, value & 0x80 != 0);
-                self.update_f(Flag::Overflow, 0x40 & value != 0);
-                self.update_f(Flag::Zero, value & a == 0);
-                self.tick(cycles)
-            }
         }
     }
 
     #[inline(always)]
-    fn clear_flag(&mut self, flag: Flag) {
-        self.p &= !(flag as u8);
+    pub fn fetch_byte(&mut self) -> u8 {
+        let byte = self.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
+        byte
     }
 
     #[inline(always)]
-    fn set_flag(&mut self, flag: Flag) {
-        self.p |= flag as u8;
+    pub fn fetch_word(&mut self) -> u16 {
+        let word = self.read_word(self.pc);
+        self.pc = self.pc.wrapping_add(2);
+        word
+    }
+
+    fn interrupt(&mut self, interrupt: interrupt::Type) -> u8 {
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
+        }
+        let pc = self.pc;
+        let p = self.p;
+        match interrupt {
+            interrupt::Type::Irq => {
+                self.push(((pc >> 8) & 0xff) as u8);
+                self.push((pc & 0xff) as u8);
+                self.push(p & 0xef);
+                self.set_flag(Flag::IntDisable, true);
+            }
+            interrupt::Type::Nmi => {
+                self.push(((pc >> 8) & 0xff) as u8);
+                self.push((pc & 0xff) as u8);
+                self.push(p & 0xef);
+                self.set_flag(Flag::IntDisable, true);
+                self.io.borrow_mut().nmi.reset();
+            }
+            interrupt::Type::Break => {
+                self.push((((pc + 1) >> 8) & 0xff) as u8);
+                self.push(((pc + 1) & 0xff) as u8);
+                self.push(p | (Flag::Break as u8) | (Flag::Reserved as u8));
+                self.set_flag(Flag::IntDisable, true);
+            }
+            interrupt::Type::Reset => {}
+        }
+        self.pc = self.read_word(interrupt.vector());
+        7
+    }
+
+    #[inline(always)]
+    fn pop(&mut self) -> u8 {
+        self.sp = self.sp.wrapping_add(1);
+        let addr = 0x0100 + self.sp as u16;
+        self.read(addr)
+    }
+
+    #[inline(always)]
+    fn push(&mut self, value: u8) {
+        let addr = 0x0100 + self.sp as u16;
+        self.write(addr, value);
+        self.sp = self.sp.wrapping_sub(1);
     }
 
     #[inline(always)]
@@ -586,114 +642,40 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn update_f(&mut self, flag: Flag, value: bool) {
-        if value {
-            self.set_flag(flag);
-        } else {
-            self.clear_flag(flag);
-        }
-    }
-
-    #[inline(always)]
     fn update_nz(&mut self, value: u8) {
-        if value & 0x80 != 0 {
-            self.set_flag(Flag::Negative);
-        } else {
-            self.clear_flag(Flag::Negative);
-        }
-        if value == 0 {
-            self.set_flag(Flag::Zero);
-        } else {
-            self.clear_flag(Flag::Zero);
-        }
-    }
-
-    // -- Interrupt Ops
-
-    fn interrupt(&mut self, interrupt: interrupt::Type) -> u8 {
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
-        }
-        let pc = self.pc;
-        let p = self.p;
-        match interrupt {
-            interrupt::Type::Irq => {
-                self.push(((pc >> 8) & 0xff) as u8);
-                self.push((pc & 0xff) as u8);
-                self.push(p & 0xef);
-                self.set_flag(Flag::IntDisable);
-            }
-            interrupt::Type::Nmi => {
-                self.push(((pc >> 8) & 0xff) as u8);
-                self.push((pc & 0xff) as u8);
-                self.push(p & 0xef);
-                self.set_flag(Flag::IntDisable);
-                self.io.borrow_mut().nmi.reset();
-            }
-            interrupt::Type::Break => {
-                self.push((((pc + 1) >> 8) & 0xff) as u8);
-                self.push(((pc + 1) & 0xff) as u8);
-                self.push(p | (Flag::Break as u8) | (Flag::Reserved as u8));
-                self.set_flag(Flag::IntDisable);
-            }
-            interrupt::Type::Reset => {}
-        }
-        self.pc = self.read_word(interrupt.vector());
-        7
+        self.set_flag(Flag::Negative, value & 0x80 != 0);
+        self.set_flag(Flag::Zero, value == 0);
     }
 
     // -- Memory Ops
 
-    pub fn fetch_op(&mut self) -> u8 {
-        let op = self.read(self.pc);
-        self.pc = self.pc.wrapping_add(1);
-        op
-    }
-
-    pub fn fetch_word(&mut self) -> u16 {
-        let word = self.read_word(self.pc);
-        self.pc = self.pc.wrapping_add(2);
-        word
-    }
-
+    #[inline(always)]
     pub fn read(&self, address: u16) -> u8 {
         match address {
             0x0001 => {
                 let cassette_switch = bit::value(4, self.io.borrow().cassette_switch);
-                (self.io.borrow().port.get_value() & 0x27) | cassette_switch
+                (self.io.borrow().port_1.get_value() & 0x27) | cassette_switch
             }
             _ => self.mem.borrow().read(address),
         }
     }
 
+    #[inline(always)]
     pub fn read_word(&self, address: u16) -> u16 {
-        let low = self.read(address) as u16;
-        let high = self.read(address + 1) as u16;
-        low | (high << 8)
+        let low = self.read(address);
+        let high = self.read(address + 1);
+        ((high as u16) << 8) | low as u16
     }
 
+    #[inline(always)]
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0001 => {
-                self.io.borrow_mut().port.set_value(value);
+                self.io.borrow_mut().port_1.set_value(value);
                 self.mem.borrow_mut().write(address, value);
             }
             _ => self.mem.borrow_mut().write(address, value),
         }
-    }
-
-    // -- Stack Ops
-
-    fn pop(&mut self) -> u8 {
-        self.sp = self.sp.wrapping_add(1);
-        let addr = 0x0100 + self.sp as u16;
-        self.read(addr)
-    }
-
-    fn push(&mut self, value: u8) {
-        let addr = 0x0100 + self.sp as u16;
-        self.write(addr, value);
-        self.sp = self.sp.wrapping_sub(1);
     }
 }
 
@@ -762,15 +744,15 @@ mod tests {
     }
 
     fn setup_reg_a(cpu: &mut Cpu, value: u8) {
-        cpu.execute_instruction(&Instruction::LDA(Operand::Immediate(value), 1));
+        cpu.execute(&Instruction::LDA(Operand::Immediate(value), 1));
     }
 
     #[test]
     fn execute_adc_80_16() {
         let mut cpu = setup_cpu().unwrap();
         setup_reg_a(&mut cpu, 80);
-        cpu.clear_flag(Flag::Carry);
-        cpu.execute_instruction(&Instruction::ADC(Operand::Immediate(16), 1));
+        cpu.set_flag(Flag::Carry, false);
+        cpu.execute(&Instruction::ADC(Operand::Immediate(16), 1));
         assert_eq!(96, cpu.a);
         assert_eq!(false, cpu.test_flag(Flag::Carry));
         assert_eq!(false, cpu.test_flag(Flag::Negative));

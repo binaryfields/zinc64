@@ -64,6 +64,7 @@ impl Operand {
         }
     }
 
+    #[inline(always)]
     pub fn get(&self, cpu: &Cpu) -> u8 {
         match *self {
             Operand::Accumulator => cpu.get_a(),
@@ -77,6 +78,7 @@ impl Operand {
         }
     }
 
+    #[inline(always)]
     pub fn set(&self, cpu: &mut Cpu, value: u8) {
         match *self {
             Operand::Accumulator => cpu.set_a(value),

@@ -37,6 +37,7 @@ Overall, my impression of Rust is that it provides wonderful ergonomics for the 
 
 I've included a number of examples from Kick Assembler that I've used to test various components of the emulator. They can be found in the bin folder of this repository and started with the emulator's autostart option.
 
+        ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
         ./target/release/zinc64 --autostart bin/SineAndGraphics.prg
 
 ## Status

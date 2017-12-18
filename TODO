@@ -4,14 +4,9 @@ cli module
 add deviceio
 
 remove sdl2 from lib
-cpu
-cia
 vic
 review device module
 review loader module
-
-cia port observer call vic_memory set port a
-
 cartridge
 timer
 

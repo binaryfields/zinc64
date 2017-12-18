@@ -85,7 +85,7 @@ impl Datassette {
     }
 
     pub fn is_playing(&self) -> bool {
-        self.playing & !self.cpu_io.borrow().port.get_value().get_bit(5)
+        self.playing & !self.cpu_io.borrow().port_1.get_value().get_bit(5)
     }
 
     pub fn play(&mut self) {
