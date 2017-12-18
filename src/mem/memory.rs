@@ -20,16 +20,13 @@
 use std::io;
 use std::cell::RefCell;
 use std::path::Path;
-use std::option::Option;
 use std::rc::Rc;
 use std::result::Result;
 
-use cpu::CpuIo;
-use io::{Cia, ExpansionPort, ExpansionPortIo};
 use log::LogLevel;
-use util::bit;
+use util::Addressable;
 
-use super::{Addressable, Bank, Configuration, DeviceIo, MemoryMap, Ram, Rom};
+use super::{Bank, Configuration, MemoryMap, Rom};
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
 // Design:
@@ -39,20 +36,16 @@ use super::{Addressable, Bank, Configuration, DeviceIo, MemoryMap, Ram, Rom};
 //   memory layout.
 
 pub struct Memory {
-    // Dependencies
-    cpu_io: Rc<RefCell<CpuIo>>,
-    expansion_port_io: Rc<RefCell<ExpansionPortIo>>,
-    cia2: Option<Rc<RefCell<Cia>>>,
-    device_io: Option<Rc<RefCell<DeviceIo>>>,
-    expansion_port: Option<Rc<RefCell<ExpansionPort>>>,
+    // Addressable
+    basic: Box<Addressable>,
+    charset: Rc<RefCell<Addressable>>,
+    device_mem: Rc<RefCell<Addressable>>,
+    expansion_port: Rc<RefCell<Addressable>>,
+    kernal: Box<Addressable>,
+    ram: Rc<RefCell<Addressable>>,
     // Configuration
     map: MemoryMap,
     configuration: Configuration,
-    // Addressable
-    basic: Box<Addressable>,
-    charset: Box<Addressable>,
-    kernal: Box<Addressable>,
-    ram: Ram,
 }
 
 #[derive(Copy, Clone)]
@@ -70,85 +63,38 @@ impl BaseAddr {
 
 impl Memory {
     pub fn new(
-        capacity: usize,
-        cpu_io: Rc<RefCell<CpuIo>>,
-        expansion_port_io: Rc<RefCell<ExpansionPortIo>>,
+        charset: Rc<RefCell<Addressable>>,
+        device_mem: Rc<RefCell<Addressable>>,
+        expansion_port: Rc<RefCell<Addressable>>,
+        ram: Rc<RefCell<Addressable>>,
     ) -> Result<Memory, io::Error> {
-        let map = MemoryMap::new();
-        let configuration = map.get(1);
         let basic = Box::new(Rom::load(
             Path::new("res/rom/basic.rom"),
             BaseAddr::Basic.addr(),
         )?);
-        let charset = Box::new(Rom::load(Path::new("res/rom/characters.rom"), 0)?);
         let kernal = Box::new(Rom::load(
             Path::new("res/rom/kernal.rom"),
             BaseAddr::Kernal.addr(),
         )?);
-        let ram = Ram::new(capacity);
+        let map = MemoryMap::new();
+        let configuration = map.get(1);
         Ok(Memory {
-            cpu_io: cpu_io,
-            expansion_port_io: expansion_port_io,
-            cia2: None,
-            device_io: None,
-            expansion_port: None,
-            map: map,
-            configuration: configuration,
-            basic: basic,
-            charset: charset,
-            kernal: kernal,
-            ram: ram,
+            basic,
+            charset,
+            device_mem,
+            expansion_port,
+            kernal,
+            ram,
+            map,
+            configuration,
         })
     }
 
-    pub fn set_cia2(&mut self, cia: Rc<RefCell<Cia>>) {
-        self.cia2 = Some(cia);
-    }
-
-    pub fn set_device_io(&mut self, device_io: Rc<RefCell<DeviceIo>>) {
-        self.device_io = Some(device_io);
-    }
-
-    pub fn set_expansion_port(&mut self, expansion_port: Rc<RefCell<ExpansionPort>>) {
-        self.expansion_port = Some(expansion_port);
-    }
-
-    pub fn reset(&mut self) {
-        self.ram.reset();
-    }
-
-    pub fn switch_banks(&mut self) {
-        let loram = bit::value(0, self.cpu_io.borrow().loram);
-        let hiram = bit::value(1, self.cpu_io.borrow().hiram);
-        let charen = bit::value(2, self.cpu_io.borrow().charen);
-        let game = bit::value(3, self.expansion_port_io.borrow().game);
-        let exrom = bit::value(4, self.expansion_port_io.borrow().exrom);
-        let mode = loram | hiram | charen | game | exrom;
+    pub fn switch_banks(&mut self, mode: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "mem::banks", "Switching to {}", mode);
         }
         self.configuration = self.map.get(mode);
-    }
-
-    pub fn write_ram(&mut self, address: u16, value: u8) {
-        self.ram.write(address, value);
-    }
-
-    // -- VIC Memory Ops
-
-    pub fn vic_read(&self, address: u16) -> u8 {
-        if let Some(ref cia2) = self.cia2 {
-            let port_a = cia2.borrow_mut().read(0x00);
-            let full_address = ((!port_a & 0x03) as u16) << 14 | address;
-            let zone = (full_address & 0xf000) >> 12;
-            match zone {
-                0x01 => self.charset.read(full_address - 0x1000),
-                0x09 => self.charset.read(full_address - 0x9000),
-                _ => self.ram.read(full_address),
-            }
-        } else {
-            panic!("cia2 not set")
-        }
     }
 }
 
@@ -156,25 +102,15 @@ impl Addressable for Memory {
     fn read(&self, address: u16) -> u8 {
         let zone = address >> 12;
         match self.configuration.get(zone as u8) {
-            Bank::Ram => self.ram.read(address),
+            Bank::Ram => self.ram.borrow().read(address),
             Bank::Basic => self.basic.read(address),
-            Bank::Charset => self.charset.read(address - BaseAddr::Charset.addr()),
+            Bank::Charset => self.charset
+                .borrow()
+                .read(address - BaseAddr::Charset.addr()),
             Bank::Kernal => self.kernal.read(address),
-            Bank::RomL => if let Some(ref expansion_port) = self.expansion_port {
-                expansion_port.borrow().read(address)
-            } else {
-                panic!("expansion port not set")
-            },
-            Bank::RomH => if let Some(ref expansion_port) = self.expansion_port {
-                expansion_port.borrow().read(address)
-            } else {
-                panic!("expansion port not set")
-            },
-            Bank::Io => if let Some(ref device_io) = self.device_io {
-                device_io.borrow().read(address)
-            } else {
-                panic!("device io not set")
-            },
+            Bank::RomL => self.expansion_port.borrow().read(address),
+            Bank::RomH => self.expansion_port.borrow().read(address),
+            Bank::Io => self.device_mem.borrow().read(address),
             Bank::Disabled => 0,
         }
     }
@@ -182,17 +118,13 @@ impl Addressable for Memory {
     fn write(&mut self, address: u16, value: u8) {
         let zone = address >> 12;
         match self.configuration.get(zone as u8) {
-            Bank::Ram => self.ram.write(address, value),
-            Bank::Basic => self.ram.write(address, value),
-            Bank::Charset => self.ram.write(address, value),
-            Bank::Kernal => self.ram.write(address, value),
-            Bank::RomL => self.ram.write(address, value),
-            Bank::RomH => self.ram.write(address, value),
-            Bank::Io => if let Some(ref device_io) = self.device_io {
-                device_io.borrow_mut().write(address, value)
-            } else {
-                panic!("device io not set")
-            },
+            Bank::Ram => self.ram.borrow_mut().write(address, value),
+            Bank::Basic => self.ram.borrow_mut().write(address, value),
+            Bank::Charset => self.ram.borrow_mut().write(address, value),
+            Bank::Kernal => self.ram.borrow_mut().write(address, value),
+            Bank::RomL => self.ram.borrow_mut().write(address, value),
+            Bank::RomH => self.ram.borrow_mut().write(address, value),
+            Bank::Io => self.device_mem.borrow_mut().write(address, value),
             Bank::Disabled => {}
         }
     }

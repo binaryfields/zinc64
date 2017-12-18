@@ -25,10 +25,10 @@ use std::result::Result;
 use std::str;
 
 use byteorder::{BigEndian, ReadBytesExt};
-use c64::C64;
 use device::{Cartridge, Chip, ChipType, HwType};
 use loader::{Image, Loader};
 use loader::autostart;
+use system::C64;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 

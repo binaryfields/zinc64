@@ -47,7 +47,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 | Chipset | Memory        | Done
 | Chipset | 6526 CIA      | Done
 | Chipset | 6581 SID      | Done
-| Chipset | 6567 VIC      | Done
+| Chipset | 6567 VIC      | In Progress
 | Device  | Cartridge     | Done
 | Device  | Floppy        | Not Started
 | Device  | Datassette    | Done

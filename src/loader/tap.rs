@@ -25,10 +25,10 @@ use std::result::Result;
 use std::str;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use c64::C64;
 use device::Tape;
 use loader::{Autostart, Image, Loader};
 use loader::autostart;
+use system::C64;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
 

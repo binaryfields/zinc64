@@ -17,77 +17,58 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use bit_field::BitField;
 
 use device::Cartridge;
-use mem::{Addressable, Memory};
-
-pub struct ExpansionPortIo {
-    pub game: bool,
-    pub exrom: bool,
-}
-
-impl ExpansionPortIo {
-    pub fn new() -> ExpansionPortIo {
-        ExpansionPortIo {
-            game: true,
-            exrom: true,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.game = true;
-        self.exrom = true;
-    }
-
-    pub fn update(&mut self, game: bool, exrom: bool) {
-        self.game = game;
-        self.exrom = exrom;
-    }
-}
+use util::{Addressable, IoLine};
 
 pub struct ExpansionPort {
-    mem: Rc<RefCell<Memory>>,
     cartridge: Option<Cartridge>,
-    io: Rc<RefCell<ExpansionPortIo>>,
+    // I/O
+    io_line: IoLine,
 }
 
 impl ExpansionPort {
-    pub fn new(
-        expansion_port_io: Rc<RefCell<ExpansionPortIo>>,
-        mem: Rc<RefCell<Memory>>,
-    ) -> ExpansionPort {
+    pub fn new() -> ExpansionPort {
         ExpansionPort {
-            mem: mem,
             cartridge: None,
-            io: expansion_port_io,
+            io_line: IoLine::new(0xff),
         }
     }
 
+    pub fn get_io_line_value(&self) -> u8 {
+        self.io_line.get_value()
+    }
+
+    pub fn get_io_line_mut(&mut self) -> &mut IoLine {
+        &mut self.io_line
+    }
+
     pub fn attach(&mut self, cartridge: Cartridge) {
-        self.io
-            .borrow_mut()
-            .update(cartridge.get_game(), cartridge.get_exrom());
+        let mut io_value = 0u8;
+        io_value.set_bit(3, cartridge.get_game());
+        io_value.set_bit(4, cartridge.get_exrom());
+        self.io_line.set_value(io_value);
         self.cartridge = Some(cartridge);
-        self.mem.borrow_mut().switch_banks();
     }
 
     pub fn detach(&mut self) {
         if self.cartridge.is_some() {
             self.cartridge = None;
-            self.io.borrow_mut().reset();
-            self.mem.borrow_mut().switch_banks();
+            let mut io_value = 0u8;
+            io_value.set_bit(3, true);
+            io_value.set_bit(4, true);
+            self.io_line.set_value(io_value);
         }
     }
 
     pub fn reset(&mut self) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.reset();
-            self.io
-                .borrow_mut()
-                .update(cartridge.get_game(), cartridge.get_exrom());
-            self.mem.borrow_mut().switch_banks();
+            let mut io_value = 0u8;
+            io_value.set_bit(3, cartridge.get_game());
+            io_value.set_bit(4, cartridge.get_exrom());
+            self.io_line.set_value(io_value);
         }
     }
 }

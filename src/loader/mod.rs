@@ -27,7 +27,8 @@ mod tap;
 
 use std::io;
 use std::path::Path;
-use c64::C64;
+
+use system::C64;
 
 pub use self::autostart::Autostart;
 pub use self::bin::BinLoader;

@@ -18,9 +18,6 @@
  */
 
 pub mod cia;
-mod expansion_port;
 mod timer;
-mod rtc;
 
 pub use self::cia::{Cia, CiaIo};
-pub use self::expansion_port::{ExpansionPort, ExpansionPortIo};

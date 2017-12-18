@@ -18,6 +18,7 @@
  */
 
 use std::cell::RefCell;
+use std::path::Path;
 use std::io;
 use std::rc::Rc;
 use std::result::Result;
@@ -25,17 +26,19 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use time;
+
 use cpu::{Cpu, CpuIo};
 use config::Config;
 use device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
 use device::joystick;
-use mem::{DeviceIo, Memory};
-use io::{Cia, CiaIo, ExpansionPort, ExpansionPortIo};
+use mem::{DeviceMemory, ExpansionPort, Memory, Ram, Rom};
+use io::{Cia, CiaIo};
 use io::cia;
 use loader::Autostart;
 use sound::{Sid, SoundBuffer};
-use time;
-use video::{ColorRam, RenderTarget, Vic};
+use video::{RenderTarget, Vic, VicMemory};
+use util::Addressable;
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -43,18 +46,18 @@ use video::{ColorRam, RenderTarget, Vic};
 
 #[allow(dead_code)]
 pub struct C64 {
-    // Deps
+    // Dependencies
     config: Config,
     // Chipset
     cpu: Rc<RefCell<Cpu>>,
-    mem: Rc<RefCell<Memory>>,
-    color_ram: Rc<RefCell<ColorRam>>,
     cia1: Rc<RefCell<Cia>>,
     cia2: Rc<RefCell<Cia>>,
     sid: Rc<RefCell<Sid>>,
     vic: Rc<RefCell<Vic>>,
-    // I/O
+    // Memory
+    color_ram: Rc<RefCell<Ram>>,
     expansion_port: Rc<RefCell<ExpansionPort>>,
+    ram: Rc<RefCell<Ram>>,
     // Peripherals
     datassette: Rc<RefCell<Datassette>>,
     joystick1: Option<Rc<RefCell<Joystick>>>,
@@ -68,7 +71,7 @@ pub struct C64 {
     speed: u8,
     warp_mode: bool,
     // Runtime State
-    cycles: u64,
+    cycles: u32,
     frames: u32,
     last_pc: u16,
     next_frame_ns: u64,
@@ -81,11 +84,11 @@ impl C64 {
         let cia1_io = Rc::new(RefCell::new(CiaIo::new()));
         let cia2_io = Rc::new(RefCell::new(CiaIo::new()));
         let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
-        let expansion_port_io = Rc::new(RefCell::new(ExpansionPortIo::new()));
         let rt = Rc::new(RefCell::new(RenderTarget::new(config.screen_size)));
         let sound_buffer = Arc::new(Mutex::new(
             SoundBuffer::new(4096), // FIXME magic value
         ));
+
         // Peripherals
         let datassette = Rc::new(RefCell::new(Datassette::new(
             cia1_io.clone(),
@@ -102,14 +105,16 @@ impl C64 {
             None
         };
         let keyboard = Rc::new(RefCell::new(Keyboard::new()));
-        // Chipset
-        let mem = Rc::new(RefCell::new(Memory::new(
-            0x10000,
-            cpu_io.clone(),
-            expansion_port_io.clone(),
+
+        // Memory
+        let charset = Rc::new(RefCell::new(Rom::load(
+            Path::new("res/rom/characters.rom"),
+            0,
         )?));
-        let color_ram = Rc::new(RefCell::new(ColorRam::new(1024)));
-        let cpu = Rc::new(RefCell::new(Cpu::new(cpu_io.clone(), mem.clone())));
+        let color_ram = Rc::new(RefCell::new(Ram::new(1024)));
+        let ram = Rc::new(RefCell::new(Ram::new(0x10000)));
+
+        // Chipset
         let cia1 = Rc::new(RefCell::new(Cia::new(
             cia::Mode::Cia1,
             cia1_io.clone(),
@@ -127,19 +132,17 @@ impl C64 {
             keyboard.clone(),
         )));
         let sid = Rc::new(RefCell::new(Sid::new(sound_buffer.clone())));
+        let vic_mem = Rc::new(RefCell::new(VicMemory::new(charset.clone(), ram.clone())));
         let vic = Rc::new(RefCell::new(Vic::new(
             config.clone(),
             color_ram.clone(),
             cpu_io.clone(),
-            mem.clone(),
+            vic_mem.clone(),
             rt.clone(),
         )));
-        // I/O
-        let expansion_port = Rc::new(RefCell::new(ExpansionPort::new(
-            expansion_port_io.clone(),
-            mem.clone(),
-        )));
-        let device_io = Rc::new(RefCell::new(DeviceIo::new(
+
+        let expansion_port = Rc::new(RefCell::new(ExpansionPort::new()));
+        let device_mem = Rc::new(RefCell::new(DeviceMemory::new(
             cia1.clone(),
             cia2.clone(),
             color_ram.clone(),
@@ -147,22 +150,57 @@ impl C64 {
             sid.clone(),
             vic.clone(),
         )));
-        mem.borrow_mut().set_cia2(cia2.clone());
-        mem.borrow_mut().set_device_io(device_io.clone());
-        mem.borrow_mut().set_expansion_port(expansion_port.clone());
+        let mem = Rc::new(RefCell::new(Memory::new(
+            charset.clone(),
+            device_mem.clone(),
+            expansion_port.clone(),
+            ram.clone(),
+        )?));
+        let cpu = Rc::new(RefCell::new(Cpu::new(cpu_io.clone(), mem.clone())));
+
+        // Observers
+        let expansion_port_clone_1 = expansion_port.clone();
+        let mem_clone_1 = mem.clone();
+        cpu_io
+            .borrow_mut()
+            .port
+            .set_observer(Box::new(move |cpu_port| {
+                let expansion_port_io = expansion_port_clone_1.borrow().get_io_line_value();
+                let mode = cpu_port & 0x07 | expansion_port_io & 0x18;
+                mem_clone_1.borrow_mut().switch_banks(mode);
+            }));
+
+        let cpu_io_clone_2 = cpu_io.clone();
+        let mem_clone_2 = mem.clone();
+        expansion_port
+            .borrow_mut()
+            .get_io_line_mut()
+            .set_observer(Box::new(move |expansion_port_io| {
+                let cpu_port_io = cpu_io_clone_2.borrow().port.get_value();
+                let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
+                mem_clone_2.borrow_mut().switch_banks(mode);
+            }));
+
+        let vic_mem_clone = vic_mem.clone();
+        cia2.borrow_mut()
+            .get_port_a_mut()
+            .set_observer(Box::new(move |port_a| {
+                vic_mem_clone.borrow_mut().set_cia_port_a(port_a);
+            }));
+
         Ok(C64 {
-            config: config,
-            mem: mem.clone(),
-            color_ram: color_ram.clone(),
+            config,
             cpu: cpu.clone(),
             sid: sid.clone(),
             vic: vic.clone(),
             cia1: cia1.clone(),
             cia2: cia2.clone(),
+            color_ram: color_ram.clone(),
             expansion_port: expansion_port.clone(),
-            datassette: datassette,
-            joystick1: joystick1,
-            joystick2: joystick2,
+            ram: ram.clone(),
+            datassette,
+            joystick1,
+            joystick2,
             keyboard: keyboard.clone(),
             rt: rt.clone(),
             sound_buffer: sound_buffer.clone(),
@@ -185,7 +223,7 @@ impl C64 {
         self.cpu.clone()
     }
 
-    pub fn get_cycles(&self) -> u64 {
+    pub fn get_cycles(&self) -> u32 {
         self.cycles
     }
 
@@ -248,18 +286,19 @@ impl C64 {
     }
 
     pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
-        let mut mem = self.mem.borrow_mut();
+        let mut mem = self.ram.borrow_mut();
         let mut address = offset;
         for byte in data {
-            mem.write_ram(address, *byte);
+            mem.write(address, *byte);
             address = address.wrapping_add(1);
         }
     }
 
     pub fn reset(&mut self, hard: bool) {
         info!(target: "c64", "Resetting system");
+        // Memory
         if hard {
-            self.mem.borrow_mut().reset();
+            self.ram.borrow_mut().reset();
             self.color_ram.borrow_mut().reset();
         }
         // Chipset
@@ -288,45 +327,46 @@ impl C64 {
         self.next_frame_ns = 0;
     }
 
-    pub fn run_frame(&mut self, overflow_cycles: u16) -> u16 {
-        let mut cycles = (self.config.frame_cycles - overflow_cycles) as i16;
-        let mut elapsed = 0;
-        while cycles > 0 {
-            let completed = self.step();
-            cycles -= completed as i16;
-            elapsed += completed as u32;
+    pub fn run_frame(&mut self, overflow_cycles: i32) -> i32 {
+        let mut elapsed = 0u32;
+        let mut delta = self.config.frame_cycles as i32 - overflow_cycles;
+        while delta > 0 {
+            let cycles = self.step();
+            elapsed += cycles;
+            delta -= cycles as i32;
         }
-        self.frames += 1;
+        self.frames = self.frames.wrapping_add(1);
         if self.frames % (self.config.refresh_rate as u32 / 10) == 0 {
             self.cia1.borrow_mut().tod_tick();
             self.cia2.borrow_mut().tod_tick();
         }
-        self.sid.borrow_mut().step_delta(elapsed);
+        self.sid.borrow_mut().clock_delta(elapsed);
         if !self.warp_mode {
             self.sync_frame();
         }
-        (-cycles) as u16
+        delta
     }
 
-    #[allow(unused_variables)]
-    pub fn step(&mut self) -> u8 {
+    #[inline(always)]
+    pub fn step(&mut self) -> u32 {
         self.last_pc = self.cpu.borrow().get_pc();
-        let cycles = self.cpu.borrow_mut().execute();
-        for i in 0..cycles {
-            self.vic.borrow_mut().step();
-            self.cia1.borrow_mut().step();
-            self.cia2.borrow_mut().step();
-            self.datassette.borrow_mut().step();
+        let delta = self.cpu.borrow_mut().step();
+        for _i in 0..delta {
+            self.vic.borrow_mut().clock();
+            self.cia1.borrow_mut().clock();
+            self.cia2.borrow_mut().clock();
+            self.datassette.borrow_mut().clock();
         }
         if self.autostart.is_some() {
             if self.cpu.borrow().get_pc() == 0xa65c {
+                // magic value
                 if let Some(mut autostart) = self.autostart.take() {
                     autostart.execute(self);
                 }
             }
         }
-        self.cycles += cycles as u64;
-        cycles
+        self.cycles = self.cycles.wrapping_add(delta);
+        delta
     }
 
     fn sync_frame(&mut self) {
@@ -341,6 +381,18 @@ impl C64 {
             thread::sleep(Duration::new(0, wait_ns));
         }
         self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
+    }
+
+    // -- Debug Ops
+
+    pub fn add_breakpoint(&mut self, breakpoint: u16) {
+        self.breakpoints.push(breakpoint);
+    }
+
+    #[allow(dead_code)]
+    pub fn check_breakpoints(&self) -> bool {
+        let pc = self.cpu.borrow().get_pc();
+        !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)
     }
 
     // -- Peripherals Ops
@@ -360,18 +412,6 @@ impl C64 {
 
     pub fn detach_tape(&mut self) {
         self.datassette.borrow_mut().detach();
-    }
-
-    // -- Debug Ops
-
-    pub fn add_breakpoint(&mut self, breakpoint: u16) {
-        self.breakpoints.push(breakpoint);
-    }
-
-    #[allow(dead_code)]
-    pub fn check_breakpoints(&self) -> bool {
-        let pc = self.cpu.borrow().get_pc();
-        !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)
     }
 }
 

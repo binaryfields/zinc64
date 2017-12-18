@@ -31,20 +31,18 @@ pub struct Sid {
 
 impl Sid {
     pub fn new(buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
+        info!(target: "sound", "Initializing SID");
         let mut sid = Sid {
             resid: resid::Sid::new(resid::ChipModel::Mos6581),
-            buffer: buffer,
+            buffer,
         };
         sid.resid
             .set_sampling_parameters(resid::SamplingMethod::ResampleFast, 985248, 44100);
         sid
     }
 
-    pub fn reset(&mut self) {
-        self.resid.reset();
-    }
-
-    pub fn step_delta(&mut self, cycles: u32) {
+    #[inline(always)]
+    pub fn clock_delta(&mut self, cycles: u32) {
         let mut buffer = [0i16; 4096]; // FIXME magic value
         let buffer_length = buffer.len();
         let mut samples = 0;
@@ -61,6 +59,10 @@ impl Sid {
         for i in 0..samples {
             output.push(buffer[i]);
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.resid.reset();
     }
 
     // -- Device I/O

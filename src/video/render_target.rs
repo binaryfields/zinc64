@@ -34,8 +34,8 @@ pub struct RenderTarget {
 impl RenderTarget {
     pub fn new(dim: Dimension) -> RenderTarget {
         RenderTarget {
-            dim: dim,
-            pixels: vec![0; (dim.width as usize) * (dim.height as usize)],
+            dim,
+            pixels: vec![0; dim.width as usize * dim.height as usize],
             sync: false,
         }
     }
@@ -73,9 +73,7 @@ impl RenderTarget {
         self.pixels[index] = Color::from(color).rgb();
     }
 
-    // -- Internal Ops
-
     fn index(&self, x: u16, y: u16) -> usize {
-        (y as usize) * (self.dim.width as usize) + (x as usize)
+        y as usize * self.dim.width as usize + x as usize
     }
 }

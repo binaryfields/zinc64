@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use c64::C64;
 use loader::Image;
+use system::C64;
 
 pub enum Mode {
     Run,

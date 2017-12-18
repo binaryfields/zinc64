@@ -24,9 +24,9 @@ use std::path::Path;
 use std::result::Result;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use c64::C64;
 use loader::{Autostart, Image, Loader};
 use loader::autostart;
+use system::C64;
 
 struct PrgImage {
     data: Vec<u8>,

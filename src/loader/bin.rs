@@ -23,9 +23,9 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::result::Result;
 
-use c64::C64;
 use loader::{Image, Loader};
 use loader::autostart;
+use system::C64;
 
 struct BinImage {
     data: Vec<u8>,

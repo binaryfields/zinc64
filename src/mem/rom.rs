@@ -23,7 +23,7 @@ use std::io::Read;
 use std::path::Path;
 use std::result::Result;
 
-use super::Addressable;
+use util::Addressable;
 
 pub struct Rom {
     data: Vec<u8>,
@@ -36,10 +36,7 @@ impl Rom {
         let mut data = Vec::new();
         let mut file = fs::File::open(path)?;
         file.read_to_end(&mut data)?;
-        Ok(Rom {
-            data: data,
-            offset: offset,
-        })
+        Ok(Rom { data, offset })
     }
 }
 

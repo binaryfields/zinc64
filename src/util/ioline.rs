@@ -17,33 +17,37 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use mem::Addressable;
+use std::ops::Fn;
 
-pub struct ColorRam {
-    data: Vec<u8>,
+pub type Observer = Box<Fn(u8)>;
+
+pub struct IoLine {
+    value: u8,
+    observer: Option<Observer>,
 }
 
-impl ColorRam {
-    pub fn new(capacity: usize) -> ColorRam {
-        info!(target: "video", "Initializing Color RAM with capacity {}", capacity);
-        ColorRam {
-            data: vec![0x00; capacity],
+impl IoLine {
+    pub fn new(initial_value: u8) -> IoLine {
+        IoLine {
+            value: initial_value,
+            observer: None,
         }
     }
 
-    pub fn reset(&mut self) {
-        for i in 0..self.data.len() {
-            self.data[i] = 0x00;
+    #[inline(always)]
+    pub fn get_value(&self) -> u8 {
+        self.value
+    }
+
+    pub fn set_observer(&mut self, observer: Observer) {
+        self.observer = Some(observer);
+    }
+
+    #[inline(always)]
+    pub fn set_value(&mut self, value: u8) {
+        self.value = value;
+        if let Some(ref observer) = self.observer {
+            observer(self.value);
         }
-    }
-}
-
-impl Addressable for ColorRam {
-    fn read(&self, address: u16) -> u8 {
-        self.data[address as usize]
-    }
-
-    fn write(&mut self, address: u16, value: u8) {
-        self.data[address as usize] = value & 0x0f;
     }
 }

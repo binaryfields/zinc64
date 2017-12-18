@@ -23,13 +23,12 @@ use std::rc::Rc;
 use config::Config;
 use cpu::CpuIo;
 use cpu::interrupt;
+use mem::Ram;
 use log::LogLevel;
-use mem::{Addressable, Memory};
-use video::ColorRam;
-use util::{Dimension, Rect};
+use util::{Addressable, Dimension, Rect};
 use util::bit;
 
-use super::RenderTarget;
+use super::{RenderTarget, VicMemory};
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
@@ -226,9 +225,9 @@ impl Sprite {
 pub struct Vic {
     // Dependencies
     config: Config,
-    color_ram: Rc<RefCell<ColorRam>>,
+    color_ram: Rc<RefCell<Ram>>,
     cpu_io: Rc<RefCell<CpuIo>>,
-    mem: Rc<RefCell<Memory>>,
+    mem: Rc<RefCell<VicMemory>>,
     rt: Rc<RefCell<RenderTarget>>,
     // Configuration
     mode: Mode,
@@ -268,11 +267,12 @@ pub struct Vic {
 impl Vic {
     pub fn new(
         config: Config,
-        color_ram: Rc<RefCell<ColorRam>>,
+        color_ram: Rc<RefCell<Ram>>,
         cpu_io: Rc<RefCell<CpuIo>>,
-        mem: Rc<RefCell<Memory>>,
+        mem: Rc<RefCell<VicMemory>>,
         rt: Rc<RefCell<RenderTarget>>,
     ) -> Vic {
+        info!(target: "video", "Initializing VIC");
         let mut vic = Vic {
             config: config,
             color_ram: color_ram,
@@ -311,33 +311,8 @@ impl Vic {
         vic
     }
 
-    pub fn reset(&mut self) {
-        self.mode = Mode::Text;
-        self.den = true;
-        self.rsel = true;
-        self.csel = true;
-        self.scroll_x = 0;
-        self.scroll_y = 3;
-        self.int_data = 0;
-        self.int_mask = 0;
-        self.raster_compare = 0;
-        self.char_base = 4096;
-        self.video_matrix = 1024;
-        self.border_color = 0x0e;
-        self.background_color = [0x06, 0, 0, 0];
-        self.light_pen_pos = [0; 2];
-        for i in 0..8 {
-            self.sprites[i].reset();
-        }
-        self.sprite_multicolor = [0; 2];
-        self.raster = 0x0100;
-        self.cycle = 0;
-        self.vc_base = 0;
-        self.vc = 0;
-        self.rc = 0;
-    }
-
-    pub fn step(&mut self) {
+    #[inline(always)]
+    pub fn clock(&mut self) {
         // Process interrupts
         let rst_int = match self.cycle {
             0 if self.raster != 0 && self.raster == self.raster_compare => true,
@@ -411,6 +386,32 @@ impl Vic {
                 rt.set_sync(true);
             }
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.mode = Mode::Text;
+        self.den = true;
+        self.rsel = true;
+        self.csel = true;
+        self.scroll_x = 0;
+        self.scroll_y = 3;
+        self.int_data = 0;
+        self.int_mask = 0;
+        self.raster_compare = 0;
+        self.char_base = 4096;
+        self.video_matrix = 1024;
+        self.border_color = 0x0e;
+        self.background_color = [0x06, 0, 0, 0];
+        self.light_pen_pos = [0; 2];
+        for i in 0..8 {
+            self.sprites[i].reset();
+        }
+        self.sprite_multicolor = [0; 2];
+        self.raster = 0x0100;
+        self.cycle = 0;
+        self.vc_base = 0;
+        self.vc = 0;
+        self.rc = 0;
     }
 
     fn update_display_dims(&mut self) {
@@ -677,19 +678,19 @@ impl Vic {
     #[inline(always)]
     fn fetch_bitmap_color(&self, vc: u16) -> u8 {
         let address = self.video_matrix | vc;
-        self.mem.borrow().vic_read(address)
+        self.mem.borrow().read(address)
     }
 
     #[inline(always)]
     fn fetch_bitmap_pixels(&self, vc: u16, rc: u8) -> u8 {
         let address = self.char_base & 0x2000 | (vc << 3) | rc as u16;
-        self.mem.borrow().vic_read(address)
+        self.mem.borrow().read(address)
     }
 
     #[inline(always)]
     fn fetch_char_code(&self, vc: u16) -> u8 {
         let address = self.video_matrix | vc;
-        self.mem.borrow().vic_read(address)
+        self.mem.borrow().read(address)
     }
 
     #[inline(always)]
@@ -700,7 +701,7 @@ impl Vic {
     #[inline(always)]
     fn fetch_char_pixels(&self, ch: u8, rc: u8) -> u8 {
         let address = self.char_base | ((ch as u16) << 3) | rc as u16;
-        self.mem.borrow().vic_read(address)
+        self.mem.borrow().read(address)
     }
 
     #[inline(always)]
@@ -708,14 +709,14 @@ impl Vic {
         let mem = self.mem.borrow();
         for i in 0..8u16 {
             let address = self.video_matrix | 0x03f8 | i;
-            self.sprite_ptrs[i as usize] = (mem.vic_read(address) as u16) << 6;
+            self.sprite_ptrs[i as usize] = (mem.read(address) as u16) << 6;
         }
     }
 
     #[inline(always)]
     fn fetch_sprite_pixels(&self, n: usize, mc: u8) -> u8 {
         let address = self.sprite_ptrs[n] | (mc as u16);
-        self.mem.borrow().vic_read(address)
+        self.mem.borrow().read(address)
     }
 
     // -- Raster Queries

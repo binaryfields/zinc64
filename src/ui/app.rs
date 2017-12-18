@@ -22,7 +22,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use c64::C64;
 use sdl2;
 use sdl2::{EventPump, Sdl};
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
@@ -33,8 +32,10 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, Texture, TextureCreator};
 use sdl2::video::{FullscreenType, Window};
-use sound::SoundBuffer;
 use time;
+
+use sound::SoundBuffer;
+use system::C64;
 
 pub enum JamAction {
     Continue,
@@ -101,7 +102,7 @@ pub struct AppWindow {
     // Runtime State
     state: State,
     last_frame_ts: u64,
-    next_keyboard_event: u64,
+    next_keyboard_event: u32,
 }
 
 impl AppWindow {
@@ -182,7 +183,7 @@ impl AppWindow {
             )
             .unwrap();
         let mut events = self.sdl.event_pump().unwrap();
-        let mut overflow_cycles = 0;
+        let mut overflow_cycles = 0i32;
         'running: loop {
             match self.state {
                 State::Running => {

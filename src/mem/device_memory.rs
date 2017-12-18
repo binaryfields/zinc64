@@ -20,43 +20,43 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use io::{Cia, ExpansionPort};
+use io::Cia;
 use sound::Sid;
-use video::{ColorRam, Vic};
+use video::Vic;
+use util::Addressable;
 
-use super::Addressable;
+use super::ExpansionPort;
 
-pub struct DeviceIo {
+pub struct DeviceMemory {
     cia1: Rc<RefCell<Cia>>,
     cia2: Rc<RefCell<Cia>>,
-    color_ram: Rc<RefCell<ColorRam>>,
+    color_ram: Rc<RefCell<Addressable>>,
     expansion_port: Rc<RefCell<ExpansionPort>>,
     sid: Rc<RefCell<Sid>>,
     vic: Rc<RefCell<Vic>>,
 }
 
-impl DeviceIo {
+impl DeviceMemory {
     pub fn new(
         cia1: Rc<RefCell<Cia>>,
         cia2: Rc<RefCell<Cia>>,
-        color_ram: Rc<RefCell<ColorRam>>,
+        color_ram: Rc<RefCell<Addressable>>,
         expansion_port: Rc<RefCell<ExpansionPort>>,
         sid: Rc<RefCell<Sid>>,
         vic: Rc<RefCell<Vic>>,
-    ) -> DeviceIo {
-        info!(target: "mem", "Initializing Device I/O");
-        DeviceIo {
-            cia1: cia1,
-            cia2: cia2,
-            color_ram: color_ram,
-            expansion_port: expansion_port,
-            sid: sid,
-            vic: vic,
+    ) -> DeviceMemory {
+        DeviceMemory {
+            cia1,
+            cia2,
+            color_ram,
+            expansion_port,
+            sid,
+            vic,
         }
     }
 }
 
-impl Addressable for DeviceIo {
+impl Addressable for DeviceMemory {
     fn read(&self, address: u16) -> u8 {
         match address {
             0xd000...0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),

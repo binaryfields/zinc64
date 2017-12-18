@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+extern crate bit_field;
 extern crate byteorder;
 extern crate getopts;
 #[macro_use]
@@ -25,7 +26,6 @@ extern crate resid;
 extern crate sdl2;
 extern crate time;
 
-mod c64;
 mod config;
 mod cpu;
 mod device;
@@ -33,6 +33,7 @@ mod io;
 mod loader;
 mod mem;
 mod sound;
+mod system;
 mod ui;
 mod util;
 mod video;
@@ -42,9 +43,9 @@ use std::path::Path;
 use std::process;
 use std::result::Result;
 
-use c64::C64;
 use config::Config;
 use loader::{BinLoader, Loader, Loaders};
+use system::C64;
 use ui::app;
 use util::Logger;
 
@@ -202,7 +203,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         process_debug_options(&mut c64, &matches)?;
         process_autostart_options(&mut c64, &matches)?;
         if matches.opt_present("console") {
-            let mut overflow_cycles = 0;
+            let mut overflow_cycles = 0i32;
             loop {
                 overflow_cycles = c64.run_frame(overflow_cycles);
                 if c64.is_cpu_jam() {

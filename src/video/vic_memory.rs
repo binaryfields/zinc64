@@ -17,58 +17,44 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use util::Addressable;
 
-pub struct Ram {
-    data: Vec<u8>,
+pub struct VicMemory {
+    charset: Rc<RefCell<Addressable>>,
+    ram: Rc<RefCell<Addressable>>,
+    cia2_port_a: u8,
 }
 
-impl Ram {
-    pub fn new(capacity: usize) -> Ram {
-        info!(target: "mem", "Initializing RAM with capacity {}", capacity);
-        Ram {
-            data: vec![0x00; capacity],
+impl VicMemory {
+    pub fn new(charset: Rc<RefCell<Addressable>>, ram: Rc<RefCell<Addressable>>) -> VicMemory {
+        VicMemory {
+            charset,
+            ram,
+            cia2_port_a: 0,
         }
     }
 
-    pub fn reset(&mut self) {
-        for i in 0..self.data.len() {
-            self.data[i] = 0x00;
-        }
+    pub fn set_cia_port_a(&mut self, value: u8) {
+        self.cia2_port_a = value;
     }
 }
 
-impl Addressable for Ram {
+impl Addressable for VicMemory {
     fn read(&self, address: u16) -> u8 {
-        self.data[address as usize]
+        let full_address = ((!self.cia2_port_a & 0x03) as u16) << 14 | address;
+        let zone = (full_address & 0xf000) >> 12;
+        match zone {
+            0x01 => self.charset.borrow().read(full_address - 0x1000),
+            0x09 => self.charset.borrow().read(full_address - 0x9000),
+            _ => self.ram.borrow().read(full_address),
+        }
     }
 
+    #[allow(unused_variables)]
     fn write(&mut self, address: u16, value: u8) {
-        self.data[address as usize] = value
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mem::Addressable;
-
-    #[test]
-    fn new_with_capacity() {
-        let ram = Ram::new(0x10000);
-        assert_eq!(0x10000, ram.data.len());
-    }
-
-    #[test]
-    fn read_address() {
-        let ram = Ram::new(0x10000);
-        assert_eq!(0, ram.read(0xffff));
-    }
-
-    #[test]
-    fn write_address() {
-        let mut ram = Ram::new(0x10000);
-        ram.write(0x0001, 31);
-        assert_eq!(31, ram.read(0x0001));
+        panic!("writes by vic are not supported")
     }
 }

@@ -17,18 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+pub type Observer = Box<Fn(u8)>;
+
 pub struct IoPort {
     direction: u8,
     latch: u8,
     value: u8,
+    observer: Option<Observer>,
 }
 
 impl IoPort {
     pub fn new(direction: u8) -> IoPort {
         IoPort {
-            direction: direction,
+            direction,
             latch: 0,
             value: 0,
+            observer: None,
         }
     }
 
@@ -47,6 +51,13 @@ impl IoPort {
         self.direction = direction;
         // set input pins to 1
         self.value = self.latch | !self.direction;
+        if let Some(ref observer) = self.observer {
+            observer(self.value);
+        }
+    }
+
+    pub fn set_observer(&mut self, observer: Observer) {
+        self.observer = Some(observer);
     }
 
     #[inline(always)]
@@ -54,9 +65,11 @@ impl IoPort {
         self.latch = value;
         // set input pins to 1
         self.value = self.latch | !self.direction;
+        if let Some(ref observer) = self.observer {
+            observer(self.value);
+        }
     }
 
-    #[inline(always)]
     pub fn reset(&mut self) {
         self.direction = 0x00;
         self.latch = 0x00;

@@ -17,18 +17,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+mod addressable;
 pub mod bcd;
 pub mod bit;
 mod interrupt;
+mod ioline;
 mod ioport;
 mod logger;
 mod pin;
 mod pulse;
 mod rect;
+mod rtc;
 
+pub use self::addressable::Addressable;
 pub use self::interrupt::InterruptControl;
+pub use self::ioline::IoLine;
 pub use self::ioport::IoPort;
 pub use self::logger::Logger;
 pub use self::pin::Pin;
 pub use self::pulse::Pulse;
 pub use self::rect::{Dimension, Rect};
+pub use self::rtc::Rtc;

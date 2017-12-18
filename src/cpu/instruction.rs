@@ -99,6 +99,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
+    #[inline(always)]
     pub fn decode(cpu: &mut Cpu, opcode: u8) -> Instruction {
         match opcode {
             // BRK

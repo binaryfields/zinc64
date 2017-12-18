@@ -21,8 +21,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use mem::{Addressable, Memory};
 use log::LogLevel;
+use util::{Addressable, IoLine};
 use util::bit;
 
 use super::instruction::Instruction;
@@ -42,36 +42,27 @@ use super::interrupt::Interrupt;
 // TODO cpu: switch to clock accurate emulation
 
 pub struct CpuIo {
-    pub loram: bool,
-    pub hiram: bool,
-    pub charen: bool,
     pub cassette_switch: bool,
-    pub cassette_motor: bool,
     pub irq: Interrupt,
     pub nmi: Interrupt,
+    pub port: IoLine,
 }
 
 impl CpuIo {
     pub fn new() -> CpuIo {
         CpuIo {
-            loram: false,
-            hiram: false,
-            charen: false,
             cassette_switch: true,
-            cassette_motor: true,
             irq: Interrupt::new(interrupt::Type::Irq),
             nmi: Interrupt::new(interrupt::Type::Nmi),
+            port: IoLine::new(0xff),
         }
     }
 
     pub fn reset(&mut self) {
-        self.loram = true;
-        self.hiram = true;
-        self.charen = true;
         self.cassette_switch = true;
-        self.cassette_motor = true;
         self.irq.reset();
         self.nmi.reset();
+        self.port.set_value(0xff);
     }
 }
 
@@ -88,7 +79,7 @@ pub enum Flag {
 
 pub struct Cpu {
     // Dependencies
-    mem: Rc<RefCell<Memory>>,
+    mem: Rc<RefCell<Addressable>>,
     // Registers
     pc: u16,
     a: u8,
@@ -101,9 +92,9 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new(cpu_io: Rc<RefCell<CpuIo>>, mem: Rc<RefCell<Memory>>) -> Cpu {
+    pub fn new(cpu_io: Rc<RefCell<CpuIo>>, mem: Rc<RefCell<Addressable>>) -> Cpu {
         Cpu {
-            mem: mem,
+            mem,
             pc: 0,
             a: 0,
             x: 0,
@@ -114,43 +105,65 @@ impl Cpu {
         }
     }
 
+    #[inline(always)]
     pub fn get_a(&self) -> u8 {
         self.a
     }
 
+    #[inline(always)]
     pub fn get_pc(&self) -> u16 {
         self.pc
     }
 
     #[allow(dead_code)]
+    #[inline(always)]
     pub fn get_x(&self) -> u8 {
         self.x
     }
 
     #[allow(dead_code)]
+    #[inline(always)]
     pub fn get_y(&self) -> u8 {
         self.y
     }
 
+    #[inline(always)]
     pub fn set_a(&mut self, value: u8) {
         self.a = value;
     }
 
+    #[inline(always)]
     pub fn set_pc(&mut self, value: u16) {
         self.pc = value;
     }
 
     #[allow(dead_code)]
+    #[inline(always)]
     pub fn set_x(&mut self, value: u8) {
         self.x = value;
     }
 
     #[allow(dead_code)]
+    #[inline(always)]
     pub fn set_y(&mut self, value: u8) {
         self.y = value;
     }
 
-    pub fn execute(&mut self) -> u8 {
+    pub fn reset(&mut self) {
+        self.pc = 0;
+        self.a = 0;
+        self.x = 0;
+        self.y = 0;
+        self.sp = 0;
+        self.p = 0;
+        self.io.borrow_mut().reset();
+        self.write(0x0000, 0x2f);
+        self.write(0x0001, 31);
+        self.interrupt(interrupt::Type::Reset);
+    }
+
+    #[inline(always)]
+    pub fn step(&mut self) -> u32 {
         if self.io.borrow().nmi.is_low() {
             self.interrupt(interrupt::Type::Nmi);
         } else if self.io.borrow().irq.is_low() && !self.test_flag(Flag::IntDisable) {
@@ -166,7 +179,8 @@ impl Cpu {
         self.execute_instruction(&op)
     }
 
-    fn execute_instruction(&mut self, instr: &Instruction) -> u8 {
+    #[inline(always)]
+    fn execute_instruction(&mut self, instr: &Instruction) -> u32 {
         match *instr {
             // -- Data Movement
             Instruction::LDA(ref op, cycles) => {
@@ -551,26 +565,6 @@ impl Cpu {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.pc = 0;
-        self.a = 0;
-        self.x = 0;
-        self.y = 0;
-        self.sp = 0;
-        self.p = 0;
-        self.io.borrow_mut().reset();
-        self.write(0x0000, 0x2f);
-        self.write(0x0001, 31);
-        self.interrupt(interrupt::Type::Reset);
-    }
-
-    #[inline(always)]
-    fn tick(&self, elapsed: u8) -> u8 {
-        elapsed
-    }
-
-    // -- Flag Ops
-
     #[inline(always)]
     fn clear_flag(&mut self, flag: Flag) {
         self.p &= !(flag as u8);
@@ -587,6 +581,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    fn tick(&self, elapsed: u8) -> u32 {
+        elapsed as u32
+    }
+
+    #[inline(always)]
     fn update_f(&mut self, flag: Flag, value: bool) {
         if value {
             self.set_flag(flag);
@@ -595,6 +594,7 @@ impl Cpu {
         }
     }
 
+    #[inline(always)]
     fn update_nz(&mut self, value: u8) {
         if value & 0x80 != 0 {
             self.set_flag(Flag::Negative);
@@ -659,13 +659,8 @@ impl Cpu {
     pub fn read(&self, address: u16) -> u8 {
         match address {
             0x0001 => {
-                let io = self.io.borrow();
-                let loram = bit::value(0, io.loram);
-                let hiram = bit::value(1, io.hiram);
-                let charen = bit::value(2, io.charen);
-                let cassette_switch = bit::value(4, io.cassette_switch);
-                let cassette_motor = bit::value(5, io.cassette_motor);
-                loram | hiram | charen | cassette_switch | cassette_motor
+                let cassette_switch = bit::value(4, self.io.borrow().cassette_switch);
+                (self.io.borrow().port.get_value() & 0x27) | cassette_switch
             }
             _ => self.mem.borrow().read(address),
         }
@@ -680,14 +675,7 @@ impl Cpu {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0001 => {
-                {
-                    let mut io = self.io.borrow_mut();
-                    io.loram = bit::test(value, 0);
-                    io.hiram = bit::test(value, 1);
-                    io.charen = bit::test(value, 2);
-                    io.cassette_motor = bit::test(value, 5);
-                }
-                self.mem.borrow_mut().switch_banks();
+                self.io.borrow_mut().port.set_value(value);
                 self.mem.borrow_mut().write(address, value);
             }
             _ => self.mem.borrow_mut().write(address, value),

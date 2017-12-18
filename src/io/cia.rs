@@ -28,10 +28,10 @@ use log::LogLevel;
 use util::{InterruptControl, IoPort, Pin};
 use util::bcd;
 use util::bit;
+use util::Rtc;
 
 use super::timer;
 use super::timer::Timer;
-use super::rtc::Rtc;
 
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
@@ -132,7 +132,7 @@ pub struct Cia {
     // Interrupts
     int_control: InterruptControl,
     int_triggered: bool,
-    // I/O Lines
+    // I/O
     cia_io: Rc<RefCell<CiaIo>>,
 }
 
@@ -146,11 +146,11 @@ impl Cia {
         keyboard: Rc<RefCell<Keyboard>>,
     ) -> Cia {
         Cia {
-            mode: mode,
-            cpu_io: cpu_io,
-            joystick1: joystick1,
-            joystick2: joystick2,
-            keyboard: keyboard,
+            mode,
+            cpu_io,
+            joystick1,
+            joystick2,
+            keyboard,
             port_a: IoPort::new(0x00),
             port_b: IoPort::new(0x00),
             timer_a: Timer::new(),
@@ -160,30 +160,16 @@ impl Cia {
             tod_set_alarm: false,
             int_control: InterruptControl::new(),
             int_triggered: false,
-            cia_io: cia_io,
+            cia_io,
         }
     }
 
-    pub fn reset(&mut self) {
-        /*
-        A low on the RES pin resets all internal registers.The
-        port pins are set as inputs and port registers to zero
-        (although a read of the ports will return all highs
-        because of passive pullups).The timer control registers
-        are set to zero and the timer latches to all ones. All other
-        registers are reset to zero.
-        */
-        self.port_a.reset();
-        self.port_b.reset();
-        self.timer_a.reset();
-        self.timer_b.reset();
-        self.tod_set_alarm = false;
-        self.int_control.reset();
-        self.int_triggered = false;
-        self.cia_io.borrow_mut().reset();
+    pub fn get_port_a_mut(&mut self) -> &mut IoPort {
+        &mut self.port_a
     }
 
-    pub fn step(&mut self) {
+    #[inline(always)]
+    pub fn clock(&mut self) {
         // Process timers
         let timer_a_output = if self.timer_a.enabled {
             let pulse = match self.timer_a.input {
@@ -245,6 +231,25 @@ impl Cia {
         }
     }
 
+    pub fn reset(&mut self) {
+        /*
+        A low on the RES pin resets all internal registers.The
+        port pins are set as inputs and port registers to zero
+        (although a read of the ports will return all highs
+        because of passive pullups).The timer control registers
+        are set to zero and the timer latches to all ones. All other
+        registers are reset to zero.
+        */
+        self.port_a.reset();
+        self.port_b.reset();
+        self.timer_a.reset();
+        self.timer_b.reset();
+        self.tod_set_alarm = false;
+        self.int_control.reset();
+        self.int_triggered = false;
+        self.cia_io.borrow_mut().reset();
+    }
+
     pub fn tod_tick(&mut self) {
         self.tod_clock.tick();
         if self.tod_clock == self.tod_alarm {
@@ -254,8 +259,6 @@ impl Cia {
             }
         }
     }
-
-    // -- Internal Ops
 
     fn read_cia1_port_a(&self) -> u8 {
         let joystick = self.scan_joystick(&self.joystick2);
@@ -422,25 +425,25 @@ impl Cia {
                 self.port_b.set_direction(value);
             }
             Reg::TALO => {
-                let value = (self.timer_a.latch & 0xff00) | (value as u16);
-                self.timer_a.latch = value;
+                let result = (self.timer_a.latch & 0xff00) | (value as u16);
+                self.timer_a.latch = result;
             }
             Reg::TAHI => {
-                let value = (self.timer_a.latch & 0x00ff) | ((value as u16) << 8);
-                self.timer_a.latch = value;
+                let result = ((value as u16) << 8) | (self.timer_a.latch & 0x00ff);
+                self.timer_a.latch = result;
                 if !self.timer_a.enabled {
-                    self.timer_a.value = value;
+                    self.timer_a.value = result;
                 }
             }
             Reg::TBLO => {
-                let value = (self.timer_b.latch & 0xff00) | (value as u16);
-                self.timer_b.latch = value;
+                let result = (self.timer_b.latch & 0xff00) | (value as u16);
+                self.timer_b.latch = result;
             }
             Reg::TBHI => {
-                let value = (self.timer_b.latch & 0x00ff) | ((value as u16) << 8);
-                self.timer_b.latch = value;
+                let result = ((value as u16) << 8) | (self.timer_b.latch & 0x00ff);
+                self.timer_b.latch = result;
                 if !self.timer_b.enabled {
-                    self.timer_b.value = value;
+                    self.timer_b.value = result;
                 }
             }
             Reg::TODTS => {

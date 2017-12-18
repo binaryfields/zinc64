@@ -70,6 +70,21 @@ impl Timer {
         self.value = 0x0000;
     }
 
+    #[inline(always)]
+    pub fn update(&mut self, pulse: u16) -> bool {
+        if self.enabled {
+            if self.value == 0 {
+                self.reload();
+                true
+            } else {
+                self.value -= pulse;
+                false
+            }
+        } else {
+            false
+        }
+    }
+
     fn reload(&mut self) {
         /*
         A control bit selects either timer mode. In one-shot
@@ -87,20 +102,6 @@ impl Timer {
                 self.value = self.latch;
                 self.enabled = false;
             }
-        }
-    }
-
-    pub fn update(&mut self, pulse: u16) -> bool {
-        if self.enabled {
-            if self.value == 0 {
-                self.reload();
-                true
-            } else {
-                self.value -= pulse;
-                false
-            }
-        } else {
-            false
         }
     }
 }

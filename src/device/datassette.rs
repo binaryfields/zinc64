@@ -20,6 +20,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bit_field::BitField;
+
 use cpu::CpuIo;
 use io::CiaIo;
 use util::Pulse;
@@ -41,8 +43,8 @@ pub struct Datassette {
 impl Datassette {
     pub fn new(cia_io: Rc<RefCell<CiaIo>>, cpu_io: Rc<RefCell<CpuIo>>) -> Datassette {
         Datassette {
-            cia_io: cia_io,
-            cpu_io: cpu_io,
+            cia_io,
+            cpu_io,
             playing: false,
             tape: None,
             current_pulse: Pulse::new(0, DUTY_CYCLE),
@@ -53,33 +55,8 @@ impl Datassette {
         self.tape = Some(tape);
     }
 
-    pub fn detach(&mut self) {
-        self.stop();
-        self.tape = None;
-    }
-
-    pub fn is_playing(&self) -> bool {
-        self.playing & !self.cpu_io.borrow().cassette_motor
-    }
-
-    pub fn play(&mut self) {
-        info!(target: "device", "Starting datassette");
-        if self.tape.is_some() {
-            self.cpu_io.borrow_mut().cassette_switch = false;
-            self.playing = true;
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.cpu_io.borrow_mut().cassette_switch = true;
-        self.playing = false;
-        self.current_pulse = Pulse::new(0, DUTY_CYCLE);
-        if let Some(ref mut tape) = self.tape {
-            tape.seek(0);
-        }
-    }
-
-    pub fn step(&mut self) {
+    #[inline(always)]
+    pub fn clock(&mut self) {
         if self.is_playing() && self.tape.is_some() {
             if self.current_pulse.is_done() {
                 let pulse_maybe = if let Some(ref mut tape) = self.tape {
@@ -99,6 +76,32 @@ impl Datassette {
                     .flag
                     .set_active(self.current_pulse.advance());
             }
+        }
+    }
+
+    pub fn detach(&mut self) {
+        self.stop();
+        self.tape = None;
+    }
+
+    pub fn is_playing(&self) -> bool {
+        self.playing & !self.cpu_io.borrow().port.get_value().get_bit(5)
+    }
+
+    pub fn play(&mut self) {
+        info!(target: "device", "Starting datassette");
+        if self.tape.is_some() {
+            self.cpu_io.borrow_mut().cassette_switch = false;
+            self.playing = true;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.cpu_io.borrow_mut().cassette_switch = true;
+        self.playing = false;
+        self.current_pulse = Pulse::new(0, DUTY_CYCLE);
+        if let Some(ref mut tape) = self.tape {
+            tape.seek(0);
         }
     }
 
