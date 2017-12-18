@@ -34,8 +34,8 @@ use sdl2::render::{Canvas, Texture, TextureCreator};
 use sdl2::video::{FullscreenType, Window};
 use time;
 
-use sound::SoundBuffer;
-use system::C64;
+use zinc64::sound::SoundBuffer;
+use zinc64::system::C64;
 
 pub enum JamAction {
     Continue,

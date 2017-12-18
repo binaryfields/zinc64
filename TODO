@@ -1,10 +1,9 @@
 # TODO
 
 cli module
-config module
-lib module
 add deviceio
 
+remove sdl2 from lib
 cpu
 cia
 vic

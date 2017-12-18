@@ -17,37 +17,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-extern crate bit_field;
-extern crate byteorder;
 extern crate getopts;
 #[macro_use]
 extern crate log;
-extern crate resid;
 extern crate sdl2;
 extern crate time;
+extern crate zinc64;
 
-mod config;
-mod cpu;
-mod device;
-mod io;
-mod loader;
-mod mem;
-mod sound;
-mod system;
 mod ui;
-mod util;
-mod video;
 
 use std::env;
 use std::path::Path;
 use std::process;
 use std::result::Result;
 
-use config::Config;
-use loader::{BinLoader, Loader, Loaders};
-use system::C64;
+use zinc64::config::Config;
+use zinc64::device;
+use zinc64::loader::{BinLoader, Loader, Loaders};
+use zinc64::system::C64;
+use zinc64::util::Logger;
+
 use ui::app;
-use util::Logger;
 
 static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
