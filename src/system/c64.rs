@@ -71,11 +71,10 @@ pub struct C64 {
     speed: u8,
     warp_mode: bool,
     // Runtime State
-    cycles: u32,
+    clk: Rc<Cell<u32>>,
     frames: u32,
     last_pc: u16,
     next_frame_ns: u64,
-    clk: Rc<Cell<u32>>,
 }
 
 impl C64 {
@@ -209,11 +208,10 @@ impl C64 {
             breakpoints: Vec::new(),
             speed: 100,
             warp_mode: false,
-            cycles: 0,
+            clk: Rc::new(Cell::new(0u32)),
             frames: 0,
             last_pc: 0,
             next_frame_ns: 0,
-            clk: Rc::new(Cell::new(0u32)),
         })
     }
 
@@ -226,7 +224,7 @@ impl C64 {
     }
 
     pub fn get_cycles(&self) -> u32 {
-        self.cycles
+        self.clk.get()
     }
 
     pub fn get_datasette(&self) -> Rc<RefCell<Datassette>> {
@@ -323,7 +321,7 @@ impl C64 {
         self.rt.borrow_mut().reset();
         self.sound_buffer.lock().unwrap().clear();
         // Runtime State
-        self.cycles = 0;
+        self.clk.set(0);
         self.frames = 0;
         self.last_pc = 0;
         self.next_frame_ns = 0;
@@ -343,13 +341,12 @@ impl C64 {
             cia2_clone.borrow_mut().clock();
             datassette_clone.borrow_mut().clock();
             let clk = clk_clone.get();
-            clk_clone.set(clk + 1);
+            clk_clone.set(clk.wrapping_add(1));
         });
         while delta > 0 {
             let prev_clk = self.clk.get();
-            let cycles = self.step(&tick_fn);
-            let clk = self.clk.get();
-            assert_eq!(clk - prev_clk, cycles);
+            self.step(&tick_fn);
+            let cycles = self.clk.get() - prev_clk;
             elapsed += cycles;
             delta -= cycles as i32;
         }
@@ -366,15 +363,9 @@ impl C64 {
     }
 
     #[inline(always)]
-    fn step(&mut self, tick_fn: &TickFn) -> u32 {
+    fn step(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.borrow().get_pc();
-        let delta = self.cpu.borrow_mut().step(&tick_fn);
-        /* for _i in 0..delta {
-            self.vic.borrow_mut().clock();
-            self.cia1.borrow_mut().clock();
-            self.cia2.borrow_mut().clock();
-            self.datassette.borrow_mut().clock();
-        } */
+        self.cpu.borrow_mut().step(&tick_fn);
         if self.autostart.is_some() {
             if self.cpu.borrow().get_pc() == 0xa65c {
                 // magic value
@@ -383,8 +374,6 @@ impl C64 {
                 }
             }
         }
-        self.cycles = self.cycles.wrapping_add(delta);
-        delta
     }
 
     fn sync_frame(&mut self) {

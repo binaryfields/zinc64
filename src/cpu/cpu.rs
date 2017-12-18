@@ -173,14 +173,12 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn step(&mut self, tick_fn: &TickFn) -> u32 {
-        let int_cycles = if self.io.borrow().nmi.is_low() {
-            self.interrupt(interrupt::Type::Nmi, tick_fn)
+    pub fn step(&mut self, tick_fn: &TickFn)  {
+        if self.io.borrow().nmi.is_low() {
+            self.interrupt(interrupt::Type::Nmi, tick_fn);
         } else if self.io.borrow().irq.is_low() && !self.test_flag(Flag::IntDisable) {
-            self.interrupt(interrupt::Type::Irq, tick_fn)
-        } else {
-            0
-        };
+            self.interrupt(interrupt::Type::Irq, tick_fn);
+        }
         let pc = self.pc;
         let opcode = self.fetch_byte(tick_fn);
         let instr = Instruction::decode(self, opcode, tick_fn);
@@ -188,118 +186,102 @@ impl Cpu {
             let op_value = format!("{}", instr);
             trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
         }
-        self.execute(&instr, tick_fn) + int_cycles as u32
+        self.execute(&instr, tick_fn);
     }
 
     #[inline(always)]
-    fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) -> u32 {
-        let cycles = match *instr {
+    fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn)  {
+        match *instr {
             //  Data Movement
-            Instruction::LDA(ref op, cycles) => {
+            Instruction::LDA(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.a = value;
-                self.tick(cycles)
             }
-            Instruction::LDX(ref op, cycles) => {
+            Instruction::LDX(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.x = value;
-                self.tick(cycles)
             }
-            Instruction::LDY(ref op, cycles) => {
+            Instruction::LDY(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.y = value;
-                self.tick(cycles)
             }
-            Instruction::PHA(cycles) => {
+            Instruction::PHA(_) => {
                 let value = self.a;
                 self.push(value, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::PHP(cycles) => {
+            Instruction::PHP(_) => {
                 // NOTE undocumented behavior
                 let value = self.p | (Flag::Break as u8) | (Flag::Reserved as u8);
                 self.push(value, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::PLA(cycles) => {
+            Instruction::PLA(_) => {
                 let value = self.pop(tick_fn);
                 self.update_nz(value);
                 self.a = value;
                 tick_fn();
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::PLP(cycles) => {
+            Instruction::PLP(_) => {
                 let value = self.pop(tick_fn);
                 self.p = value;
                 tick_fn();
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::STA(ref op, cycles) => {
+            Instruction::STA(ref op, _) => {
                 let value = self.a;
                 op.set(self, value, true, tick_fn);
-                self.tick(cycles)
             }
-            Instruction::STX(ref op, cycles) => {
+            Instruction::STX(ref op, _) => {
                 let value = self.x;
                 op.set(self, value, true, tick_fn);
-                self.tick(cycles)
             }
-            Instruction::STY(ref op, cycles) => {
+            Instruction::STY(ref op, _) => {
                 let value = self.y;
                 op.set(self, value, true, tick_fn);
-                self.tick(cycles)
             }
-            Instruction::TAX(cycles) => {
+            Instruction::TAX(_) => {
                 let value = self.a;
                 self.update_nz(value);
                 self.x = value;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::TAY(cycles) => {
+            Instruction::TAY(_) => {
                 let value = self.a;
                 self.update_nz(value);
                 self.y = value;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::TSX(cycles) => {
+            Instruction::TSX(_) => {
                 let value = self.sp;
                 self.update_nz(value);
                 self.x = value;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::TXA(cycles) => {
+            Instruction::TXA(_) => {
                 let value = self.x;
                 self.update_nz(value);
                 self.a = value;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::TXS(cycles) => {
+            Instruction::TXS(_) => {
                 let value = self.x;
                 // NOTE do not set nz
                 self.sp = value;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::TYA(cycles) => {
+            Instruction::TYA(_) => {
                 let value = self.y;
                 self.update_nz(value);
                 self.a = value;
                 tick_fn();
-                self.tick(cycles)
             }
             // Arithmetic
-            Instruction::ADC(ref op, cycles) => {
+            Instruction::ADC(ref op, _) => {
                 let ac = self.a as u16;
                 let value = op.get(self, tick_fn) as u16;
                 let carry = if self.test_flag(Flag::Carry) { 1 } else { 0 };
@@ -324,9 +306,8 @@ impl Cpu {
                 let result = (temp & 0xff) as u8;
                 self.update_nz(result);
                 self.a = result;
-                self.tick(cycles)
             }
-            Instruction::SBC(ref op, cycles) => {
+            Instruction::SBC(ref op, _) => {
                 let ac = self.a as u16;
                 let value = op.get(self, tick_fn) as u16;
                 let carry = if self.test_flag(Flag::Carry) { 0 } else { 1 };
@@ -353,107 +334,92 @@ impl Cpu {
                 let result = (temp & 0xff) as u8;
                 self.update_nz(result);
                 self.a = result;
-                self.tick(cycles)
             }
-            Instruction::CMP(ref op, cycles) => {
+            Instruction::CMP(ref op, _) => {
                 let result = (self.a as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
-                self.tick(cycles)
             }
-            Instruction::CPX(ref op, cycles) => {
+            Instruction::CPX(ref op, _) => {
                 let result = (self.x as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
-                self.tick(cycles)
             }
-            Instruction::CPY(ref op, cycles) => {
+            Instruction::CPY(ref op, _) => {
                 let result = (self.y as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
-                self.tick(cycles)
             }
-            Instruction::DEC(ref op, cycles) => {
+            Instruction::DEC(ref op, _) => {
                 let result = op.get(self, tick_fn).wrapping_sub(1);
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::DEX(cycles) => {
+            Instruction::DEX(_) => {
                 let result = self.x.wrapping_sub(1);
                 self.update_nz(result);
                 self.x = result;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::DEY(cycles) => {
+            Instruction::DEY(_) => {
                 let result = self.y.wrapping_sub(1);
                 self.update_nz(result);
                 self.y = result;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::INC(ref op, cycles) => {
+            Instruction::INC(ref op, _) => {
                 let result = op.get(self, tick_fn).wrapping_add(1);
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::INX(cycles) => {
+            Instruction::INX(_) => {
                 let result = self.x.wrapping_add(1);
                 self.update_nz(result);
                 self.x = result;
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::INY(cycles) => {
+            Instruction::INY(_) => {
                 let result = self.y.wrapping_add(1);
                 self.update_nz(result);
                 self.y = result;
                 tick_fn();
-                self.tick(cycles)
             }
             // Logical
-            Instruction::AND(ref op, cycles) => {
+            Instruction::AND(ref op, _) => {
                 let result = op.get(self, tick_fn) & self.a;
                 self.update_nz(result);
                 self.a = result;
-                self.tick(cycles)
             }
-            Instruction::EOR(ref op, cycles) => {
+            Instruction::EOR(ref op, _) => {
                 let result = op.get(self, tick_fn) ^ self.a;
                 self.update_nz(result);
                 self.a = result;
-                self.tick(cycles)
             }
-            Instruction::ORA(ref op, cycles) => {
+            Instruction::ORA(ref op, _) => {
                 let result = op.get(self, tick_fn) | self.a;
                 self.update_nz(result);
                 self.a = result;
-                self.tick(cycles)
             }
             // Shift and Rotate
-            Instruction::ASL(ref op, cycles) => {
+            Instruction::ASL(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 self.set_flag(Flag::Carry, (value & 0x80) != 0);
                 let result = value << 1;
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::LSR(ref op, cycles) => {
+            Instruction::LSR(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 self.set_flag(Flag::Carry, (value & 0x01) != 0);
                 let result = value >> 1;
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::ROL(ref op, cycles) => {
+            Instruction::ROL(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 let mut temp = (value as u16) << 1;
                 if self.test_flag(Flag::Carry) {
@@ -464,9 +430,8 @@ impl Cpu {
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::ROR(ref op, cycles) => {
+            Instruction::ROR(ref op, _) => {
                 let value = op.get(self, tick_fn) as u16;
                 let mut temp = if self.test_flag(Flag::Carry) {
                     value | 0x100
@@ -479,138 +444,114 @@ impl Cpu {
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
             // Control Flow
-            Instruction::BCC(ref op, cycles) => {
+            Instruction::BCC(ref op, _) => {
                 if !self.test_flag(Flag::Carry) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BCS(ref op, cycles) => {
+            Instruction::BCS(ref op, _) => {
                 if self.test_flag(Flag::Carry) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BEQ(ref op, cycles) => {
+            Instruction::BEQ(ref op, _) => {
                 if self.test_flag(Flag::Zero) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BMI(ref op, cycles) => {
+            Instruction::BMI(ref op, _) => {
                 if self.test_flag(Flag::Negative) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BNE(ref op, cycles) => {
+            Instruction::BNE(ref op, _) => {
                 if !self.test_flag(Flag::Zero) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BPL(ref op, cycles) => {
+            Instruction::BPL(ref op, _) => {
                 if !self.test_flag(Flag::Negative) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BVC(ref op, cycles) => {
+            Instruction::BVC(ref op, _) => {
                 if !self.test_flag(Flag::Overflow) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::BVS(ref op, cycles) => {
+            Instruction::BVS(ref op, _) => {
                 if self.test_flag(Flag::Overflow) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
-                self.tick(cycles)
             }
-            Instruction::JMP(ref op, cycles) => {
+            Instruction::JMP(ref op, _) => {
                 self.pc = op.ea(self, false, tick_fn);
-                self.tick(cycles)
             }
-            Instruction::JSR(ref op, cycles) => {
+            Instruction::JSR(ref op, _) => {
                 let pc = self.pc.wrapping_sub(1);
                 self.push(((pc >> 8) & 0xff) as u8, tick_fn);
                 self.push((pc & 0xff) as u8, tick_fn);
                 self.pc = op.ea(self, false, tick_fn);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::RTS(cycles) => {
+            Instruction::RTS(_) => {
                 let address = (self.pop(tick_fn) as u16) | ((self.pop(tick_fn) as u16) << 8);
                 self.pc = address.wrapping_add(1);
                 tick_fn();
                 tick_fn();
                 tick_fn();
-                self.tick(cycles)
             }
             // Misc
-            Instruction::BIT(ref op, cycles) => {
+            Instruction::BIT(ref op, _) => {
                 let value = op.get(self, tick_fn);
                 let a = self.a;
                 self.set_flag(Flag::Negative, value & 0x80 != 0);
                 self.set_flag(Flag::Overflow, 0x40 & value != 0);
                 self.set_flag(Flag::Zero, value & a == 0);
-                self.tick(cycles)
             }
-            Instruction::BRK(cycles) => {
+            Instruction::BRK(_) => {
                 self.interrupt(interrupt::Type::Break, tick_fn);
-                self.tick(cycles)
             }
-            Instruction::CLC(cycles) => {
+            Instruction::CLC(_) => {
                 self.set_flag(Flag::Carry, false);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::CLD(cycles) => {
+            Instruction::CLD(_) => {
                 self.set_flag(Flag::Decimal, false);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::CLI(cycles) => {
+            Instruction::CLI(_) => {
                 self.set_flag(Flag::IntDisable, false);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::CLV(cycles) => {
+            Instruction::CLV(_) => {
                 self.set_flag(Flag::Overflow, false);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::NOP(cycles) => {
+            Instruction::NOP(_) => {
                 tick_fn();
-                self.tick(cycles)
             },
-            Instruction::SEC(cycles) => {
+            Instruction::SEC(_) => {
                 self.set_flag(Flag::Carry, true);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::SED(cycles) => {
+            Instruction::SED(_) => {
                 self.set_flag(Flag::Decimal, true);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::SEI(cycles) => {
+            Instruction::SEI(_) => {
                 self.set_flag(Flag::IntDisable, true);
                 tick_fn();
-                self.tick(cycles)
             }
-            Instruction::RTI(cycles) => {
+            Instruction::RTI(_) => {
                 self.p = self.pop(tick_fn);
                 self.pc = (self.pop(tick_fn) as u16) | ((self.pop(tick_fn) as u16) << 8);
                 tick_fn();
                 tick_fn();
-                self.tick(cycles)
             }
         };
-        cycles
     }
 
     #[inline(always)]
@@ -677,11 +618,6 @@ impl Cpu {
     #[inline(always)]
     fn test_flag(&self, flag: Flag) -> bool {
         (self.p & (flag as u8)) != 0
-    }
-
-    #[inline(always)]
-    fn tick(&self, elapsed: u8) -> u32 {
-        elapsed as u32
     }
 
     #[inline(always)]

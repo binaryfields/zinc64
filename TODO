@@ -1,7 +1,6 @@
 # TODO
 
-remove sdl2 from lib
-
+remove sdl2 from libs
 cli module
 add deviceio
 vic
