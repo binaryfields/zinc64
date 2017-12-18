@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::io;
 use std::rc::Rc;
@@ -75,6 +75,7 @@ pub struct C64 {
     frames: u32,
     last_pc: u16,
     next_frame_ns: u64,
+    clk: Rc<Cell<u32>>,
 }
 
 impl C64 {
@@ -212,6 +213,7 @@ impl C64 {
             frames: 0,
             last_pc: 0,
             next_frame_ns: 0,
+            clk: Rc::new(Cell::new(0u32)),
         })
     }
 
@@ -334,14 +336,20 @@ impl C64 {
         let cia1_clone = self.cia1.clone();
         let cia2_clone = self.cia2.clone();
         let datassette_clone = self.datassette.clone();
+        let clk_clone = self.clk.clone();
         let tick_fn: TickFn = Box::new(move || {
             vic_clone.borrow_mut().clock();
             cia1_clone.borrow_mut().clock();
             cia2_clone.borrow_mut().clock();
             datassette_clone.borrow_mut().clock();
+            let clk = clk_clone.get();
+            clk_clone.set(clk + 1);
         });
         while delta > 0 {
+            let prev_clk = self.clk.get();
             let cycles = self.step(&tick_fn);
+            let clk = self.clk.get();
+            assert_eq!(clk - prev_clk, cycles);
             elapsed += cycles;
             delta -= cycles as i32;
         }

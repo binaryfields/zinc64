@@ -23,6 +23,7 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::result::Result;
 
+use cpu::TickFn;
 use loader::{Image, Loader};
 use loader::autostart;
 use system::C64;
@@ -36,7 +37,8 @@ impl Image for BinImage {
     fn mount(&mut self, c64: &mut C64) {
         info!(target: "loader", "Mounting BIN image");
         let cpu = c64.get_cpu();
-        cpu.borrow_mut().write(0x0001, 0);
+        let tick_fn: TickFn = Box::new(move || {});
+        cpu.borrow_mut().write(0x0001, 0, &tick_fn);
         c64.load(&self.data, self.offset);
         cpu.borrow_mut().set_pc(self.offset);
     }

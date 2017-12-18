@@ -1,6 +1,6 @@
 [package]
 name = "zinc64"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 readme = "README.md"
 keywords = ["c64", "commodore", "emulator"]

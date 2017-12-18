@@ -19,7 +19,7 @@
 
 use std::fmt;
 
-use super::Cpu;
+use super::{Cpu, TickFn};
 
 // Spec: INSTRUCTION ADDRESSING MODES AND RELATED EXECUTION TIMES (p. 255)
 // Design:
@@ -43,51 +43,85 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn ea(&self, cpu: &Cpu) -> u16 {
+    pub fn ea(&self, cpu: &Cpu, rmw: bool, tick_fn: &TickFn) -> u16 {
         match *self {
             Operand::Accumulator => panic!("Illegal op for addressing mode {}", "accumulator"),
             Operand::Immediate(_) => panic!("Illegal op for addressing mode {}", "immediate"),
-            Operand::ZeroPage(address) => address as u16,
-            Operand::ZeroPageX(address) => address.wrapping_add(cpu.get_x()) as u16,
-            Operand::ZeroPageY(address) => address.wrapping_add(cpu.get_y()) as u16,
-            Operand::Absolute(address) => address,
-            Operand::AbsoluteX(address) => address.wrapping_add(cpu.get_x() as u16),
-            Operand::AbsoluteY(address) => address.wrapping_add(cpu.get_y() as u16),
-            Operand::IndirectX(address) => cpu.read_word(address.wrapping_add(cpu.get_x()) as u16),
-            Operand::IndirectY(address) => cpu.read_word(address as u16)
-                .wrapping_add(cpu.get_y() as u16),
-            Operand::Indirect(address) => cpu.read_word(address),
+            Operand::ZeroPage(address) => {
+                address as u16
+            }
+            Operand::ZeroPageX(address) => {
+                if !rmw { // FIXME rmw
+                    tick_fn();
+                }
+                address.wrapping_add(cpu.get_x()) as u16
+            }
+            Operand::ZeroPageY(address) => {
+                tick_fn();
+                address.wrapping_add(cpu.get_y()) as u16
+            }
+            Operand::Absolute(address) => {
+                address
+            }
+            Operand::AbsoluteX(address) => {
+                if rmw {
+                    tick_fn();
+                }
+                address.wrapping_add(cpu.get_x() as u16)
+            }
+            Operand::AbsoluteY(address) => {
+                if rmw {
+                    tick_fn();
+                }
+                address.wrapping_add(cpu.get_y() as u16)
+            }
+            Operand::IndirectX(address) => {
+                let calc_address = address.wrapping_add(cpu.get_x()) as u16;
+                tick_fn();
+                cpu.read_word(calc_address, tick_fn)
+            }
+            Operand::IndirectY(address) => {
+                if rmw {
+                    tick_fn();
+                }
+                cpu.read_word(address as u16, tick_fn).wrapping_add(cpu.get_y() as u16)
+            }
+            Operand::Indirect(address) => {
+                cpu.read_word(address, tick_fn)
+            }
             Operand::Relative(offset) if offset < 0 => {
                 cpu.get_pc().wrapping_sub((offset as i16).abs() as u16)
             }
-            Operand::Relative(offset) => cpu.get_pc().wrapping_add(offset as u16),
+            Operand::Relative(offset) => {
+                cpu.get_pc().wrapping_add(offset as u16)
+            }
         }
     }
 
     #[inline(always)]
-    pub fn get(&self, cpu: &Cpu) -> u8 {
+    pub fn get(&self, cpu: &Cpu, tick_fn: &TickFn) -> u8 {
         match *self {
             Operand::Accumulator => cpu.get_a(),
             Operand::Immediate(value) => value,
             Operand::Indirect(_) => panic!("illegal op for addressing mode {}", "indirect"),
             Operand::Relative(_) => panic!("illegal op for addressing mode {}", "relative"),
             _ => {
-                let address = self.ea(cpu);
-                cpu.read(address)
+                let address = self.ea(cpu, false, tick_fn);
+                cpu.read(address, tick_fn)
             }
         }
     }
 
     #[inline(always)]
-    pub fn set(&self, cpu: &mut Cpu, value: u8) {
+    pub fn set(&self, cpu: &mut Cpu, value: u8, rmw: bool, tick_fn: &TickFn) {
         match *self {
             Operand::Accumulator => cpu.set_a(value),
             Operand::Immediate(_) => panic!("illegal op for addressing mode {}", "immediate"),
             Operand::Indirect(_) => panic!("illegal op for addressing mode {}", "indirect"),
             Operand::Relative(_) => panic!("illegal op for addressing mode {}", "relative"),
             _ => {
-                let address = self.ea(cpu);
-                cpu.write(address, value)
+                let address = self.ea(cpu, rmw, tick_fn);
+                cpu.write(address, value, tick_fn);
             }
         }
     }
