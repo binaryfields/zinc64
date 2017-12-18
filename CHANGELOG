@@ -1,13 +1,13 @@
 # CHANGELOG
 
-### Week 1
+### Week 1 - 20161224
 
 - landed cpu
 - landed mem with basic bank switching
 - landed skeleton c64
 - milestone 1: pass 6502 functional test
 
-### Week 2
+### Week 2 - 20161231
 
 - landed cia
 - landed mem device i/o
@@ -24,7 +24,7 @@
 - fix ...
 - milestone 3: boot to basic
 
-### Week 3
+### Week 3 - 20170107
 
 - landed ui options
 - landed expansion port and cartridge
@@ -36,7 +36,7 @@
 * hack up vic sprites
 - milestone 4: run frogger_ii.crt
 
-### Week 4
+### Week 4 - 20170114
 
 - landed logging
 - landed app speed control
@@ -51,7 +51,7 @@
 - rework vic drawing and add scrolling support
 - milestone 5: run commando.tap
 
-### Week 5
+### Week 5 - 20170121
 
 - ported resid
 - landed sid
