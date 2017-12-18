@@ -22,4 +22,4 @@ mod instruction;
 pub mod interrupt;
 mod operand;
 
-pub use self::cpu::{Cpu, CpuIo};
+pub use self::cpu::{Cpu, CpuIo, TickFn};

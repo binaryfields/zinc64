@@ -28,7 +28,7 @@ use std::time::Duration;
 
 use time;
 
-use cpu::{Cpu, CpuIo};
+use cpu::{Cpu, CpuIo, TickFn};
 use config::Config;
 use device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
 use device::joystick;
@@ -330,8 +330,18 @@ impl C64 {
     pub fn run_frame(&mut self, overflow_cycles: i32) -> i32 {
         let mut elapsed = 0u32;
         let mut delta = self.config.frame_cycles as i32 - overflow_cycles;
+        let vic_clone = self.vic.clone();
+        let cia1_clone = self.cia1.clone();
+        let cia2_clone = self.cia2.clone();
+        let datassette_clone = self.datassette.clone();
+        let tick_fn: TickFn = Box::new(move || {
+            vic_clone.borrow_mut().clock();
+            cia1_clone.borrow_mut().clock();
+            cia2_clone.borrow_mut().clock();
+            datassette_clone.borrow_mut().clock();
+        });
         while delta > 0 {
-            let cycles = self.step();
+            let cycles = self.step(&tick_fn);
             elapsed += cycles;
             delta -= cycles as i32;
         }
@@ -348,15 +358,15 @@ impl C64 {
     }
 
     #[inline(always)]
-    pub fn step(&mut self) -> u32 {
+    fn step(&mut self, tick_fn: &TickFn) -> u32 {
         self.last_pc = self.cpu.borrow().get_pc();
-        let delta = self.cpu.borrow_mut().step();
-        for _i in 0..delta {
+        let delta = self.cpu.borrow_mut().step(&tick_fn);
+        /* for _i in 0..delta {
             self.vic.borrow_mut().clock();
             self.cia1.borrow_mut().clock();
             self.cia2.borrow_mut().clock();
             self.datassette.borrow_mut().clock();
-        }
+        } */
         if self.autostart.is_some() {
             if self.cpu.borrow().get_pc() == 0xa65c {
                 // magic value

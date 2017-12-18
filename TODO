@@ -1,9 +1,9 @@
 # TODO
 
+remove sdl2 from lib
+
 cli module
 add deviceio
-
-remove sdl2 from lib
 vic
 review device module
 review loader module

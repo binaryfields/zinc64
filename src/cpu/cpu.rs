@@ -77,6 +77,8 @@ pub enum Flag {
     Negative = 1 << 7,
 }
 
+pub type TickFn = Box<Fn()>;
+
 pub struct Cpu {
     // Dependencies
     mem: Rc<RefCell<Addressable>>,
@@ -172,7 +174,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn step(&mut self) -> u32 {
+    pub fn step(&mut self, tick_fn: &TickFn) -> u32 {
         if self.io.borrow().nmi.is_low() {
             self.interrupt(interrupt::Type::Nmi);
         } else if self.io.borrow().irq.is_low() && !self.test_flag(Flag::IntDisable) {
@@ -185,12 +187,12 @@ impl Cpu {
             let op_value = format!("{}", instr);
             trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
         }
-        self.execute(&instr)
+        self.execute(&instr, tick_fn)
     }
 
     #[inline(always)]
-    fn execute(&mut self, instr: &Instruction) -> u32 {
-        match *instr {
+    fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) -> u32 {
+        let cycles = match *instr {
             //  Data Movement
             Instruction::LDA(ref op, cycles) => {
                 let value = op.get(self);
@@ -568,7 +570,11 @@ impl Cpu {
                 self.pc = (self.pop() as u16) | ((self.pop() as u16) << 8);
                 self.tick(cycles)
             }
+        };
+        for _i in 0..cycles {
+            tick_fn();
         }
+        cycles
     }
 
     #[inline(always)]
