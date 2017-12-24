@@ -19,6 +19,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use log::LogLevel;
 use resid;
 
 use super::SoundBuffer;
@@ -72,6 +73,9 @@ impl Sid {
     }
 
     pub fn write(&mut self, reg: u8, value: u8) {
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "sid::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
+        }
         self.resid.write(reg, value);
     }
 }
