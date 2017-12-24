@@ -19,14 +19,14 @@
 
 use super::bit;
 
-pub struct InterruptControl {
+pub struct Icr {
     data: u8,
     mask: u8,
 }
 
-impl InterruptControl {
-    pub fn new() -> InterruptControl {
-        InterruptControl { data: 0, mask: 0 }
+impl Icr {
+    pub fn new() -> Icr {
+        Icr { data: 0, mask: 0 }
     }
 
     #[inline(always)]

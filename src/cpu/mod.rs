@@ -19,7 +19,7 @@
 
 mod cpu;
 mod instruction;
-pub mod interrupt;
+pub mod interrupt_line;
 mod operand;
 
 pub use self::cpu::{Cpu, CpuIo, TickFn};

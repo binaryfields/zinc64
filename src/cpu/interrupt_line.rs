@@ -19,15 +19,15 @@
 
 use log::LogLevel;
 
-pub struct Interrupt {
+pub struct InterruptLine {
     kind: Type,
     line: u8,
 }
 
-impl Interrupt {
-    pub fn new(kind: Type) -> Interrupt {
-        Interrupt {
-            kind: kind,
+impl InterruptLine {
+    pub fn new(kind: Type) -> InterruptLine {
+        InterruptLine {
+            kind,
             line: 0,
         }
     }

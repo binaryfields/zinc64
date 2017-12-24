@@ -26,8 +26,8 @@ use util::{Addressable, IoLine};
 use util::bit;
 
 use super::instruction::Instruction;
-use super::interrupt;
-use super::interrupt::Interrupt;
+use super::interrupt_line;
+use super::interrupt_line::InterruptLine;
 
 // Spec: http://nesdev.com/6502.txt
 // Design:
@@ -41,8 +41,8 @@ use super::interrupt::Interrupt;
 
 pub struct CpuIo {
     pub cassette_switch: bool,
-    pub irq: Interrupt,
-    pub nmi: Interrupt,
+    pub irq: InterruptLine,
+    pub nmi: InterruptLine,
     pub port_1: IoLine,
 }
 
@@ -50,8 +50,8 @@ impl CpuIo {
     pub fn new() -> CpuIo {
         CpuIo {
             cassette_switch: true,
-            irq: Interrupt::new(interrupt::Type::Irq),
-            nmi: Interrupt::new(interrupt::Type::Nmi),
+            irq: InterruptLine::new(interrupt_line::Type::Irq),
+            nmi: InterruptLine::new(interrupt_line::Type::Nmi),
             port_1: IoLine::new(0xff),
         }
     }
@@ -169,15 +169,15 @@ impl Cpu {
         let tick_fn: TickFn = Box::new(move || {});
         self.write(0x0000, 0x2f, &tick_fn);
         self.write(0x0001, 31, &tick_fn);
-        self.interrupt(interrupt::Type::Reset, &tick_fn);
+        self.interrupt(interrupt_line::Type::Reset, &tick_fn);
     }
 
     #[inline(always)]
     pub fn step(&mut self, tick_fn: &TickFn) {
         if self.io.borrow().nmi.is_low() {
-            self.interrupt(interrupt::Type::Nmi, tick_fn);
+            self.interrupt(interrupt_line::Type::Nmi, tick_fn);
         } else if self.io.borrow().irq.is_low() && !self.test_flag(Flag::IntDisable) {
-            self.interrupt(interrupt::Type::Irq, tick_fn);
+            self.interrupt(interrupt_line::Type::Irq, tick_fn);
         }
         let pc = self.pc;
         let opcode = self.fetch_byte(tick_fn);
@@ -512,7 +512,7 @@ impl Cpu {
                 self.set_flag(Flag::Zero, value & a == 0);
             }
             Instruction::BRK(_) => {
-                self.interrupt(interrupt::Type::Break, tick_fn);
+                self.interrupt(interrupt_line::Type::Break, tick_fn);
             }
             Instruction::CLC(_) => {
                 self.set_flag(Flag::Carry, false);
@@ -568,33 +568,33 @@ impl Cpu {
         word
     }
 
-    fn interrupt(&mut self, interrupt: interrupt::Type, tick_fn: &TickFn) -> u8 {
+    fn interrupt(&mut self, interrupt: interrupt_line::Type, tick_fn: &TickFn) -> u8 {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
         }
         let pc = self.pc;
         let p = self.p;
         match interrupt {
-            interrupt::Type::Irq => {
+            interrupt_line::Type::Irq => {
                 self.push(((pc >> 8) & 0xff) as u8, tick_fn);
                 self.push((pc & 0xff) as u8, tick_fn);
                 self.push(p & 0xef, tick_fn);
                 self.set_flag(Flag::IntDisable, true);
             }
-            interrupt::Type::Nmi => {
+            interrupt_line::Type::Nmi => {
                 self.push(((pc >> 8) & 0xff) as u8, tick_fn);
                 self.push((pc & 0xff) as u8, tick_fn);
                 self.push(p & 0xef, tick_fn);
                 self.set_flag(Flag::IntDisable, true);
                 self.io.borrow_mut().nmi.reset();
             }
-            interrupt::Type::Break => {
+            interrupt_line::Type::Break => {
                 self.push((((pc + 1) >> 8) & 0xff) as u8, tick_fn);
                 self.push(((pc + 1) & 0xff) as u8, tick_fn);
                 self.push(p | (Flag::Break as u8) | (Flag::Reserved as u8), tick_fn);
                 self.set_flag(Flag::IntDisable, true);
             }
-            interrupt::Type::Reset => {}
+            interrupt_line::Type::Reset => {}
         }
         self.pc = self.read_word(interrupt.vector(), tick_fn);
         tick_fn();

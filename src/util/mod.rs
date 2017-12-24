@@ -20,7 +20,7 @@
 mod addressable;
 pub mod bcd;
 pub mod bit;
-mod interrupt;
+mod icr;
 mod ioline;
 mod ioport;
 mod logger;
@@ -30,7 +30,7 @@ mod rect;
 mod rtc;
 
 pub use self::addressable::Addressable;
-pub use self::interrupt::InterruptControl;
+pub use self::icr::Icr;
 pub use self::ioline::IoLine;
 pub use self::ioport::IoPort;
 pub use self::logger::Logger;

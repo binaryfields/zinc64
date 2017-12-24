@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 use config::Config;
 use cpu::CpuIo;
-use cpu::interrupt;
+use cpu::interrupt_line;
 use mem::Ram;
 use log::LogLevel;
 use util::{Addressable, Dimension, Rect};
@@ -322,7 +322,7 @@ impl Vic {
         if rst_int {
             self.int_data |= 1 << 0;
             if (self.int_mask & self.int_data) != 0 {
-                self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
+                self.cpu_io.borrow_mut().irq.set(interrupt_line::Source::Vic);
             }
         }
         // Prepare sprite data
@@ -949,13 +949,13 @@ impl Vic {
             Reg::IRR => {
                 self.int_data &= !value;
                 if (self.int_mask & self.int_data) == 0 {
-                    self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Vic);
+                    self.cpu_io.borrow_mut().irq.clear(interrupt_line::Source::Vic);
                 }
             }
             Reg::IMR => {
                 self.int_mask = value & 0x0f;
                 if (self.int_mask & self.int_data) != 0 {
-                    self.cpu_io.borrow_mut().irq.set(interrupt::Source::Vic);
+                    self.cpu_io.borrow_mut().irq.set(interrupt_line::Source::Vic);
                 }
             }
             Reg::MDP => {

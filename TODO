@@ -1,11 +1,8 @@
 # TODO
 
-- add sid logging
-- add test cases
-- rename InterruptControl to Icr
-
 - cli module
 - config module
+- add test cases
 - review device module
 - review loader module
 

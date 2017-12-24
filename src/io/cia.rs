@@ -21,11 +21,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cpu::CpuIo;
-use cpu::interrupt;
+use cpu::interrupt_line;
 use device::{Joystick, Keyboard};
 use device::joystick;
 use log::LogLevel;
-use util::{InterruptControl, IoPort, Pin};
+use util::{Icr, IoPort, Pin};
 use util::bcd;
 use util::bit;
 use util::Rtc;
@@ -118,8 +118,8 @@ pub struct Cia {
     // Dependencies
     mode: Mode,
     cpu_io: Rc<RefCell<CpuIo>>,
-    joystick1: Option<Rc<RefCell<Joystick>>>,
-    joystick2: Option<Rc<RefCell<Joystick>>>,
+    joystick_1: Option<Rc<RefCell<Joystick>>>,
+    joystick_2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     // Functional Units
     port_a: IoPort,
@@ -130,7 +130,7 @@ pub struct Cia {
     tod_clock: Rtc,
     tod_set_alarm: bool,
     // Interrupts
-    int_control: InterruptControl,
+    int_control: Icr,
     int_triggered: bool,
     // I/O
     cia_io: Rc<RefCell<CiaIo>>,
@@ -148,8 +148,8 @@ impl Cia {
         Cia {
             mode,
             cpu_io,
-            joystick1,
-            joystick2,
+            joystick_1: joystick1,
+            joystick_2: joystick2,
             keyboard,
             port_a: IoPort::new(0x00),
             port_b: IoPort::new(0x00),
@@ -158,7 +158,7 @@ impl Cia {
             tod_alarm: Rtc::new(),
             tod_clock: Rtc::new(),
             tod_set_alarm: false,
-            int_control: InterruptControl::new(),
+            int_control: Icr::new(),
             int_triggered: false,
             cia_io,
         }
@@ -171,7 +171,7 @@ impl Cia {
     #[inline(always)]
     pub fn clock(&mut self) {
         // Process timers
-        let timer_a_output = if self.timer_a.enabled {
+        let timer_a_underflow = if self.timer_a.enabled {
             let pulse = match self.timer_a.input {
                 timer::Input::SystemClock => 1,
                 timer::Input::External => if self.cia_io.borrow().cnt.is_rising() {
@@ -185,7 +185,7 @@ impl Cia {
         } else {
             false
         };
-        let timer_b_output = if self.timer_b.enabled {
+        let timer_b_underflow = if self.timer_b.enabled {
             let pulse = match self.timer_b.input {
                 timer::Input::SystemClock => 1,
                 timer::Input::External => if self.cia_io.borrow().cnt.is_rising() {
@@ -193,13 +193,13 @@ impl Cia {
                 } else {
                     0
                 },
-                timer::Input::TimerA => if timer_a_output {
+                timer::Input::TimerA => if timer_a_underflow {
                     1
                 } else {
                     0
                 },
                 timer::Input::TimerAWithCNT => {
-                    if timer_a_output && self.cia_io.borrow().cnt.is_high() {
+                    if timer_a_underflow && self.cia_io.borrow().cnt.is_high() {
                         1
                     } else {
                         0
@@ -217,10 +217,10 @@ impl Cia {
         register will set the IR bit (MSB) of the DATA register
         and bring the IRQ pin low.
         */
-        if timer_a_output {
+        if timer_a_underflow {
             self.int_control.set_event(0);
         }
-        if timer_b_output {
+        if timer_b_underflow {
             self.int_control.set_event(1);
         }
         if self.cia_io.borrow().flag.is_falling() {
@@ -261,7 +261,7 @@ impl Cia {
     }
 
     fn read_cia1_port_a(&self) -> u8 {
-        let joystick = self.scan_joystick(&self.joystick2);
+        let joystick = self.scan_joystick(&self.joystick_2);
         self.port_a.get_value() & joystick
     }
 
@@ -273,7 +273,7 @@ impl Cia {
             0xff => 0xff,
             _ => self.scan_keyboard(!self.port_a.get_value()),
         };
-        let joystick = self.scan_joystick(&self.joystick1);
+        let joystick = self.scan_joystick(&self.joystick_1);
         self.port_b.get_value() & keyboard & joystick
     }
 
@@ -314,16 +314,16 @@ impl Cia {
 
     fn clear_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_io.borrow_mut().irq.clear(interrupt::Source::Cia),
-            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.clear(interrupt::Source::Cia),
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq.clear(interrupt_line::Source::Cia),
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.clear(interrupt_line::Source::Cia),
         }
         self.int_triggered = false;
     }
 
     fn trigger_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_io.borrow_mut().irq.set(interrupt::Source::Cia),
-            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.set(interrupt::Source::Cia),
+            Mode::Cia1 => self.cpu_io.borrow_mut().irq.set(interrupt_line::Source::Cia),
+            Mode::Cia2 => self.cpu_io.borrow_mut().nmi.set(interrupt_line::Source::Cia),
         }
         self.int_triggered = true;
     }
