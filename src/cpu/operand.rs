@@ -47,11 +47,10 @@ impl Operand {
         match *self {
             Operand::Accumulator => panic!("Illegal op for addressing mode {}", "accumulator"),
             Operand::Immediate(_) => panic!("Illegal op for addressing mode {}", "immediate"),
-            Operand::ZeroPage(address) => {
-                address as u16
-            }
+            Operand::ZeroPage(address) => address as u16,
             Operand::ZeroPageX(address) => {
-                if !rmw { // FIXME rmw
+                if !rmw {
+                    // FIXME rmw
                     tick_fn();
                 }
                 address.wrapping_add(cpu.get_x()) as u16
@@ -60,9 +59,7 @@ impl Operand {
                 tick_fn();
                 address.wrapping_add(cpu.get_y()) as u16
             }
-            Operand::Absolute(address) => {
-                address
-            }
+            Operand::Absolute(address) => address,
             Operand::AbsoluteX(address) => {
                 if rmw {
                     tick_fn();
@@ -84,17 +81,14 @@ impl Operand {
                 if rmw {
                     tick_fn();
                 }
-                cpu.read_word(address as u16, tick_fn).wrapping_add(cpu.get_y() as u16)
+                cpu.read_word(address as u16, tick_fn)
+                    .wrapping_add(cpu.get_y() as u16)
             }
-            Operand::Indirect(address) => {
-                cpu.read_word(address, tick_fn)
-            }
+            Operand::Indirect(address) => cpu.read_word(address, tick_fn),
             Operand::Relative(offset) if offset < 0 => {
                 cpu.get_pc().wrapping_sub((offset as i16).abs() as u16)
             }
-            Operand::Relative(offset) => {
-                cpu.get_pc().wrapping_add(offset as u16)
-            }
+            Operand::Relative(offset) => cpu.get_pc().wrapping_add(offset as u16),
         }
     }
 

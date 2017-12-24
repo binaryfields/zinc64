@@ -17,7 +17,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use sdl2::keyboard::Keycode;
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AxisMotion {
+    Negative,
+    Neutral,
+    Positive,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Button {
+    Left,
+    Right,
+    Down,
+    Up,
+    Fire,
+}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Mode {
@@ -43,13 +57,6 @@ impl Mode {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum AxisMotion {
-    Negative,
-    Neutral,
-    Positive,
-}
-
 pub struct Joystick {
     // Configuration
     mode: Mode,
@@ -63,8 +70,8 @@ pub struct Joystick {
 impl Joystick {
     pub fn new(mode: Mode, threshold: i16) -> Joystick {
         Joystick {
-            mode: mode,
-            threshold: threshold,
+            mode,
+            threshold,
             x_axis: AxisMotion::Neutral,
             y_axis: AxisMotion::Neutral,
             button: false,
@@ -111,35 +118,31 @@ impl Joystick {
         }
     }
 
-    #[allow(unused_variables)]
-    pub fn on_button_down(&mut self, button_idx: u8) {
+    pub fn on_button_down(&mut self, _button_idx: u8) {
         self.button = true;
     }
 
-    #[allow(unused_variables)]
-    pub fn on_button_up(&mut self, button_idx: u8) {
+    pub fn on_button_up(&mut self, _button_idx: u8) {
         self.button = false;
     }
 
-    pub fn on_key_down(&mut self, keycode: Keycode) {
+    pub fn on_key_down(&mut self, keycode: Button) {
         match keycode {
-            Keycode::Kp4 => self.x_axis = AxisMotion::Negative,
-            Keycode::Kp6 => self.x_axis = AxisMotion::Positive,
-            Keycode::Kp2 => self.y_axis = AxisMotion::Negative,
-            Keycode::Kp8 => self.y_axis = AxisMotion::Positive,
-            Keycode::Kp5 => self.button = true,
-            _ => {}
+            Button::Left => self.x_axis = AxisMotion::Negative,
+            Button::Right => self.x_axis = AxisMotion::Positive,
+            Button::Down => self.y_axis = AxisMotion::Negative,
+            Button::Up => self.y_axis = AxisMotion::Positive,
+            Button::Fire => self.button = true,
         }
     }
 
-    pub fn on_key_up(&mut self, keycode: Keycode) {
+    pub fn on_key_up(&mut self, keycode: Button) {
         match keycode {
-            Keycode::Kp4 => self.x_axis = AxisMotion::Neutral,
-            Keycode::Kp6 => self.x_axis = AxisMotion::Neutral,
-            Keycode::Kp2 => self.y_axis = AxisMotion::Neutral,
-            Keycode::Kp8 => self.y_axis = AxisMotion::Neutral,
-            Keycode::Kp5 => self.button = false,
-            _ => {}
+            Button::Left => self.x_axis = AxisMotion::Neutral,
+            Button::Right => self.x_axis = AxisMotion::Neutral,
+            Button::Up => self.y_axis = AxisMotion::Neutral,
+            Button::Down => self.y_axis = AxisMotion::Neutral,
+            Button::Fire => self.button = false,
         }
     }
 }

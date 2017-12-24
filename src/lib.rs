@@ -22,7 +22,6 @@ extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate resid;
-extern crate sdl2;
 extern crate time;
 
 pub mod config;

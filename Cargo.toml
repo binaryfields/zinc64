@@ -2,10 +2,10 @@
 name = "zinc64"
 version = "0.2.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
-readme = "README.md"
-keywords = ["c64", "commodore", "emulator"]
 repository = "https://github.com/digitalstreamio/zinc64"
 categories = ["c64", "emulator"]
+keywords = ["c64", "commodore", "emulator"]
+readme = "README.md"
 description = "Commodore 64 rustified"
 
 [dependencies]

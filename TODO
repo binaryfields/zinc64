@@ -1,14 +1,17 @@
 # TODO
 
-- remove sdl2 from libs
+- add sid logging
+- add test cases
+- rename InterruptControl to Icr
+
 - cli module
 - config module
 - review device module
 - review loader module
 
 - vic
-- monitor/telnet
 - ui/menus
+- monitor/telnet
 - time cycles for cia timer start to interrupt
 
 - https://forums.libsdl.org/viewtopic.php?t=6723&sid=23faf65c9e5db23708d5a1f7990165c3

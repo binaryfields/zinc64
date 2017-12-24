@@ -173,7 +173,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn step(&mut self, tick_fn: &TickFn)  {
+    pub fn step(&mut self, tick_fn: &TickFn) {
         if self.io.borrow().nmi.is_low() {
             self.interrupt(interrupt::Type::Nmi, tick_fn);
         } else if self.io.borrow().irq.is_low() && !self.test_flag(Flag::IntDisable) {
@@ -190,7 +190,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn)  {
+    fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) {
         match *instr {
             //  Data Movement
             Instruction::LDA(ref op, _) => {
@@ -532,7 +532,7 @@ impl Cpu {
             }
             Instruction::NOP(_) => {
                 tick_fn();
-            },
+            }
             Instruction::SEC(_) => {
                 self.set_flag(Flag::Carry, true);
                 tick_fn();
