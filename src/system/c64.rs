@@ -425,40 +425,10 @@ impl C64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
-    use config::Config;
-    use mem::BaseAddr;
 
-    //#[test]
-    fn cpu_test() {
-        let mut c64 = C64::new(Config::pal()).unwrap();
-        let cpu = c64.get_cpu();
-        cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0x00);
-        c64.load(Path::new("rom/6502_functional_test.bin"), 0x0400)
-            .unwrap();
-        cpu.borrow_mut().set_pc(0x0400);
-        let mut last_pc = 0x0000;
-        loop {
-            c64.step();
-            if cpu.borrow_mut().get_pc() == 0x3463 {
-                break;
-            }
-            if cpu.borrow_mut().get_pc() == last_pc {
-                panic!("trap at 0x{:x}", cpu.borrow_mut().get_pc());
-            }
-            last_pc = cpu.borrow_mut().get_pc();
-        }
-    }
 
     #[test]
-    fn mem_layout() {
-        let c64 = C64::new(Config::pal()).unwrap();
-        let cpu = c64.get_cpu();
-        assert_eq!(0x94, cpu.borrow().read(BaseAddr::Basic.addr()));
-    }
-
-    #[test]
-    fn keyboard_read() {
+    fn exec_keyboard_read() {
         /*
         .c000  78         sei
         .c001  a9 ff      lda #$ff
@@ -476,18 +446,17 @@ mod tests {
             0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d,
             0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
         ];
+        let tick_fn: TickFn = Box::new(move || {});
         let mut c64 = C64::new(Config::pal()).unwrap();
-        let cpu = c64.get_cpu();
-        let keyboard = c64.get_keyboard();
-        cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0x00);
         c64.load(&code.to_vec(), 0xc000);
-        cpu.borrow_mut().write(BaseAddr::IoPort.addr(), 0x06);
+        let keyboard = c64.get_keyboard();
         keyboard.borrow_mut().set_row(1, !(1 << 5));
+        let cpu = c64.get_cpu();
+        cpu.borrow_mut().write(0x0001, 0x06, &tick_fn);
         cpu.borrow_mut().set_pc(0xc000);
-        let mut last_pc = 0x0000;
         let mut branch_count = 0;
         loop {
-            c64.step();
+            c64.step(&tick_fn);
             if cpu.borrow().get_pc() == 0xc018 {
                 break;
             }
@@ -497,7 +466,15 @@ mod tests {
                     panic!("trap at 0x{:x}", cpu.borrow_mut().get_pc());
                 }
             }
-            last_pc = cpu.borrow_mut().get_pc();
         }
+    }
+
+    #[test]
+    fn verify_mem_layout() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut c64 = C64::new(Config::pal()).unwrap();
+        c64.reset(false);
+        let cpu = c64.get_cpu();
+        assert_eq!(0x94, cpu.borrow().read(0xa000, &tick_fn));
     }
 }

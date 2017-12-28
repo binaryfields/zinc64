@@ -31,6 +31,12 @@ impl Ram {
         }
     }
 
+    pub fn fill(&mut self, pattern: u8) {
+        for i in 0..self.data.len() {
+            self.data[i] = pattern;
+        }
+    }
+
     pub fn reset(&mut self) {
         for i in 0..self.data.len() {
             self.data[i] = 0x00;
@@ -51,7 +57,6 @@ impl Addressable for Ram {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mem::Addressable;
 
     #[test]
     fn new_with_capacity() {
@@ -61,13 +66,15 @@ mod tests {
 
     #[test]
     fn read_address() {
-        let ram = Ram::new(0x10000);
-        assert_eq!(0, ram.read(0xffff));
+        let mut ram = Ram::new(0x10000);
+        ram.fill(0xfe);
+        assert_eq!(0xfe, ram.read(0xffff));
     }
 
     #[test]
     fn write_address() {
         let mut ram = Ram::new(0x10000);
+        ram.fill(0xfe);
         ram.write(0x0001, 31);
         assert_eq!(31, ram.read(0x0001));
     }

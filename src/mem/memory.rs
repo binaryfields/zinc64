@@ -133,61 +133,59 @@ impl Addressable for Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::Bank;
-    use mem::Addressable;
+    use super::super::Ram;
 
-    #[test]
-    fn new_memory() {
-        let mem = Memory::new().unwrap();
-        for bank in &mem.cpu_map {
-            assert_eq!(Bank::Ram, *bank);
-        }
+    fn setup_memory() -> Result<Memory, io::Error> {
+        let charset = Rc::new(RefCell::new(Ram::new(0x1000)));
+        charset.borrow_mut().fill(0x11);
+        let device_mem = Rc::new(RefCell::new(Ram::new(0x10000)));
+        device_mem.borrow_mut().fill(0x22);
+        let expansion_port = Rc::new(RefCell::new(Ram::new(0x1000)));
+        expansion_port.borrow_mut().fill(0x33);
+        let ram = Rc::new(RefCell::new(Ram::new(0x10000)));
+        ram.borrow_mut().fill(0x44);
+        Memory::new(charset, device_mem, expansion_port, ram)
     }
 
     #[test]
-    fn read_basic_rom() {
-        let mut mem = Memory::new().unwrap();
+    fn read_basic() {
+        let mut mem = setup_memory().unwrap();
         mem.switch_banks(31);
         assert_eq!(0x94, mem.read(BaseAddr::Basic.addr()));
     }
 
     #[test]
+    fn read_charset() {
+        let mut mem = setup_memory().unwrap();
+        mem.switch_banks(27);
+        assert_eq!(0x11, mem.read(BaseAddr::Charset.addr()));
+    }
+
+    #[test]
+    fn read_io() {
+        let mut mem = setup_memory().unwrap();
+        mem.switch_banks(31);
+        assert_eq!(0x22, mem.read(0xd000));
+    }
+
+    #[test]
+    fn read_kernal() {
+        let mut mem = setup_memory().unwrap();
+        mem.switch_banks(31);
+        assert_eq!(0x85, mem.read(BaseAddr::Kernal.addr()));
+    }
+
+    #[test]
     fn write_page_0() {
-        let mut mem = Memory::new().unwrap();
+        let mut mem = setup_memory().unwrap();
         mem.write(0x00f0, 0xff);
-        assert_eq!(0xff, mem.ram.read(0x00f0));
+        assert_eq!(0xff, mem.ram.borrow().read(0x00f0));
     }
 
     #[test]
     fn write_page_1() {
-        let mut mem = Memory::new().unwrap();
+        let mut mem = setup_memory().unwrap();
         mem.write(0x0100, 0xff);
-        assert_eq!(0xff, mem.ram.read(0x0100));
-    }
-
-    #[test]
-    fn switch_banks_mode_24() {
-        let mut mem = Memory::new().unwrap();
-        mem.switch_banks(24);
-        assert_eq!(Bank::Ram, mem.cpu_map[0x0]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0x9]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0xa]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0xb]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0xd]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0xe]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0xf]);
-    }
-
-    #[test]
-    fn switch_banks_mode_31() {
-        let mut mem = Memory::new().unwrap();
-        mem.switch_banks(31);
-        assert_eq!(Bank::Ram, mem.cpu_map[0x0]);
-        assert_eq!(Bank::Ram, mem.cpu_map[0x9]);
-        assert_eq!(Bank::Basic, mem.cpu_map[0xa]);
-        assert_eq!(Bank::Basic, mem.cpu_map[0xb]);
-        assert_eq!(Bank::Io, mem.cpu_map[0xd]);
-        assert_eq!(Bank::Kernal, mem.cpu_map[0xe]);
-        assert_eq!(Bank::Kernal, mem.cpu_map[0xf]);
+        assert_eq!(0xff, mem.ram.borrow().read(0x0100));
     }
 }

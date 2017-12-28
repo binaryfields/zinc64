@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Mode {
     OneShot,
     Continuous,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Input {
     SystemClock = 0,
     External = 1,
@@ -31,12 +31,13 @@ pub enum Input {
     TimerAWithCNT = 3,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Output {
     Toggle,
     Pulse,
 }
 
+#[derive(Debug)]
 pub struct Timer {
     pub enabled: bool,
     pub mode: Mode,

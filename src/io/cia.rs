@@ -37,7 +37,10 @@ use super::timer::Timer;
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
 
-// TODO cia: add timer output logic
+// TODO cia: revise timer latency
+// - load 1c
+// - int 1c
+// - count 3c
 
 pub struct CiaIo {
     pub cnt: Pin,
@@ -113,7 +116,6 @@ impl Reg {
     }
 }
 
-#[allow(dead_code)]
 pub struct Cia {
     // Dependencies
     mode: Mode,
@@ -542,153 +544,180 @@ s                */
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cpu::Cpu;
-    use io::keyboard::Keyboard;
-    use mem::Memory;
-    use std::cell::RefCell;
-    use std::io;
-    use std::rc::Rc;
-    use std::result::Result;
 
-    fn setup_cpu() -> Result<Cpu, io::Error> {
-        let mem = Rc::new(RefCell::new(Memory::new()?));
-        Ok(Cpu::new(mem))
-    }
-
-    fn setup_cia() -> Result<Cia, io::Error> {
-        let cpu = setup_cpu()?;
-        let keyboard = Keyboard::new();
+    fn setup_cia() -> Cia {
+        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let cia_io = Rc::new(RefCell::new(CiaIo::new()));
+        let mut keyboard = Keyboard::new();
+        keyboard.reset();
         let mut cia = Cia::new(
             Mode::Cia1,
-            Rc::new(RefCell::new(cpu)),
+            cia_io,
+            cpu_io,
+            None,
+            None,
             Rc::new(RefCell::new(keyboard)),
         );
-        Ok(cia)
+        cia.reset();
+        cia
+    }
+
+    fn setup_cia_with_keyboard(keyboard: Rc<RefCell<Keyboard>>) -> Cia {
+        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let cia_io = Rc::new(RefCell::new(CiaIo::new()));
+        let mut cia = Cia::new(
+            Mode::Cia1,
+            cia_io,
+            cpu_io,
+            None,
+            None,
+            keyboard,
+        );
+        cia.reset();
+        cia
     }
 
     #[test]
-    fn read_default_cia1_reg_0x00() {
-        let mut cia = setup_cia().unwrap();
-        assert_eq!(0x7f, cia.read(Reg::PRA.addr()));
-    }
-
-    #[test]
-    fn read_default_cia1_reg_0x02() {
-        let mut cia = setup_cia().unwrap();
-        assert_eq!(0xff, cia.read(Reg::DDRA.addr()));
-    }
-
-    #[test]
-    fn read_default_cia1_reg_0x03() {
-        let mut cia = setup_cia().unwrap();
+    fn read_regs() {
+        let mut cia = setup_cia();
+        assert_eq!(0xff, cia.read(Reg::PRA.addr()));
+        assert_eq!(0xff, cia.read(Reg::PRB.addr()));
+        assert_eq!(0x00, cia.read(Reg::DDRA.addr()));
         assert_eq!(0x00, cia.read(Reg::DDRB.addr()));
-    }
-
-    #[test]
-    fn read_default_cia1_reg_0x0d() {
-        let mut cia = setup_cia().unwrap();
-        assert_eq!(0x00, cia.read(Reg::ICR.addr())); // 0x81
-    }
-
-    #[test]
-    fn read_default_cia1_reg_0x0e() {
-        let mut cia = setup_cia().unwrap();
-        assert_eq!(0x08, cia.read(Reg::CRA.addr())); // 0x11
-    }
-
-    #[test]
-    fn read_default_cia1_reg_0x0f() {
-        let mut cia = setup_cia().unwrap();
+        assert_eq!(0x00, cia.read(Reg::TALO.addr()));
+        assert_eq!(0x00, cia.read(Reg::TAHI.addr()));
+        assert_eq!(0x00, cia.read(Reg::TBLO.addr()));
+        assert_eq!(0x00, cia.read(Reg::TBHI.addr()));
+        assert_eq!(0x00, cia.read(Reg::TODTS.addr()));
+        assert_eq!(0x00, cia.read(Reg::TODSEC.addr()));
+        assert_eq!(0x00, cia.read(Reg::TODMIN.addr()));
+        assert_eq!(0x00, cia.read(Reg::TODHR.addr()));
+        assert_eq!(0x00, cia.read(Reg::SDR.addr()));
+        assert_eq!(0x00, cia.read(Reg::ICR.addr()));
+        assert_eq!(0x08, cia.read(Reg::CRA.addr()));
         assert_eq!(0x08, cia.read(Reg::CRB.addr()));
     }
 
     #[test]
     fn read_keyboard_s() {
-        let cpu = setup_cpu().unwrap();
-        let mut keyboard = Keyboard::new();
-        keyboard.set_row(1, !(1 << 5));
-        let mut cia = Cia::new(
-            Mode::Cia1,
-            Rc::new(RefCell::new(cpu)),
-            Rc::new(RefCell::new(keyboard)),
-        );
+        let keyboard = Rc::new(RefCell::new(Keyboard::new()));
+        keyboard.borrow_mut().reset();
+        let mut cia = setup_cia_with_keyboard(keyboard.clone());
+        keyboard.borrow_mut().enqueue("S");
+        keyboard.borrow_mut().drain_event();
         cia.write(Reg::DDRA.addr(), 0xff);
         cia.write(Reg::DDRB.addr(), 0x00);
         cia.write(Reg::PRA.addr(), 0xfd);
-        assert_eq!(!(1 << 5), cia.read(0x01));
+        assert_eq!(!(1 << 5), cia.read(Reg::PRB.addr()));
+    }
+
+    #[test]
+    fn trigger_timer_a_interrupt() {
+        let mut cia = setup_cia();
+        cia.write(Reg::TALO.addr(), 0x01);
+        cia.write(Reg::TAHI.addr(), 0x00);
+        cia.write(Reg::ICR.addr(), 0x81); // enable irq for timer a
+        cia.write(Reg::CRA.addr(), 0b00011001u8);
+        cia.clock();
+        {
+            let cpu_io = cia.cpu_io.borrow();
+            assert_eq!(false, cpu_io.irq.is_low());
+        }
+        cia.clock();
+        {
+            let cpu_io = cia.cpu_io.borrow();
+            assert_eq!(true, cpu_io.irq.is_low());
+        }
+    }
+
+    #[test]
+    fn trigger_timer_b_interrupt() {
+        let mut cia = setup_cia();
+        cia.write(Reg::TBLO.addr(), 0x01);
+        cia.write(Reg::TBHI.addr(), 0x00);
+        cia.write(Reg::ICR.addr(), 0x82); // enable irq for timer b
+        cia.write(Reg::CRB.addr(), 0b00011001u8);
+        cia.clock();
+        {
+            let cpu_io = cia.cpu_io.borrow();
+            assert_eq!(false, cpu_io.irq.is_low());
+        }
+        cia.clock();
+        {
+            let cpu_io = cia.cpu_io.borrow();
+            assert_eq!(true, cpu_io.irq.is_low());
+        }
     }
 
     #[test]
     fn write_reg_0x00() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::PRA.addr(), 0xff);
-        assert_eq!(0xff, cia.port_a);
+        assert_eq!(0xff, cia.port_a.get_value());
     }
 
     #[test]
     fn write_reg_0x01() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::PRB.addr(), 0xff);
-        assert_eq!(0xff, cia.port_b);
+        assert_eq!(0xff, cia.port_b.get_value());
     }
 
     #[test]
     fn write_reg_0x02() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::DDRA.addr(), 0xff);
-        assert_eq!(0xff, cia.ddr_a);
+        assert_eq!(0xff, cia.port_a.get_direction());
     }
 
     #[test]
     fn write_reg_0x03() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::DDRB.addr(), 0xff);
-        assert_eq!(0xff, cia.ddr_b);
+        assert_eq!(0xff, cia.port_b.get_direction());
     }
 
     #[test]
     fn write_reg_0x04() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::TALO.addr(), 0xab);
         assert_eq!(0xab, cia.timer_a.latch & 0x00ff);
     }
 
     #[test]
     fn write_reg_0x05() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::TAHI.addr(), 0xcd);
         assert_eq!(0xcd, (cia.timer_a.latch & 0xff00) >> 8);
     }
 
     #[test]
     fn write_reg_0x06() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::TBLO.addr(), 0xab);
         assert_eq!(0xab, cia.timer_b.latch & 0x00ff);
     }
 
     #[test]
     fn write_reg_0x07() {
-        let mut cia = setup_cia().unwrap();
+        let mut cia = setup_cia();
         cia.write(Reg::TBHI.addr(), 0xcd);
         assert_eq!(0xcd, (cia.timer_b.latch & 0xff00) >> 8);
     }
 
     #[test]
     fn write_reg_0x0d() {
-        let mut cia = setup_cia().unwrap();
-        cia.write(Reg::ICR.addr(), 1 << 7 | 1 << 1 | 1 << 0);
-        assert_eq!(true, cia.timer_a.int_enabled);
-        assert_eq!(true, cia.timer_b.int_enabled);
-        cia.write(Reg::ICR.addr(), 1 << 1);
-        assert_eq!(true, cia.timer_a.int_enabled);
-        assert_eq!(false, cia.timer_b.int_enabled);
+        let mut cia = setup_cia();
+        cia.write(Reg::ICR.addr(), 0b10000011u8);
+        assert_eq!(0b00000011u8, cia.int_control.get_mask());
+        cia.write(Reg::ICR.addr(), 0b00000010u8);
+        assert_eq!(0b00000001u8, cia.int_control.get_mask());
     }
 
     #[test]
     fn write_reg_0x0e() {
-        let mut cia = setup_cia().unwrap();
-        cia.write(Reg::CRA.addr(), (1 << 0) | (1 << 3) | (1 << 5));
+        let mut cia = setup_cia();
+        cia.write(Reg::CRA.addr(), 0b00101001u8);
         assert_eq!(true, cia.timer_a.enabled);
         assert_eq!(timer::Mode::OneShot, cia.timer_a.mode);
         assert_eq!(timer::Input::External, cia.timer_a.input);
@@ -696,16 +725,16 @@ mod tests {
 
     #[test]
     fn write_reg_0x0f() {
-        let mut cia = setup_cia().unwrap();
-        cia.write(Reg::CRB.addr(), (1 << 0) | (1 << 3) | (1 << 5));
+        let mut cia = setup_cia();
+        cia.write(Reg::CRB.addr(), 0b00101001u8);
         assert_eq!(true, cia.timer_b.enabled);
         assert_eq!(timer::Mode::OneShot, cia.timer_b.mode);
         assert_eq!(timer::Input::External, cia.timer_b.input);
     }
 
     #[test]
-    fn load_timer_a_value() {
-        let mut cia = setup_cia().unwrap();
+    fn write_timer_a_value() {
+        let mut cia = setup_cia();
         cia.write(Reg::TALO.addr(), 0xab);
         assert_eq!(0x00, cia.timer_a.value);
         cia.write(Reg::TAHI.addr(), 0xcd);
@@ -713,8 +742,8 @@ mod tests {
     }
 
     #[test]
-    fn load_timer_b_value() {
-        let mut cia = setup_cia().unwrap();
+    fn write_timer_b_value() {
+        let mut cia = setup_cia();
         cia.write(Reg::TBLO.addr(), 0xab);
         assert_eq!(0x00, cia.timer_b.value);
         cia.write(Reg::TBHI.addr(), 0xcd);

@@ -54,30 +54,10 @@ impl Addressable for Rom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
-    use mem::Addressable;
-
-    #[test]
-    fn load_basic_rom() {
-        let rom = Rom::load(&Path::new("rom/basic.rom"), 0x000).unwrap();
-        assert_eq!(0x2000, rom.data.len());
-    }
-
-    #[test]
-    fn load_charset_rom() {
-        let rom = Rom::load(&Path::new("rom/characters.rom"), 0x000).unwrap();
-        assert_eq!(0x1000, rom.data.len());
-    }
-
-    #[test]
-    fn load_kernal_rom() {
-        let rom = Rom::load(&Path::new("rom/kernal.rom"), 0x0000).unwrap();
-        assert_eq!(0x2000, rom.data.len());
-    }
 
     #[test]
     fn read_address() {
-        let rom = Rom::load(&Path::new("rom/basic.rom"), 0x0000).unwrap();
+        let rom = Rom::load(&Path::new("res/rom/basic.rom"), 0x0000).unwrap();
         assert_eq!(0x94, rom.read(0x0000));
     }
 }

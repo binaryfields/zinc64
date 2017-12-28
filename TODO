@@ -1,15 +1,12 @@
 # TODO
 
-- cli module
+- update build instructions
 - config module
-- add test cases
-- review device module
+- cli module
 - review loader module
-
 - vic
 - ui/menus
 - monitor/telnet
-- time cycles for cia timer start to interrupt
 
 - https://forums.libsdl.org/viewtopic.php?t=6723&sid=23faf65c9e5db23708d5a1f7990165c3
 

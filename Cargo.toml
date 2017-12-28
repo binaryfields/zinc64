@@ -1,6 +1,6 @@
 [package]
 name = "zinc64"
-version = "0.2.0"
+version = "0.1.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 repository = "https://github.com/digitalstreamio/zinc64"
 categories = ["c64", "emulator"]

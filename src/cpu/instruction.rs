@@ -475,3 +475,40 @@ impl fmt::Display for Instruction {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::CpuIo;
+    use mem::Ram;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn setup_cpu() -> Cpu {
+        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
+        Cpu::new(cpu_io, mem)
+    }
+
+    #[test]
+    fn decode_brk() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        let valid = match Instruction::decode(&mut cpu, 0x00, &tick_fn) {
+            Instruction::BRK(_) => true,
+            _ => false,
+        };
+        assert_eq!(true, valid);
+    }
+
+    #[test]
+    fn decode_lda_absolute() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        let valid = match Instruction::decode(&mut cpu, 0xad, &tick_fn) {
+            Instruction::LDA(Operand::Absolute(_), _) => true,
+            _ => false,
+        };
+        assert_eq!(true, valid);
+    }
+}

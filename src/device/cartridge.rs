@@ -23,6 +23,8 @@ use util::Addressable;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
+// TODO device: cartridge test cases
+
 pub enum ChipType {
     Rom,
     Ram,

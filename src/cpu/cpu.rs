@@ -712,32 +712,36 @@ impl fmt::Display for Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cpu::Instruction;
-    use cpu::Operand;
-    use mem::Memory;
-    use std::cell::RefCell;
-    use std::io;
-    use std::rc::Rc;
-    use std::result::Result;
+    use super::super::operand::Operand;
+    use mem::Ram;
 
-    fn setup_cpu() -> Result<Cpu, io::Error> {
-        let mem = Rc::new(RefCell::new(Memory::new()?));
-        Ok(Cpu::new(mem))
-    }
-
-    fn setup_reg_a(cpu: &mut Cpu, value: u8) {
-        cpu.execute(&Instruction::LDA(Operand::Immediate(value), 1));
+    fn setup_cpu() -> Cpu {
+        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
+        Cpu::new(cpu_io, mem)
     }
 
     #[test]
-    fn execute_adc_80_16() {
-        let mut cpu = setup_cpu().unwrap();
-        setup_reg_a(&mut cpu, 80);
+    fn adc_80_16() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.a = 80;
         cpu.set_flag(Flag::Carry, false);
-        cpu.execute(&Instruction::ADC(Operand::Immediate(16), 1));
+        cpu.execute(&Instruction::ADC(Operand::Immediate(16), 1), &tick_fn);
         assert_eq!(96, cpu.a);
         assert_eq!(false, cpu.test_flag(Flag::Carry));
         assert_eq!(false, cpu.test_flag(Flag::Negative));
         assert_eq!(false, cpu.test_flag(Flag::Overflow));
+    }
+
+    #[test]
+    fn inc_with_overflow() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.a = 0xff;
+        cpu.execute(&Instruction::INC(Operand::Accumulator, 1), &tick_fn);
+        assert_eq!(0x00, cpu.a);
+        assert_eq!(false, cpu.test_flag(Flag::Negative));
+        assert_eq!(true, cpu.test_flag(Flag::Zero));
     }
 }

@@ -371,3 +371,37 @@ impl Keyboard {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enqueue_key_event() {
+        let mut keyboard = Keyboard::new();
+        keyboard.reset();
+        assert_eq!(false, keyboard.has_events());
+        keyboard.enqueue("S");
+        assert_eq!(true, keyboard.has_events());
+    }
+
+    #[test]
+    fn drain_key_event() {
+        let mut keyboard = Keyboard::new();
+        keyboard.reset();
+        keyboard.enqueue("S");
+        assert_eq!(true, keyboard.has_events());
+        keyboard.drain_event();
+        keyboard.drain_event();
+        assert_eq!(false, keyboard.has_events());
+    }
+
+    #[test]
+    fn emulate_key_press() {
+        let mut keyboard = Keyboard::new();
+        keyboard.reset();
+        keyboard.enqueue("S");
+        keyboard.drain_event();
+        assert_eq!(0xdf, keyboard.get_row(1));
+    }
+}

@@ -22,6 +22,8 @@ use bit_field::BitField;
 use device::Cartridge;
 use util::{Addressable, IoLine};
 
+// TODO device: expansion port test cases
+
 pub struct ExpansionPort {
     cartridge: Option<Cartridge>,
     // I/O

@@ -28,6 +28,8 @@ use util::Pulse;
 
 use super::Tape;
 
+// TODO device: datassette test cases
+
 const DUTY_CYCLE: u32 = 50;
 
 pub struct Datassette {

@@ -143,204 +143,226 @@ impl fmt::Display for Operand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cpu::Cpu;
-    use mem::Memory;
+    use super::super::CpuIo;
+    use mem::Ram;
     use std::cell::RefCell;
-    use std::io;
     use std::rc::Rc;
-    use std::result::Result;
 
-    fn setup_cpu() -> Result<Cpu, io::Error> {
-        let mem = Rc::new(RefCell::new(Memory::new()?));
-        Ok(Cpu::new(mem))
+    fn setup_cpu() -> Cpu {
+        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
+        Cpu::new(cpu_io, mem)
     }
 
     #[test]
-    fn address_zeropage() {
-        let cpu = setup_cpu().unwrap();
+    fn ea_zeropage() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let cpu = setup_cpu();
         let op = Operand::ZeroPage(0x10);
-        assert_eq!(0x0010, op.ea(&cpu));
+        assert_eq!(0x0010, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_zeropagex() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_zeropage_x() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_x(0x01);
         let op = Operand::ZeroPageX(0x10);
-        assert_eq!(0x0011, op.ea(&cpu));
+        assert_eq!(0x0011, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_zeropagex_wrapping() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_zeropage_x_wrapping() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_x(0x03);
         let op = Operand::ZeroPageX(0xff);
-        assert_eq!(0x0002, op.ea(&cpu));
+        assert_eq!(0x0002, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_zeropagey() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_zeropage_y() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_y(0x01);
         let op = Operand::ZeroPageY(0x10);
-        assert_eq!(0x0011, op.ea(&cpu));
+        assert_eq!(0x0011, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_zeropagey_wrapping() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_zeropage_y_wrapping() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_y(0x03);
         let op = Operand::ZeroPageY(0xff);
-        assert_eq!(0x0002, op.ea(&cpu));
+        assert_eq!(0x0002, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_absolute() {
-        let cpu = setup_cpu().unwrap();
+    fn ea_absolute() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let cpu = setup_cpu();
         let op = Operand::Absolute(0x0100);
-        assert_eq!(0x0100, op.ea(&cpu));
+        assert_eq!(0x0100, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_absolutex() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_absolute_x() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_x(0x01);
         let op = Operand::AbsoluteX(0x0100);
-        assert_eq!(0x0101, op.ea(&cpu));
+        assert_eq!(0x0101, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_absolutex_wrapping() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_absolute_x_wrapping() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_x(0x03);
         let op = Operand::AbsoluteX(0xffff);
-        assert_eq!(0x0002, op.ea(&cpu));
+        assert_eq!(0x0002, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_absolutey() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_absolute_y() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_y(0x01);
         let op = Operand::AbsoluteY(0x0100);
-        assert_eq!(0x0101, op.ea(&cpu));
+        assert_eq!(0x0101, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_absolutey_wrapping() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_absolute_y_wrapping() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_y(0x03);
         let op = Operand::AbsoluteY(0xffff);
-        assert_eq!(0x0002, op.ea(&cpu));
+        assert_eq!(0x0002, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_indirectx() {
-        let mut cpu = setup_cpu().unwrap();
-        cpu.write(0x0006, 0x00);
-        cpu.write(0x0007, 0x16);
+    fn ea_indirect_x() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.write(0x0006, 0x00, &tick_fn);
+        cpu.write(0x0007, 0x16, &tick_fn);
         cpu.set_x(0x05);
         let op = Operand::IndirectX(0x01);
-        assert_eq!(0x1600, op.ea(&cpu));
+        assert_eq!(0x1600, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_indirectx_wrapping() {
-        let mut cpu = setup_cpu().unwrap();
-        cpu.write(0x0006, 0x00);
-        cpu.write(0x0007, 0x16);
+    fn ea_indirect_x_wrapping() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.write(0x0006, 0x00, &tick_fn);
+        cpu.write(0x0007, 0x16, &tick_fn);
         cpu.set_x(0x07);
         let op = Operand::IndirectX(0xff);
-        assert_eq!(0x1600, op.ea(&cpu));
+        assert_eq!(0x1600, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_indirecty() {
-        let mut cpu = setup_cpu().unwrap();
-        cpu.write(0x0006, 0x00);
-        cpu.write(0x0007, 0x16);
+    fn ea_indirect_y() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.write(0x0006, 0x00, &tick_fn);
+        cpu.write(0x0007, 0x16, &tick_fn);
         cpu.set_y(0x05);
         let op = Operand::IndirectY(0x06);
-        assert_eq!(0x1605, op.ea(&cpu));
+        assert_eq!(0x1605, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_indirecty_wrapping() {
-        let mut cpu = setup_cpu().unwrap();
-        cpu.write(0x0006, 0xff);
-        cpu.write(0x0007, 0xff);
+    fn ea_indirect_y_wrapping() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.write(0x0006, 0xff, &tick_fn);
+        cpu.write(0x0007, 0xff, &tick_fn);
         cpu.set_y(0x06);
         let op = Operand::IndirectY(0x06);
-        assert_eq!(0x0005, op.ea(&cpu));
+        assert_eq!(0x0005, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_relative_pos() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_relative_pos() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_pc(0x0100);
         let op = Operand::Relative(0x01);
-        assert_eq!(0x0101, op.ea(&cpu));
+        assert_eq!(0x0101, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_relative_neg() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_relative_neg() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_pc(0x0100);
         let op = Operand::Relative(-0x01);
-        assert_eq!(0x00ff, op.ea(&cpu));
+        assert_eq!(0x00ff, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
-    fn address_relative_neg_max() {
-        let mut cpu = setup_cpu().unwrap();
+    fn ea_relative_neg_max() {
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_pc(0x0505);
         let op = Operand::Relative(-128);
-        assert_eq!(0x0485, op.ea(&cpu));
+        assert_eq!(0x0485, op.ea(&cpu, false, &tick_fn));
     }
 
     #[test]
     fn get_accumulator() {
-        let mut cpu = setup_cpu().unwrap();
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         cpu.set_a(0xab);
         let op = Operand::Accumulator;
-        assert_eq!(0xab, op.get(&cpu));
+        assert_eq!(0xab, op.get(&cpu, &tick_fn));
     }
 
     #[test]
     fn get_immediate() {
-        let cpu = setup_cpu().unwrap();
+        let tick_fn: TickFn = Box::new(move || {});
+        let cpu = setup_cpu();
         let op = Operand::Immediate(0xab);
-        assert_eq!(0xab, op.get(&cpu));
+        assert_eq!(0xab, op.get(&cpu, &tick_fn));
     }
 
     #[test]
     fn get_zeropage() {
-        let mut cpu = setup_cpu().unwrap();
-        cpu.write(0x0010, 0xab);
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.write(0x0010, 0xab, &tick_fn);
         let op = Operand::ZeroPage(0x10);
-        assert_eq!(0xab, op.get(&cpu));
+        assert_eq!(0xab, op.get(&cpu, &tick_fn));
     }
 
     #[test]
     fn get_absolute() {
-        let mut cpu = setup_cpu().unwrap();
-        cpu.write(0x0100, 0xab);
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
+        cpu.write(0x0100, 0xab, &tick_fn);
         let op = Operand::Absolute(0x0100);
-        assert_eq!(0xab, op.get(&cpu));
+        assert_eq!(0xab, op.get(&cpu, &tick_fn));
     }
 
     #[test]
     fn set_zeropage() {
-        let mut cpu = setup_cpu().unwrap();
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         let op = Operand::ZeroPage(0x10);
-        op.set(&mut cpu, 0xab);
-        assert_eq!(0xab, cpu.read(0x0010));
+        op.set(&mut cpu, 0xab, false, &tick_fn);
+        assert_eq!(0xab, cpu.read(0x0010, &tick_fn));
     }
 
     #[test]
     fn set_absolute() {
-        let mut cpu = setup_cpu().unwrap();
+        let tick_fn: TickFn = Box::new(move || {});
+        let mut cpu = setup_cpu();
         let op = Operand::Absolute(0x0100);
-        op.set(&mut cpu, 0xab);
-        assert_eq!(0xab, cpu.read(0x0100));
+        op.set(&mut cpu, 0xab, false, &tick_fn);
+        assert_eq!(0xab, cpu.read(0x0100, &tick_fn));
     }
 }

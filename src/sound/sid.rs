@@ -79,3 +79,55 @@ impl Sid {
         self.resid.write(reg, value);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    static SID_DATA: [u16; 51] = [
+        25, 177, 250, 28, 214, 250,
+        25, 177, 250, 25, 177, 250,
+        25, 177, 125, 28, 214, 125,
+        32, 94, 750, 25, 177, 250,
+        28, 214, 250, 19, 63, 250,
+        19, 63, 250, 19, 63, 250,
+        21, 154, 63, 24, 63, 63,
+        25, 177, 250, 24, 63, 125,
+        19, 63, 250,
+    ];
+
+    fn setup_sid() -> Sid {
+        let buffer = Arc::new(Mutex::new(SoundBuffer::new(8192)));
+        let mut sid = Sid::new(buffer);
+        sid.reset();
+        sid
+    }
+
+    #[test]
+    fn test_sid_output() {
+        let mut sid = setup_sid();
+        sid.write(0x05, 0x09); // AD1
+        sid.write(0x06, 0x00); // SR1
+        sid.write(0x18, 0x0f); // MODVOL
+        let mut i = 0;
+        let mut clocks = 0usize;
+        while i < SID_DATA.len() {
+            sid.write(0x01, SID_DATA[i + 0] as u8); // FREQHI1
+            sid.write(0x00, SID_DATA[i + 1] as u8); // FREQLO1
+            sid.write(0x00, 0x21); // CR1
+            for _j in 0..SID_DATA[i + 2] {
+                sid.clock_delta(22);
+                clocks += 22;
+            }
+            sid.write(0x00, 0x20); // CR1
+            for _j in 0..50 {
+                sid.clock_delta(22);
+                clocks += 22;
+            }
+            i += 3;
+        }
+        let buffer = sid.buffer.lock().unwrap();
+        assert_eq!(clocks * 44100 / 985248, buffer.len());
+    }
+}

@@ -40,6 +40,14 @@ impl SoundBuffer {
         self.tail = 0;
     }
 
+    pub fn len(&self) -> usize {
+        if self.tail > self.head {
+            self.tail - self.head
+        } else {
+            self.buffer.len() - self.head + self.tail
+        }
+    }
+
     pub fn pop(&mut self) -> i16 {
         let value = self.buffer[self.head];
         self.head += 1;
@@ -55,5 +63,54 @@ impl SoundBuffer {
         if self.tail == self.buffer.len() {
             self.tail = 0;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn len() {
+        let mut buffer = SoundBuffer::new(4);
+        buffer.push(1);
+        buffer.push(2);
+        buffer.push(3);
+        assert_eq!(3, buffer.len());
+    }
+
+    #[test]
+    fn len_with_overflow() {
+        let mut buffer = SoundBuffer::new(4);
+        buffer.push(1);
+        buffer.push(2);
+        buffer.push(3);
+        buffer.push(4);
+        buffer.pop();
+        buffer.pop();
+        buffer.push(5);
+        buffer.push(6);
+        assert_eq!(4, buffer.len());
+    }
+
+    #[test]
+    fn push_and_pop() {
+        let mut buffer = SoundBuffer::new(4);
+        buffer.push(1);
+        buffer.push(2);
+        buffer.push(3);
+        assert_eq!(1, buffer.pop());
+        assert_eq!(2, buffer.pop());
+        assert_eq!(3, buffer.pop());
+    }
+
+    #[test]
+    fn push_overflow() {
+        let mut buffer = SoundBuffer::new(2);
+        buffer.push(1);
+        buffer.push(2);
+        buffer.push(3);
+        assert_eq!(3, buffer.pop());
+        assert_eq!(2, buffer.pop());
     }
 }

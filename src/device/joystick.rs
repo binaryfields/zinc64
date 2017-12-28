@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// TODO device: joystick test cases
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AxisMotion {
     Negative,

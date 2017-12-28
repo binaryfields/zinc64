@@ -59,10 +59,11 @@
 
 ... LONG INTERMISSION ...
 
-### Week 6
+### Week 6 - 20171216
 
 - landed compliant sid output
 
-### Week 7
+### Week 7 - 20171223
 
 - landed revised cpu clock emulation
+- landed revised keyboard handling
