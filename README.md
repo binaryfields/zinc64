@@ -2,7 +2,7 @@
 
 ## Overview
 
-zinc64 is a quickly evolving emulator for Commodore 64 written in Rust. It implements MOS 6502 CPU, MOS 6526 CIA, MOS 6581 SID, MOS 6567/6569 VIC chipset as well as various devices/perhiperhals available with C64.
+zinc64 is a quickly evolving emulator for Commodore 64 written in Rust. It implements MOS 6510 CPU, MOS 6526 CIA, MOS 6581 SID, MOS 6567/6569 VIC chipset as well as various devices/perhiperhals available with C64.
 
 ### Story
 
@@ -12,7 +12,7 @@ zinc64 was started as an exercise to learn Rust and explore Commodore 64 hardwar
 
 I have been following Rust development for a while and since it has reached its first stability milestone, version 1.0 back in May 2015, I have been meaning to write something more substantial with it. Exploring Rust and its features is really the second driver behind this emulator. Coming from Scala background, a lot of concepts and features in Rust felt right at home. Things like type inference, immutable by default, traits, ADTs, pattern matching all contribute to writing code that parallels many of the things I've done in Scala. The biggest departure between the two languages is quite obviously memory management. While ownership/borrowing is not conceptually hard, it takes a bit of practice to fully appreciate its application in the code base.
 
-Overall, my impression of Rust is that it provides wonderful ergonomics for the developer while blending performance that only low-level languages provide with safety of a high level language (typically garbage collected one). While the language ecosystem may still be young and some libraries (futures/asyncio) need a bit more time to mature, the language already delivers a major productivity boost. The experience I had with it while writing code for the emulator can be largely summarized as "if it compiles, it works" (except for pieces that didn't ;). Very impressive, big props to Rust folks for pulling off an excellent development platform.
+Overall, my impression of Rust is that it provides wonderful ergonomics for the developer while blending performance that only low-level languages provide with safety of a high level language. The experience I had with it while writing code for the emulator can be largely summarized as "if it compiles, it works" (except for pieces that didn't ;). Very impressive, big props to Rust folks for pulling off an excellent development platform.
 
 ## Getting Started
 
@@ -22,7 +22,11 @@ Overall, my impression of Rust is that it provides wonderful ergonomics for the 
 
 2. Clone this repository.
 
-        git clone https://digitalstreamio/zinc64
+        git clone https://github.com/digitalstreamio/zinc64
+
+	or download as zip archive
+
+		https://github.com/digitalstreamio/zinc64/archive/master.zip
 
 3. Build the emulator.
 
@@ -33,12 +37,55 @@ Overall, my impression of Rust is that it provides wonderful ergonomics for the 
 
         ./target/release/zinc64
 
+    or start a program
+
+    	./target/release/zinc64 --autostart path
+
+### Windows Considerations
+
+1. Install [Microsoft Visual C++ Build Tools 2017](https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017). Select Visual C++ build tools workload.
+
+2. Install [SDL2 Development Libraries](http://www.libsdl.org/release/SDL2-devel-2.0.7-VC.zip).
+
+3. Copy all SDL2 lib files from
+
+		SDL2-devel-2.0.x-VC\SDL2-2.0.x\lib\x64\
+
+	to 
+
+		C:\Users\{Your Username}\.multirust\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\stable-x86_64-pc-windows-msvc\lib
+
+4. Copy SDL2.dll from
+
+		SDL2-devel-2.0.x-VC\SDL2-2.0.x\lib\x64\
+
+	to zinc64 project directory
+
 ## Examples
 
 I've included a number of examples from Kick Assembler that I've used to test various components of the emulator. They can be found in the bin folder of this repository and started with the emulator's autostart option.
 
-        ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
         ./target/release/zinc64 --autostart bin/SineAndGraphics.prg
+
+### Execution Results
+
+| Program                  | Status  |
+|--------------------------|---------|
+| 6502_functional_test.bin | Pass    |
+| FloydSteinberg.prg       | Pass    | 
+| KoalaShower.prg          | Pass    |
+| Message.prg              | Pass    |
+| MusicIrq.prg             | Pass    |
+| Scroll.prg               | Pass    |
+| SID_Player.prg           | Fails   |
+| SimpleSplits.prg         | Fails   |
+| SineAndGraphics.prg      | Pass    |
+
+## Tests
+
+The cpu validation was performed with the help of [Klaus2m5 functional tests](https://github.com/Klaus2m5/6502_65C02_functional_tests) for the 6502 processor 
+
+        ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
 
 ## Status
 
@@ -60,6 +107,13 @@ I've included a number of examples from Kick Assembler that I've used to test va
 | Format  | Prg           | Done
 | Format  | Tap           | Done
 | Format  | T64           | Not Started
+
+## Roadmap
+
+- v0.1 - zinc64 lib crate
+- v0.2 - zinc64 ui
+- v0.3 - vic rewrite
+- v0.4 - floppy support
 
 ## Issues
 
