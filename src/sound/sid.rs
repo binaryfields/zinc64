@@ -33,13 +33,23 @@ pub struct Sid {
 impl Sid {
     pub fn new(buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
         info!(target: "sound", "Initializing SID");
-        let mut sid = Sid {
+        Sid {
             resid: resid::Sid::new(resid::ChipModel::Mos6581),
             buffer,
-        };
-        sid.resid
-            .set_sampling_parameters(resid::SamplingMethod::ResampleFast, 985248, 44100);
-        sid
+        }
+    }
+
+    pub fn enable_filter(&mut self, enabled: bool) {
+        self.resid.enable_filter(enabled);
+    }
+
+    pub fn set_sampling_parameters(
+        &mut self,
+        method: resid::SamplingMethod,
+        clock_freq: u32,
+        sample_freq: u32,
+    ) {
+        self.resid.set_sampling_parameters(method, clock_freq, sample_freq);
     }
 
     #[inline(always)]

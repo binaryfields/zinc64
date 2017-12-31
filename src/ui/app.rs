@@ -34,10 +34,11 @@ use sdl2::render::{Canvas, Texture, TextureCreator};
 use sdl2::video::{FullscreenType, Window};
 use time;
 
+use zinc64::device::joystick::Button;
+use zinc64::device::keyboard::{Key, KeyEvent};
 use zinc64::sound::SoundBuffer;
 use zinc64::system::C64;
-use zinc64::device::keyboard::{Key, KeyEvent};
-use zinc64::device::joystick::Button;
+use zinc64::video::vic;
 
 pub enum JamAction {
     Continue,
@@ -125,9 +126,9 @@ impl AppWindow {
         // Initialize audio
         let audio = sdl.audio()?;
         let audio_spec = AudioSpecDesired {
-            freq: Some(44100),
+            freq: Some(c64.get_config().sound.sample_rate as i32),
             channels: Some(1),
-            samples: None,
+            samples: Some(c64.get_config().sound.buffer_size as u16),
         };
         let audio_device = audio.open_playback(None, &audio_spec, |spec| {
             info!(target: "audio", "{:?}", spec);
@@ -175,7 +176,8 @@ impl AppWindow {
     pub fn run(&mut self) -> Result<(), String> {
         info!(target: "ui", "Running main loop");
         self.audio_device.resume();
-        let screen_size = self.c64.get_config().screen_size;
+        let vic_spec = vic::Spec::new(self.c64.get_config().model.vic_model);
+        let screen_size = vic_spec.display_rect.size();
         let texture_creator: TextureCreator<_> = self.canvas.texture_creator();
         let mut texture = texture_creator
             .create_texture_streaming(

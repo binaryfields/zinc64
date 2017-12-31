@@ -19,7 +19,7 @@
 
 mod color;
 mod render_target;
-mod vic;
+pub mod vic;
 mod vic_memory;
 
 pub use self::render_target::RenderTarget;

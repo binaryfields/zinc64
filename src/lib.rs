@@ -24,7 +24,6 @@ extern crate log;
 extern crate resid;
 extern crate time;
 
-pub mod config;
 pub mod cpu;
 pub mod device;
 pub mod io;

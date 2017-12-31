@@ -20,7 +20,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use config::Config;
 use cpu::CpuIo;
 use cpu::interrupt_line;
 use mem::Ram;
@@ -34,6 +33,73 @@ use super::{RenderTarget, VicMemory};
 
 // TODO vic: impl bad line logic
 // TODO vic: implement sprites
+
+/*
+
+The dimensions of the video display for the different VIC types are as
+follows:
+
+          | Video  | # of  | Visible | Cycles/ |  Visible
+   Type   | system | lines |  lines  |  line   | pixels/line
+ ---------+--------+-------+---------+---------+------------
+ 6567R56A | NTSC-M |  262  |   234   |   64    |    411
+  6567R8  | NTSC-M |  263  |   235   |   65    |    418
+   6569   |  PAL-B |  312  |   284   |   63    |    403
+
+          | First  |  Last  |              |   First    |   Last
+          | vblank | vblank | First X coo. |  visible   |  visible
+   Type   |  line  |  line  |  of a line   |   X coo.   |   X coo.
+ ---------+--------+--------+--------------+------------+-----------
+ 6567R56A |   13   |   40   |  412 ($19c)  | 488 ($1e8) | 388 ($184)
+  6567R8  |   13   |   40   |  412 ($19c)  | 489 ($1e9) | 396 ($18c)
+   6569   |  300   |   15   |  404 ($194)  | 480 ($1e0) | 380 ($17c)
+
+*/
+
+/*
+
+The height and width of the display window can each be set to two different
+values with the bits RSEL and CSEL in the registers $d011 and $d016:
+
+ RSEL|  Display window height   | First line  | Last line
+ ----+--------------------------+-------------+----------
+   0 | 24 text lines/192 pixels |   55 ($37)  | 246 ($f6)
+   1 | 25 text lines/200 pixels |   51 ($33)  | 250 ($fa)
+
+ CSEL|   Display window width   | First X coo. | Last X coo.
+ ----+--------------------------+--------------+------------
+   0 | 38 characters/304 pixels |   31 ($1f)   |  334 ($14e)
+   1 | 40 characters/320 pixels |   24 ($18)   |  343 ($157)
+
+The X coordinates run up to $1ff (only $1f7 on the 6569) within a line, then comes X coordinate 0.
+
+There are 2×2 comparators belonging to each of the two flip flops. There
+comparators compare the X/Y position of the raster beam with one of two
+hardwired values (depending on the state of the CSEL/RSEL bits) to control
+the flip flops. The comparisons only match if the values are reached
+precisely. There is no comparison with an interval.
+
+The horizontal comparison values:
+
+       |   CSEL=0   |   CSEL=1
+ ------+------------+-----------
+ Left  |  31 ($1f)  |  24 ($18)
+ Right | 335 ($14f) | 344 ($158)
+
+And the vertical ones:
+
+        |   RSEL=0  |  RSEL=1
+ -------+-----------+----------
+ Top    |  55 ($37) |  51 ($33)
+ Bottom | 247 ($f7) | 251 ($fb)
+
+*/
+
+#[derive(Copy, Clone)]
+pub enum ChipModel {
+    Mos6567, // NTSC
+    Mos6569, // PAL
+}
 
 #[derive(Copy, Clone)]
 enum Mode {
@@ -183,6 +249,43 @@ impl Reg {
     }
 }
 
+pub struct Spec {
+    pub raster_lines: u16,
+    pub cycles_per_raster: u16,
+    pub display_rect: Rect,
+    pub display_size: Dimension,
+    pub window_rect: Rect,
+}
+
+impl Spec {
+    pub fn new(chip_model: ChipModel) -> Spec {
+        match chip_model {
+            ChipModel::Mos6567 => Spec::ntsc(),
+            ChipModel::Mos6569 => Spec::pal(),
+        }
+    }
+
+    fn ntsc() -> Spec {
+        Spec {
+            raster_lines: 278,
+            cycles_per_raster: 65,
+            display_rect: Rect::new_with_dim(80, 28, Dimension::new(403, 250)),
+            display_size: Dimension::new(403, 250),
+            window_rect: Rect::new_with_dim(128, 51 - 3, Dimension::new(320, 200)),
+        }
+    }
+
+    fn pal() -> Spec {
+        Spec {
+            raster_lines: 312,
+            cycles_per_raster: 63,
+            display_rect: Rect::new_with_dim(80, 16, Dimension::new(403, 284)),
+            display_size: Dimension::new(403, 284),
+            window_rect: Rect::new_with_dim(128, 51 - 3, Dimension::new(320, 200)),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 struct Sprite {
     enabled: bool,
@@ -224,7 +327,7 @@ impl Sprite {
 #[allow(dead_code)]
 pub struct Vic {
     // Dependencies
-    config: Config,
+    spec: Spec,
     color_ram: Rc<RefCell<Ram>>,
     cpu_io: Rc<RefCell<CpuIo>>,
     mem: Rc<RefCell<VicMemory>>,
@@ -238,7 +341,6 @@ pub struct Vic {
     scroll_y: u8,
     // Dimensions
     graphics: Rect,
-    screen: Rect,
     window: Rect,
     // Interrupts
     int_data: u8,
@@ -266,19 +368,20 @@ pub struct Vic {
 
 impl Vic {
     pub fn new(
-        config: Config,
+        chip_model: ChipModel,
         color_ram: Rc<RefCell<Ram>>,
         cpu_io: Rc<RefCell<CpuIo>>,
         mem: Rc<RefCell<VicMemory>>,
         rt: Rc<RefCell<RenderTarget>>,
     ) -> Vic {
         info!(target: "video", "Initializing VIC");
+        let spec = Spec::new(chip_model);
         let mut vic = Vic {
-            config: config,
-            color_ram: color_ram,
-            cpu_io: cpu_io,
-            mem: mem,
-            rt: rt,
+            spec,
+            color_ram,
+            cpu_io,
+            mem,
+            rt,
             mode: Mode::Text,
             den: false,
             rsel: false,
@@ -286,7 +389,6 @@ impl Vic {
             scroll_x: 0,
             scroll_y: 0,
             graphics: Rect::new(0, 0, 0, 0),
-            screen: config.screen,
             window: Rect::new(0, 0, 0, 0),
             int_data: 0x00,
             int_mask: 0x00,
@@ -345,9 +447,9 @@ impl Vic {
         }
         let x_pos = self.cycle << 3;
         let y_pos = self.raster;
-        if self.screen.contains(x_pos, y_pos) {
-            let x_screen = x_pos - self.screen.left;
-            let y_screen = self.raster - self.screen.top;
+        if self.spec.display_rect.contains(x_pos, y_pos) {
+            let x_screen = x_pos - self.spec.display_rect.left;
+            let y_screen = self.raster - self.spec.display_rect.top;
             if self.graphics.contains(x_pos, y_pos) {
                 if self.window.contains(x_screen, y_screen) {
                     self.draw(x_screen, y_screen, self.vc, self.rc);
@@ -374,10 +476,10 @@ impl Vic {
         }
         // Update counters/runtime state
         self.cycle += 1;
-        if self.cycle >= self.config.raster_line_cycles {
+        if self.cycle >= self.spec.cycles_per_raster {
             self.cycle = 0;
             self.raster += 1;
-            if self.raster >= self.config.raster_size.height {
+            if self.raster >= self.spec.raster_lines {
                 self.raster = 0;
                 // 1. Once somewhere outside of the range of raster lines $30-$f7, VCBASE is reset
                 // to zero.
@@ -415,16 +517,16 @@ impl Vic {
     }
 
     fn update_display_dims(&mut self) {
-        self.graphics = self.config
-            .graphics
+        self.graphics = self.spec
+            .window_rect
             .offset(self.scroll_x as i16, self.scroll_y as i16);
         let window_x = if self.csel { 128 } else { 128 + 7 };
         let window_width = if self.csel { 320 } else { 304 };
         let window_y = if self.rsel { 51 } else { 55 };
         let window_height = if self.rsel { 200 } else { 192 };
         self.window = Rect::new_with_dim(
-            window_x - self.screen.left,
-            window_y - self.screen.top,
+            window_x - self.spec.display_rect.left,
+            window_y - self.spec.display_rect.top,
             Dimension::new(window_width, window_height),
         );
     }
@@ -509,7 +611,7 @@ impl Vic {
         let mut rt = self.rt.borrow_mut();
         for i in 0..4u16 {
             let x_pos = x + 6 - (i << 1);
-            if x_pos <= self.config.window.right {
+            if x_pos <= self.window.right {
                 let source = (data >> (i as u8 * 2)) & 0x03;
                 let color = match source {
                     0 => self.background_color[0],
@@ -519,7 +621,7 @@ impl Vic {
                     _ => panic!("invalid color source {}", source),
                 };
                 rt.write(x_pos, y, color);
-                if x_pos + 1 <= self.config.window.right {
+                if x_pos + 1 <= self.window.right {
                     rt.write(x_pos + 1, y, color);
                 }
             } else {
@@ -532,18 +634,18 @@ impl Vic {
         let mut rt = self.rt.borrow_mut();
         for i in 0..8u16 {
             let x_pos = x + 7 - i;
-            if x_pos < self.config.window.right {
+            if x_pos < self.window.right {
                 rt.write(x_pos, y, 0);
             }
         }
     }
 
     fn draw_border(&self, x: u16, y: u16) {
-        if y < self.config.screen_size.height {
+        if y < self.spec.display_size.height {
             let mut rt = self.rt.borrow_mut();
             for i in 0..8u16 {
                 let x_pos = x + 7 - i;
-                if x_pos < self.config.screen_size.width {
+                if x_pos < self.spec.display_size.width {
                     rt.write(x_pos, y, self.border_color);
                 }
             }
@@ -554,7 +656,7 @@ impl Vic {
         let mut rt = self.rt.borrow_mut();
         for i in 0..8u16 {
             let x_pos = x + 7 - i;
-            if x_pos <= self.config.window.right {
+            if x_pos <= self.window.right {
                 let color = if bit::test(data, i as u8) {
                     color_1
                 } else {
@@ -571,7 +673,7 @@ impl Vic {
         let mut rt = self.rt.borrow_mut();
         for i in 0..8u16 {
             let x_pos = x + 7 - i;
-            if x_pos <= self.config.window.right {
+            if x_pos <= self.window.right {
                 let color = if bit::test(data, i as u8) {
                     color_1
                 } else {
@@ -594,7 +696,7 @@ impl Vic {
         let mut rt = self.rt.borrow_mut();
         for i in 0..4u16 {
             let x_pos = x + 6 - (i << 1);
-            if x_pos <= self.config.window.right {
+            if x_pos <= self.window.right {
                 let source = (data >> ((i as u8) << 1)) & 0x03;
                 let color = match source {
                     0 => self.background_color[0],
@@ -604,7 +706,7 @@ impl Vic {
                     _ => panic!("invalid color source {}", source),
                 };
                 rt.write(x_pos, y, color);
-                if x_pos + 1 <= self.config.window.right {
+                if x_pos + 1 <= self.window.right {
                     rt.write(x_pos + 1, y, color);
                 }
             } else {
@@ -644,7 +746,7 @@ impl Vic {
 
     fn draw_sprite(&self, x: u16, y: u16, data: u8, color: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.screen.top;
+        let y_trans = y - self.spec.display_rect.top;
         let x_trans = x;
         for i in 0..8u16 {
             if bit::test(data, i as u8) {
@@ -655,7 +757,7 @@ impl Vic {
 
     fn draw_sprite_mc(&self, x: u16, y: u16, n: usize, data: u8) {
         let mut rt = self.rt.borrow_mut();
-        let y_trans = y - self.config.screen.top;
+        let y_trans = y - self.spec.display_rect.top;
         let x_trans = x;
         for i in 0..4u16 {
             let source = (data >> (i as u8 * 2)) & 0x03;

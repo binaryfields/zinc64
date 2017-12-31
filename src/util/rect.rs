@@ -44,18 +44,18 @@ impl Rect {
     #[allow(dead_code)]
     pub fn new(left: u16, right: u16, top: u16, bottom: u16) -> Rect {
         Rect {
-            left: left,
-            right: right,
-            top: top,
-            bottom: bottom,
+            left,
+            right,
+            top,
+            bottom,
         }
     }
 
     pub fn new_with_dim(left: u16, top: u16, size: Dimension) -> Rect {
         Rect {
-            left: left,
+            left,
             right: left + size.width - 1,
-            top: top,
+            top,
             bottom: top + size.height - 1,
         }
     }

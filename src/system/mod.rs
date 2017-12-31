@@ -18,5 +18,9 @@
  */
 
 pub mod c64;
+pub mod config;
+pub mod model;
 
 pub use self::c64::C64;
+pub use self::config::Config;
+pub use self::model::Model;

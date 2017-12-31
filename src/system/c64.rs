@@ -29,7 +29,6 @@ use std::time::Duration;
 use time;
 
 use cpu::{Cpu, CpuIo, TickFn};
-use config::Config;
 use device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
 use device::joystick;
 use mem::{DeviceMemory, ExpansionPort, Memory, Ram, Rom};
@@ -38,7 +37,10 @@ use io::cia;
 use loader::Autostart;
 use sound::{Sid, SoundBuffer};
 use video::{RenderTarget, Vic, VicMemory};
+use video::vic;
 use util::Addressable;
+
+use super::Config;
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -84,9 +86,10 @@ impl C64 {
         let cia1_io = Rc::new(RefCell::new(CiaIo::new()));
         let cia2_io = Rc::new(RefCell::new(CiaIo::new()));
         let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
-        let rt = Rc::new(RefCell::new(RenderTarget::new(config.screen_size)));
+        let vic_spec = vic::Spec::new(config.model.vic_model);
+        let rt = Rc::new(RefCell::new(RenderTarget::new(vic_spec.display_rect.size())));
         let sound_buffer = Arc::new(Mutex::new(
-            SoundBuffer::new(4096), // FIXME magic value
+            SoundBuffer::new(config.sound.buffer_size),
         ));
 
         // Peripherals
@@ -94,13 +97,13 @@ impl C64 {
             cia1_io.clone(),
             cpu_io.clone(),
         )));
-        let joystick1 = if config.joystick1 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(Joystick::new(config.joystick1, 3200))))
+        let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
+            Some(Rc::new(RefCell::new(Joystick::new(config.joystick.joystick_1, 3200))))
         } else {
             None
         };
-        let joystick2 = if config.joystick2 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(Joystick::new(config.joystick2, 3200))))
+        let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
+            Some(Rc::new(RefCell::new(Joystick::new(config.joystick.joystick_2, 3200))))
         } else {
             None
         };
@@ -132,9 +135,15 @@ impl C64 {
             keyboard.clone(),
         )));
         let sid = Rc::new(RefCell::new(Sid::new(sound_buffer.clone())));
+        sid.borrow_mut().set_sampling_parameters(
+            config.sound.sampling_method,
+            config.model.cpu_freq,
+            config.sound.sample_rate
+        );
+        sid.borrow_mut().enable_filter(config.sound.sid_filters);
         let vic_mem = Rc::new(RefCell::new(VicMemory::new(charset.clone(), ram.clone())));
         let vic = Rc::new(RefCell::new(Vic::new(
-            config.clone(),
+            config.model.vic_model,
             color_ram.clone(),
             cpu_io.clone(),
             vic_mem.clone(),
@@ -329,7 +338,7 @@ impl C64 {
 
     pub fn run_frame(&mut self, overflow_cycles: i32) -> i32 {
         let mut elapsed = 0u32;
-        let mut delta = self.config.frame_cycles as i32 - overflow_cycles;
+        let mut delta = self.config.model.cycles_per_frame as i32 - overflow_cycles;
         let vic_clone = self.vic.clone();
         let cia1_clone = self.cia1.clone();
         let cia2_clone = self.cia2.clone();
@@ -351,7 +360,7 @@ impl C64 {
             delta -= cycles as i32;
         }
         self.frames = self.frames.wrapping_add(1);
-        if self.frames % (self.config.refresh_rate as u32 / 10) == 0 {
+        if self.frames % (self.config.model.refresh_rate as u32 / 10) == 0 {
             self.cia1.borrow_mut().tod_tick();
             self.cia2.borrow_mut().tod_tick();
         }
@@ -377,7 +386,8 @@ impl C64 {
     }
 
     fn sync_frame(&mut self) {
-        let frame_duration_scaled_ns = self.config.frame_duration_ns * 100 / self.speed as u32;
+        let frame_duration_ns = ((1.0 / self.config.model.refresh_rate) * 1_000_000_000.0) as u32;
+        let frame_duration_scaled_ns = frame_duration_ns * 100 / self.speed as u32;
         let time_ns = time::precise_time_ns();
         let wait_ns = if self.next_frame_ns > time_ns {
             (self.next_frame_ns - time_ns) as u32

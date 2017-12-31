@@ -31,10 +31,9 @@ use std::path::Path;
 use std::process;
 use std::result::Result;
 
-use zinc64::config::Config;
 use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
-use zinc64::system::C64;
+use zinc64::system::{C64, Config, Model};
 use zinc64::util::Logger;
 
 use ui::app;
@@ -100,13 +99,13 @@ fn build_app_options(matches: &getopts::Matches) -> Result<app::Options, String>
 }
 
 fn build_sys_config(matches: &getopts::Matches) -> Result<Config, String> {
-    let model = matches.opt_str("model").unwrap_or(String::from("pal"));
-    let mut config = Config::new(&model);
+    let model = Model::from(&matches.opt_str("model").unwrap_or(String::from("pal")));
+    let mut config = Config::new(model);
     if let Some(joydev) = matches.opt_str("joydev1") {
-        config.joystick1 = device::joystick::Mode::from(&joydev);
+        config.joystick.joystick_1 = device::joystick::Mode::from(&joydev);
     }
     if let Some(joydev) = matches.opt_str("joydev2") {
-        config.joystick2 = device::joystick::Mode::from(&joydev);
+        config.joystick.joystick_2 = device::joystick::Mode::from(&joydev);
     }
     Ok(config)
 }
