@@ -203,7 +203,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             }
         } else {
             let options = build_app_options(&matches)?;
-            let mut app_window = ui::AppWindow::new(c64, options)?;
+            let mut app_window = ui::App::new(c64, options)?;
             app_window.run()?;
         }
     }

@@ -1,10 +1,14 @@
 # TODO
 
+- add clock
+- minimize more deps
 - cli module
-- review loader module
-- vic
 - ui/menus
 - monitor/telnet
+- review loader module
+
+- vic
+- floppy
 
 - https://forums.libsdl.org/viewtopic.php?t=6723&sid=23faf65c9e5db23708d5a1f7990165c3
 

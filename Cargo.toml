@@ -15,5 +15,9 @@ getopts = "0.2"
 gl = "0.7"
 log = "0.3"
 resid-rs = "0.4"
-sdl2 = "0.31"
 time = "0.1"
+
+[dependencies.sdl2]
+version = "0.31"
+default-features = false
+features = ["unsafe_textures"]

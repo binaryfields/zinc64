@@ -18,5 +18,9 @@
  */
 
 pub mod app;
+mod audio;
+mod io;
+mod keymap;
+mod renderer;
 
-pub use self::app::AppWindow;
+pub use self::app::App;
