@@ -27,7 +27,6 @@ use sdl2::audio::AudioDevice;
 use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
-
 use zinc64::system::C64;
 use zinc64::util::Dimension;
 use zinc64::video::vic;

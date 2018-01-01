@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod app;
+mod app;
 mod audio;
 mod io;
 mod keymap;
 mod renderer;
 
-pub use self::app::App;
+pub use self::app::{App, JamAction, Options};

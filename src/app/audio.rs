@@ -21,7 +21,6 @@ use std::sync::{Arc, Mutex};
 
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
-
 use zinc64::sound::SoundBuffer;
 
 // TODO app/audio: add play/resume/volume

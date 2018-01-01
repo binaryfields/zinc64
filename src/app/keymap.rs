@@ -19,7 +19,6 @@
 
 use sdl2::keyboard;
 use sdl2::keyboard::{Keycode, Mod};
-
 use zinc64::device::keyboard::{Key, KeyEvent};
 
 pub struct KeyMap;

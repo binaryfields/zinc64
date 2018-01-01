@@ -24,7 +24,7 @@ extern crate sdl2;
 extern crate time;
 extern crate zinc64;
 
-mod ui;
+mod app;
 
 use std::env;
 use std::path::Path;
@@ -35,8 +35,6 @@ use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
 use zinc64::system::{C64, Config, Model};
 use zinc64::util::Logger;
-
-use ui::app;
 
 static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -203,7 +201,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             }
         } else {
             let options = build_app_options(&matches)?;
-            let mut app_window = ui::App::new(c64, options)?;
+            let mut app_window = app::App::new(c64, options)?;
             app_window.run()?;
         }
     }

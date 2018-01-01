@@ -24,7 +24,6 @@ use sdl2::pixels;
 use sdl2::render;
 use sdl2::video;
 use time;
-
 use zinc64::video::RenderTarget;
 use zinc64::util::Dimension;
 
