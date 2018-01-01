@@ -17,14 +17,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod app;
-mod audio;
-mod cli;
-mod console;
-mod io;
-mod keymap;
-mod renderer;
+use zinc64::system::C64;
 
-pub use self::app::{App, JamAction, Options};
-pub use self::cli::Cli;
-pub use self::console::ConsoleApp;
+pub struct ConsoleApp {
+    c64: C64,
+}
+
+impl ConsoleApp {
+    pub fn new(c64: C64) -> ConsoleApp {
+        ConsoleApp {
+            c64
+        }
+    }
+
+    pub fn run(&mut self) {
+        let mut overflow_cycles = 0i32;
+        loop {
+            overflow_cycles = self.c64.run_frame(overflow_cycles);
+            if self.c64.is_cpu_jam() {
+                let cpu = self.c64.get_cpu();
+                warn!(target: "main", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
+                break;
+            }
+        }
+    }
+}

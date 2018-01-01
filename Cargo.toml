@@ -14,7 +14,7 @@ byteorder = "1.2"
 getopts = "0.2"
 gl = "0.7"
 log = "0.3"
-resid-rs = "0.4"
+resid-rs = "0.5"
 time = "0.1"
 
 [dependencies.sdl2]
