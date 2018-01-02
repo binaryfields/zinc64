@@ -23,8 +23,10 @@ mod cli;
 mod console;
 mod io;
 mod keymap;
+mod logger;
 mod renderer;
 
 pub use self::app::{App, JamAction, Options};
 pub use self::cli::Cli;
 pub use self::console::ConsoleApp;
+pub use self::logger::Logger;

@@ -17,11 +17,38 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod c64;
-mod clock;
-pub mod config;
-pub mod model;
+use std::ops::Fn;
 
-pub use self::c64::C64;
-pub use self::config::Config;
-pub use self::model::Model;
+pub type Observer = Box<Fn(u8)>;
+
+pub struct IoLine {
+    value: u8,
+    observer: Option<Observer>,
+}
+
+impl IoLine {
+    pub fn new(initial_value: u8) -> IoLine {
+        IoLine {
+            value: initial_value,
+            observer: None,
+        }
+    }
+
+    #[inline]
+    pub fn get_value(&self) -> u8 {
+        self.value
+    }
+
+    #[inline]
+    pub fn set_observer(&mut self, observer: Observer) {
+        self.observer = Some(observer);
+    }
+
+    #[inline]
+    pub fn set_value(&mut self, value: u8) {
+        self.value = value;
+        if let Some(ref observer) = self.observer {
+            observer(self.value);
+        }
+    }
+}

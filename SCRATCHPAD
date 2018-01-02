@@ -98,8 +98,8 @@ pub struct AppWindow {
     sdl: Sdl,
     canvas: Canvas<Window>,
     // Devices
-    #[allow(dead_code)] joystick1: Option<Joystick>,
-    #[allow(dead_code)] joystick2: Option<Joystick>,
+    joystick1: Option<Joystick>,
+    joystick2: Option<Joystick>,
     // Configuration
     jam_action: JamAction,
     // Runtime State

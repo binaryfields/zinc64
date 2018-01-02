@@ -20,7 +20,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use util::Addressable;
+use core::Addressable;
 
 pub struct VicMemory {
     charset: Rc<RefCell<Addressable>>,

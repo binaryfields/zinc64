@@ -23,7 +23,7 @@ use std::io::Read;
 use std::path::Path;
 use std::result::Result;
 
-use util::Addressable;
+use core::Addressable;
 
 pub struct Rom {
     data: Vec<u8>,

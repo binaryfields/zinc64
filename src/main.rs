@@ -29,10 +29,9 @@ mod app;
 use std::env;
 use std::process;
 
-use zinc64::util::Logger;
 use zinc64::system::C64;
 
-use self::app::{App, Cli, ConsoleApp};
+use self::app::{App, Cli, ConsoleApp, Logger};
 
 static NAME: &'static str = "zinc64";
 

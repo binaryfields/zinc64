@@ -17,24 +17,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod addressable;
-pub mod bcd;
-pub mod bit;
-mod icr;
-mod ioline;
-mod ioport;
-mod logger;
-mod pin;
-mod pulse;
-mod rect;
-mod rtc;
+pub struct Pulse {
+    low_cycles: u32,
+    remaining_cycles: u32,
+}
 
-pub use self::addressable::Addressable;
-pub use self::icr::Icr;
-pub use self::ioline::IoLine;
-pub use self::ioport::IoPort;
-pub use self::logger::Logger;
-pub use self::pin::Pin;
-pub use self::pulse::Pulse;
-pub use self::rect::{Dimension, Rect};
-pub use self::rtc::Rtc;
+impl Pulse {
+    pub fn new(length: u32, duty: u32) -> Pulse {
+        Pulse {
+            low_cycles: length * (100 - duty) / 100,
+            remaining_cycles: length,
+        }
+    }
+
+    #[inline]
+    pub fn is_done(&self) -> bool {
+        self.remaining_cycles == 0
+    }
+
+    #[inline]
+    pub fn advance(&mut self) -> bool {
+        self.remaining_cycles -= 1;
+        if self.low_cycles == 0 {
+            true
+        } else {
+            self.low_cycles -= 1;
+            false
+        }
+    }
+}

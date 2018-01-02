@@ -23,8 +23,8 @@ use std::path::Path;
 use std::rc::Rc;
 use std::result::Result;
 
+use core::Addressable;
 use log::LogLevel;
-use util::Addressable;
 
 use super::{Bank, Configuration, MemoryMap, Rom};
 
@@ -36,6 +36,9 @@ use super::{Bank, Configuration, MemoryMap, Rom};
 //   memory layout.
 
 pub struct Memory {
+    // Configuration
+    map: MemoryMap,
+    configuration: Configuration,
     // Addressable
     basic: Box<Addressable>,
     charset: Rc<RefCell<Addressable>>,
@@ -43,9 +46,6 @@ pub struct Memory {
     expansion_port: Rc<RefCell<Addressable>>,
     kernal: Box<Addressable>,
     ram: Rc<RefCell<Addressable>>,
-    // Configuration
-    map: MemoryMap,
-    configuration: Configuration,
 }
 
 #[derive(Copy, Clone)]
@@ -79,14 +79,14 @@ impl Memory {
         let map = MemoryMap::new();
         let configuration = map.get(1);
         Ok(Memory {
+            map,
+            configuration,
             basic,
             charset,
             device_mem,
             expansion_port,
             kernal,
             ram,
-            map,
-            configuration,
         })
     }
 

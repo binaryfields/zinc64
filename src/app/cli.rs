@@ -57,6 +57,11 @@ impl Cli {
                 .opt_str("width")
                 .map(|s| s.parse::<u32>().unwrap())
                 .unwrap_or(800),
+            speed: matches
+                .opt_str("speed")
+                .map(|s| s.parse::<u8>().unwrap())
+                .unwrap_or(100),
+            warp_mode: matches.opt_present("warp"),
         };
         Ok(options)
     }
@@ -103,6 +108,8 @@ impl Cli {
             .optflag("f", "fullscreen", "enable fullscreen")
             .optopt("", "width", "window width", "800")
             .optopt("", "height", "window height", "600")
+            .optopt("", "speed", "set speed of the emulator", "number")
+            .optflag("", "warp", "enable wrap mode")
             // Device
             .optopt("", "joydev1", "set device for joystick 1", "none")
             .optopt("", "joydev2", "set device for joystick 2", "numpad")
@@ -114,7 +121,6 @@ impl Cli {
             // Debug
             .optmulti("", "bp", "set breakpoint at this address", "address")
             .optopt("", "jamaction", "set cpu jam handling", "[continue|quit|reset]")
-            .optopt("", "speed", "set speed of the emulator", "number")
             // Logging
             .optopt("", "loglevel", "set log level", "[error|warn|info|debug|trace]")
             .optmulti("", "log", "set log level for a target", "target=level")
@@ -187,11 +193,6 @@ impl Cli {
         for bp in bps {
             c64.add_breakpoint(bp);
         }
-        let speed = matches
-            .opt_str("speed")
-            .map(|s| s.parse::<u8>().unwrap())
-            .unwrap_or(100);
-        c64.set_speed(speed);
         Ok(())
     }
 }

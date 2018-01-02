@@ -1,10 +1,9 @@
 # TODO
 
-- system: add clock
-- core: minimize more deps
-- app: add ui/menus
-- debugger: monitor/telnet
 - misc: review loader module
+- app: add screenshot support
+- app: add ui/menus
+- app: add debugger support
 
-- vic
-- floppy
+- chipset: rewrite vic
+- device: add floppy support

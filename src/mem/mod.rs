@@ -18,14 +18,12 @@
  */
 
 mod device_memory;
-mod expansion_port;
 mod memory;
 mod memory_map;
 mod ram;
 mod rom;
 
 pub use self::device_memory::DeviceMemory;
-pub use self::expansion_port::ExpansionPort;
 pub use self::memory::Memory;
 pub use self::memory_map::{Bank, Configuration, MemoryMap};
 pub use self::ram::Ram;

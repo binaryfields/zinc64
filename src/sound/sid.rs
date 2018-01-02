@@ -19,12 +19,14 @@
 
 use std::sync::{Arc, Mutex};
 
+use core::Chip;
 use log::LogLevel;
 use resid;
 
 use super::SoundBuffer;
 
 pub struct Sid {
+    // Functional Units
     resid: resid::Sid,
     // I/O
     buffer: Arc<Mutex<SoundBuffer>>,
@@ -71,18 +73,19 @@ impl Sid {
             output.push(buffer[i]);
         }
     }
+}
 
-    pub fn reset(&mut self) {
+impl Chip for Sid {
+
+    fn reset(&mut self) {
         self.resid.reset();
     }
 
-    // -- Device I/O
-
-    pub fn read(&self, reg: u8) -> u8 {
+    fn read(&mut self, reg: u8) -> u8 {
         self.resid.read(reg)
     }
 
-    pub fn write(&mut self, reg: u8, value: u8) {
+    fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "sid::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }

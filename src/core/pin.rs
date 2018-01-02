@@ -18,7 +18,7 @@
  */
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum State {
+enum State {
     High,
     Low,
 }
@@ -43,39 +43,38 @@ impl Pin {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn is_falling(&self) -> bool {
         self.last == State::High && self.state == State::Low
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn is_high(&self) -> bool {
         self.state == State::High
     }
 
-    #[allow(dead_code)]
-    #[inline(always)]
+    #[inline]
     pub fn is_low(&self) -> bool {
         self.state == State::Low
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn is_rising(&self) -> bool {
         self.last == State::Low && self.state == State::High
     }
 
-    #[inline(always)]
-    pub fn set(&mut self, state: State) {
-        self.last = self.state;
-        self.state = state;
-    }
-
-    #[inline(always)]
+    #[inline]
     pub fn set_active(&mut self, active: bool) {
         if active {
             self.set(State::High);
         } else {
             self.set(State::Low);
         }
+    }
+
+    #[inline]
+    fn set(&mut self, state: State) {
+        self.last = self.state;
+        self.state = state;
     }
 }

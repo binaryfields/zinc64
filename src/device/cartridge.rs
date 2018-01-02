@@ -19,7 +19,7 @@
 
 use std::iter::Iterator;
 
-use util::Addressable;
+use core::Addressable;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 

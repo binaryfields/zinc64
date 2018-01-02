@@ -24,8 +24,7 @@ use sdl2::pixels;
 use sdl2::render;
 use sdl2::video;
 use time;
-use zinc64::video::RenderTarget;
-use zinc64::util::Dimension;
+use zinc64::video::{Dimension, RenderTarget};
 
 pub struct Renderer {
     canvas: render::WindowCanvas,
@@ -77,7 +76,7 @@ impl Renderer {
         self.canvas.clear();
         self.canvas.copy(&self.texture, None, None)?;
         self.canvas.present();
-        self.frame += 1;
+        self.frame = self.frame.wrapping_add(1);
         self.last_frame_ts = time::precise_time_ns();
         Ok(())
     }

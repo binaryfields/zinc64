@@ -19,9 +19,8 @@
 
 use std::mem;
 
-use util::Dimension;
-
 use super::color::Color;
+use super::rect::Dimension;
 
 const PIXEL_BYTES: usize = 4;
 
@@ -38,11 +37,6 @@ impl RenderTarget {
             pixels: vec![0; dim.width as usize * dim.height as usize],
             sync: false,
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_dimension(&self) -> Dimension {
-        self.dim
     }
 
     pub fn get_pitch(&self) -> usize {

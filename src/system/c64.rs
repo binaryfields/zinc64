@@ -23,30 +23,26 @@ use std::io;
 use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
-use time;
-
-use cpu::{Cpu, CpuIo, TickFn};
-use device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
+use core::{Addressable, Chip, IoPort, IrqLine};
+use cpu::{Cpu, TickFn};
+use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 use device::joystick;
-use mem::{DeviceMemory, ExpansionPort, Memory, Ram, Rom};
-use io::{Cia, CiaIo};
+use mem::{DeviceMemory, Memory, Ram, Rom};
+use io::Cia;
 use io::cia;
 use loader::Autostart;
 use sound::{Sid, SoundBuffer};
 use video::{RenderTarget, Vic, VicMemory};
 use video::vic;
-use util::Addressable;
 
 use super::Config;
+use super::clock::Clock;
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
 //   components are managed as component dependencies.
 
-#[allow(dead_code)]
 pub struct C64 {
     // Dependencies
     config: Config,
@@ -65,74 +61,65 @@ pub struct C64 {
     joystick1: Option<Rc<RefCell<Joystick>>>,
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
-    rt: Rc<RefCell<RenderTarget>>,
+    // Buffers
+    frame_buffer: Rc<RefCell<RenderTarget>>,
     sound_buffer: Arc<Mutex<SoundBuffer>>,
     // Configuration
     autostart: Option<Autostart>,
     breakpoints: Vec<u16>,
-    speed: u8,
-    warp_mode: bool,
     // Runtime State
-    clk: Rc<Cell<u32>>,
+    clock: Rc<Clock>,
     frames: u32,
     last_pc: u16,
-    next_frame_ns: u64,
 }
 
 impl C64 {
     pub fn new(config: Config) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
-        // I/O Lines
-        let cia1_io = Rc::new(RefCell::new(CiaIo::new()));
-        let cia2_io = Rc::new(RefCell::new(CiaIo::new()));
-        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
         let vic_spec = vic::Spec::new(config.model.vic_model);
-        let rt = Rc::new(RefCell::new(RenderTarget::new(vic_spec.display_rect.size())));
+
+        // I/O Lines
+        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
+        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
+
+        // Buffers
+        let frame_buffer = Rc::new(RefCell::new(
+            RenderTarget::new(vic_spec.display_rect.size())
+        ));
+        let joystick_1_state = Rc::new(Cell::new(0u8));
+        let joystick_2_state = Rc::new(Cell::new(0u8));
+        let keyboard_matrix = Rc::new(RefCell::new([0; 8]));
         let sound_buffer = Arc::new(Mutex::new(
             SoundBuffer::new(config.sound.buffer_size),
         ));
-
-        // Peripherals
-        let datassette = Rc::new(RefCell::new(Datassette::new(
-            cia1_io.clone(),
-            cpu_io.clone(),
-        )));
-        let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(Joystick::new(config.joystick.joystick_1, 3200))))
-        } else {
-            None
-        };
-        let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(Joystick::new(config.joystick.joystick_2, 3200))))
-        } else {
-            None
-        };
-        let keyboard = Rc::new(RefCell::new(Keyboard::new()));
 
         // Memory
         let charset = Rc::new(RefCell::new(Rom::load(
             Path::new("res/rom/characters.rom"),
             0,
         )?));
-        let color_ram = Rc::new(RefCell::new(Ram::new(1024)));
-        let ram = Rc::new(RefCell::new(Ram::new(0x10000)));
+        let color_ram = Rc::new(RefCell::new(Ram::new(1024))); // FIXME use config.model value
+        let ram = Rc::new(RefCell::new(Ram::new(config.model.memory_size)));
 
         // Chipset
-        let cia1 = Rc::new(RefCell::new(Cia::new(
-            cia::Mode::Cia1,
-            cia1_io.clone(),
-            cpu_io.clone(),
-            joystick1.clone(),
-            joystick2.clone(),
-            keyboard.clone(),
-        )));
+        let cia1 = Rc::new(RefCell::new(
+            Cia::new(
+                cia::Mode::Cia1,
+                cpu_irq.clone(),
+                cpu_nmi.clone(),
+                Some(joystick_1_state.clone()),
+                Some(joystick_2_state.clone()),
+                keyboard_matrix.clone(),
+            )
+        ));
         let cia2 = Rc::new(RefCell::new(Cia::new(
             cia::Mode::Cia2,
-            cia2_io.clone(),
-            cpu_io.clone(),
-            joystick1.clone(),
-            joystick2.clone(),
-            keyboard.clone(),
+            cpu_irq.clone(),
+            cpu_nmi.clone(),
+            None,
+            None,
+            keyboard_matrix.clone(),
         )));
         let sid = Rc::new(RefCell::new(Sid::new(sound_buffer.clone())));
         sid.borrow_mut().set_sampling_parameters(
@@ -145,9 +132,9 @@ impl C64 {
         let vic = Rc::new(RefCell::new(Vic::new(
             config.model.vic_model,
             color_ram.clone(),
-            cpu_io.clone(),
+            cpu_irq.clone(),
             vic_mem.clone(),
-            rt.clone(),
+            frame_buffer.clone(),
         )));
 
         let expansion_port = Rc::new(RefCell::new(ExpansionPort::new()));
@@ -165,27 +152,54 @@ impl C64 {
             expansion_port.clone(),
             ram.clone(),
         )?));
-        let cpu = Rc::new(RefCell::new(Cpu::new(cpu_io.clone(), mem.clone())));
+        let cpu = Rc::new(RefCell::new(Cpu::new(
+            cpu_io_port.clone(),
+            cpu_irq.clone(),
+            cpu_nmi.clone(),
+            mem.clone(),
+        )));
+
+        // Peripherals
+        let datassette = Rc::new(RefCell::new(Datassette::new(
+            cia1.borrow().get_flag(),
+            cpu_io_port.clone(),
+        )));
+        let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
+            Some(Rc::new(RefCell::new(
+                Joystick::new(config.joystick.joystick_1, 3200, joystick_1_state.clone()))
+            )) // FIXME magic value
+        } else {
+            None
+        };
+        let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
+            Some(Rc::new(RefCell::new(
+                Joystick::new(config.joystick.joystick_2, 3200, joystick_2_state.clone()))
+            )) // FIXME magic value
+        } else {
+            None
+        };
+        let keyboard = Rc::new(RefCell::new(
+            Keyboard::new(keyboard_matrix.clone())
+        ));
 
         // Observers
         let expansion_port_clone_1 = expansion_port.clone();
         let mem_clone_1 = mem.clone();
-        cpu_io
+        cpu_io_port
             .borrow_mut()
-            .port_1
             .set_observer(Box::new(move |cpu_port| {
                 let expansion_port_io = expansion_port_clone_1.borrow().get_io_line_value();
                 let mode = cpu_port & 0x07 | expansion_port_io & 0x18;
                 mem_clone_1.borrow_mut().switch_banks(mode);
             }));
 
-        let cpu_io_clone_2 = cpu_io.clone();
+        let cpu_io_port_clone_2 = cpu_io_port.clone();
         let mem_clone_2 = mem.clone();
         expansion_port
             .borrow_mut()
             .get_io_line_mut()
             .set_observer(Box::new(move |expansion_port_io| {
-                let cpu_port_io = cpu_io_clone_2.borrow().port_1.get_value();
+                let cpu_port_io = cpu_io_port_clone_2.borrow().get_value();
                 let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
                 mem_clone_2.borrow_mut().switch_banks(mode);
             }));
@@ -211,16 +225,13 @@ impl C64 {
             joystick1,
             joystick2,
             keyboard: keyboard.clone(),
-            rt: rt.clone(),
+            frame_buffer: frame_buffer.clone(),
             sound_buffer: sound_buffer.clone(),
             autostart: None,
             breakpoints: Vec::new(),
-            speed: 100,
-            warp_mode: false,
-            clk: Rc::new(Cell::new(0u32)),
+            clock: Rc::new(Clock::new()),
             frames: 0,
             last_pc: 0,
-            next_frame_ns: 0,
         })
     }
 
@@ -232,8 +243,8 @@ impl C64 {
         self.cpu.clone()
     }
 
-    pub fn get_cycles(&self) -> u32 {
-        self.clk.get()
+    pub fn get_cycles(&self) -> u64 {
+        self.clock.get()
     }
 
     pub fn get_datasette(&self) -> Rc<RefCell<Datassette>> {
@@ -267,15 +278,11 @@ impl C64 {
     }
 
     pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
-        self.rt.clone()
+        self.frame_buffer.clone()
     }
 
     pub fn get_sound_buffer(&self) -> Arc<Mutex<SoundBuffer>> {
         self.sound_buffer.clone()
-    }
-
-    pub fn get_warp_mode(&self) -> bool {
-        self.warp_mode
     }
 
     pub fn is_cpu_jam(&self) -> bool {
@@ -284,14 +291,6 @@ impl C64 {
 
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
         self.autostart = autostart;
-    }
-
-    pub fn set_speed(&mut self, value: u8) {
-        self.speed = value;
-    }
-
-    pub fn set_warp_mode(&mut self, enabled: bool) {
-        self.warp_mode = enabled;
     }
 
     pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
@@ -327,13 +326,12 @@ impl C64 {
             joystick.borrow_mut().reset();
         }
         self.keyboard.borrow_mut().reset();
-        self.rt.borrow_mut().reset();
+        self.frame_buffer.borrow_mut().reset();
         self.sound_buffer.lock().unwrap().clear();
         // Runtime State
-        self.clk.set(0);
+        // self.clock.set(0);
         self.frames = 0;
         self.last_pc = 0;
-        self.next_frame_ns = 0;
     }
 
     pub fn run_frame(&mut self, overflow_cycles: i32) -> i32 {
@@ -343,19 +341,18 @@ impl C64 {
         let cia1_clone = self.cia1.clone();
         let cia2_clone = self.cia2.clone();
         let datassette_clone = self.datassette.clone();
-        let clk_clone = self.clk.clone();
+        let clock_clone = self.clock.clone();
         let tick_fn: TickFn = Box::new(move || {
             vic_clone.borrow_mut().clock();
             cia1_clone.borrow_mut().clock();
             cia2_clone.borrow_mut().clock();
             datassette_clone.borrow_mut().clock();
-            let clk = clk_clone.get();
-            clk_clone.set(clk.wrapping_add(1));
+            clock_clone.tick();
         });
         while delta > 0 {
-            let prev_clk = self.clk.get();
+            let prev_clk = self.clock.get();
             self.step(&tick_fn);
-            let cycles = self.clk.get() - prev_clk;
+            let cycles = (self.clock.get() - prev_clk) as u32;
             elapsed += cycles;
             delta -= cycles as i32;
         }
@@ -365,9 +362,6 @@ impl C64 {
             self.cia2.borrow_mut().tod_tick();
         }
         self.sid.borrow_mut().clock_delta(elapsed);
-        if !self.warp_mode {
-            self.sync_frame();
-        }
         delta
     }
 
@@ -376,28 +370,13 @@ impl C64 {
         self.last_pc = self.cpu.borrow().get_pc();
         self.cpu.borrow_mut().step(&tick_fn);
         if self.autostart.is_some() {
+            // FIXME magic value
             if self.cpu.borrow().get_pc() == 0xa65c {
-                // magic value
                 if let Some(mut autostart) = self.autostart.take() {
                     autostart.execute(self);
                 }
             }
         }
-    }
-
-    fn sync_frame(&mut self) {
-        let frame_duration_ns = ((1.0 / self.config.model.refresh_rate) * 1_000_000_000.0) as u32;
-        let frame_duration_scaled_ns = frame_duration_ns * 100 / self.speed as u32;
-        let time_ns = time::precise_time_ns();
-        let wait_ns = if self.next_frame_ns > time_ns {
-            (self.next_frame_ns - time_ns) as u32
-        } else {
-            0
-        };
-        if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
-            thread::sleep(Duration::new(0, wait_ns));
-        }
-        self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
     }
 
     // -- Debug Ops
@@ -435,7 +414,7 @@ impl C64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use super::super::Model;
 
     #[test]
     fn exec_keyboard_read() {
@@ -457,7 +436,7 @@ mod tests {
             0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
         ];
         let tick_fn: TickFn = Box::new(move || {});
-        let mut c64 = C64::new(Config::pal()).unwrap();
+        let mut c64 = C64::new(Config::new(Model::from("pal"))).unwrap();
         c64.load(&code.to_vec(), 0xc000);
         let keyboard = c64.get_keyboard();
         keyboard.borrow_mut().set_row(1, !(1 << 5));
@@ -482,7 +461,7 @@ mod tests {
     #[test]
     fn verify_mem_layout() {
         let tick_fn: TickFn = Box::new(move || {});
-        let mut c64 = C64::new(Config::pal()).unwrap();
+        let mut c64 = C64::new(Config::new(Model::from("pal"))).unwrap();
         c64.reset(false);
         let cpu = c64.get_cpu();
         assert_eq!(0x94, cpu.borrow().read(0xa000, &tick_fn));

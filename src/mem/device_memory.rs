@@ -20,30 +20,25 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use io::Cia;
-use sound::Sid;
-use video::Vic;
-use util::Addressable;
-
-use super::ExpansionPort;
+use core::{Addressable, Chip};
 
 pub struct DeviceMemory {
-    cia1: Rc<RefCell<Cia>>,
-    cia2: Rc<RefCell<Cia>>,
+    cia1: Rc<RefCell<Chip>>,
+    cia2: Rc<RefCell<Chip>>,
     color_ram: Rc<RefCell<Addressable>>,
-    expansion_port: Rc<RefCell<ExpansionPort>>,
-    sid: Rc<RefCell<Sid>>,
-    vic: Rc<RefCell<Vic>>,
+    expansion_port: Rc<RefCell<Addressable>>,
+    sid: Rc<RefCell<Chip>>,
+    vic: Rc<RefCell<Chip>>,
 }
 
 impl DeviceMemory {
     pub fn new(
-        cia1: Rc<RefCell<Cia>>,
-        cia2: Rc<RefCell<Cia>>,
+        cia1: Rc<RefCell<Chip>>,
+        cia2: Rc<RefCell<Chip>>,
         color_ram: Rc<RefCell<Addressable>>,
-        expansion_port: Rc<RefCell<ExpansionPort>>,
-        sid: Rc<RefCell<Sid>>,
-        vic: Rc<RefCell<Vic>>,
+        expansion_port: Rc<RefCell<Addressable>>,
+        sid: Rc<RefCell<Chip>>,
+        vic: Rc<RefCell<Chip>>,
     ) -> DeviceMemory {
         DeviceMemory {
             cia1,

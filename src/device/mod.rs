@@ -19,12 +19,14 @@
 
 pub mod cartridge;
 mod datassette;
+mod expansion_port;
 pub mod joystick;
 pub mod keyboard;
 mod tape;
 
 pub use self::cartridge::{Cartridge, Chip, ChipType, HwType};
 pub use self::datassette::Datassette;
+pub use self::expansion_port::ExpansionPort;
 pub use self::joystick::Joystick;
 pub use self::keyboard::{Key, KeyEvent, Keyboard};
 pub use self::tape::Tape;

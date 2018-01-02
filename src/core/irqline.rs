@@ -17,71 +17,45 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use bit_field::BitField;
 use log::LogLevel;
 
-pub struct InterruptLine {
-    kind: Type,
+pub struct IrqLine {
+    kind: &'static str,
     line: u8,
 }
 
-impl InterruptLine {
-    pub fn new(kind: Type) -> InterruptLine {
-        InterruptLine {
+impl IrqLine {
+    pub fn new(kind: &'static str) -> IrqLine {
+        IrqLine {
             kind,
             line: 0,
         }
     }
 
-    pub fn clear(&mut self, source: Source) {
+    #[inline]
+    pub fn clear(&mut self, source: usize) {
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::int", "Clear {:?}, source {:?}", self.kind, source);
+            trace!(target: "cpu::int", "Clear {}, source {:?}", self.kind, source);
         }
-        self.line &= !(source as u8);
+        self.line.set_bit(source, false);
     }
 
+    #[inline]
     pub fn is_low(&self) -> bool {
         self.line != 0
     }
 
+    #[inline]
     pub fn reset(&mut self) {
         self.line = 0;
     }
 
-    pub fn set(&mut self, source: Source) {
+    #[inline]
+    pub fn set(&mut self, source: usize) {
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::int", "Set {:?}, source {:?}", self.kind, source);
+            trace!(target: "cpu::int", "Set {}, source {:?}", self.kind, source);
         }
-        self.line |= source as u8;
-    }
-}
-
-#[derive(Debug)]
-pub enum Source {
-    Cia = 1 << 0,
-    Vic = 1 << 1,
-}
-
-enum Vector {
-    Nmi = 0xfffa,
-    Reset = 0xfffc,
-    Irq = 0xfffe,
-}
-
-#[derive(Debug)]
-pub enum Type {
-    Break = 1 << 0,
-    Irq = 1 << 1,
-    Nmi = 1 << 2,
-    Reset = 1 << 3,
-}
-
-impl Type {
-    pub fn vector(&self) -> u16 {
-        match *self {
-            Type::Break => Vector::Irq as u16,
-            Type::Irq => Vector::Irq as u16,
-            Type::Nmi => Vector::Nmi as u16,
-            Type::Reset => Vector::Reset as u16,
-        }
+        self.line.set_bit(source, true);
     }
 }

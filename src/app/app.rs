@@ -21,6 +21,8 @@ use std::result::Result;
 use std::thread;
 use std::time::Duration;
 
+use time;
+
 use sdl2;
 use sdl2::{EventPump, Sdl};
 use sdl2::audio::AudioDevice;
@@ -28,7 +30,7 @@ use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use zinc64::system::C64;
-use zinc64::util::Dimension;
+use zinc64::video::Dimension;
 use zinc64::video::vic;
 
 use super::audio::AppAudio;
@@ -57,6 +59,9 @@ pub struct Options {
     pub jam_action: JamAction,
     pub height: u32,
     pub width: u32,
+    pub speed: u8,
+    pub warp_mode: bool,
+
 }
 
 #[derive(Debug, PartialEq)]
@@ -77,7 +82,8 @@ pub struct App {
     renderer: Renderer,
     // Runtime State
     state: State,
-    next_keyboard_event: u32,
+    next_frame_ns: u64,
+    next_keyboard_event: u64,
 }
 
 impl App {
@@ -120,6 +126,7 @@ impl App {
             io,
             renderer,
             state: State::Running,
+            next_frame_ns: 0,
             next_keyboard_event: 0,
         };
         Ok(app)
@@ -135,6 +142,9 @@ impl App {
                 State::Running => {
                     self.handle_events(&mut events);
                     overflow_cycles = self.c64.run_frame(overflow_cycles);
+                    if !self.options.warp_mode {
+                        self.sync_frame();
+                    }
                     if self.c64.is_cpu_jam() {
                         self.handle_cpu_jam();
                     }
@@ -180,7 +190,24 @@ impl App {
 
     fn reset(&mut self) {
         self.c64.reset(false);
+        self.next_frame_ns = 0;
         self.next_keyboard_event = 0;
+    }
+
+    fn sync_frame(&mut self) {
+        let refresh_rate = self.c64.get_config().model.refresh_rate;
+        let frame_duration_ns = (1_000_000_000.0 / refresh_rate) as u32;
+        let frame_duration_scaled_ns = frame_duration_ns * 100 / self.options.speed as u32;
+        let time_ns = time::precise_time_ns();
+        let wait_ns = if self.next_frame_ns > time_ns {
+            (self.next_frame_ns - time_ns) as u32
+        } else {
+            0
+        };
+        if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
+            thread::sleep(Duration::new(0, wait_ns));
+        }
+        self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
     }
 
     fn toggle_datassette_play(&mut self) {
@@ -204,8 +231,8 @@ impl App {
     }
 
     fn toggle_warp(&mut self) {
-        let warp_mode = self.c64.get_warp_mode();
-        self.c64.set_warp_mode(!warp_mode);
+        let warp_mode = self.options.warp_mode;
+        self.options.warp_mode = !warp_mode;
     }
 
     // -- Event Handling

@@ -24,6 +24,7 @@ extern crate log;
 extern crate resid;
 extern crate time;
 
+pub mod core;
 pub mod cpu;
 pub mod device;
 pub mod io;
@@ -31,5 +32,4 @@ pub mod loader;
 pub mod mem;
 pub mod sound;
 pub mod system;
-pub mod util;
 pub mod video;

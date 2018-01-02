@@ -17,22 +17,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// TODO device: joystick test cases
+use std::cell::Cell;
+use std::rc::Rc;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum AxisMotion {
-    Negative,
-    Neutral,
-    Positive,
-}
+use bit_field::BitField;
+
+// TODO device: joystick test cases
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Button {
-    Left,
-    Right,
-    Down,
-    Up,
-    Fire,
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3,
+    Fire = 4,
+}
+
+impl Button {
+    pub fn bit(&self) -> usize {
+        *self as usize
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -64,36 +68,20 @@ pub struct Joystick {
     mode: Mode,
     threshold: i16,
     // State
-    x_axis: AxisMotion,
-    y_axis: AxisMotion,
-    button: bool,
+    state: Rc<Cell<u8>>,
 }
 
 impl Joystick {
-    pub fn new(mode: Mode, threshold: i16) -> Joystick {
+    pub fn new(mode: Mode, threshold: i16, state: Rc<Cell<u8>>) -> Joystick {
         Joystick {
             mode,
             threshold,
-            x_axis: AxisMotion::Neutral,
-            y_axis: AxisMotion::Neutral,
-            button: false,
+            state,
         }
-    }
-
-    pub fn get_button(&self) -> bool {
-        self.button
     }
 
     pub fn get_index(&self) -> u8 {
         self.mode.index()
-    }
-
-    pub fn get_x_axis(&self) -> AxisMotion {
-        self.x_axis
-    }
-
-    pub fn get_y_axis(&self) -> AxisMotion {
-        self.y_axis
     }
 
     pub fn is_virtual(&self) -> bool {
@@ -101,50 +89,60 @@ impl Joystick {
     }
 
     pub fn reset(&mut self) {
-        self.x_axis = AxisMotion::Neutral;
-        self.y_axis = AxisMotion::Neutral;
-        self.button = false;
+        self.state.set(0);
+    }
+
+    fn set_state(&mut self, bit: usize, value: bool) {
+        let mut new_state = self.state.get();
+        new_state.set_bit(bit, value);
+        self.state.set(new_state);
     }
 
     // -- Event Handlers
 
     pub fn on_axis_motion(&mut self, axis_idx: u8, value: i16) {
         match axis_idx {
-            0 if value < -self.threshold => self.x_axis = AxisMotion::Negative,
-            0 if value > self.threshold => self.x_axis = AxisMotion::Positive,
-            0 => self.x_axis = AxisMotion::Neutral,
-            1 if value < -self.threshold => self.y_axis = AxisMotion::Negative,
-            1 if value > self.threshold => self.y_axis = AxisMotion::Positive,
-            1 => self.y_axis = AxisMotion::Neutral,
+            0 if value < -self.threshold => {
+                self.set_state(Button::Left.bit(), true);
+                self.set_state(Button::Right.bit(), false);
+            },
+            0 if value > self.threshold => {
+                self.set_state(Button::Left.bit(), false);
+                self.set_state(Button::Right.bit(), true);
+            },
+            0 => {
+                self.set_state(Button::Left.bit(), false);
+                self.set_state(Button::Right.bit(), false);
+            },
+            1 if value < -self.threshold => {
+                self.set_state(Button::Up.bit(), false);
+                self.set_state(Button::Down.bit(), true);
+            },
+            1 if value > self.threshold => {
+                self.set_state(Button::Up.bit(), true);
+                self.set_state(Button::Down.bit(), false);
+            },
+            1 => {
+                self.set_state(Button::Up.bit(), false);
+                self.set_state(Button::Down.bit(), false);
+            },
             _ => panic!("invalid axis {}", axis_idx),
         }
     }
 
     pub fn on_button_down(&mut self, _button_idx: u8) {
-        self.button = true;
+        self.set_state(Button::Fire.bit(), true);
     }
 
     pub fn on_button_up(&mut self, _button_idx: u8) {
-        self.button = false;
+        self.set_state(Button::Fire.bit(), false);
     }
 
     pub fn on_key_down(&mut self, keycode: Button) {
-        match keycode {
-            Button::Left => self.x_axis = AxisMotion::Negative,
-            Button::Right => self.x_axis = AxisMotion::Positive,
-            Button::Down => self.y_axis = AxisMotion::Negative,
-            Button::Up => self.y_axis = AxisMotion::Positive,
-            Button::Fire => self.button = true,
-        }
+        self.set_state(keycode.bit(), true);
     }
 
     pub fn on_key_up(&mut self, keycode: Button) {
-        match keycode {
-            Button::Left => self.x_axis = AxisMotion::Neutral,
-            Button::Right => self.x_axis = AxisMotion::Neutral,
-            Button::Up => self.y_axis = AxisMotion::Neutral,
-            Button::Down => self.y_axis = AxisMotion::Neutral,
-            Button::Fire => self.button = false,
-        }
+        self.set_state(keycode.bit(), false);
     }
 }

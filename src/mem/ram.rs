@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use util::Addressable;
+use core::Addressable;
 
 pub struct Ram {
     data: Vec<u8>,

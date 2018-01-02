@@ -17,37 +17,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::ops::Fn;
+use std::cell::Cell;
 
-pub type Observer = Box<Fn(u8)>;
-
-pub struct IoLine {
-    value: u8,
-    observer: Option<Observer>,
+pub struct Clock {
+    counter: Cell<u64>,
 }
 
-impl IoLine {
-    pub fn new(initial_value: u8) -> IoLine {
-        IoLine {
-            value: initial_value,
-            observer: None,
-        }
+impl Clock {
+    pub fn new() -> Clock {
+        Clock { counter: Cell::new(0) }
     }
 
-    #[inline(always)]
-    pub fn get_value(&self) -> u8 {
-        self.value
+    pub fn get(&self) -> u64 {
+        self.counter.get()
     }
 
-    pub fn set_observer(&mut self, observer: Observer) {
-        self.observer = Some(observer);
-    }
-
-    #[inline(always)]
-    pub fn set_value(&mut self, value: u8) {
-        self.value = value;
-        if let Some(ref observer) = self.observer {
-            observer(self.value);
-        }
+    pub fn tick(&self) {
+        let result = self.counter.get().wrapping_add(1);
+        self.counter.set(result);
     }
 }

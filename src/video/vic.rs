@@ -20,14 +20,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cpu::CpuIo;
-use cpu::interrupt_line;
-use mem::Ram;
+use bit_field::BitField;
+
+use core::{Addressable, Chip, IrqLine};
 use log::LogLevel;
-use util::{Addressable, Dimension, Rect};
-use util::bit;
 
 use super::{RenderTarget, VicMemory};
+use super::rect::{Dimension, Rect};
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
@@ -324,12 +323,11 @@ impl Sprite {
     }
 }
 
-#[allow(dead_code)]
 pub struct Vic {
     // Dependencies
     spec: Spec,
-    color_ram: Rc<RefCell<Ram>>,
-    cpu_io: Rc<RefCell<CpuIo>>,
+    color_ram: Rc<RefCell<Addressable>>,
+    cpu_irq: Rc<RefCell<IrqLine>>,
     mem: Rc<RefCell<VicMemory>>,
     rt: Rc<RefCell<RenderTarget>>,
     // Configuration
@@ -363,14 +361,14 @@ pub struct Vic {
     rc: u8,
     sprite_ptrs: [u16; 8],
     sprite_mc: [u8; 8],
-    sprite_mcbase: [u8; 8],
+    #[allow(dead_code)] sprite_mcbase: [u8; 8],
 }
 
 impl Vic {
     pub fn new(
         chip_model: ChipModel,
-        color_ram: Rc<RefCell<Ram>>,
-        cpu_io: Rc<RefCell<CpuIo>>,
+        color_ram: Rc<RefCell<Addressable>>,
+        cpu_irq: Rc<RefCell<IrqLine>>,
         mem: Rc<RefCell<VicMemory>>,
         rt: Rc<RefCell<RenderTarget>>,
     ) -> Vic {
@@ -379,7 +377,7 @@ impl Vic {
         let mut vic = Vic {
             spec,
             color_ram,
-            cpu_io,
+            cpu_irq,
             mem,
             rt,
             mode: Mode::Text,
@@ -424,7 +422,7 @@ impl Vic {
         if rst_int {
             self.int_data |= 1 << 0;
             if (self.int_mask & self.int_data) != 0 {
-                self.cpu_io.borrow_mut().irq.set(interrupt_line::Source::Vic);
+                self.cpu_irq.borrow_mut().set(1); // FIXME magic value
             }
         }
         // Prepare sprite data
@@ -453,7 +451,7 @@ impl Vic {
             if self.graphics.contains(x_pos, y_pos) {
                 if self.window.contains(x_screen, y_screen) {
                     self.draw(x_screen, y_screen, self.vc, self.rc);
-                // 4. VC and VMLI are incremented after each g-access in display state.
+                    // 4. VC and VMLI are incremented after each g-access in display state.
                 } else {
                     self.draw_border(x_screen, y_screen);
                 }
@@ -488,32 +486,6 @@ impl Vic {
                 rt.set_sync(true);
             }
         }
-    }
-
-    pub fn reset(&mut self) {
-        self.mode = Mode::Text;
-        self.den = true;
-        self.rsel = true;
-        self.csel = true;
-        self.scroll_x = 0;
-        self.scroll_y = 3;
-        self.int_data = 0;
-        self.int_mask = 0;
-        self.raster_compare = 0;
-        self.char_base = 4096;
-        self.video_matrix = 1024;
-        self.border_color = 0x0e;
-        self.background_color = [0x06, 0, 0, 0];
-        self.light_pen_pos = [0; 2];
-        for i in 0..8 {
-            self.sprites[i].reset();
-        }
-        self.sprite_multicolor = [0; 2];
-        self.raster = 0x0100;
-        self.cycle = 0;
-        self.vc_base = 0;
-        self.vc = 0;
-        self.rc = 0;
     }
 
     fn update_display_dims(&mut self) {
@@ -554,7 +526,7 @@ impl Vic {
                 let char_code = self.fetch_char_code(vc);
                 let char_color = self.fetch_char_color(vc);
                 let char_data = self.fetch_char_pixels(char_code, rc);
-                if bit::test(char_color, 3) {
+                if char_color.get_bit(3) {
                     self.draw_char_mctext(x, y, char_data, char_color);
                 } else {
                     self.draw_char_text(x, y, char_data, char_color);
@@ -595,7 +567,7 @@ impl Vic {
         for i in 0..8u16 {
             let x_pos = x + 7 - i;
             if x_pos < self.window.right {
-                let color = if bit::test(data, i as u8) {
+                let color = if data.get_bit(i as usize) {
                     color_1
                 } else {
                     color_0
@@ -657,7 +629,7 @@ impl Vic {
         for i in 0..8u16 {
             let x_pos = x + 7 - i;
             if x_pos <= self.window.right {
-                let color = if bit::test(data, i as u8) {
+                let color = if data.get_bit(i as usize) {
                     color_1
                 } else {
                     self.background_color[0]
@@ -674,7 +646,7 @@ impl Vic {
         for i in 0..8u16 {
             let x_pos = x + 7 - i;
             if x_pos <= self.window.right {
-                let color = if bit::test(data, i as u8) {
+                let color = if data.get_bit(i as usize) {
                     color_1
                 } else {
                     match color_0_src {
@@ -749,7 +721,7 @@ impl Vic {
         let y_trans = y - self.spec.display_rect.top;
         let x_trans = x;
         for i in 0..8u16 {
-            if bit::test(data, i as u8) {
+            if data.get_bit(i as usize) {
                 rt.write(x_trans + 7 - i, y_trans, color);
             }
         }
@@ -832,10 +804,37 @@ impl Vic {
             false
         }
     }
+}
 
-    // -- Device I/O
+impl Chip for Vic {
 
-    pub fn read(&mut self, reg: u8) -> u8 {
+    fn reset(&mut self) {
+        self.mode = Mode::Text;
+        self.den = true;
+        self.rsel = true;
+        self.csel = true;
+        self.scroll_x = 0;
+        self.scroll_y = 3;
+        self.int_data = 0;
+        self.int_mask = 0;
+        self.raster_compare = 0;
+        self.char_base = 4096;
+        self.video_matrix = 1024;
+        self.border_color = 0x0e;
+        self.background_color = [0x06, 0, 0, 0];
+        self.light_pen_pos = [0; 2];
+        for i in 0..8 {
+            self.sprites[i].reset();
+        }
+        self.sprite_multicolor = [0; 2];
+        self.raster = 0x0100;
+        self.cycle = 0;
+        self.vc_base = 0;
+        self.vc = 0;
+        self.rc = 0;
+    }
+
+    fn read(&mut self, reg: u8) -> u8 {
         let value = match Reg::from(reg) {
             Reg::M0X => (self.sprites[0].x & 0x00ff) as u8,
             Reg::M0Y => self.sprites[0].y,
@@ -854,56 +853,46 @@ impl Vic {
             Reg::M7X => (self.sprites[7].x & 0x00ff) as u8,
             Reg::M7Y => self.sprites[7].y,
             Reg::MX8 => {
-                let m0x8 = bit::get_u16(self.sprites[0].x, 8) << 0;
-                let m1x8 = bit::get_u16(self.sprites[1].x, 8) << 1;
-                let m2x8 = bit::get_u16(self.sprites[2].x, 8) << 2;
-                let m3x8 = bit::get_u16(self.sprites[3].x, 8) << 3;
-                let m4x8 = bit::get_u16(self.sprites[4].x, 8) << 4;
-                let m5x8 = bit::get_u16(self.sprites[5].x, 8) << 5;
-                let m6x8 = bit::get_u16(self.sprites[6].x, 8) << 6;
-                let m7x8 = bit::get_u16(self.sprites[7].x, 8) << 7;
-                m0x8 | m1x8 | m2x8 | m3x8 | m4x8 | m5x8 | m6x8 | m7x8
+                let mut result = 0;
+                for i in 0..8 {
+                    result.set_bit(i, self.sprites[i].x.get_bit(8));
+                }
+                result
             }
             Reg::CR1 => {
-                let rst8 = bit::get_u16(self.raster, 8) << 7;
-                let ecm = bit::get(self.mode.value(), 2) << 6;
-                let bmm = bit::get(self.mode.value(), 1) << 5;
-                let den = bit::value(4, self.den);
-                let rsel = bit::value(3, self.rsel);
-                let yscroll = self.scroll_y & 0x07;
-                rst8 | ecm | bmm | den | rsel | yscroll
+                let mut result = 0;
+                result
+                    .set_bit(7, self.raster.get_bit(8))
+                    .set_bit(6, self.mode.value().get_bit(2))
+                    .set_bit(5, self.mode.value().get_bit(1))
+                    .set_bit(4, self.den)
+                    .set_bit(3, self.rsel);
+                result | (self.scroll_y & 0x07)
             }
             Reg::RASTER => (self.raster & 0x00ff) as u8,
             Reg::LPX => self.light_pen_pos[0],
             Reg::LPY => self.light_pen_pos[1],
             Reg::ME => {
-                let m0e = bit::value(0, self.sprites[0].enabled);
-                let m1e = bit::value(1, self.sprites[1].enabled);
-                let m2e = bit::value(2, self.sprites[2].enabled);
-                let m3e = bit::value(3, self.sprites[3].enabled);
-                let m4e = bit::value(4, self.sprites[4].enabled);
-                let m5e = bit::value(5, self.sprites[5].enabled);
-                let m6e = bit::value(6, self.sprites[6].enabled);
-                let m7e = bit::value(7, self.sprites[7].enabled);
-                m0e | m1e | m2e | m3e | m4e | m5e | m6e | m7e
+                let mut result = 0;
+                for i in 0..8 {
+                    result.set_bit(i, self.sprites[i].enabled);
+                }
+                result
             }
             Reg::CR2 => {
-                let res = 1 << 5;
-                let mcm = bit::get(self.mode.value(), 0) << 4;
-                let csel = bit::value(3, self.csel);
-                let yscroll = self.scroll_x & 0x07;
-                res | mcm | csel | yscroll | 0xc0
+                let mut result = 0;
+                result
+                    .set_bit(5, true)
+                    .set_bit(4, self.mode.value().get_bit(0))
+                    .set_bit(3, self.csel);
+                result | (self.scroll_x & 0x07) | 0xc0
             }
             Reg::MYE => {
-                let m0ye = bit::value(0, self.sprites[0].expand_y);
-                let m1ye = bit::value(1, self.sprites[1].expand_y);
-                let m2ye = bit::value(2, self.sprites[2].expand_y);
-                let m3ye = bit::value(3, self.sprites[3].expand_y);
-                let m4ye = bit::value(4, self.sprites[4].expand_y);
-                let m5ye = bit::value(5, self.sprites[5].expand_y);
-                let m6ye = bit::value(6, self.sprites[6].expand_y);
-                let m7ye = bit::value(7, self.sprites[7].expand_y);
-                m0ye | m1ye | m2ye | m3ye | m4ye | m5ye | m6ye | m7ye
+                let mut result = 0;
+                for i in 0..8 {
+                    result.set_bit(i, self.sprites[i].expand_y);
+                }
+                result
             }
             Reg::MEMPTR => {
                 let vm = (((self.video_matrix & 0x3c00) >> 10) as u8) << 4;
@@ -911,42 +900,31 @@ impl Vic {
                 vm | cb | 0x01
             }
             Reg::IRR => {
-                let result = bit::set(self.int_data, 7, (self.int_mask & self.int_data) != 0);
+                let mut result = self.int_data;
+                result.set_bit(7, (self.int_mask & self.int_data) != 0);
                 result | 0x70
             }
             Reg::IMR => self.int_mask | 0xf0,
             Reg::MDP => {
-                let m0dp = bit::value(0, self.sprites[0].priority);
-                let m1dp = bit::value(1, self.sprites[1].priority);
-                let m2dp = bit::value(2, self.sprites[2].priority);
-                let m3dp = bit::value(3, self.sprites[3].priority);
-                let m4dp = bit::value(4, self.sprites[4].priority);
-                let m5dp = bit::value(5, self.sprites[5].priority);
-                let m6dp = bit::value(6, self.sprites[6].priority);
-                let m7dp = bit::value(7, self.sprites[7].priority);
-                m0dp | m1dp | m2dp | m3dp | m4dp | m5dp | m6dp | m7dp
+                let mut result = 0;
+                for i in 0..8 {
+                    result.set_bit(i, self.sprites[i].priority);
+                }
+                result
             }
             Reg::MMC => {
-                let m0mc = bit::value(0, self.sprites[0].multicolor);
-                let m1mc = bit::value(1, self.sprites[1].multicolor);
-                let m2mc = bit::value(2, self.sprites[2].multicolor);
-                let m3mc = bit::value(3, self.sprites[3].multicolor);
-                let m4mc = bit::value(4, self.sprites[4].multicolor);
-                let m5mc = bit::value(5, self.sprites[5].multicolor);
-                let m6mc = bit::value(6, self.sprites[6].multicolor);
-                let m7mc = bit::value(7, self.sprites[7].multicolor);
-                m0mc | m1mc | m2mc | m3mc | m4mc | m5mc | m6mc | m7mc
+                let mut result = 0;
+                for i in 0..8 {
+                    result.set_bit(i, self.sprites[i].multicolor);
+                }
+                result
             }
             Reg::MXE => {
-                let m0xe = bit::value(0, self.sprites[0].expand_x);
-                let m1xe = bit::value(1, self.sprites[1].expand_x);
-                let m2xe = bit::value(2, self.sprites[2].expand_x);
-                let m3xe = bit::value(3, self.sprites[3].expand_x);
-                let m4xe = bit::value(4, self.sprites[4].expand_x);
-                let m5xe = bit::value(5, self.sprites[5].expand_x);
-                let m6xe = bit::value(6, self.sprites[6].expand_x);
-                let m7xe = bit::value(7, self.sprites[7].expand_x);
-                m0xe | m1xe | m2xe | m3xe | m4xe | m5xe | m6xe | m7xe
+                let mut result = 0;
+                for i in 0..8 {
+                    result.set_bit(i, self.sprites[i].expand_x);
+                }
+                result
             }
             Reg::MM => 0xff, // DEFERRED collision
             Reg::MD => 0xff, // DEFERRED collision
@@ -973,7 +951,7 @@ impl Vic {
         value
     }
 
-    pub fn write(&mut self, reg: u8, value: u8) {
+    fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "vic::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
@@ -995,22 +973,19 @@ impl Vic {
             Reg::M7X => self.sprites[7].x = (self.sprites[7].x & 0xff00) | (value as u16),
             Reg::M7Y => self.sprites[7].y = value,
             Reg::MX8 => {
-                self.sprites[0].x = bit::set_u16(self.sprites[0].x, 8, bit::test(value, 0));
-                self.sprites[1].x = bit::set_u16(self.sprites[1].x, 8, bit::test(value, 1));
-                self.sprites[2].x = bit::set_u16(self.sprites[2].x, 8, bit::test(value, 2));
-                self.sprites[3].x = bit::set_u16(self.sprites[3].x, 8, bit::test(value, 3));
-                self.sprites[4].x = bit::set_u16(self.sprites[4].x, 8, bit::test(value, 4));
-                self.sprites[5].x = bit::set_u16(self.sprites[5].x, 8, bit::test(value, 5));
-                self.sprites[6].x = bit::set_u16(self.sprites[6].x, 8, bit::test(value, 6));
-                self.sprites[7].x = bit::set_u16(self.sprites[7].x, 8, bit::test(value, 7));
+                for i in 0..8 as usize {
+                    self.sprites[i].x.set_bit(8, value.get_bit(i));
+                }
             }
             Reg::CR1 => {
-                self.raster_compare = bit::set_u16(self.raster_compare, 8, bit::test(value, 7));
-                let mode = bit::set(self.mode.value(), 2, bit::test(value, 6));
-                let mode2 = bit::set(mode, 1, bit::test(value, 5));
-                self.mode = Mode::from(mode2);
-                self.den = bit::test(value, 4);
-                self.rsel = bit::test(value, 3);
+                self.raster_compare.set_bit(8, value.get_bit(7));
+                let mut mode = self.mode.value();
+                mode
+                    .set_bit(2, value.get_bit(6))
+                    .set_bit(1, value.get_bit(5));
+                self.mode = Mode::from(mode);
+                self.den = value.get_bit(4);
+                self.rsel = value.get_bit(3);
                 self.scroll_y = value & 0x07;
                 self.update_display_dims();
             }
@@ -1018,31 +993,22 @@ impl Vic {
             Reg::LPX => self.light_pen_pos[0] = value,
             Reg::LPY => self.light_pen_pos[1] = value,
             Reg::ME => {
-                self.sprites[0].enabled = bit::test(value, 0);
-                self.sprites[1].enabled = bit::test(value, 1);
-                self.sprites[2].enabled = bit::test(value, 2);
-                self.sprites[3].enabled = bit::test(value, 3);
-                self.sprites[4].enabled = bit::test(value, 4);
-                self.sprites[5].enabled = bit::test(value, 5);
-                self.sprites[6].enabled = bit::test(value, 6);
-                self.sprites[7].enabled = bit::test(value, 7);
+                for i in 0..8 as usize {
+                    self.sprites[i].enabled = value.get_bit(i);
+                }
             }
             Reg::CR2 => {
-                let mode = bit::set(self.mode.value(), 0, bit::test(value, 4));
+                let mut mode = self.mode.value();
+                mode.set_bit(0, value.get_bit(4));
                 self.mode = Mode::from(mode);
-                self.csel = bit::test(value, 3);
+                self.csel = value.get_bit(3);
                 self.scroll_x = value & 0x07;
                 self.update_display_dims();
             }
             Reg::MYE => {
-                self.sprites[0].expand_y = bit::test(value, 0);
-                self.sprites[1].expand_y = bit::test(value, 1);
-                self.sprites[2].expand_y = bit::test(value, 2);
-                self.sprites[3].expand_y = bit::test(value, 3);
-                self.sprites[4].expand_y = bit::test(value, 4);
-                self.sprites[5].expand_y = bit::test(value, 5);
-                self.sprites[6].expand_y = bit::test(value, 6);
-                self.sprites[7].expand_y = bit::test(value, 7);
+                for i in 0..8 as usize {
+                    self.sprites[i].expand_y = value.get_bit(i);
+                }
             }
             Reg::MEMPTR => {
                 self.video_matrix = (((value & 0xf0) >> 4) as u16) << 10;
@@ -1051,44 +1017,29 @@ impl Vic {
             Reg::IRR => {
                 self.int_data &= !value;
                 if (self.int_mask & self.int_data) == 0 {
-                    self.cpu_io.borrow_mut().irq.clear(interrupt_line::Source::Vic);
+                    self.cpu_irq.borrow_mut().clear(1); // FIXME magic value
                 }
             }
             Reg::IMR => {
                 self.int_mask = value & 0x0f;
                 if (self.int_mask & self.int_data) != 0 {
-                    self.cpu_io.borrow_mut().irq.set(interrupt_line::Source::Vic);
+                    self.cpu_irq.borrow_mut().set(1); // FIXME magic value
                 }
             }
             Reg::MDP => {
-                self.sprites[0].priority = bit::test(value, 0);
-                self.sprites[1].priority = bit::test(value, 1);
-                self.sprites[2].priority = bit::test(value, 2);
-                self.sprites[3].priority = bit::test(value, 3);
-                self.sprites[4].priority = bit::test(value, 4);
-                self.sprites[5].priority = bit::test(value, 5);
-                self.sprites[6].priority = bit::test(value, 6);
-                self.sprites[7].priority = bit::test(value, 7);
+                for i in 0..8 as usize {
+                    self.sprites[i].priority = value.get_bit(i);
+                }
             }
             Reg::MMC => {
-                self.sprites[0].multicolor = bit::test(value, 0);
-                self.sprites[1].multicolor = bit::test(value, 1);
-                self.sprites[2].multicolor = bit::test(value, 2);
-                self.sprites[3].multicolor = bit::test(value, 3);
-                self.sprites[4].multicolor = bit::test(value, 4);
-                self.sprites[5].multicolor = bit::test(value, 5);
-                self.sprites[6].multicolor = bit::test(value, 6);
-                self.sprites[7].multicolor = bit::test(value, 7);
+                for i in 0..8 as usize {
+                    self.sprites[i].multicolor = value.get_bit(i);
+                }
             }
             Reg::MXE => {
-                self.sprites[0].expand_x = bit::test(value, 0);
-                self.sprites[1].expand_x = bit::test(value, 1);
-                self.sprites[2].expand_x = bit::test(value, 2);
-                self.sprites[3].expand_x = bit::test(value, 3);
-                self.sprites[4].expand_x = bit::test(value, 4);
-                self.sprites[5].expand_x = bit::test(value, 5);
-                self.sprites[6].expand_x = bit::test(value, 6);
-                self.sprites[7].expand_x = bit::test(value, 7);
+                for i in 0..8 as usize {
+                    self.sprites[i].expand_x = value.get_bit(i);
+                }
             }
             Reg::MM => {}
             Reg::MD => {}

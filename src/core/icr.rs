@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use super::bit;
+use bit_field::BitField;
 
 pub struct Icr {
     data: u8,
@@ -29,45 +29,45 @@ impl Icr {
         Icr { data: 0, mask: 0 }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn clear(&mut self) {
         self.data = 0;
     }
 
-    #[allow(dead_code)]
-    #[inline(always)]
+    #[inline]
     pub fn clear_events(&mut self, events: u8) {
         self.data &= !events;
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get_data(&self) -> u8 {
-        bit::set(self.data, 7, self.get_interrupt_request())
+        let mut data = self.data;
+        data.set_bit(7, self.get_interrupt_request());
+        data
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get_interrupt_request(&self) -> bool {
         (self.mask & self.data) != 0
     }
 
-    #[allow(dead_code)]
-    #[inline(always)]
+    #[inline]
     pub fn get_mask(&self) -> u8 {
         self.mask
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn set_event(&mut self, bit: u8) {
-        self.data |= 1 << bit;
+        self.data.set_bit(bit as usize, true);
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn reset(&mut self) {
         self.data = 0;
         self.mask = 0;
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn update_mask(&mut self, mask: u8) {
         /*
         The MASK register provides convenient control of
@@ -81,7 +81,7 @@ impl Icr {
         set IR and generate an Interrupt Request, the corresponding
         MASK bit must be set.
         */
-        if bit::test(mask, 7) {
+        if mask.get_bit(7) {
             self.mask |= mask & 0x1f;
         } else {
             self.mask &= !(mask & 0x1f);

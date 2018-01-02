@@ -18,6 +18,7 @@
  */
 
 pub mod cia;
+mod rtc;
 mod timer;
 
-pub use self::cia::{Cia, CiaIo};
+pub use self::cia::Cia;

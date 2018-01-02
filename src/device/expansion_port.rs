@@ -19,8 +19,9 @@
 
 use bit_field::BitField;
 
-use device::Cartridge;
-use util::{Addressable, IoLine};
+use core::{Addressable, IoLine};
+
+use super::cartridge::Cartridge;
 
 // TODO device: expansion port test cases
 
@@ -84,7 +85,6 @@ impl Addressable for ExpansionPort {
         }
     }
 
-    #[allow(unused_variables)]
     fn write(&mut self, address: u16, value: u8) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.write(address, value)

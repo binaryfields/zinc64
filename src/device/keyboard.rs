@@ -17,9 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
-use util::bit;
+use bit_field::BitField;
 
 // SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
 
@@ -130,31 +132,30 @@ impl KeyEvent {
 }
 
 pub struct Keyboard {
-    matrix: [u8; 8],
-    buffer: VecDeque<(KeyEvent, bool)>,
+    matrix: Rc<RefCell<[u8; 8]>>,
+    queue: VecDeque<(KeyEvent, bool)>,
     disabled_shift: u8,
 }
 
 impl Keyboard {
-    pub fn new() -> Keyboard {
+    pub fn new(matrix: Rc<RefCell<[u8; 8]>>) -> Keyboard {
         Keyboard {
-            matrix: [0; 8],
-            buffer: VecDeque::new(),
+            matrix,
+            queue: VecDeque::new(),
             disabled_shift: 0,
         }
     }
 
     pub fn get_row(&self, row: u8) -> u8 {
-        self.matrix[row as usize]
+        self.matrix.borrow()[row as usize]
     }
 
-    #[allow(dead_code)]
     pub fn set_row(&mut self, row: u8, value: u8) {
-        self.matrix[row as usize] = value;
+        self.matrix.borrow_mut()[row as usize] = value;
     }
 
     pub fn drain_event(&mut self) {
-        if let Some((key_event, pressed)) = self.buffer.pop_front() {
+        if let Some((key_event, pressed)) = self.queue.pop_front() {
             match pressed {
                 true => self.on_key_down(key_event),
                 false => self.on_key_up(key_event),
@@ -165,29 +166,30 @@ impl Keyboard {
     pub fn enqueue(&mut self, str: &str) {
         for c in str.to_string().chars() {
             let key_event = self.map_char(c);
-            self.buffer.push_back((key_event, true));
-            self.buffer.push_back((key_event, false));
+            self.queue.push_back((key_event, true));
+            self.queue.push_back((key_event, false));
         }
     }
 
     pub fn has_events(&self) -> bool {
-        !self.buffer.is_empty()
+        !self.queue.is_empty()
     }
 
     pub fn reset(&mut self) {
-        self.matrix = [0xff; 8];
-        self.buffer.clear();
+        for i in 0..8 {
+            self.set_row(i, 0xff);
+        }
+        self.queue.clear();
     }
 
     fn is_pressed(&self, keycode: Key) -> bool {
         let mapping = self.map_keycode(keycode);
-        !bit::test(self.matrix[mapping.0 as usize], mapping.1)
+        !self.matrix.borrow()[mapping.0].get_bit(mapping.1)
     }
 
     fn set_key(&mut self, keycode: Key, enabled: bool) {
         let mapping = self.map_keycode(keycode);
-        self.matrix[mapping.0 as usize] =
-            bit::set(self.matrix[mapping.0 as usize], mapping.1, !enabled);
+        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
     }
 
     // -- Event Handlers
@@ -200,11 +202,11 @@ impl Keyboard {
         if event.disable_shift {
             if self.is_pressed(Key::LShift) {
                 self.set_key(Key::LShift, false);
-                self.disabled_shift = bit::set(self.disabled_shift, 0, true);
+                self.disabled_shift.set_bit(0, true);
             }
             if self.is_pressed(Key::RShift) {
                 self.set_key(Key::RShift, false);
-                self.disabled_shift = bit::set(self.disabled_shift, 1, true);
+                self.disabled_shift.set_bit(1, true);
             }
         }
     }
@@ -215,10 +217,10 @@ impl Keyboard {
             self.set_key(modifier, false);
         }
         if event.disable_shift {
-            if bit::test(self.disabled_shift, 0) {
+            if self.disabled_shift.get_bit(0) {
                 self.set_key(Key::LShift, true);
             }
-            if bit::test(self.disabled_shift, 1) {
+            if self.disabled_shift.get_bit(1) {
                 self.set_key(Key::RShift, true);
             }
             self.disabled_shift = 0;
@@ -294,7 +296,7 @@ impl Keyboard {
         }
     }
 
-    fn map_keycode(&self, keycode: Key) -> (u8, u8) {
+    fn map_keycode(&self, keycode: Key) -> (usize, usize) {
         match keycode {
             // Row 0
             Key::Backspace => (0, 0),
@@ -378,7 +380,8 @@ mod tests {
 
     #[test]
     fn enqueue_key_event() {
-        let mut keyboard = Keyboard::new();
+        let matrix = Rc::new(RefCell::new([0; 8]));
+        let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         assert_eq!(false, keyboard.has_events());
         keyboard.enqueue("S");
@@ -387,7 +390,8 @@ mod tests {
 
     #[test]
     fn drain_key_event() {
-        let mut keyboard = Keyboard::new();
+        let matrix = Rc::new(RefCell::new([0; 8]));
+        let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");
         assert_eq!(true, keyboard.has_events());
@@ -398,7 +402,8 @@ mod tests {
 
     #[test]
     fn emulate_key_press() {
-        let mut keyboard = Keyboard::new();
+        let matrix = Rc::new(RefCell::new([0; 8]));
+        let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");
         keyboard.drain_event();

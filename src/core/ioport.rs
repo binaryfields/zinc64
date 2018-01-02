@@ -17,62 +17,79 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use bit_field::BitField;
+
 pub type Observer = Box<Fn(u8)>;
+
+// direction - (where 1 is an output, and 0 is an input).
 
 pub struct IoPort {
     direction: u8,
-    latch: u8,
-    value: u8,
+    input: u8,
+    output: u8,
     observer: Option<Observer>,
 }
 
 impl IoPort {
-    pub fn new(direction: u8) -> IoPort {
+    pub fn new(direction: u8, input: u8) -> IoPort {
         IoPort {
             direction,
-            latch: 0,
-            value: 0,
+            input,
+            output: 0,
             observer: None,
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get_direction(&self) -> u8 {
         self.direction
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get_value(&self) -> u8 {
-        self.value
+        (self.output & self.direction) | (self.input & !self.direction)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn set_direction(&mut self, direction: u8) {
         self.direction = direction;
-        // set input pins to 1
-        self.value = self.latch | !self.direction;
-        if let Some(ref observer) = self.observer {
-            observer(self.value);
-        }
+        self.notify_observer();
     }
 
+    #[inline]
+    pub fn set_input(&mut self, value: u8) {
+        self.input = value;
+        self.notify_observer();
+    }
+
+    #[inline]
+    pub fn set_input_bit(&mut self, bit: usize, value: bool) {
+        self.input.set_bit(bit, value);
+        self.notify_observer();
+    }
+
+    #[inline]
     pub fn set_observer(&mut self, observer: Observer) {
         self.observer = Some(observer);
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn set_value(&mut self, value: u8) {
-        self.latch = value;
-        // set input pins to 1
-        self.value = self.latch | !self.direction;
-        if let Some(ref observer) = self.observer {
-            observer(self.value);
-        }
+        self.output = value;
+        self.notify_observer();
     }
 
+    #[inline]
     pub fn reset(&mut self) {
         self.direction = 0x00;
-        self.latch = 0x00;
-        self.set_value(0x00);
+        self.input = 0xff;
+        self.output = 0x00;
+        self.notify_observer();
+    }
+
+    fn notify_observer(&self) {
+        if let Some(ref observer) = self.observer {
+            observer(self.get_value());
+        }
     }
 }

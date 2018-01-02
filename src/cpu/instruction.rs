@@ -479,15 +479,17 @@ impl fmt::Display for Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::CpuIo;
+    use core::{IoPort, IrqLine};
     use mem::Ram;
     use std::cell::RefCell;
     use std::rc::Rc;
 
     fn setup_cpu() -> Cpu {
-        let cpu_io = Rc::new(RefCell::new(CpuIo::new()));
+        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
+        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
-        Cpu::new(cpu_io, mem)
+        Cpu::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
     #[test]

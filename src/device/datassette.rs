@@ -22,20 +22,43 @@ use std::rc::Rc;
 
 use bit_field::BitField;
 
-use cpu::CpuIo;
-use io::CiaIo;
-use util::Pulse;
+use core::{IoPort, Pin, Pulse};
 
 use super::Tape;
 
 // TODO device: datassette test cases
 
+/*
+  +---------+---+------------+--------------------------------------------+
+  |  NAME   |BIT| DIRECTION  |                 DESCRIPTION                |
+  +---------+---+------------+--------------------------------------------+
+  |  LORAM  | 0 |   OUTPUT   | Control for RAM/ROM at $A000-$BFFF         |
+  |  HIRAM  | 1 |   OUTPUT   | Control for RAM/ROM at $E000-$FFFF         |
+  |  CHAREN | 2 |   OUTPUT   | Control for I/O/ROM at $D000-$DFFF         |
+  |         | 3 |   OUTPUT   | Cassette write line                        |
+  |         | 4 |   INPUT    | Cassette switch sense (0=play button down) |
+  |         | 5 |   OUTPUT   | Cassette motor control (0=motor spins)     |
+  +---------+---+------------+--------------------------------------------+
+*/
+
 const DUTY_CYCLE: u32 = 50;
+
+#[derive(Copy, Clone)]
+enum ControlPort {
+    CassetteSwitch = 4,
+    CassetteMotor = 5,
+}
+
+impl ControlPort {
+    pub fn value(&self) -> usize {
+        *self as usize
+    }
+}
 
 pub struct Datassette {
     // Dependencies
-    cia_io: Rc<RefCell<CiaIo>>,
-    cpu_io: Rc<RefCell<CpuIo>>,
+    cia_flag: Rc<RefCell<Pin>>,
+    cpu_io_port: Rc<RefCell<IoPort>>,
     // Runtime State
     playing: bool,
     tape: Option<Box<Tape>>,
@@ -43,10 +66,10 @@ pub struct Datassette {
 }
 
 impl Datassette {
-    pub fn new(cia_io: Rc<RefCell<CiaIo>>, cpu_io: Rc<RefCell<CpuIo>>) -> Datassette {
+    pub fn new(cia_flag: Rc<RefCell<Pin>>, cpu_io_port: Rc<RefCell<IoPort>>) -> Datassette {
         Datassette {
-            cia_io,
-            cpu_io,
+            cia_flag,
+            cpu_io_port,
             playing: false,
             tape: None,
             current_pulse: Pulse::new(0, DUTY_CYCLE),
@@ -73,9 +96,8 @@ impl Datassette {
                 }
             }
             if !self.current_pulse.is_done() {
-                self.cia_io
+                self.cia_flag
                     .borrow_mut()
-                    .flag
                     .set_active(self.current_pulse.advance());
             }
         }
@@ -87,19 +109,28 @@ impl Datassette {
     }
 
     pub fn is_playing(&self) -> bool {
-        self.playing & !self.cpu_io.borrow().port_1.get_value().get_bit(5)
+        // Cassette motor control (0=motor spins)
+        let motor_on = !self.cpu_io_port
+            .borrow()
+            .get_value()
+            .get_bit(ControlPort::CassetteMotor.value());
+        self.playing & motor_on
     }
 
     pub fn play(&mut self) {
         info!(target: "device", "Starting datassette");
         if self.tape.is_some() {
-            self.cpu_io.borrow_mut().cassette_switch = false;
+            self.cpu_io_port
+                .borrow_mut()
+                .set_input_bit(ControlPort::CassetteSwitch.value(), false);
             self.playing = true;
         }
     }
 
     pub fn reset(&mut self) {
-        self.cpu_io.borrow_mut().cassette_switch = true;
+        self.cpu_io_port
+            .borrow_mut()
+            .set_input_bit(ControlPort::CassetteSwitch.value(), true);
         self.playing = false;
         self.current_pulse = Pulse::new(0, DUTY_CYCLE);
         if let Some(ref mut tape) = self.tape {
@@ -109,7 +140,9 @@ impl Datassette {
 
     pub fn stop(&mut self) {
         info!(target: "device", "Stopping datassette");
-        self.cpu_io.borrow_mut().cassette_switch = true;
+        self.cpu_io_port
+            .borrow_mut()
+            .set_input_bit(ControlPort::CassetteSwitch.value(), true);
         self.playing = false;
     }
 }
