@@ -87,6 +87,7 @@ impl IoPort {
         self.notify_observer();
     }
 
+    #[inline]
     fn notify_observer(&self) {
         if let Some(ref observer) = self.observer {
             observer(self.get_value());

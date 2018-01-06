@@ -17,13 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod color;
 mod rect;
-mod render_target;
 pub mod vic;
 mod vic_memory;
 
 pub use self::rect::Dimension;
-pub use self::render_target::RenderTarget;
 pub use self::vic::Vic;
 pub use self::vic_memory::VicMemory;

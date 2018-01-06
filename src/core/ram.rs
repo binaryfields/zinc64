@@ -17,8 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use core::Addressable;
-
 pub struct Ram {
     data: Vec<u8>,
 }
@@ -37,19 +35,13 @@ impl Ram {
         }
     }
 
-    pub fn reset(&mut self) {
-        for i in 0..self.data.len() {
-            self.data[i] = 0x00;
-        }
-    }
-}
-
-impl Addressable for Ram {
-    fn read(&self, address: u16) -> u8 {
+    #[inline]
+    pub fn read(&self, address: u16) -> u8 {
         self.data[address as usize]
     }
 
-    fn write(&mut self, address: u16, value: u8) {
+    #[inline]
+    pub fn write(&mut self, address: u16, value: u8) {
         self.data[address as usize] = value
     }
 }

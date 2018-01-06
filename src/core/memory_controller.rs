@@ -17,22 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod bin;
-mod crt;
-//mod hex;
-mod loaders;
-mod prg;
-mod tap;
-
-use std::io;
-use std::path::Path;
-
-use system::{AutostartMethod, Image};
-
-pub use self::bin::BinLoader;
-pub use self::loaders::Loaders;
-
-pub trait Loader {
-    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error>;
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error>;
+pub trait MemoryController {
+    fn switch_banks(&mut self, mode: u8);
+    // I/O
+    fn read(&self, address: u16) -> u8;
+    fn write(&mut self, address: u16, value: u8);
 }

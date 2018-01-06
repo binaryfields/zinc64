@@ -17,14 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod device_memory;
+mod mmio;
 mod memory;
 mod memory_map;
-mod ram;
-mod rom;
 
-pub use self::device_memory::DeviceMemory;
+pub use self::mmio::Mmio;
 pub use self::memory::Memory;
 pub use self::memory_map::{Bank, Configuration, MemoryMap};
-pub use self::ram::Ram;
-pub use self::rom::Rom;

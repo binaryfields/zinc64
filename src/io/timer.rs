@@ -71,7 +71,6 @@ impl Timer {
         self.value = 0x0000;
     }
 
-    #[inline(always)]
     pub fn update(&mut self, pulse: u16) -> bool {
         if self.enabled {
             if self.value == 0 {

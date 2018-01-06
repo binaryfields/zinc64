@@ -21,7 +21,6 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bit_field::BitField;
-
 use core::{Chip, Icr, IoPort, IrqLine, Pin};
 use log::LogLevel;
 
@@ -102,8 +101,6 @@ pub struct Cia {
     joystick_2: Option<Rc<Cell<u8>>>,
     keyboard_matrix: Rc<RefCell<[u8; 8]>>,
     // Functional Units
-    port_a: IoPort,
-    port_b: IoPort,
     timer_a: Timer,
     timer_b: Timer,
     tod_alarm: Rtc,
@@ -115,11 +112,16 @@ pub struct Cia {
     // I/O
     cnt: Rc<RefCell<Pin>>,
     flag: Rc<RefCell<Pin>>,
+    port_a: Rc<RefCell<IoPort>>,
+    port_b: Rc<RefCell<IoPort>>,
 }
 
 impl Cia {
     pub fn new(
         mode: Mode,
+        cia_flag: Rc<RefCell<Pin>>,
+        cia_port_a: Rc<RefCell<IoPort>>,
+        cia_port_b: Rc<RefCell<IoPort>>,
         cpu_irq: Rc<RefCell<IrqLine>>,
         cpu_nmi: Rc<RefCell<IrqLine>>,
         joystick_1: Option<Rc<Cell<u8>>>,
@@ -133,8 +135,6 @@ impl Cia {
             joystick_1,
             joystick_2,
             keyboard_matrix,
-            port_a: IoPort::new(0x00, 0xff),
-            port_b: IoPort::new(0x00, 0xff),
             timer_a: Timer::new(),
             timer_b: Timer::new(),
             tod_alarm: Rtc::new(),
@@ -143,20 +143,87 @@ impl Cia {
             int_control: Icr::new(),
             int_triggered: false,
             cnt: Rc::new(RefCell::new(Pin::new_high())),
-            flag: Rc::new(RefCell::new(Pin::new_low())),
+            flag: cia_flag,
+            port_a: cia_port_a,
+            port_b: cia_port_b,
         }
     }
 
-    pub fn get_flag(&self) -> Rc<RefCell<Pin>> {
-        self.flag.clone()
+    pub fn tod_tick(&mut self) {
+        self.tod_clock.tick();
+        if self.tod_clock == self.tod_alarm {
+            self.int_control.set_event(2);
+            if self.int_control.get_interrupt_request() && !self.int_triggered {
+                self.trigger_interrupt();
+            }
+        }
     }
 
-    pub fn get_port_a_mut(&mut self) -> &mut IoPort {
-        &mut self.port_a
+    fn read_cia1_port_a(&self) -> u8 {
+        let joystick_state = self.scan_joystick(&self.joystick_2);
+        self.port_a.borrow().get_value() & joystick_state
     }
 
-    #[inline(always)]
-    pub fn clock(&mut self) {
+    fn read_cia1_port_b(&self) -> u8 {
+        // let timer_a_out = 1u8 << 6;
+        // let timer_b_out = 1u8 << 7;
+        let keyboard_state = match self.port_a.borrow().get_value() {
+            0x00 => 0x00,
+            0xff => 0xff,
+            _ => self.scan_keyboard(!self.port_a.borrow().get_value()),
+        };
+        let joystick_state = self.scan_joystick(&self.joystick_1);
+        self.port_b.borrow().get_value() & keyboard_state & joystick_state
+    }
+
+    fn read_cia2_port_a(&self) -> u8 {
+        // iec inputs
+        self.port_a.borrow().get_value()
+    }
+
+    fn read_cia2_port_b(&self) -> u8 {
+        self.port_b.borrow().get_value()
+    }
+
+    fn scan_joystick(&self, joystick: &Option<Rc<Cell<u8>>>) -> u8 {
+        if let Some(ref state) = *joystick {
+            !state.get()
+        } else {
+            0xff
+        }
+    }
+
+    fn scan_keyboard(&self, columns: u8) -> u8 {
+        let mut result = 0;
+        for i in 0..8 as usize {
+            if columns.get_bit(i) {
+                result |= self.keyboard_matrix.borrow()[i];
+            }
+        }
+        result
+    }
+
+    // -- Interrupt Ops
+
+    fn clear_interrupt(&mut self) {
+        match self.mode {
+            Mode::Cia1 => self.cpu_irq.borrow_mut().clear(0), // FIXME magic value
+            Mode::Cia2 => self.cpu_nmi.borrow_mut().clear(0), // FIXME magic value
+        }
+        self.int_triggered = false;
+    }
+
+    fn trigger_interrupt(&mut self) {
+        match self.mode {
+            Mode::Cia1 => self.cpu_irq.borrow_mut().set(0), // FIXME magic value
+            Mode::Cia2 => self.cpu_nmi.borrow_mut().set(0), // FIXME magic value
+        }
+        self.int_triggered = true;
+    }
+}
+
+impl Chip for Cia {
+    fn clock(&mut self) {
         // Process timers
         let timer_a_underflow = if self.timer_a.enabled {
             let pulse = match self.timer_a.input {
@@ -218,80 +285,15 @@ impl Cia {
         }
     }
 
-    pub fn tod_tick(&mut self) {
-        self.tod_clock.tick();
-        if self.tod_clock == self.tod_alarm {
-            self.int_control.set_event(2);
-            if self.int_control.get_interrupt_request() && !self.int_triggered {
-                self.trigger_interrupt();
-            }
+    fn clock_delta(&mut self, delta: u32) {
+        for _i in 0..delta {
+            self.clock();
         }
     }
 
-    fn read_cia1_port_a(&self) -> u8 {
-        let joystick_state = self.scan_joystick(&self.joystick_2);
-        self.port_a.get_value() & joystick_state
+    fn process_vsync(&mut self) {
+        // FIXME tod counter
     }
-
-    fn read_cia1_port_b(&self) -> u8 {
-        // let timer_a_out = 1u8 << 6;
-        // let timer_b_out = 1u8 << 7;
-        let keyboard_state = match self.port_a.get_value() {
-            0x00 => 0x00,
-            0xff => 0xff,
-            _ => self.scan_keyboard(!self.port_a.get_value()),
-        };
-        let joystick_state = self.scan_joystick(&self.joystick_1);
-        self.port_b.get_value() & keyboard_state & joystick_state
-    }
-
-    fn read_cia2_port_a(&self) -> u8 {
-        // iec inputs
-        self.port_a.get_value()
-    }
-
-    fn read_cia2_port_b(&self) -> u8 {
-        self.port_b.get_value()
-    }
-
-    fn scan_joystick(&self, joystick: &Option<Rc<Cell<u8>>>) -> u8 {
-        if let Some(ref state) = *joystick {
-            !state.get()
-        } else {
-            0xff
-        }
-    }
-
-    fn scan_keyboard(&self, columns: u8) -> u8 {
-        let mut result = 0;
-        for i in 0..8 as usize {
-            if columns.get_bit(i) {
-                result |= self.keyboard_matrix.borrow()[i];
-            }
-        }
-        result
-    }
-
-    // -- Interrupt Ops
-
-    fn clear_interrupt(&mut self) {
-        match self.mode {
-            Mode::Cia1 => self.cpu_irq.borrow_mut().clear(0), // FIXME magic value
-            Mode::Cia2 => self.cpu_nmi.borrow_mut().clear(0), // FIXME magic value
-        }
-        self.int_triggered = false;
-    }
-
-    fn trigger_interrupt(&mut self) {
-        match self.mode {
-            Mode::Cia1 => self.cpu_irq.borrow_mut().set(0), // FIXME magic value
-            Mode::Cia2 => self.cpu_nmi.borrow_mut().set(0), // FIXME magic value
-        }
-        self.int_triggered = true;
-    }
-}
-
-impl Chip for Cia {
 
     fn reset(&mut self) {
         /*
@@ -302,8 +304,8 @@ impl Chip for Cia {
         are set to zero and the timer latches to all ones. All other
         registers are reset to zero.
         */
-        self.port_a.reset();
-        self.port_b.reset();
+        self.port_a.borrow_mut().reset();
+        self.port_b.borrow_mut().reset();
         self.timer_a.reset();
         self.timer_b.reset();
         self.tod_set_alarm = false;
@@ -312,6 +314,8 @@ impl Chip for Cia {
         self.cnt.borrow_mut().set_active(true);
         self.flag.borrow_mut().set_active(false);
     }
+
+    // I/O
 
     fn read(&mut self, reg: u8) -> u8 {
         let value = match Reg::from(reg) {
@@ -323,8 +327,8 @@ impl Chip for Cia {
                 Mode::Cia1 => self.read_cia1_port_b(),
                 Mode::Cia2 => self.read_cia2_port_b(),
             },
-            Reg::DDRA => self.port_a.get_direction(),
-            Reg::DDRB => self.port_b.get_direction(),
+            Reg::DDRA => self.port_a.borrow().get_direction(),
+            Reg::DDRB => self.port_b.borrow().get_direction(),
             Reg::TALO => (self.timer_a.value & 0xff) as u8,
             Reg::TAHI => (self.timer_a.value >> 8) as u8,
             Reg::TBLO => (self.timer_b.value & 0xff) as u8,
@@ -392,23 +396,22 @@ impl Chip for Cia {
         value
     }
 
-    #[allow(dead_code, unused_variables)]
     fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cia::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
         match Reg::from(reg) {
             Reg::PRA => {
-                self.port_a.set_value(value);
+                self.port_a.borrow_mut().set_value(value);
             }
             Reg::PRB => {
-                self.port_b.set_value(value);
+                self.port_b.borrow_mut().set_value(value);
             }
             Reg::DDRA => {
-                self.port_a.set_direction(value);
+                self.port_a.borrow_mut().set_direction(value);
             }
             Reg::DDRB => {
-                self.port_b.set_direction(value);
+                self.port_b.borrow_mut().set_direction(value);
             }
             Reg::TALO => {
                 let result = (self.timer_a.latch & 0xff00) | (value as u16);
@@ -525,12 +528,12 @@ s                */
     }
 }
 
-#[inline(always)]
+#[inline]
 fn from_bcd(decimal: u8) -> u8 {
     (decimal >> 4) * 10 + (decimal & 0x0f)
 }
 
-#[inline(always)]
+#[inline]
 fn to_bcd(num: u8) -> u8 {
     ((num / 10) << 4) | (num % 10)
 }
@@ -540,11 +543,15 @@ mod tests {
     use super::*;
 
     fn setup_cia() -> Cia {
+        let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
         let mut cia = Cia::new(
             Mode::Cia1,
+            cia_port_a,
+            cia_port_b,
             cpu_irq,
             cpu_nmi,
             None,
@@ -557,10 +564,14 @@ mod tests {
 
     #[allow(dead_code)]
     fn setup_cia_with_keyboard(keyboard_matrix: Rc<RefCell<[u8; 8]>>) -> Cia {
+        let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mut cia = Cia::new(
             Mode::Cia1,
+            cia_port_a,
+            cia_port_b,
             cpu_irq,
             cpu_nmi,
             None,
@@ -650,28 +661,28 @@ mod tests {
     fn write_reg_0x00() {
         let mut cia = setup_cia();
         cia.write(Reg::PRA.addr(), 0xff);
-        assert_eq!(0xff, cia.port_a.get_value());
+        assert_eq!(0xff, cia.port_a.borrow().get_value());
     }
 
     #[test]
     fn write_reg_0x01() {
         let mut cia = setup_cia();
         cia.write(Reg::PRB.addr(), 0xff);
-        assert_eq!(0xff, cia.port_b.get_value());
+        assert_eq!(0xff, cia.port_b.borrow().get_value());
     }
 
     #[test]
     fn write_reg_0x02() {
         let mut cia = setup_cia();
         cia.write(Reg::DDRA.addr(), 0xff);
-        assert_eq!(0xff, cia.port_a.get_direction());
+        assert_eq!(0xff, cia.port_a.borrow().get_direction());
     }
 
     #[test]
     fn write_reg_0x03() {
         let mut cia = setup_cia();
         cia.write(Reg::DDRB.addr(), 0xff);
-        assert_eq!(0xff, cia.port_b.get_direction());
+        assert_eq!(0xff, cia.port_b.borrow().get_direction());
     }
 
     #[test]

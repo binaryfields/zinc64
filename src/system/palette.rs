@@ -17,22 +17,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod bin;
-mod crt;
-//mod hex;
-mod loaders;
-mod prg;
-mod tap;
+// Spec: http://unusedino.de/ec64/technical/misc/vic656x/colors/
 
-use std::io;
-use std::path::Path;
+pub struct Palette;
 
-use system::{AutostartMethod, Image};
-
-pub use self::bin::BinLoader;
-pub use self::loaders::Loaders;
-
-pub trait Loader {
-    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error>;
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error>;
+impl Palette {
+    pub fn default() -> [u32; 16] {
+        [
+            0x000000, // Black
+            0xffffff, // White
+            0x68372b, // Red
+            0x70a4b2, // Cyan
+            0x6f3d86, // Purple
+            0x588d43, // Green
+            0x352879, // Blue
+            0xb8c76f, // Yellow
+            0x6f4f25, // Orange
+            0x433900, // Brown
+            0x9a6759, // LightRed
+            0x444444, // DarkGray
+            0x6c6c6c, // MediumGray
+            0x9ad284, // LightGreen
+            0x6c5eb5, // LightBlue
+            0x959595, // LightGray
+        ]
+    }
 }

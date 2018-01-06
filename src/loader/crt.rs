@@ -26,9 +26,10 @@ use std::str;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use device::{Cartridge, Chip, ChipType, HwType};
-use loader::{Image, Loader};
-use loader::autostart;
-use system::C64;
+use system::{C64, Image};
+use system::autostart;
+
+use super::Loader;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
@@ -94,7 +95,7 @@ impl CrtLoader {
             bank_number: header.bank_number as u8,
             offset: header.load_address,
             size: header.image_size,
-            data: data,
+            data,
         }
     }
 
@@ -104,7 +105,7 @@ impl CrtLoader {
             0 => Ok(None),
             4 => {
                 let header = ChipHeader {
-                    signature: signature,
+                    signature,
                     length: rdr.read_u32::<BigEndian>()?,
                     chip_type: rdr.read_u16::<BigEndian>()?,
                     bank_number: rdr.read_u16::<BigEndian>()?,
@@ -177,9 +178,9 @@ impl CrtLoader {
 }
 
 impl Loader for CrtLoader {
-    fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error> {
+    fn autostart(&self, path: &Path) -> Result<autostart::AutostartMethod, io::Error> {
         let image = self.load(path)?;
-        Ok(autostart::Method::WithImage(image))
+        Ok(autostart::AutostartMethod::WithImage(image))
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
@@ -189,10 +190,10 @@ impl Loader for CrtLoader {
         let header = self.read_header(&mut rdr)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge header"))?;
         info!(target: "loader", "Found cartridge {}, version {}.{}, type {}",
-        str::from_utf8(&header.name).unwrap_or(""),
-        header.version >> 8,
-        header.version & 0xff,
-        header.hw_type);
+              str::from_utf8(&header.name).unwrap_or(""),
+              header.version >> 8,
+              header.version & 0xff,
+              header.hw_type);
         self.validate_header(&header)?;
         rdr.consume((header.header_length - 0x40) as usize);
         let mut cartridge = self.build_cartridge(header);
@@ -202,7 +203,7 @@ impl Loader for CrtLoader {
             match chip_header_opt {
                 Some(chip_header) => {
                     info!(target: "loader", "Found chip {}, offset 0x{:x}, size {}",
-                    chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
+                          chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
                     self.validate_chip_header(&chip_header)?;
                     let chip_data = self.read_data(&mut rdr, (chip_header.length - 0x10) as usize)
                         .map_err(|_| {
@@ -219,8 +220,10 @@ impl Loader for CrtLoader {
                 }
             }
         }
-        Ok(Box::new(CrtImage {
-            cartridge: Some(cartridge),
-        }))
+        Ok(Box::new(
+            CrtImage {
+                cartridge: Some(cartridge),
+            }
+        ))
     }
 }

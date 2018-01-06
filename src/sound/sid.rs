@@ -19,11 +19,17 @@
 
 use std::sync::{Arc, Mutex};
 
-use core::Chip;
+use core::{Chip, SidModel, SoundBuffer};
 use log::LogLevel;
 use resid;
 
-use super::SoundBuffer;
+#[derive(Clone, Copy, PartialEq)]
+pub enum SamplingMethod {
+    Fast,
+    Interpolate,
+    Resample,
+    ResampleFast,
+}
 
 pub struct Sid {
     // Functional Units
@@ -33,10 +39,14 @@ pub struct Sid {
 }
 
 impl Sid {
-    pub fn new(buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
+    pub fn new(chip_model: SidModel, buffer: Arc<Mutex<SoundBuffer>>) -> Sid {
         info!(target: "sound", "Initializing SID");
+        let resid_model = match chip_model {
+            SidModel::Mos6581 => resid::ChipModel::Mos6581,
+            SidModel::Mos8580 => resid::ChipModel::Mos8580,
+        };
         Sid {
-            resid: resid::Sid::new(resid::ChipModel::Mos6581),
+            resid: resid::Sid::new(resid_model),
             buffer,
         }
     }
@@ -47,15 +57,26 @@ impl Sid {
 
     pub fn set_sampling_parameters(
         &mut self,
-        method: resid::SamplingMethod,
+        sampling_method: SamplingMethod,
         clock_freq: u32,
         sample_freq: u32,
     ) {
-        self.resid.set_sampling_parameters(method, clock_freq, sample_freq);
+        let resid_sampling_method = match sampling_method {
+            SamplingMethod::Fast => resid::SamplingMethod::Fast,
+            SamplingMethod::Interpolate => resid::SamplingMethod::Interpolate,
+            SamplingMethod::Resample => resid::SamplingMethod::Resample,
+            SamplingMethod::ResampleFast => resid::SamplingMethod::ResampleFast,
+        };
+        self.resid.set_sampling_parameters(resid_sampling_method, clock_freq, sample_freq);
+    }
+}
+
+impl Chip for Sid {
+    fn clock(&mut self) {
+        self.resid.clock();
     }
 
-    #[inline(always)]
-    pub fn clock_delta(&mut self, cycles: u32) {
+    fn clock_delta(&mut self, cycles: u32) {
         let mut buffer = [0i16; 4096]; // FIXME magic value
         let buffer_length = buffer.len();
         let mut samples = 0;
@@ -73,13 +94,14 @@ impl Sid {
             output.push(buffer[i]);
         }
     }
-}
 
-impl Chip for Sid {
+    fn process_vsync(&mut self) {}
 
     fn reset(&mut self) {
         self.resid.reset();
     }
+
+    // I/O
 
     fn read(&mut self, reg: u8) -> u8 {
         self.resid.read(reg)
@@ -112,7 +134,7 @@ mod tests {
 
     fn setup_sid() -> Sid {
         let buffer = Arc::new(Mutex::new(SoundBuffer::new(8192)));
-        let mut sid = Sid::new(buffer);
+        let mut sid = Sid::new(SidModel::Mos6581, buffer);
         sid.reset();
         sid
     }

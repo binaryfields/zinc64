@@ -23,10 +23,9 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::result::Result;
 
-use cpu::TickFn;
-use loader::{Image, Loader};
-use loader::autostart;
-use system::C64;
+use system::{AutostartMethod, C64, Image};
+
+use super::Loader;
 
 struct BinImage {
     data: Vec<u8>,
@@ -37,8 +36,7 @@ impl Image for BinImage {
     fn mount(&mut self, c64: &mut C64) {
         info!(target: "loader", "Mounting BIN image");
         let cpu = c64.get_cpu();
-        let tick_fn: TickFn = Box::new(move || {});
-        cpu.borrow_mut().write(0x0001, 0, &tick_fn);
+        cpu.borrow_mut().write_debug(0x0001, 0);
         c64.load(&self.data, self.offset);
         cpu.borrow_mut().set_pc(self.offset);
     }
@@ -53,14 +51,14 @@ pub struct BinLoader {
 
 impl BinLoader {
     pub fn new(offset: u16) -> BinLoader {
-        BinLoader { offset: offset }
+        BinLoader { offset }
     }
 }
 
 impl Loader for BinLoader {
-    fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error> {
+    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error> {
         let image = self.load(path)?;
-        Ok(autostart::Method::WithBinImage(image))
+        Ok(AutostartMethod::WithBinImage(image))
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
@@ -69,9 +67,11 @@ impl Loader for BinLoader {
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
-        Ok(Box::new(BinImage {
-            data: data,
-            offset: self.offset,
-        }))
+        Ok(Box::new(
+            BinImage {
+                data,
+                offset: self.offset,
+            }
+        ))
     }
 }

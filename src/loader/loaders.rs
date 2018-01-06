@@ -24,7 +24,7 @@ use loader::crt;
 use loader::prg;
 use loader::tap;
 
-pub struct Loaders {}
+pub struct Loaders;
 
 impl Loaders {
     pub fn from_ext(ext: Option<&str>) -> Box<Loader> {

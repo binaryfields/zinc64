@@ -20,32 +20,32 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use core::Addressable;
+use core::{IoPort, Ram, Rom};
 
 pub struct VicMemory {
-    charset: Rc<RefCell<Addressable>>,
-    ram: Rc<RefCell<Addressable>>,
-    cia2_port_a: u8,
+    charset: Rc<RefCell<Rom>>,
+    cia_2_port_a: Rc<RefCell<IoPort>>,
+    ram: Rc<RefCell<Ram>>,
 }
 
 impl VicMemory {
-    pub fn new(charset: Rc<RefCell<Addressable>>, ram: Rc<RefCell<Addressable>>) -> VicMemory {
+    pub fn new(
+        charset: Rc<RefCell<Rom>>,
+        cia_2_port_a: Rc<RefCell<IoPort>>,
+        ram: Rc<RefCell<Ram>>
+    ) -> VicMemory {
         VicMemory {
             charset,
+            cia_2_port_a,
             ram,
-            cia2_port_a: 0,
         }
     }
 
-    pub fn set_cia_port_a(&mut self, value: u8) {
-        self.cia2_port_a = value;
-    }
-}
-
-impl Addressable for VicMemory {
-    fn read(&self, address: u16) -> u8 {
-        let full_address = ((!self.cia2_port_a & 0x03) as u16) << 14 | address;
-        let zone = (full_address & 0xf000) >> 12;
+    #[inline]
+    pub fn read(&self, address: u16) -> u8 {
+        let cia2_port_a = self.cia_2_port_a.borrow().get_value();
+        let full_address = ((!cia2_port_a & 0x03) as u16) << 14 | address;
+        let zone = full_address >> 12;
         match zone {
             0x01 => self.charset.borrow().read(full_address - 0x1000),
             0x09 => self.charset.borrow().read(full_address - 0x9000),
@@ -54,7 +54,8 @@ impl Addressable for VicMemory {
     }
 
     #[allow(unused_variables)]
-    fn write(&mut self, address: u16, value: u8) {
+    #[inline]
+    pub fn write(&mut self, address: u16, value: u8) {
         panic!("writes by vic are not supported")
     }
 }

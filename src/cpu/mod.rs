@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod cpu;
+mod cpu6510;
 mod instruction;
 mod operand;
 
-pub use self::cpu::{Cpu, TickFn};
+pub use self::cpu6510::Cpu6510;

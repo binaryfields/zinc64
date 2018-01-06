@@ -24,45 +24,70 @@ use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
-use core::{Addressable, Chip, IoPort, IrqLine};
-use cpu::{Cpu, TickFn};
-use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
+use core::{
+    Chip,
+    Cpu,
+    Factory,
+    FrameBuffer,
+    IoLine,
+    IoPort,
+    IrqLine,
+    Pin,
+    Ram,
+    SoundBuffer,
+    TickFn,
+};
+use device::{
+    Cartridge,
+    Datassette,
+    ExpansionPort,
+    Joystick,
+    Keyboard,
+    Tape,
+};
 use device::joystick;
-use mem::{DeviceMemory, Memory, Ram, Rom};
-use io::Cia;
-use io::cia;
-use loader::Autostart;
-use sound::{Sid, SoundBuffer};
-use video::{RenderTarget, Vic, VicMemory};
-use video::vic;
 
-use super::Config;
-use super::clock::Clock;
+use super::{Autostart, Clock, Config, Palette};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
 //   components are managed as component dependencies.
+
+#[allow(dead_code)]
+#[derive(Copy, Clone)]
+enum BaseAddr {
+    Basic = 0xa000,
+    BootComplete = 0xa65c,
+    Charset = 0xd000,
+    Kernal = 0xe000,
+}
+
+impl BaseAddr {
+    pub fn addr(&self) -> u16 {
+        *self as u16
+    }
+}
 
 pub struct C64 {
     // Dependencies
     config: Config,
     // Chipset
     cpu: Rc<RefCell<Cpu>>,
-    cia1: Rc<RefCell<Cia>>,
-    cia2: Rc<RefCell<Cia>>,
-    sid: Rc<RefCell<Sid>>,
-    vic: Rc<RefCell<Vic>>,
+    cia1: Rc<RefCell<Chip>>,
+    cia2: Rc<RefCell<Chip>>,
+    sid: Rc<RefCell<Chip>>,
+    vic: Rc<RefCell<Chip>>,
     // Memory
     color_ram: Rc<RefCell<Ram>>,
-    expansion_port: Rc<RefCell<ExpansionPort>>,
     ram: Rc<RefCell<Ram>>,
     // Peripherals
     datassette: Rc<RefCell<Datassette>>,
+    expansion_port: Rc<RefCell<ExpansionPort>>,
     joystick1: Option<Rc<RefCell<Joystick>>>,
     joystick2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     // Buffers
-    frame_buffer: Rc<RefCell<RenderTarget>>,
+    frame_buffer: Rc<RefCell<FrameBuffer>>,
     sound_buffer: Arc<Mutex<SoundBuffer>>,
     // Configuration
     autostart: Option<Autostart>,
@@ -74,18 +99,15 @@ pub struct C64 {
 }
 
 impl C64 {
-    pub fn new(config: Config) -> Result<C64, io::Error> {
+    pub fn new(config: Config, factory: Box<Factory>) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
-        let vic_spec = vic::Spec::new(config.model.vic_model);
-
-        // I/O Lines
-        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
-
         // Buffers
         let frame_buffer = Rc::new(RefCell::new(
-            RenderTarget::new(vic_spec.display_rect.size())
+            FrameBuffer::new(
+                config.model.frame_buffer_size.0,
+                config.model.frame_buffer_size.1,
+                Palette::default(),
+            )
         ));
         let joystick_1_state = Rc::new(Cell::new(0u8));
         let joystick_2_state = Rc::new(Cell::new(0u8));
@@ -94,87 +116,127 @@ impl C64 {
             SoundBuffer::new(config.sound.buffer_size),
         ));
 
+        // I/O Lines
+        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
+        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
+        let exp_io_line = Rc::new(RefCell::new(IoLine::new(0xff)));
+        let cia_1_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cia_1_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cia_1_flag = Rc::new(RefCell::new(Pin::new_low()));
+        let cia_2_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cia_2_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let cia_2_flag = Rc::new(RefCell::new(Pin::new_low()));
+
         // Memory
-        let charset = Rc::new(RefCell::new(Rom::load(
+        let color_ram = factory.new_ram(config.model.color_ram);
+        let ram = factory.new_ram(config.model.memory_size);
+        let basic = factory.new_rom(
+            Path::new("res/rom/basic.rom"),
+            BaseAddr::Basic.addr(),
+        )?;
+        let charset = factory.new_rom(
             Path::new("res/rom/characters.rom"),
             0,
-        )?));
-        let color_ram = Rc::new(RefCell::new(Ram::new(1024))); // FIXME use config.model value
-        let ram = Rc::new(RefCell::new(Ram::new(config.model.memory_size)));
+        )?;
+        let kernal = factory.new_rom(
+            Path::new("res/rom/kernal.rom"),
+            BaseAddr::Kernal.addr(),
+        )?;
 
         // Chipset
-        let cia1 = Rc::new(RefCell::new(
-            Cia::new(
-                cia::Mode::Cia1,
-                cpu_irq.clone(),
-                cpu_nmi.clone(),
-                Some(joystick_1_state.clone()),
-                Some(joystick_2_state.clone()),
-                keyboard_matrix.clone(),
-            )
-        ));
-        let cia2 = Rc::new(RefCell::new(Cia::new(
-            cia::Mode::Cia2,
+        let cia1 = factory.new_cia1(
+            cia_1_flag.clone(),
+            cia_1_port_a.clone(),
+            cia_1_port_b.clone(),
             cpu_irq.clone(),
             cpu_nmi.clone(),
-            None,
-            None,
+            joystick_1_state.clone(),
+            joystick_2_state.clone(),
             keyboard_matrix.clone(),
-        )));
-        let sid = Rc::new(RefCell::new(Sid::new(sound_buffer.clone())));
+        );
+        let cia2 = factory.new_cia2(
+            cia_2_flag.clone(),
+            cia_2_port_a.clone(),
+            cia_2_port_b.clone(),
+            cpu_irq.clone(),
+            cpu_nmi.clone(),
+            keyboard_matrix.clone(),
+        );
+        let sid = factory.new_sid(
+            &config.model,
+            sound_buffer.clone(),
+        );
+        /*
+        FIXME
         sid.borrow_mut().set_sampling_parameters(
             config.sound.sampling_method,
             config.model.cpu_freq,
-            config.sound.sample_rate
+            config.sound.sample_rate,
         );
         sid.borrow_mut().enable_filter(config.sound.sid_filters);
-        let vic_mem = Rc::new(RefCell::new(VicMemory::new(charset.clone(), ram.clone())));
-        let vic = Rc::new(RefCell::new(Vic::new(
+        */
+        let vic = factory.new_vic(
             config.model.vic_model,
+            charset.clone(),
+            cia_2_port_a.clone(),
             color_ram.clone(),
             cpu_irq.clone(),
-            vic_mem.clone(),
             frame_buffer.clone(),
-        )));
+            ram.clone(),
+        );
 
-        let expansion_port = Rc::new(RefCell::new(ExpansionPort::new()));
-        let device_mem = Rc::new(RefCell::new(DeviceMemory::new(
+        // Memory Controller and Processor
+        let expansion_port = Rc::new(RefCell::new(
+            ExpansionPort::new(
+                exp_io_line.clone()
+            )
+        ));
+        let mem = factory.new_memory(
             cia1.clone(),
             cia2.clone(),
             color_ram.clone(),
             expansion_port.clone(),
+            ram.clone(),
+            basic.clone(),
+            charset.clone(),
+            kernal.clone(),
             sid.clone(),
             vic.clone(),
-        )));
-        let mem = Rc::new(RefCell::new(Memory::new(
-            charset.clone(),
-            device_mem.clone(),
-            expansion_port.clone(),
-            ram.clone(),
-        )?));
-        let cpu = Rc::new(RefCell::new(Cpu::new(
+        );
+        let cpu = factory.new_cpu(
             cpu_io_port.clone(),
             cpu_irq.clone(),
             cpu_nmi.clone(),
             mem.clone(),
-        )));
+        );
 
         // Peripherals
-        let datassette = Rc::new(RefCell::new(Datassette::new(
-            cia1.borrow().get_flag(),
-            cpu_io_port.clone(),
-        )));
+        let datassette = Rc::new(RefCell::new(
+            Datassette::new(
+                cia_1_flag.clone(),
+                cpu_io_port.clone(),
+            )
+        ));
         let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
             Some(Rc::new(RefCell::new(
-                Joystick::new(config.joystick.joystick_1, 3200, joystick_1_state.clone()))
-            )) // FIXME magic value
+                Joystick::new(
+                    config.joystick.joystick_1,
+                    config.joystick.axis_motion_threshold,
+                    joystick_1_state.clone(),
+                )
+            )))
         } else {
             None
         };
         let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
             Some(Rc::new(RefCell::new(
-                Joystick::new(config.joystick.joystick_2, 3200, joystick_2_state.clone()))
-            )) // FIXME magic value
+                Joystick::new(
+                    config.joystick.joystick_2,
+                    config.joystick.axis_motion_threshold,
+                    joystick_2_state.clone(),
+                )
+            )))
         } else {
             None
         };
@@ -183,32 +245,24 @@ impl C64 {
         ));
 
         // Observers
-        let expansion_port_clone_1 = expansion_port.clone();
+        let exp_io_line_clone_1 = exp_io_line.clone();
         let mem_clone_1 = mem.clone();
         cpu_io_port
             .borrow_mut()
             .set_observer(Box::new(move |cpu_port| {
-                let expansion_port_io = expansion_port_clone_1.borrow().get_io_line_value();
+                let expansion_port_io = exp_io_line_clone_1.borrow().get_value();
                 let mode = cpu_port & 0x07 | expansion_port_io & 0x18;
                 mem_clone_1.borrow_mut().switch_banks(mode);
             }));
 
         let cpu_io_port_clone_2 = cpu_io_port.clone();
         let mem_clone_2 = mem.clone();
-        expansion_port
+        exp_io_line
             .borrow_mut()
-            .get_io_line_mut()
             .set_observer(Box::new(move |expansion_port_io| {
                 let cpu_port_io = cpu_io_port_clone_2.borrow().get_value();
                 let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
                 mem_clone_2.borrow_mut().switch_banks(mode);
-            }));
-
-        let vic_mem_clone = vic_mem.clone();
-        cia2.borrow_mut()
-            .get_port_a_mut()
-            .set_observer(Box::new(move |port_a| {
-                vic_mem_clone.borrow_mut().set_cia_port_a(port_a);
             }));
 
         Ok(C64 {
@@ -251,6 +305,10 @@ impl C64 {
         self.datassette.clone()
     }
 
+    pub fn get_frame_buffer(&self) -> Rc<RefCell<FrameBuffer>> {
+        self.frame_buffer.clone()
+    }
+
     pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
         if let Some(ref joystick) = self.joystick1 {
             if joystick.borrow().get_index() == index {
@@ -275,10 +333,6 @@ impl C64 {
 
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> {
         self.keyboard.clone()
-    }
-
-    pub fn get_render_target(&self) -> Rc<RefCell<RenderTarget>> {
-        self.frame_buffer.clone()
     }
 
     pub fn get_sound_buffer(&self) -> Arc<Mutex<SoundBuffer>> {
@@ -306,8 +360,12 @@ impl C64 {
         info!(target: "c64", "Resetting system");
         // Memory
         if hard {
-            self.ram.borrow_mut().reset();
-            self.color_ram.borrow_mut().reset();
+            for i in 0..self.config.model.memory_size as u16 {
+                self.ram.borrow_mut().write(i, 0x00);
+            }
+            for i in 0..self.config.model.color_ram as u16 {
+                self.color_ram.borrow_mut().write(i, 0x00);
+            }
         }
         // Chipset
         self.cpu.borrow_mut().reset();
@@ -356,22 +414,19 @@ impl C64 {
             elapsed += cycles;
             delta -= cycles as i32;
         }
-        self.frames = self.frames.wrapping_add(1);
-        if self.frames % (self.config.model.refresh_rate as u32 / 10) == 0 {
-            self.cia1.borrow_mut().tod_tick();
-            self.cia2.borrow_mut().tod_tick();
-        }
         self.sid.borrow_mut().clock_delta(elapsed);
+        self.cia1.borrow_mut().process_vsync();
+        self.cia2.borrow_mut().process_vsync();
+        self.frames = self.frames.wrapping_add(1);
         delta
     }
 
-    #[inline(always)]
+    #[inline]
     fn step(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.borrow().get_pc();
         self.cpu.borrow_mut().step(&tick_fn);
         if self.autostart.is_some() {
-            // FIXME magic value
-            if self.cpu.borrow().get_pc() == 0xa65c {
+            if self.cpu.borrow().get_pc() == BaseAddr::BootComplete.addr() {
                 if let Some(mut autostart) = self.autostart.take() {
                     autostart.execute(self);
                 }
@@ -414,7 +469,7 @@ impl C64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::Model;
+    use core::Model;
 
     #[test]
     fn exec_keyboard_read() {

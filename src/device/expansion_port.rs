@@ -17,8 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use bit_field::BitField;
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use bit_field::BitField;
 use core::{Addressable, IoLine};
 
 use super::cartridge::Cartridge;
@@ -28,30 +30,22 @@ use super::cartridge::Cartridge;
 pub struct ExpansionPort {
     cartridge: Option<Cartridge>,
     // I/O
-    io_line: IoLine,
+    io_line: Rc<RefCell<IoLine>>,
 }
 
 impl ExpansionPort {
-    pub fn new() -> ExpansionPort {
+    pub fn new(io_line: Rc<RefCell<IoLine>>) -> ExpansionPort {
         ExpansionPort {
             cartridge: None,
-            io_line: IoLine::new(0xff),
+            io_line,
         }
-    }
-
-    pub fn get_io_line_value(&self) -> u8 {
-        self.io_line.get_value()
-    }
-
-    pub fn get_io_line_mut(&mut self) -> &mut IoLine {
-        &mut self.io_line
     }
 
     pub fn attach(&mut self, cartridge: Cartridge) {
         let mut io_value = 0u8;
         io_value.set_bit(3, cartridge.get_game());
         io_value.set_bit(4, cartridge.get_exrom());
-        self.io_line.set_value(io_value);
+        self.io_line.borrow_mut().set_value(io_value);
         self.cartridge = Some(cartridge);
     }
 
@@ -61,7 +55,7 @@ impl ExpansionPort {
             let mut io_value = 0u8;
             io_value.set_bit(3, true);
             io_value.set_bit(4, true);
-            self.io_line.set_value(io_value);
+            self.io_line.borrow_mut().set_value(io_value);
         }
     }
 
@@ -71,7 +65,7 @@ impl ExpansionPort {
             let mut io_value = 0u8;
             io_value.set_bit(3, cartridge.get_game());
             io_value.set_bit(4, cartridge.get_exrom());
-            self.io_line.set_value(io_value);
+            self.io_line.borrow_mut().set_value(io_value);
         }
     }
 }

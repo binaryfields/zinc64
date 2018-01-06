@@ -19,7 +19,9 @@
 
 use std::fmt;
 
-use super::{Cpu, TickFn};
+use core::{Cpu, TickFn};
+
+use super::Cpu6510;
 use super::operand::Operand;
 
 // Spec: MCS6510 MICROPROCESSOR INSTRUCTION SET p.232
@@ -96,8 +98,8 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    #[inline(always)]
-    pub fn decode(cpu: &mut Cpu, opcode: u8, tick_fn: &TickFn) -> Instruction {
+    #[inline]
+    pub fn decode(cpu: &mut Cpu6510, opcode: u8, tick_fn: &TickFn) -> Instruction {
         match opcode {
             // BRK
             0x00 => Instruction::BRK(7),
@@ -484,12 +486,12 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    fn setup_cpu() -> Cpu {
+    fn setup_cpu() -> Cpu6510 {
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
-        Cpu::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
+        Cpu6510::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
     #[test]

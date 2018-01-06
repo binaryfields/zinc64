@@ -19,7 +19,9 @@
 
 use std::fmt;
 
-use super::{Cpu, TickFn};
+use core::{Cpu, TickFn};
+
+use super::Cpu6510;
 
 // Spec: INSTRUCTION ADDRESSING MODES AND RELATED EXECUTION TIMES (p. 255)
 // Design:
@@ -43,7 +45,7 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn ea(&self, cpu: &Cpu, rmw: bool, tick_fn: &TickFn) -> u16 {
+    pub fn ea(&self, cpu: &Cpu6510, rmw: bool, tick_fn: &TickFn) -> u16 {
         match *self {
             Operand::Accumulator => panic!("Illegal op for addressing mode {}", "accumulator"),
             Operand::Immediate(_) => panic!("Illegal op for addressing mode {}", "immediate"),
@@ -92,8 +94,8 @@ impl Operand {
         }
     }
 
-    #[inline(always)]
-    pub fn get(&self, cpu: &Cpu, tick_fn: &TickFn) -> u8 {
+    #[inline]
+    pub fn get(&self, cpu: &Cpu6510, tick_fn: &TickFn) -> u8 {
         match *self {
             Operand::Accumulator => cpu.get_a(),
             Operand::Immediate(value) => value,
@@ -106,8 +108,8 @@ impl Operand {
         }
     }
 
-    #[inline(always)]
-    pub fn set(&self, cpu: &mut Cpu, value: u8, rmw: bool, tick_fn: &TickFn) {
+    #[inline]
+    pub fn set(&self, cpu: &mut Cpu6510, value: u8, rmw: bool, tick_fn: &TickFn) {
         match *self {
             Operand::Accumulator => cpu.set_a(value),
             Operand::Immediate(_) => panic!("illegal op for addressing mode {}", "immediate"),
@@ -148,12 +150,12 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    fn setup_cpu() -> Cpu {
+    fn setup_cpu() -> Cpu6510 {
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
-        Cpu::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
+        Cpu6510::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
     #[test]

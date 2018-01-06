@@ -23,8 +23,6 @@ use std::io::Read;
 use std::path::Path;
 use std::result::Result;
 
-use core::Addressable;
-
 pub struct Rom {
     data: Vec<u8>,
     offset: u16,
@@ -38,15 +36,15 @@ impl Rom {
         file.read_to_end(&mut data)?;
         Ok(Rom { data, offset })
     }
-}
 
-impl Addressable for Rom {
-    fn read(&self, address: u16) -> u8 {
+    #[inline]
+    pub fn read(&self, address: u16) -> u8 {
         self.data[(address - self.offset) as usize]
     }
 
     #[allow(unused_variables)]
-    fn write(&mut self, address: u16, value: u8) {
+    #[inline]
+    pub fn write(&mut self, address: u16, value: u8) {
         panic!("writes to rom are not supported")
     }
 }

@@ -1,9 +1,12 @@
 # TODO
 
+- fix test cases
+- sid config
+- video: remove dimension
 - misc: review loader module
+
 - app: add screenshot support
 - app: add ui/menus
 - app: add debugger support
-
 - chipset: rewrite vic
 - device: add floppy support

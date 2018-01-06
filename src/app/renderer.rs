@@ -24,7 +24,8 @@ use sdl2::pixels;
 use sdl2::render;
 use sdl2::video;
 use time;
-use zinc64::video::{Dimension, RenderTarget};
+use zinc64::core::FrameBuffer;
+use zinc64::video::Dimension;
 
 pub struct Renderer {
     canvas: render::WindowCanvas,
@@ -69,7 +70,7 @@ impl Renderer {
         Ok(renderer)
     }
 
-    pub fn render(&mut self, frame_buffer: &RenderTarget) -> Result<(), String> {
+    pub fn render(&mut self, frame_buffer: &FrameBuffer) -> Result<(), String> {
         self.texture
             .update(None, frame_buffer.get_pixel_data(), frame_buffer.get_pitch())
             .map_err(|_| "failed to update texture")?;

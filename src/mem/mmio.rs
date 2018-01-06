@@ -20,27 +20,27 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use core::{Addressable, Chip};
+use core::{Addressable, Chip, Ram};
 
-pub struct DeviceMemory {
+pub struct Mmio {
     cia1: Rc<RefCell<Chip>>,
     cia2: Rc<RefCell<Chip>>,
-    color_ram: Rc<RefCell<Addressable>>,
+    color_ram: Rc<RefCell<Ram>>,
     expansion_port: Rc<RefCell<Addressable>>,
     sid: Rc<RefCell<Chip>>,
     vic: Rc<RefCell<Chip>>,
 }
 
-impl DeviceMemory {
+impl Mmio {
     pub fn new(
         cia1: Rc<RefCell<Chip>>,
         cia2: Rc<RefCell<Chip>>,
-        color_ram: Rc<RefCell<Addressable>>,
+        color_ram: Rc<RefCell<Ram>>,
         expansion_port: Rc<RefCell<Addressable>>,
         sid: Rc<RefCell<Chip>>,
         vic: Rc<RefCell<Chip>>,
-    ) -> DeviceMemory {
-        DeviceMemory {
+    ) -> Mmio {
+        Mmio {
             cia1,
             cia2,
             color_ram,
@@ -49,10 +49,8 @@ impl DeviceMemory {
             vic,
         }
     }
-}
 
-impl Addressable for DeviceMemory {
-    fn read(&self, address: u16) -> u8 {
+    pub fn read(&self, address: u16) -> u8 {
         match address {
             0xd000...0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
             0xd400...0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
@@ -64,7 +62,7 @@ impl Addressable for DeviceMemory {
         }
     }
 
-    fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0xd000...0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
             0xd400...0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),

@@ -51,7 +51,7 @@ impl Configuration {
                 _ => panic!("invalid bank {}", i),
             };
         }
-        Configuration { banks: banks }
+        Configuration { banks }
     }
 
     pub fn get(&self, zone: u8) -> Bank {

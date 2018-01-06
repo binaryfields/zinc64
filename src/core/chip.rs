@@ -18,6 +18,9 @@
  */
 
 pub trait Chip {
+    fn clock(&mut self);
+    fn clock_delta(&mut self, delta: u32);
+    fn process_vsync(&mut self);
     fn reset(&mut self);
     // I/O
     fn read(&mut self, reg: u8) -> u8;

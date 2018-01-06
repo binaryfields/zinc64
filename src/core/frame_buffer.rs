@@ -19,28 +19,27 @@
 
 use std::mem;
 
-use super::color::Color;
-use super::rect::Dimension;
-
 const PIXEL_BYTES: usize = 4;
 
-pub struct RenderTarget {
-    dim: Dimension,
+pub struct FrameBuffer {
+    dim: (usize, usize),
+    palette: [u32; 16],
     pixels: Vec<u32>,
     sync: bool,
 }
 
-impl RenderTarget {
-    pub fn new(dim: Dimension) -> RenderTarget {
-        RenderTarget {
-            dim,
-            pixels: vec![0; dim.width as usize * dim.height as usize],
+impl FrameBuffer {
+    pub fn new(width: usize, height: usize, palette: [u32; 16]) -> FrameBuffer {
+        FrameBuffer {
+            dim: (width, height),
+            palette,
+            pixels: vec![0; width * height],
             sync: false,
         }
     }
 
     pub fn get_pitch(&self) -> usize {
-        self.dim.width as usize * PIXEL_BYTES
+        self.dim.0 * PIXEL_BYTES
     }
 
     pub fn get_pixel_data(&self) -> &[u8] {
@@ -62,12 +61,14 @@ impl RenderTarget {
         self.sync = false;
     }
 
+    #[inline]
     pub fn write(&mut self, x: u16, y: u16, color: u8) {
         let index = self.index(x, y);
-        self.pixels[index] = Color::from(color).rgb();
+        self.pixels[index] = self.palette[color as usize];
     }
 
+    #[inline]
     fn index(&self, x: u16, y: u16) -> usize {
-        y as usize * self.dim.width as usize + x as usize
+        y as usize * self.dim.0 + x as usize
     }
 }

@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use core::{Addressable, IoPort, IrqLine};
+use core::{Cpu, IoPort, IrqLine, MemoryController, TickFn};
 use log::LogLevel;
 
 use super::instruction::Instruction;
@@ -66,11 +66,9 @@ impl Interrupt {
     }
 }
 
-pub type TickFn = Box<Fn()>;
-
-pub struct Cpu {
+pub struct Cpu6510 {
     // Dependencies
-    mem: Rc<RefCell<Addressable>>,
+    mem: Rc<RefCell<MemoryController>>,
     // Registers
     a: u8,
     x: u8,
@@ -84,12 +82,12 @@ pub struct Cpu {
     nmi: Rc<RefCell<IrqLine>>,
 }
 
-impl Cpu {
+impl Cpu6510 {
     pub fn new(io_port: Rc<RefCell<IoPort>>,
                irq: Rc<RefCell<IrqLine>>,
                nmi: Rc<RefCell<IrqLine>>,
-               mem: Rc<RefCell<Addressable>>) -> Cpu {
-        Cpu {
+               mem: Rc<RefCell<MemoryController>>) -> Cpu6510 {
+        Cpu6510 {
             mem,
             a: 0,
             x: 0,
@@ -103,32 +101,23 @@ impl Cpu {
         }
     }
 
-    #[inline(always)]
     pub fn get_a(&self) -> u8 {
         self.a
     }
 
-    #[inline(always)]
-    pub fn get_pc(&self) -> u16 {
-        self.pc
-    }
-
-    #[inline(always)]
     pub fn get_x(&self) -> u8 {
         self.x
     }
 
-    #[inline(always)]
     pub fn get_y(&self) -> u8 {
         self.y
     }
 
-    #[inline(always)]
     pub fn set_a(&mut self, value: u8) {
         self.a = value;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_flag(&mut self, flag: Flag, value: bool) {
         if value {
             self.p |= flag as u8;
@@ -137,55 +126,15 @@ impl Cpu {
         }
     }
 
-    #[inline(always)]
-    pub fn set_pc(&mut self, value: u16) {
-        self.pc = value;
-    }
-
-    #[inline(always)]
     pub fn set_x(&mut self, value: u8) {
         self.x = value;
     }
 
-    #[inline(always)]
     pub fn set_y(&mut self, value: u8) {
         self.y = value;
     }
 
-    pub fn reset(&mut self) {
-        self.a = 0;
-        self.x = 0;
-        self.y = 0;
-        self.p = 0;
-        self.pc = 0;
-        self.sp = 0;
-        self.irq.borrow_mut().reset();
-        self.nmi.borrow_mut().reset();
-        self.io_port.borrow_mut().set_value(0xff);
-        let tick_fn: TickFn = Box::new(move || {});
-        self.write(0x0000, 0b0010_1111, &tick_fn);
-        self.write(0x0001, 0b0001_1111, &tick_fn);
-        self.interrupt(Interrupt::Reset, &tick_fn);
-    }
-
-    #[inline(always)]
-    pub fn step(&mut self, tick_fn: &TickFn) {
-        if self.nmi.borrow().is_low() {
-            self.interrupt(Interrupt::Nmi, tick_fn);
-        } else if self.irq.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
-            self.interrupt(Interrupt::Irq, tick_fn);
-        }
-        let pc = self.pc;
-        let opcode = self.fetch_byte(tick_fn);
-        let instr = Instruction::decode(self, opcode, tick_fn);
-        if log_enabled!(LogLevel::Trace) {
-            let op_value = format!("{}", instr);
-            trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
-        }
-        self.execute(&instr, tick_fn);
-    }
-
-    #[inline(always)]
+    #[inline]
     fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) {
         match *instr {
             //  Data Movement
@@ -550,14 +499,14 @@ impl Cpu {
         };
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn fetch_byte(&mut self, tick_fn: &TickFn) -> u8 {
         let byte = self.read(self.pc, tick_fn);
         self.pc = self.pc.wrapping_add(1);
         byte
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn fetch_word(&mut self, tick_fn: &TickFn) -> u16 {
         let word = self.read_word(self.pc, tick_fn);
         self.pc = self.pc.wrapping_add(2);
@@ -597,26 +546,26 @@ impl Cpu {
         7
     }
 
-    #[inline(always)]
+    #[inline]
     fn pop(&mut self, tick_fn: &TickFn) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         let addr = 0x0100 + self.sp as u16;
         self.read(addr, tick_fn)
     }
 
-    #[inline(always)]
+    #[inline]
     fn push(&mut self, value: u8, tick_fn: &TickFn) {
         let addr = 0x0100 + self.sp as u16;
         self.sp = self.sp.wrapping_sub(1);
         self.write(addr, value, tick_fn);
     }
 
-    #[inline(always)]
+    #[inline]
     fn test_flag(&self, flag: Flag) -> bool {
         (self.p & (flag as u8)) != 0
     }
 
-    #[inline(always)]
+    #[inline]
     fn update_nz(&mut self, value: u8) {
         self.set_flag(Flag::Negative, value & 0x80 != 0);
         self.set_flag(Flag::Zero, value == 0);
@@ -624,7 +573,7 @@ impl Cpu {
 
     // -- Memory Ops
 
-    #[inline(always)]
+    #[inline]
     pub fn read(&self, address: u16, tick_fn: &TickFn) -> u8 {
         let value = match address {
             0x0000 => self.io_port.borrow().get_direction(),
@@ -635,14 +584,14 @@ impl Cpu {
         value
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn read_word(&self, address: u16, tick_fn: &TickFn) -> u16 {
         let low = self.read(address, tick_fn);
         let high = self.read(address + 1, tick_fn);
         ((high as u16) << 8) | low as u16
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn write(&mut self, address: u16, value: u8, tick_fn: &TickFn) {
         match address {
             0x0000 => self.io_port.borrow_mut().set_direction(value),
@@ -654,7 +603,58 @@ impl Cpu {
     }
 }
 
-impl fmt::Display for Cpu {
+impl Cpu for Cpu6510 {
+    fn get_pc(&self) -> u16 {
+        self.pc
+    }
+
+    fn set_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    fn reset(&mut self) {
+        self.a = 0;
+        self.x = 0;
+        self.y = 0;
+        self.p = 0;
+        self.pc = 0;
+        self.sp = 0;
+        self.irq.borrow_mut().reset();
+        self.nmi.borrow_mut().reset();
+        self.io_port.borrow_mut().set_value(0xff);
+        let tick_fn: TickFn = Box::new(move || {});
+        self.write(0x0000, 0b0010_1111, &tick_fn);
+        self.write(0x0001, 0b0001_1111, &tick_fn);
+        self.interrupt(Interrupt::Reset, &tick_fn);
+    }
+
+    fn step(&mut self, tick_fn: &TickFn) {
+        if self.nmi.borrow().is_low() {
+            self.interrupt(Interrupt::Nmi, tick_fn);
+        } else if self.irq.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
+            self.interrupt(Interrupt::Irq, tick_fn);
+        }
+        let pc = self.pc;
+        let opcode = self.fetch_byte(tick_fn);
+        let instr = Instruction::decode(self, opcode, tick_fn);
+        if log_enabled!(LogLevel::Trace) {
+            let op_value = format!("{}", instr);
+            trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
+        }
+        self.execute(&instr, tick_fn);
+    }
+
+    fn write_debug(&mut self, address: u16, value: u8) {
+        match address {
+            0x0000 => self.io_port.borrow_mut().set_direction(value),
+            0x0001 => self.io_port.borrow_mut().set_value(value),
+            _ => {}
+        }
+        self.mem.borrow_mut().write(address, value);
+    }
+}
+
+impl fmt::Display for Cpu6510 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -708,12 +708,12 @@ mod tests {
     use super::super::operand::Operand;
     use mem::Ram;
 
-    fn setup_cpu() -> Cpu {
+    fn setup_cpu() -> Cpu6510 {
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
-        Cpu::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
+        Cpu6510::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
     #[test]

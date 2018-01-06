@@ -19,18 +19,34 @@
 
 mod addressable;
 mod chip;
+mod cpu;
+mod factory;
+mod frame_buffer;
 mod icr;
 mod ioline;
 mod ioport;
 mod irqline;
+mod memory_controller;
+mod model;
 mod pin;
 mod pulse;
+mod ram;
+mod rom;
+mod sound_buffer;
 
 pub use self::addressable::Addressable;
 pub use self::chip::Chip;
+pub use self::cpu::{Cpu, TickFn};
+pub use self::factory::Factory;
+pub use self::frame_buffer::FrameBuffer;
 pub use self::icr::Icr;
 pub use self::ioline::IoLine;
 pub use self::ioport::IoPort;
 pub use self::irqline::IrqLine;
+pub use self::memory_controller::MemoryController;
+pub use self::model::{Model, SidModel, VicModel};
 pub use self::pin::Pin;
 pub use self::pulse::Pulse;
+pub use self::ram::Ram;
+pub use self::rom::Rom;
+pub use self::sound_buffer::SoundBuffer;

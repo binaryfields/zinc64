@@ -21,7 +21,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-
 use core::{IoPort, Pin, Pulse};
 
 use super::Tape;
@@ -80,7 +79,6 @@ impl Datassette {
         self.tape = Some(tape);
     }
 
-    #[inline(always)]
     pub fn clock(&mut self) {
         if self.is_playing() && self.tape.is_some() {
             if self.current_pulse.is_done() {

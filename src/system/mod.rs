@@ -17,11 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+pub mod autostart;
 pub mod c64;
 mod clock;
 pub mod config;
-pub mod model;
+mod palette;
 
+pub use self::autostart::{Autostart, AutostartMethod, Image};
 pub use self::c64::C64;
+pub use self::clock::Clock;
 pub use self::config::Config;
-pub use self::model::Model;
+pub use self::palette::Palette;

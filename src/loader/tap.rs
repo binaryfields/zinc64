@@ -26,9 +26,10 @@ use std::str;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use device::Tape;
-use loader::{Autostart, Image, Loader};
-use loader::autostart;
-use system::C64;
+use system::{Autostart, AutostartMethod, C64, Image};
+use system::autostart;
+
+use super::Loader;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
 
@@ -96,10 +97,10 @@ impl TapLoader {
 }
 
 impl Loader for TapLoader {
-    fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error> {
+    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error> {
         let image = self.load(path)?;
         let autostart = Autostart::new(autostart::Mode::Run, image);
-        Ok(autostart::Method::WithAutostart(Some(autostart)))
+        Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
@@ -114,12 +115,14 @@ impl Loader for TapLoader {
         rdr.read_exact(&mut data)?;
         let tape = TapTape {
             version: header.version,
-            data: data,
+            data,
             pos: 0,
         };
-        Ok(Box::new(TapImage {
-            tape: Some(Box::new(tape)),
-        }))
+        Ok(Box::new(
+            TapImage {
+                tape: Some(Box::new(tape)),
+            }
+        ))
     }
 }
 

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod sid;
-mod sound_buffer;
+pub mod sid;
 
 pub use self::sid::Sid;
-pub use self::sound_buffer::SoundBuffer;

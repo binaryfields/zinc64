@@ -21,9 +21,10 @@ use std::result::Result;
 use std::path::Path;
 
 use getopts;
+use zinc64::core::Model;
 use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
-use zinc64::system::{C64, Config, Model};
+use zinc64::system::{C64, Config};
 
 use super::app;
 

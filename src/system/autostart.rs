@@ -17,8 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use loader::Image;
-use system::C64;
+use super::C64;
+
+pub trait Image {
+    fn mount(&mut self, c64: &mut C64);
+    fn unmount(&mut self, c64: &mut C64);
+}
 
 pub enum Mode {
     Run,
@@ -32,8 +36,8 @@ pub struct Autostart {
 impl Autostart {
     pub fn new(mode: Mode, image: Box<Image>) -> Autostart {
         Autostart {
-            mode: mode,
-            image: image,
+            mode,
+            image,
         }
     }
 
@@ -51,23 +55,23 @@ impl Autostart {
     }
 }
 
-pub enum Method {
+pub enum AutostartMethod {
     WithImage(Box<Image>),
     WithBinImage(Box<Image>),
     WithAutostart(Option<Autostart>),
 }
 
-impl Method {
+impl AutostartMethod {
     pub fn execute(&mut self, c64: &mut C64) {
         match *self {
-            Method::WithImage(ref mut image) => {
+            AutostartMethod::WithImage(ref mut image) => {
                 image.mount(c64);
                 c64.reset(false);
             }
-            Method::WithBinImage(ref mut image) => {
+            AutostartMethod::WithBinImage(ref mut image) => {
                 image.mount(c64);
             }
-            Method::WithAutostart(ref mut autostart) => {
+            AutostartMethod::WithAutostart(ref mut autostart) => {
                 c64.set_autostart(autostart.take());
                 c64.reset(false);
             }

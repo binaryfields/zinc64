@@ -148,7 +148,7 @@ impl App {
                     if self.c64.is_cpu_jam() {
                         self.handle_cpu_jam();
                     }
-                    let rt = self.c64.get_render_target();
+                    let rt = self.c64.get_frame_buffer();
                     if rt.borrow().get_sync() {
                         {
                             let frame_buffer = rt.borrow();

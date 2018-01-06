@@ -48,6 +48,7 @@ impl SoundBuffer {
         }
     }
 
+    #[inline]
     pub fn pop(&mut self) -> i16 {
         let value = self.buffer[self.head];
         self.head += 1;
@@ -57,6 +58,7 @@ impl SoundBuffer {
         value
     }
 
+    #[inline]
     pub fn push(&mut self, value: i16) {
         self.buffer[self.tail] = value;
         self.tail += 1;

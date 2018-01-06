@@ -31,7 +31,7 @@ use std::process;
 
 use zinc64::system::C64;
 
-use self::app::{App, Cli, ConsoleApp, Logger};
+use self::app::{App, ChipFactory, Cli, ConsoleApp, Logger};
 
 static NAME: &'static str = "zinc64";
 
@@ -70,7 +70,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
         init_logging(&matches)?;
         info!("Staring {}", NAME);
         let config = Cli::parse_system_config(&matches)?;
-        let mut c64 = C64::new(config).unwrap();
+        let factory = Box::new(ChipFactory{});
+        let mut c64 = C64::new(config, factory).unwrap();
         c64.reset(true);
         Cli::set_c64_options(&mut c64, &matches)?;
         if matches.opt_present("console") {

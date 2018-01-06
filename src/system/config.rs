@@ -17,9 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use core::Model;
 use device::joystick;
-use resid;
-use super::Model;
 
 pub struct Config {
     pub model: Model,
@@ -38,6 +37,7 @@ impl Config {
 }
 
 pub struct JoystickConfig {
+    pub axis_motion_threshold: i16,
     pub joystick_1: joystick::Mode,
     pub joystick_2: joystick::Mode,
 }
@@ -45,6 +45,7 @@ pub struct JoystickConfig {
 impl JoystickConfig {
     pub fn default() -> JoystickConfig {
         JoystickConfig {
+            axis_motion_threshold: 3200,
             joystick_1: joystick::Mode::Numpad,
             joystick_2: joystick::Mode::None,
         }
@@ -55,7 +56,6 @@ pub struct SoundConfig {
     pub enable: bool,
     pub buffer_size: usize,
     pub sample_rate: u32,
-    pub sampling_method: resid::SamplingMethod,
     pub sid_filters: bool,
 }
 
@@ -65,7 +65,6 @@ impl SoundConfig {
             enable: true,
             buffer_size: 4096,
             sample_rate: 44100,
-            sampling_method: resid::SamplingMethod::ResampleFast,
             sid_filters: true,
         }
     }

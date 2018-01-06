@@ -17,16 +17,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use resid;
-use video::vic;
+#[derive(Clone, Copy)]
+pub enum SidModel {
+    Mos6581,
+    Mos8580,
+}
+
+#[derive(Copy, Clone)]
+pub enum VicModel {
+    Mos6567, // NTSC
+    Mos6569, // PAL
+}
 
 pub struct Model {
+    pub color_ram: usize,
     pub cpu_freq: u32,
     pub cycles_per_frame: u16,
+    pub frame_buffer_size: (usize, usize),
     pub memory_size: usize,
     pub refresh_rate: f32,
-    pub sid_model: resid::ChipModel,
-    pub vic_model: vic::ChipModel,
+    pub sid_model: SidModel,
+    pub vic_model: VicModel,
 }
 
 impl Model {
@@ -42,23 +53,27 @@ impl Model {
 
     fn c64_ntsc() -> Model {
         Model {
+            color_ram: 1024,
             cpu_freq: 1_022_727,
             cycles_per_frame: 17095,
+            frame_buffer_size: (403, 250),
             memory_size: 65536,
             refresh_rate: 59.826,
-            sid_model: resid::ChipModel::Mos6581,
-            vic_model: vic::ChipModel::Mos6567,
+            sid_model: SidModel::Mos6581,
+            vic_model: VicModel::Mos6567,
         }
     }
 
     fn c64_pal() -> Model {
         Model {
+            color_ram: 1024,
             cpu_freq: 985_248,
             cycles_per_frame: 19656,
+            frame_buffer_size: (403, 284),
             memory_size: 65536,
             refresh_rate: 50.125,
-            sid_model: resid::ChipModel::Mos6581,
-            vic_model: vic::ChipModel::Mos6569,
+            sid_model: SidModel::Mos6581,
+            vic_model: VicModel::Mos6569,
         }
     }
 }

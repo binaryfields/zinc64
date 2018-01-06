@@ -24,9 +24,10 @@ use std::path::Path;
 use std::result::Result;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use loader::{Autostart, Image, Loader};
-use loader::autostart;
-use system::C64;
+use system::{Autostart, AutostartMethod, C64, Image};
+use system::autostart;
+
+use super::Loader;
 
 struct PrgImage {
     data: Vec<u8>,
@@ -52,10 +53,10 @@ impl PrgLoader {
 }
 
 impl Loader for PrgLoader {
-    fn autostart(&self, path: &Path) -> Result<autostart::Method, io::Error> {
+    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error> {
         let image = self.load(path)?;
         let autostart = Autostart::new(autostart::Mode::Run, image);
-        Ok(autostart::Method::WithAutostart(Some(autostart)))
+        Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
     fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
@@ -66,9 +67,11 @@ impl Loader for PrgLoader {
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
-        Ok(Box::new(PrgImage {
-            data: data,
-            offset: offset,
-        }))
+        Ok(Box::new(
+            PrgImage {
+                data,
+                offset,
+            }
+        ))
     }
 }

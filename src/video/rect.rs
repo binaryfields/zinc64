@@ -26,8 +26,8 @@ pub struct Dimension {
 impl Dimension {
     pub fn new(width: u16, height: u16) -> Dimension {
         Dimension {
-            width: width,
-            height: height,
+            width,
+            height,
         }
     }
 }
@@ -60,7 +60,7 @@ impl Rect {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn contains(&self, x: u16, y: u16) -> bool {
         y >= self.top && y <= self.bottom && x >= self.left && x <= self.right
     }
@@ -75,7 +75,7 @@ impl Rect {
     }
 
     #[allow(dead_code)]
-    #[inline(always)]
+    #[inline]
     pub fn size(&self) -> Dimension {
         Dimension::new(self.right - self.left + 1, self.bottom - self.top + 1)
     }

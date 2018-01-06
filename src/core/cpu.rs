@@ -17,22 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod bin;
-mod crt;
-//mod hex;
-mod loaders;
-mod prg;
-mod tap;
+pub type TickFn = Box<Fn()>;
 
-use std::io;
-use std::path::Path;
-
-use system::{AutostartMethod, Image};
-
-pub use self::bin::BinLoader;
-pub use self::loaders::Loaders;
-
-pub trait Loader {
-    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error>;
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error>;
+pub trait Cpu {
+    fn get_pc(&self) -> u16;
+    fn set_pc(&mut self, value: u16);
+    fn reset(&mut self);
+    fn step(&mut self, tick_fn: &TickFn);
+    fn write_debug(&mut self, address: u16, value: u8);
 }

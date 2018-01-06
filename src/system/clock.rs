@@ -28,10 +28,12 @@ impl Clock {
         Clock { counter: Cell::new(0) }
     }
 
+    #[inline]
     pub fn get(&self) -> u64 {
         self.counter.get()
     }
 
+    #[inline]
     pub fn tick(&self) {
         let result = self.counter.get().wrapping_add(1);
         self.counter.set(result);
