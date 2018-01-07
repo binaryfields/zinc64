@@ -67,3 +67,15 @@
 
 - landed revised cpu clock emulation
 - landed revised keyboard handling
+
+### Week 8 - 20171230
+
+- landed revised model and system configuration
+- landed revamped cli handling
+- factored out app ui into separate components
+- factored out common hw primitives into core module
+
+### Week 9 - 20180106
+
+- landed modularized emulator design
+

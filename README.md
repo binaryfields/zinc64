@@ -2,17 +2,42 @@
 
 ## Overview
 
-zinc64 is a quickly evolving emulator for Commodore 64 written in Rust. It implements MOS 6510 CPU, MOS 6526 CIA, MOS 6581 SID, MOS 6567/6569 VIC chipset as well as various devices/perhiperhals available with C64.
+zinc64 is a Commodore 64 emulator toolkit "with batteries included but
+swappable". It is designed to be used as a standalone emulator or a library
+used to build new emulators. The design philosophy allows for each component
+to be swapped out and replaced by different implementation. Therefore,
+special considerations were made to model interactions between chips
+without coupling them together.
+
+It implements MOS 6510 CPU, MOS 6526 CIA, MOS 6581 SID,
+MOS 6567/6569 VIC chipset as well as various devices and peripherals available
+with C64.
 
 ### Story
 
-zinc64 was started as an exercise to learn Rust and explore Commodore 64 hardware in more detail. Somewhere around mid 2016 I needed to feed my 8-bit nostalgia so I picked up a working Commodore 64 (physical version) and started to assemble various accessories required to get software onto it. Soon enough I had picked up a copy of C64 Programmer's Reference Guide and the rest is now history.
+zinc64 was started as an exercise to learn Rust and explore Commodore 64
+hardware in more detail. Somewhere around mid 2016 I needed to feed my 8-bit
+nostalgia so I picked up a working Commodore 64 (physical version) and started
+to assemble various accessories required to get software onto it. Soon enough I
+had picked up a copy of C64 Programmer's Reference Guide and the rest is now
+history.
 
 ### Rust
 
-I have been following Rust development for a while and since it has reached its first stability milestone, version 1.0 back in May 2015, I have been meaning to write something more substantial with it. Exploring Rust and its features is really the second driver behind this emulator. Coming from Scala background, a lot of concepts and features in Rust felt right at home. Things like type inference, immutable by default, traits, ADTs, pattern matching all contribute to writing code that parallels many of the things I've done in Scala. The biggest departure between the two languages is quite obviously memory management. While ownership/borrowing is not conceptually hard, it takes a bit of practice to fully appreciate its application in the code base.
+I have been following Rust development for a while and since it has reached its
+first stability milestone, version 1.0 back in May 2015, I have been meaning to
+write something more substantial with it. Exploring Rust and its features is
+really the second driver behind this emulator. Coming from Scala background, a
+lot of concepts and features in Rust felt right at home. Things like type
+inference, immutable by default, traits, ADTs, pattern matching all contribute
+to writing code that parallels many of the things I've done in Scala. The
+biggest departure between the two languages is quite obviously memory
+management. While ownership/borrowing is not conceptually hard, it takes a bit
+of practice to fully appreciate its application in the code base.
 
-Overall, my impression of Rust is that it provides wonderful ergonomics for the developer while blending performance that only low-level languages provide with safety of a high level language. The experience I had with it while writing code for the emulator can be largely summarized as "if it compiles, it works" (except for pieces that didn't ;). Very impressive, big props to Rust folks for pulling off an excellent development platform.
+The experience I had with the language while writing code for the emulator
+can be largely summarized as "if it compiles, it works" (except for pieces
+that didn't ;). Big props to Rust folks for creating a great language.
 
 ## Getting Started
 
@@ -67,8 +92,6 @@ I've included a number of examples from Kick Assembler that I've used to test va
 
         ./target/release/zinc64 --autostart bin/SineAndGraphics.prg
 
-### Execution Results
-
 | Program                  | Status  |
 |--------------------------|---------|
 | 6502_functional_test.bin | Pass    |
@@ -81,7 +104,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 | SimpleSplits.prg         | Fails   |
 | SineAndGraphics.prg      | Pass    |
 
-## Tests
+### Tests
 
 The cpu validation was performed with the help of [Klaus2m5 functional tests](https://github.com/Klaus2m5/6502_65C02_functional_tests) for the 6502 processor 
 
