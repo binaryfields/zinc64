@@ -33,7 +33,7 @@ use zinc64::core::{
     IoLine,
     IoPort,
     MemoryController,
-    Model,
+    SystemModel,
     Pin,
     Ram,
     Rom,
@@ -107,7 +107,7 @@ impl Factory for ChipFactory {
 
     fn new_sid(
         &self,
-        system_model: &Model,
+        system_model: &SystemModel,
         sound_buffer: Arc<Mutex<SoundBuffer>>,
     ) -> Rc<RefCell<Chip>> {
         let mut sid = Sid::new(system_model.sid_model, sound_buffer);
@@ -171,13 +171,15 @@ impl Factory for ChipFactory {
         sid: Rc<RefCell<Chip>>,
         vic: Rc<RefCell<Chip>>,
     ) -> Rc<RefCell<MemoryController>> {
-        let io = Mmio::new(
-            cia1,
-            cia2,
-            color_ram,
-            expansion_port.clone(),
-            sid,
-            vic,
+        let io = Box::new(
+            Mmio::new(
+                cia1,
+                cia2,
+                color_ram,
+                expansion_port.clone(),
+                sid,
+                vic,
+            )
         );
         Rc::new(RefCell::new(
             Memory::new(

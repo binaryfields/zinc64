@@ -23,7 +23,7 @@ use std::rc::Rc;
 use core::{Addressable, MemoryController, Ram, Rom};
 use log::LogLevel;
 
-use super::{Bank, Configuration, Mmio, MemoryMap};
+use super::{Bank, Configuration, MemoryMap};
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
 // Design:
@@ -40,7 +40,7 @@ pub struct Memory {
     basic: Rc<RefCell<Rom>>,
     charset: Rc<RefCell<Rom>>,
     expansion_port: Rc<RefCell<Addressable>>,
-    io: Mmio,
+    io: Box<Addressable>,
     kernal: Rc<RefCell<Rom>>,
     ram: Rc<RefCell<Ram>>,
 }
@@ -62,7 +62,7 @@ impl BaseAddr {
 impl Memory {
     pub fn new(
         expansion_port: Rc<RefCell<Addressable>>,
-        io: Mmio,
+        io: Box<Addressable>,
         ram: Rc<RefCell<Ram>>,
         rom_basic: Rc<RefCell<Rom>>,
         rom_charset: Rc<RefCell<Rom>>,
@@ -131,29 +131,36 @@ impl MemoryController for Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::Ram;
+    use core::{Ram, Rom};
+
+    impl Addressable for Ram {
+        fn read(&self, address: u16) -> u8 {
+            self.read(address)
+        }
+
+        fn write(&mut self, address: u16, value: u8) {
+            self.write(address, value);
+        }
+    }
 
     fn setup_memory() -> Memory {
-        let basic = Rc::new(RefCell::new(Ram::new(0x1000)));
-        basic.borrow_mut().fill(0x10);
-        let charset = Rc::new(RefCell::new(Ram::new(0x1000)));
-        charset.borrow_mut().fill(0x11);
-        let kernal = Rc::new(RefCell::new(Ram::new(0x1000)));
-        kernal.borrow_mut().fill(0x12);
-        let mmio = Rc::new(RefCell::new(Ram::new(0x10000)));
-        mmio.borrow_mut().fill(0x22);
+        let basic = Rc::new(RefCell::new(Rom::new(0x1000, BaseAddr::Basic.addr(), 0x10)));
+        let charset = Rc::new(RefCell::new(Rom::new(0x1000, 0x0000, 0x11)));
+        let kernal = Rc::new(RefCell::new(Rom::new(0x1000, BaseAddr::Kernal.addr(), 0x12)));
+        let mut mmio = Box::new(Ram::new(0x10000));
+        mmio.fill(0x22);
         let expansion_port = Rc::new(RefCell::new(Ram::new(0x1000)));
         expansion_port.borrow_mut().fill(0x33);
         let ram = Rc::new(RefCell::new(Ram::new(0x10000)));
         ram.borrow_mut().fill(0x44);
-        Memory::new(basic, charset, mmio, expansion_port, kernal, ram)
+        Memory::new(expansion_port, mmio, ram, basic, charset, kernal)
     }
 
     #[test]
     fn read_basic() {
         let mut mem = setup_memory();
         mem.switch_banks(31);
-        assert_eq!(0x94, mem.read(BaseAddr::Basic.addr()));
+        assert_eq!(0x10, mem.read(BaseAddr::Basic.addr()));
     }
 
     #[test]
@@ -174,7 +181,7 @@ mod tests {
     fn read_kernal() {
         let mut mem = setup_memory();
         mem.switch_banks(31);
-        assert_eq!(0x85, mem.read(BaseAddr::Kernal.addr()));
+        assert_eq!(0x12, mem.read(BaseAddr::Kernal.addr()));
     }
 
     #[test]

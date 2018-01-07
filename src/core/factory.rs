@@ -32,7 +32,7 @@ use core::{
     IoLine,
     IoPort,
     MemoryController,
-    Model,
+    SystemModel,
     Pin,
     Ram,
     Rom,
@@ -68,7 +68,7 @@ pub trait Factory {
 
     fn new_sid(
         &self,
-        system_model: &Model,
+        system_model: &SystemModel,
         sound_buffer: Arc<Mutex<SoundBuffer>>,
     ) -> Rc<RefCell<Chip>>;
 

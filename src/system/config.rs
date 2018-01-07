@@ -17,17 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use core::Model;
+use core::SystemModel;
 use device::joystick;
 
 pub struct Config {
-    pub model: Model,
+    pub model: SystemModel,
     pub joystick: JoystickConfig,
     pub sound: SoundConfig,
 }
 
 impl Config {
-    pub fn new(model: Model) -> Config {
+    pub fn new(model: SystemModel) -> Config {
         Config {
             model,
             joystick: JoystickConfig::default(),

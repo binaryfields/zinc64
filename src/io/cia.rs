@@ -543,6 +543,7 @@ mod tests {
     use super::*;
 
     fn setup_cia() -> Cia {
+        let cia_flag = Rc::new(RefCell::new(Pin::new_low()));
         let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
@@ -550,6 +551,7 @@ mod tests {
         let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
         let mut cia = Cia::new(
             Mode::Cia1,
+            cia_flag,
             cia_port_a,
             cia_port_b,
             cpu_irq,
@@ -564,12 +566,14 @@ mod tests {
 
     #[allow(dead_code)]
     fn setup_cia_with_keyboard(keyboard_matrix: Rc<RefCell<[u8; 8]>>) -> Cia {
+        let cia_flag = Rc::new(RefCell::new(Pin::new_low()));
         let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mut cia = Cia::new(
             Mode::Cia1,
+            cia_flag,
             cia_port_a,
             cia_port_b,
             cpu_irq,

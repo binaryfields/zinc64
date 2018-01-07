@@ -21,7 +21,7 @@ use std::result::Result;
 use std::path::Path;
 
 use getopts;
-use zinc64::core::Model;
+use zinc64::core::SystemModel;
 use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
 use zinc64::system::{C64, Config};
@@ -68,7 +68,7 @@ impl Cli {
     }
 
     pub fn parse_system_config(matches: &getopts::Matches) -> Result<Config, String> {
-        let model = Model::from(
+        let model = SystemModel::from(
             &matches
                 .opt_str("model")
                 .unwrap_or(String::from("pal"))

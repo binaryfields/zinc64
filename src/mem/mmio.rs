@@ -49,8 +49,10 @@ impl Mmio {
             vic,
         }
     }
+}
 
-    pub fn read(&self, address: u16) -> u8 {
+impl Addressable for Mmio {
+    fn read(&self, address: u16) -> u8 {
         match address {
             0xd000...0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
             0xd400...0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
@@ -62,7 +64,7 @@ impl Mmio {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    fn write(&mut self, address: u16, value: u8) {
         match address {
             0xd000...0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
             0xd400...0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),

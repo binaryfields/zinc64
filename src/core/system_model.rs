@@ -29,7 +29,7 @@ pub enum VicModel {
     Mos6569, // PAL
 }
 
-pub struct Model {
+pub struct SystemModel {
     pub color_ram: usize,
     pub cpu_freq: u32,
     pub cycles_per_frame: u16,
@@ -40,19 +40,19 @@ pub struct Model {
     pub vic_model: VicModel,
 }
 
-impl Model {
-    pub fn from(model: &str) -> Model {
+impl SystemModel {
+    pub fn from(model: &str) -> SystemModel {
         match model {
-            "ntsc" => Model::c64_ntsc(),
-            "pal" => Model::c64_pal(),
-            "c64-ntsc" => Model::c64_ntsc(),
-            "c64-pal" => Model::c64_pal(),
+            "ntsc" => SystemModel::c64_ntsc(),
+            "pal" => SystemModel::c64_pal(),
+            "c64-ntsc" => SystemModel::c64_ntsc(),
+            "c64-pal" => SystemModel::c64_pal(),
             _ => panic!("invalid model {}", model),
         }
     }
 
-    fn c64_ntsc() -> Model {
-        Model {
+    fn c64_ntsc() -> SystemModel {
+        SystemModel {
             color_ram: 1024,
             cpu_freq: 1_022_727,
             cycles_per_frame: 17095,
@@ -64,8 +64,8 @@ impl Model {
         }
     }
 
-    fn c64_pal() -> Model {
-        Model {
+    fn c64_pal() -> SystemModel {
+        SystemModel {
             color_ram: 1024,
             cpu_freq: 985_248,
             cycles_per_frame: 19656,

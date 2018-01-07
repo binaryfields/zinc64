@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{IoPort, Pin, Pulse};
+use core::{IoPort, Pin};
 
 use super::Tape;
 
@@ -51,6 +51,36 @@ enum ControlPort {
 impl ControlPort {
     pub fn value(&self) -> usize {
         *self as usize
+    }
+}
+
+pub struct Pulse {
+    low_cycles: u32,
+    remaining_cycles: u32,
+}
+
+impl Pulse {
+    pub fn new(length: u32, duty: u32) -> Pulse {
+        Pulse {
+            low_cycles: length * (100 - duty) / 100,
+            remaining_cycles: length,
+        }
+    }
+
+    #[inline]
+    pub fn is_done(&self) -> bool {
+        self.remaining_cycles == 0
+    }
+
+    #[inline]
+    pub fn advance(&mut self) -> bool {
+        self.remaining_cycles -= 1;
+        if self.low_cycles == 0 {
+            true
+        } else {
+            self.low_cycles -= 1;
+            false
+        }
     }
 }
 

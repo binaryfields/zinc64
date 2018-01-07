@@ -29,6 +29,17 @@ pub struct Rom {
 }
 
 impl Rom {
+    pub fn new(capacity: usize, offset: u16, pattern: u8) -> Rom {
+        let mut data = vec![0x00; capacity];
+        for i in 0..data.len() {
+            data[i] = pattern;
+        }
+        Rom {
+            data,
+            offset,
+        }
+    }
+
     pub fn load(path: &Path, offset: u16) -> Result<Rom, io::Error> {
         info!(target: "mem", "Loading ROM {:?}", path.to_str().unwrap());
         let mut data = Vec::new();

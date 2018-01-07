@@ -145,16 +145,37 @@ impl fmt::Display for Operand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::{IoPort, IrqLine};
-    use mem::Ram;
+    use core::{IoPort, IrqLine, MemoryController, Ram};
     use std::cell::RefCell;
     use std::rc::Rc;
+
+    struct MockMemory {
+        ram: Ram,
+    }
+
+    impl MockMemory {
+        pub fn new(ram: Ram) -> Self {
+            MockMemory { ram }
+        }
+    }
+
+    impl MemoryController for MockMemory {
+        fn switch_banks(&mut self, _mode: u8) {}
+
+        fn read(&self, address: u16) -> u8 {
+            self.ram.read(address)
+        }
+
+        fn write(&mut self, address: u16, value: u8) {
+            self.ram.write(address, value);
+        }
+    }
 
     fn setup_cpu() -> Cpu6510 {
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
-        let mem = Rc::new(RefCell::new(Ram::new(0x10000)));
+        let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
         Cpu6510::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
