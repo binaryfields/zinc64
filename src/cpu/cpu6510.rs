@@ -36,7 +36,7 @@ use super::instruction::Instruction;
 //   6510 has two port registers at 0x0000 and 0x0001 that control PLA configuration so they
 //   are also handled here.
 
-pub enum Flag {
+enum Flag {
     Carry = 1 << 0,
     Zero = 1 << 1,
     IntDisable = 1 << 2,
@@ -642,6 +642,11 @@ impl Cpu for Cpu6510 {
             trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
         }
         self.execute(&instr, tick_fn);
+    }
+
+    fn read_debug(&self, address: u16) -> u8 {
+        let tick_fn: TickFn = Box::new(move || {});
+        self.read(address, &tick_fn)
     }
 
     fn write_debug(&mut self, address: u16, value: u8) {

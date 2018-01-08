@@ -25,7 +25,7 @@ use sdl2::render;
 use sdl2::video;
 use time;
 use zinc64::core::FrameBuffer;
-use zinc64::video::Dimension;
+use zinc64::core::geo;
 
 pub struct Renderer {
     canvas: render::WindowCanvas,
@@ -38,11 +38,11 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(
         sdl_video: &sdl2::VideoSubsystem,
-        window_size: Dimension,
-        screen_size: Dimension,
+        window_size: geo::Size,
+        screen_size: geo::Size,
         fullscreen: bool
     ) -> Result<Renderer, String> {
-        let mut builder = sdl_video.window("zinc64", window_size.width as u32, window_size.height as u32);
+        let mut builder = sdl_video.window("zinc64", window_size.width, window_size.height);
         builder.opengl();
         if fullscreen {
             builder.fullscreen();
@@ -56,8 +56,8 @@ impl Renderer {
         let texture = creator
             .create_texture_streaming(
                 pixels::PixelFormatEnum::ARGB8888,
-                screen_size.width as u32,
-                screen_size.height as u32,
+                screen_size.width,
+                screen_size.height,
             )
             .unwrap();
         let renderer = Renderer {

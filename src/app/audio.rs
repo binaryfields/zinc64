@@ -25,6 +25,8 @@ use zinc64::core::SoundBuffer;
 
 // TODO app/audio: add play/resume/volume
 
+const SAMPLE_SCALER: f32 = 0.000020;
+
 pub struct AppAudio {
     buffer: Arc<Mutex<SoundBuffer>>,
 }
@@ -57,7 +59,7 @@ impl AudioCallback for AppAudio {
         let mut input = self.buffer.lock().unwrap();
         for x in out.iter_mut() {
             let sample = input.pop();
-            *x = sample as f32 * 0.000020; // FIXME magic value
+            *x = sample as f32 * SAMPLE_SCALER;
         }
     }
 }

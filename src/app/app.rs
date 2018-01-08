@@ -29,9 +29,8 @@ use sdl2::audio::AudioDevice;
 use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
+use zinc64::core::geo;
 use zinc64::system::C64;
-use zinc64::video::Dimension;
-use zinc64::video::vic;
 
 use super::audio::AppAudio;
 use super::io::Io;
@@ -57,8 +56,7 @@ impl JamAction {
 pub struct Options {
     pub fullscreen: bool,
     pub jam_action: JamAction,
-    pub height: u32,
-    pub width: u32,
+    pub window_size: geo::Size,
     pub speed: u8,
     pub warp_mode: bool,
 
@@ -91,14 +89,11 @@ impl App {
         let sdl_context = sdl2::init()?;
         // Initialize video
         let sdl_video = sdl_context.video()?;
-        info!(target: "ui", "Opening app window {}x{}", options.width, options.height);
-        let vic_spec = vic::Spec::new(c64.get_config().model.vic_model);
-        let window_size = Dimension::new(options.width as u16, options.height as u16);
-        let screen_size = vic_spec.display_rect.size();
+        info!(target: "ui", "Opening app window {}x{}", options.window_size.width, options.window_size.height);
         let renderer = Renderer::new(
             &sdl_video,
-            window_size,
-            screen_size,
+            options.window_size,
+            geo::Size::from_tuple(c64.get_config().model.frame_buffer_size),
             options.fullscreen
         )?;
         // Initialize audio

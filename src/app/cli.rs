@@ -22,6 +22,7 @@ use std::path::Path;
 
 use getopts;
 use zinc64::core::SystemModel;
+use zinc64::core::geo;
 use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
 use zinc64::system::{C64, Config};
@@ -44,20 +45,21 @@ impl Cli {
     }
 
     pub fn parse_app_options(matches: &getopts::Matches) -> Result<app::Options, String> {
+        let width = matches
+            .opt_str("width")
+            .map(|s| s.parse::<u32>().unwrap())
+            .unwrap_or(800);
+        let height = matches
+            .opt_str("height")
+            .map(|s| s.parse::<u32>().unwrap())
+            .unwrap_or(600);
         let options = app::Options {
             fullscreen: matches.opt_present("fullscreen"),
             jam_action: matches
                 .opt_str("jamaction")
                 .map(|s| app::JamAction::from(&s))
                 .unwrap_or(app::JamAction::Continue),
-            height: matches
-                .opt_str("height")
-                .map(|s| s.parse::<u32>().unwrap())
-                .unwrap_or(600),
-            width: matches
-                .opt_str("width")
-                .map(|s| s.parse::<u32>().unwrap())
-                .unwrap_or(800),
+            window_size: geo::Size::new(width, height),
             speed: matches
                 .opt_str("speed")
                 .map(|s| s.parse::<u8>().unwrap())

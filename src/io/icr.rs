@@ -34,6 +34,7 @@ impl Icr {
         self.data = 0;
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn clear_events(&mut self, events: u8) {
         self.data &= !events;
@@ -51,6 +52,7 @@ impl Icr {
         (self.mask & self.data) != 0
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn get_mask(&self) -> u8 {
         self.mask

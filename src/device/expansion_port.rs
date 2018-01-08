@@ -21,20 +21,32 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Addressable, IoLine};
+use core::{Addressable, IoPort};
 
 use super::cartridge::Cartridge;
 
 // TODO device: expansion port test cases
 
+#[derive(Copy, Clone)]
+enum IoLine {
+    Game = 3,
+    Exrom = 4,
+}
+
+impl IoLine {
+    pub fn value(&self) -> usize {
+        *self as usize
+    }
+}
+
 pub struct ExpansionPort {
     cartridge: Option<Cartridge>,
     // I/O
-    io_line: Rc<RefCell<IoLine>>,
+    io_line: Rc<RefCell<IoPort>>,
 }
 
 impl ExpansionPort {
-    pub fn new(io_line: Rc<RefCell<IoLine>>) -> ExpansionPort {
+    pub fn new(io_line: Rc<RefCell<IoPort>>) -> ExpansionPort {
         ExpansionPort {
             cartridge: None,
             io_line,
@@ -43,8 +55,8 @@ impl ExpansionPort {
 
     pub fn attach(&mut self, cartridge: Cartridge) {
         let mut io_value = 0u8;
-        io_value.set_bit(3, cartridge.get_game());
-        io_value.set_bit(4, cartridge.get_exrom());
+        io_value.set_bit(IoLine::Game.value(), cartridge.get_game());
+        io_value.set_bit(IoLine::Exrom.value(), cartridge.get_exrom());
         self.io_line.borrow_mut().set_value(io_value);
         self.cartridge = Some(cartridge);
     }
@@ -53,8 +65,8 @@ impl ExpansionPort {
         if self.cartridge.is_some() {
             self.cartridge = None;
             let mut io_value = 0u8;
-            io_value.set_bit(3, true);
-            io_value.set_bit(4, true);
+            io_value.set_bit(IoLine::Game.value(), true);
+            io_value.set_bit(IoLine::Exrom.value(), true);
             self.io_line.borrow_mut().set_value(io_value);
         }
     }
@@ -63,8 +75,13 @@ impl ExpansionPort {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.reset();
             let mut io_value = 0u8;
-            io_value.set_bit(3, cartridge.get_game());
-            io_value.set_bit(4, cartridge.get_exrom());
+            io_value.set_bit(IoLine::Game.value(), cartridge.get_game());
+            io_value.set_bit(IoLine::Exrom.value(), cartridge.get_exrom());
+            self.io_line.borrow_mut().set_value(io_value);
+        } else {
+            let mut io_value = 0u8;
+            io_value.set_bit(IoLine::Game.value(), true);
+            io_value.set_bit(IoLine::Exrom.value(), true);
             self.io_line.borrow_mut().set_value(io_value);
         }
     }

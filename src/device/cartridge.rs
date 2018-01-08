@@ -137,7 +137,7 @@ impl Cartridge {
         match address {
             0xde00 if self.hw_type == HwType::SimonsBasic => {
                 self.game = value == 0x01;
-                // FIXME crt: update memory layout
+                // TODO crt: update memory layout
             }
             0xde00 if self.hw_type == HwType::OceanType1 => {
                 self.switch_bank(value & 0x3f);

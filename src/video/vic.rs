@@ -95,6 +95,17 @@ And the vertical ones:
 */
 
 #[derive(Copy, Clone)]
+pub enum IrqSource {
+    Vic = 2,
+}
+
+impl IrqSource {
+    pub fn value(&self) -> usize {
+        *self as usize
+    }
+}
+
+#[derive(Copy, Clone)]
 enum Mode {
     // (ECM/BMM/MCM=0/0/0)
     Text = 0x00,
@@ -745,7 +756,7 @@ impl Chip for Vic {
         if rst_int {
             self.int_data |= 1 << 0;
             if (self.int_mask & self.int_data) != 0 {
-                self.cpu_irq.borrow_mut().set(1); // FIXME magic value
+                self.cpu_irq.borrow_mut().set(IrqSource::Vic.value());
             }
         }
         // Prepare sprite data
@@ -1030,13 +1041,13 @@ impl Chip for Vic {
             Reg::IRR => {
                 self.int_data &= !value;
                 if (self.int_mask & self.int_data) == 0 {
-                    self.cpu_irq.borrow_mut().clear(1); // FIXME magic value
+                    self.cpu_irq.borrow_mut().clear(IrqSource::Vic.value());
                 }
             }
             Reg::IMR => {
                 self.int_mask = value & 0x0f;
                 if (self.int_mask & self.int_data) != 0 {
-                    self.cpu_irq.borrow_mut().set(1); // FIXME magic value
+                    self.cpu_irq.borrow_mut().set(IrqSource::Vic.value());
                 }
             }
             Reg::MDP => {

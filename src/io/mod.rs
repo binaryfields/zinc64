@@ -18,6 +18,7 @@
  */
 
 pub mod cia;
+mod icr;
 mod rtc;
 mod timer;
 

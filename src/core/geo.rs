@@ -17,38 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::ops::Fn;
-
-pub type Observer = Box<Fn(u8)>;
-
-pub struct IoLine {
-    value: u8,
-    observer: Option<Observer>,
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Size {
+    pub width: u32,
+    pub height: u32,
 }
 
-impl IoLine {
-    pub fn new(initial_value: u8) -> IoLine {
-        IoLine {
-            value: initial_value,
-            observer: None,
-        }
+impl Size {
+    pub fn new(width: u32, height: u32) -> Size {
+        Size { width, height }
     }
 
-    #[inline]
-    pub fn get_value(&self) -> u8 {
-        self.value
-    }
-
-    #[inline]
-    pub fn set_observer(&mut self, observer: Observer) {
-        self.observer = Some(observer);
-    }
-
-    #[inline]
-    pub fn set_value(&mut self, value: u8) {
-        self.value = value;
-        if let Some(ref observer) = self.observer {
-            observer(self.value);
-        }
+    pub fn from_tuple(size: (u32, u32)) -> Size {
+        Size { width: size.0, height: size.1 }
     }
 }

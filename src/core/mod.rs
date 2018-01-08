@@ -19,8 +19,7 @@
 
 mod factory;
 mod frame_buffer;
-mod icr;
-mod ioline;
+pub mod geo;
 mod ioport;
 mod irqline;
 mod system_model;
@@ -31,8 +30,6 @@ mod sound_buffer;
 
 pub use self::factory::Factory;
 pub use self::frame_buffer::FrameBuffer;
-pub use self::icr::Icr;
-pub use self::ioline::IoLine;
 pub use self::ioport::IoPort;
 pub use self::irqline::IrqLine;
 pub use self::system_model::{SystemModel, SidModel, VicModel};
@@ -63,6 +60,7 @@ pub trait Cpu {
     fn set_pc(&mut self, value: u16);
     fn reset(&mut self);
     fn step(&mut self, tick_fn: &TickFn);
+    fn read_debug(&self, address: u16) -> u8;
     fn write_debug(&mut self, address: u16, value: u8);
 }
 

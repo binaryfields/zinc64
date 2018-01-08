@@ -23,14 +23,13 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use zinc64::core::{
+use core::{
     Addressable,
     Chip,
     Cpu,
     Factory,
     FrameBuffer,
     IrqLine,
-    IoLine,
     IoPort,
     MemoryController,
     SystemModel,
@@ -40,16 +39,26 @@ use zinc64::core::{
     SoundBuffer,
     VicModel,
 };
-use zinc64::cpu::Cpu6510;
-use zinc64::device::ExpansionPort;
-use zinc64::mem::{Mmio, Memory};
-use zinc64::io::Cia;
-use zinc64::io::cia;
-use zinc64::sound::Sid;
-use zinc64::sound::sid;
-use zinc64::video::{Vic, VicMemory};
+use cpu::Cpu6510;
+use device::ExpansionPort;
+use mem::{Mmio, Memory};
+use io::Cia;
+use io::cia;
+use sound::Sid;
+use sound::sid::SamplingMethod;
+use video::{Vic, VicMemory};
 
-pub struct ChipFactory;
+use super::Config;
+
+pub struct ChipFactory {
+    config: Rc<Config>,
+}
+
+impl ChipFactory {
+    pub fn new(config: Rc<Config>) -> ChipFactory {
+        ChipFactory { config }
+    }
+}
 
 impl Factory for ChipFactory {
 
@@ -112,10 +121,11 @@ impl Factory for ChipFactory {
     ) -> Rc<RefCell<Chip>> {
         let mut sid = Sid::new(system_model.sid_model, sound_buffer);
         sid.set_sampling_parameters(
-            sid::SamplingMethod::ResampleFast,
-            system_model.cpu_freq,
-            44100,
+            SamplingMethod::ResampleFast,
+            self.config.model.cpu_freq,
+            self.config.sound.sample_rate,
         );
+        sid.enable_filter(self.config.sound.sid_filters);
         Rc::new(RefCell::new(sid))
     }
 
@@ -151,7 +161,7 @@ impl Factory for ChipFactory {
 
     fn new_expansion_port(
         &self,
-        exp_io_line: Rc<RefCell<IoLine>>,
+        exp_io_line: Rc<RefCell<IoPort>>,
     ) -> Rc<RefCell<Addressable>> {
         Rc::new(RefCell::new(
             ExpansionPort::new(exp_io_line)

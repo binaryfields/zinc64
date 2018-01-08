@@ -19,7 +19,6 @@
 
 mod app;
 mod audio;
-mod chip_factory;
 mod cli;
 mod console;
 mod io;
@@ -28,7 +27,6 @@ mod logger;
 mod renderer;
 
 pub use self::app::{App, JamAction, Options};
-pub use self::chip_factory::ChipFactory;
 pub use self::cli::Cli;
 pub use self::console::ConsoleApp;
 pub use self::logger::Logger;

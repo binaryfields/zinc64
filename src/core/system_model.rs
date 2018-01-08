@@ -33,7 +33,7 @@ pub struct SystemModel {
     pub color_ram: usize,
     pub cpu_freq: u32,
     pub cycles_per_frame: u16,
-    pub frame_buffer_size: (usize, usize),
+    pub frame_buffer_size: (u32, u32),
     pub memory_size: usize,
     pub refresh_rate: f32,
     pub sid_model: SidModel,

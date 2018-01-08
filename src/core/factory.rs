@@ -29,7 +29,6 @@ use core::{
     Cpu,
     FrameBuffer,
     IrqLine,
-    IoLine,
     IoPort,
     MemoryController,
     SystemModel,
@@ -87,7 +86,7 @@ pub trait Factory {
 
     fn new_expansion_port(
         &self,
-        exp_io_line: Rc<RefCell<IoLine>>,
+        exp_io_line: Rc<RefCell<IoPort>>,
     ) -> Rc<RefCell<Addressable>>;
 
     fn new_memory(

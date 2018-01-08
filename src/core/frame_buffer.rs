@@ -29,11 +29,11 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
-    pub fn new(width: usize, height: usize, palette: [u32; 16]) -> FrameBuffer {
+    pub fn new(width: u32, height: u32, palette: [u32; 16]) -> FrameBuffer {
         FrameBuffer {
-            dim: (width, height),
+            dim: (width as usize, height as usize),
             palette,
-            pixels: vec![0; width * height],
+            pixels: vec![0; (width * height) as usize],
             sync: false,
         }
     }

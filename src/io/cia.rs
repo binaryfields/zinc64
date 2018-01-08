@@ -21,9 +21,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Chip, Icr, IoPort, IrqLine, Pin};
+use core::{Chip, IoPort, IrqLine, Pin};
 use log::LogLevel;
 
+use super::icr::Icr;
 use super::timer;
 use super::timer::Timer;
 use super::rtc::Rtc;
@@ -36,6 +37,18 @@ use super::rtc::Rtc;
 // - load 1c
 // - int 1c
 // - count 3c
+
+#[derive(Copy, Clone)]
+pub enum IrqSource {
+    Cia1 = 0,
+    Cia2 = 1,
+}
+
+impl IrqSource {
+    pub fn value(&self) -> usize {
+        *self as usize
+    }
+}
 
 #[derive(PartialEq)]
 pub enum Mode {
@@ -207,16 +220,16 @@ impl Cia {
 
     fn clear_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_irq.borrow_mut().clear(0), // FIXME magic value
-            Mode::Cia2 => self.cpu_nmi.borrow_mut().clear(0), // FIXME magic value
+            Mode::Cia1 => self.cpu_irq.borrow_mut().clear(IrqSource::Cia1.value()),
+            Mode::Cia2 => self.cpu_nmi.borrow_mut().clear(IrqSource::Cia2.value()),
         }
         self.int_triggered = false;
     }
 
     fn trigger_interrupt(&mut self) {
         match self.mode {
-            Mode::Cia1 => self.cpu_irq.borrow_mut().set(0), // FIXME magic value
-            Mode::Cia2 => self.cpu_nmi.borrow_mut().set(0), // FIXME magic value
+            Mode::Cia1 => self.cpu_irq.borrow_mut().set(IrqSource::Cia1.value()),
+            Mode::Cia2 => self.cpu_nmi.borrow_mut().set(IrqSource::Cia2.value()),
         }
         self.int_triggered = true;
     }

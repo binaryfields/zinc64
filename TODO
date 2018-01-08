@@ -1,11 +1,10 @@
 # TODO
 
-- sid config
-- video: remove dimension
-- misc: review loader module
-
+- cpu: fix page boundary cycle accounting
+- sound: add fragment size
 - app: add screenshot support
 - app: add ui/menus
 - app: add debugger support
+- chipset: rewrite cia
 - chipset: rewrite vic
 - device: add floppy support
