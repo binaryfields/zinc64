@@ -51,7 +51,7 @@ impl SystemModel {
         }
     }
 
-    fn c64_ntsc() -> SystemModel {
+    pub fn c64_ntsc() -> SystemModel {
         SystemModel {
             color_ram: 1024,
             cpu_freq: 1_022_727,
@@ -64,7 +64,7 @@ impl SystemModel {
         }
     }
 
-    fn c64_pal() -> SystemModel {
+    pub fn c64_pal() -> SystemModel {
         SystemModel {
             color_ram: 1024,
             cpu_freq: 985_248,

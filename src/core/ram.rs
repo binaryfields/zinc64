@@ -35,6 +35,14 @@ impl Ram {
         }
     }
 
+    pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
+        let mut address = offset;
+        for byte in data {
+            self.write(address, *byte);
+            address = address.wrapping_add(1);
+        }
+    }
+
     #[inline]
     pub fn read(&self, address: u16) -> u8 {
         self.data[address as usize]

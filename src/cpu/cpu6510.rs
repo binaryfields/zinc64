@@ -48,7 +48,7 @@ enum Flag {
 }
 
 #[derive(Debug)]
-pub enum Interrupt {
+enum Interrupt {
     Break = 1 << 0,
     Irq = 1 << 1,
     Nmi = 1 << 2,
