@@ -26,6 +26,8 @@ use std::sync::{Arc, Mutex};
 
 use core::{
     Chip,
+    CircularBuffer,
+    Clock,
     Cpu,
     Factory,
     FrameBuffer,
@@ -33,7 +35,6 @@ use core::{
     IrqLine,
     Pin,
     Ram,
-    SoundBuffer,
     TickFn,
 };
 use device::{
@@ -46,7 +47,7 @@ use device::{
 };
 use device::joystick;
 
-use super::{Autostart, Clock, Config, Palette};
+use super::{Autostart, Config, Palette};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -87,7 +88,7 @@ pub struct C64 {
     keyboard: Rc<RefCell<Keyboard>>,
     // Buffers
     frame_buffer: Rc<RefCell<FrameBuffer>>,
-    sound_buffer: Arc<Mutex<SoundBuffer>>,
+    sound_buffer: Arc<Mutex<CircularBuffer>>,
     // Configuration
     autostart: Option<Autostart>,
     breakpoints: Vec<u16>,
@@ -101,6 +102,7 @@ impl C64 {
     pub fn new(config: Rc<Config>, factory: Box<Factory>) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
         // Buffers
+        let clock = Rc::new(Clock::new());
         let frame_buffer = Rc::new(RefCell::new(
             FrameBuffer::new(
                 config.model.frame_buffer_size.0,
@@ -112,7 +114,7 @@ impl C64 {
         let joystick_2_state = Rc::new(Cell::new(0u8));
         let keyboard_matrix = Rc::new(RefCell::new([0; 8]));
         let sound_buffer = Arc::new(Mutex::new(
-            SoundBuffer::new(config.sound.buffer_size),
+            CircularBuffer::new(config.sound.buffer_size << 2),
         ));
 
         // I/O Lines
@@ -164,6 +166,7 @@ impl C64 {
         );
         let sid = factory.new_sid(
             &config.model,
+            clock.clone(),
             sound_buffer.clone(),
         );
         let vic = factory.new_vic(
@@ -273,7 +276,7 @@ impl C64 {
             sound_buffer: sound_buffer.clone(),
             autostart: None,
             breakpoints: Vec::new(),
-            clock: Rc::new(Clock::new()),
+            clock,
             frames: 0,
             last_pc: 0,
         })
@@ -325,7 +328,7 @@ impl C64 {
         self.keyboard.clone()
     }
 
-    pub fn get_sound_buffer(&self) -> Arc<Mutex<SoundBuffer>> {
+    pub fn get_sound_buffer(&self) -> Arc<Mutex<CircularBuffer>> {
         self.sound_buffer.clone()
     }
 
@@ -375,21 +378,19 @@ impl C64 {
         }
         self.keyboard.borrow_mut().reset();
         self.frame_buffer.borrow_mut().reset();
-        self.sound_buffer.lock().unwrap().clear();
+        self.sound_buffer.lock().unwrap().reset();
         // Runtime State
-        // self.clock.set(0);
+        // self.clock.reset();
         self.frames = 0;
         self.last_pc = 0;
     }
 
-    pub fn run_frame(&mut self, overflow_cycles: i32) -> i32 {
-        let mut elapsed = 0u32;
-        let mut delta = self.config.model.cycles_per_frame as i32 - overflow_cycles;
-        let vic_clone = self.vic.clone();
+    pub fn run_frame(&mut self, prev_overflow: i32) -> i32 {
         let cia1_clone = self.cia1.clone();
         let cia2_clone = self.cia2.clone();
-        let datassette_clone = self.datassette.clone();
         let clock_clone = self.clock.clone();
+        let datassette_clone = self.datassette.clone();
+        let vic_clone = self.vic.clone();
         let tick_fn: TickFn = Box::new(move || {
             vic_clone.borrow_mut().clock();
             cia1_clone.borrow_mut().clock();
@@ -397,14 +398,13 @@ impl C64 {
             datassette_clone.borrow_mut().clock();
             clock_clone.tick();
         });
+        let mut delta = self.config.model.cycles_per_frame as i32 + prev_overflow;
         while delta > 0 {
-            let prev_clk = self.clock.get();
+            let prev_clock = self.clock.get();
             self.step(&tick_fn);
-            let cycles = (self.clock.get() - prev_clk) as u32;
-            elapsed += cycles;
-            delta -= cycles as i32;
+            delta -= self.clock.elapsed(prev_clock) as i32;
         }
-        self.sid.borrow_mut().clock_delta(elapsed);
+        self.sid.borrow_mut().process_vsync();
         self.cia1.borrow_mut().process_vsync();
         self.cia2.borrow_mut().process_vsync();
         self.frames = self.frames.wrapping_add(1);

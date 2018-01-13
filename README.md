@@ -150,6 +150,7 @@ The cpu validation was performed with the help of [Klaus2m5 functional tests](ht
 |-----------|-------------------|
 | Alt-Enter | Toggle Full Screen
 | Alt-F9    | Reset
+| Alt-M     | Toggle Mute
 | Alt-P     | Toggle Pause
 | Alt-Q     | Quit
 | Alt-W     | Warp Mode

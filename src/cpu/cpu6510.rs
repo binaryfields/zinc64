@@ -657,6 +657,8 @@ impl Cpu for Cpu6510 {
         self.execute(&instr, tick_fn);
     }
 
+    // I/O
+
     fn read_debug(&self, address: u16) -> u8 {
         let tick_fn: TickFn = Box::new(move || {});
         self.read(address, &tick_fn)

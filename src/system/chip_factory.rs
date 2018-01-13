@@ -26,6 +26,8 @@ use std::sync::{Arc, Mutex};
 use core::{
     Addressable,
     Chip,
+    CircularBuffer,
+    Clock,
     Cpu,
     Factory,
     FrameBuffer,
@@ -36,7 +38,6 @@ use core::{
     Pin,
     Ram,
     Rom,
-    SoundBuffer,
     VicModel,
 };
 use cpu::Cpu6510;
@@ -117,9 +118,10 @@ impl Factory for ChipFactory {
     fn new_sid(
         &self,
         system_model: &SystemModel,
-        sound_buffer: Arc<Mutex<SoundBuffer>>,
+        clock: Rc<Clock>,
+        sound_buffer: Arc<Mutex<CircularBuffer>>,
     ) -> Rc<RefCell<Chip>> {
-        let mut sid = Sid::new(system_model.sid_model, sound_buffer);
+        let mut sid = Sid::new(system_model.sid_model, clock, sound_buffer);
         sid.set_sampling_parameters(
             SamplingMethod::ResampleFast,
             self.config.model.cpu_freq,

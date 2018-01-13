@@ -21,14 +21,17 @@ use std::sync::{Arc, Mutex};
 
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
-use zinc64::core::SoundBuffer;
+use zinc64::core::CircularBuffer;
 
-// TODO app/audio: add play/resume/volume
-
-const SAMPLE_SCALER: f32 = 0.000020;
+const SCALER_MAX: i32 = 4096;
+const SCALER_SHIFT: usize = 12;
+const VOLUME_MAX: u8 = 100;
 
 pub struct AppAudio {
-    buffer: Arc<Mutex<SoundBuffer>>,
+    buffer: Arc<Mutex<CircularBuffer>>,
+    mute: bool,
+    scaler: i32,
+    volume: u8,
 }
 
 impl AppAudio {
@@ -37,7 +40,7 @@ impl AppAudio {
         sample_rate: i32,
         channels: u8,
         buffer_size: u16,
-        buffer: Arc<Mutex<SoundBuffer>>
+        buffer: Arc<Mutex<CircularBuffer>>
     ) -> Result<AudioDevice<AppAudio>, String> {
         let audio_spec = AudioSpecDesired {
             freq: Some(sample_rate),
@@ -46,20 +49,42 @@ impl AppAudio {
         };
         let audio_device = sdl_audio.open_playback(None, &audio_spec, |spec| {
             info!(target: "audio", "{:?}", spec);
-            AppAudio { buffer }
+            AppAudio {
+                buffer,
+                mute: false,
+                scaler: SCALER_MAX,
+                volume: VOLUME_MAX
+            }
         })?;
         Ok(audio_device)
+    }
+
+    pub fn set_volume(&mut self, volume: u8) {
+        self.scaler = (volume as i32 * SCALER_MAX) / VOLUME_MAX as i32;
+        self.volume = volume;
+    }
+
+    pub fn toggle_mute(&mut self) {
+        let mute = self.mute;
+        self.mute = !mute;
     }
 }
 
 impl AudioCallback for AppAudio {
-    type Channel = f32;
+    type Channel = i16;
 
-    fn callback(&mut self, out: &mut [f32]) {
+    fn callback(&mut self, out: &mut [i16]) {
         let mut input = self.buffer.lock().unwrap();
+        if input.len() < out.len() {
+            debug!(target: "app", "audio callback underflow {}/{}", out.len(), input.len());
+        }
         for x in out.iter_mut() {
             let sample = input.pop();
-            *x = sample as f32 * SAMPLE_SCALER;
+            if !self.mute {
+                *x = ((sample as i32 * self.scaler) >> SCALER_SHIFT) as i16;
+            } else {
+                *x = 0;
+            }
         }
     }
 }

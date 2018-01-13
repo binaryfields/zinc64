@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+mod circular_buffer;
+mod clock;
 mod factory;
 mod frame_buffer;
 pub mod geo;
@@ -26,8 +28,9 @@ mod system_model;
 mod pin;
 mod ram;
 mod rom;
-mod sound_buffer;
 
+pub use self::circular_buffer::CircularBuffer;
+pub use self::clock::Clock;
 pub use self::factory::Factory;
 pub use self::frame_buffer::FrameBuffer;
 pub use self::ioport::IoPort;
@@ -36,7 +39,6 @@ pub use self::system_model::{SystemModel, SidModel, VicModel};
 pub use self::pin::Pin;
 pub use self::ram::Ram;
 pub use self::rom::Rom;
-pub use self::sound_buffer::SoundBuffer;
 
 pub trait Addressable {
     fn read(&self, address: u16) -> u8;
@@ -60,6 +62,7 @@ pub trait Cpu {
     fn set_pc(&mut self, value: u16);
     fn reset(&mut self);
     fn step(&mut self, tick_fn: &TickFn);
+    // I/O
     fn read_debug(&self, address: u16) -> u8;
     fn write_debug(&mut self, address: u16, value: u8);
 }

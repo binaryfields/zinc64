@@ -36,6 +36,8 @@ use super::audio::AppAudio;
 use super::io::Io;
 use super::renderer::Renderer;
 
+// TODO app: audio warp handling
+
 pub enum JamAction {
     Continue,
     Quit,
@@ -64,6 +66,7 @@ pub struct Options {
 
 #[derive(Debug, PartialEq)]
 enum State {
+    Starting,
     Running,
     Paused,
     Stopped,
@@ -98,13 +101,14 @@ impl App {
         )?;
         // Initialize audio
         let sdl_audio = sdl_context.audio()?;
-        let audio_device = AppAudio::new_device(
+        let mut audio_device = AppAudio::new_device(
             &sdl_audio,
             c64.get_config().sound.sample_rate as i32,
             1,
             c64.get_config().sound.buffer_size as u16,
             c64.get_sound_buffer()
         )?;
+        audio_device.lock().set_volume(100);
         // Initialize I/O
         let sdl_joystick = sdl_context.joystick()?;
         let io = Io::new(
@@ -120,7 +124,7 @@ impl App {
             audio_device,
             io,
             renderer,
-            state: State::Running,
+            state: State::Starting,
             next_frame_ns: 0,
             next_keyboard_event: 0,
         };
@@ -129,28 +133,17 @@ impl App {
 
     pub fn run(&mut self) -> Result<(), String> {
         info!(target: "ui", "Running main loop");
-        self.audio_device.resume();
         let mut events = self.sdl_context.event_pump().unwrap();
         let mut overflow_cycles = 0i32;
         'running: loop {
             match self.state {
+                State::Starting => {
+                    overflow_cycles = self.run_frame(overflow_cycles)?;
+                    self.set_state(State::Running);
+                }
                 State::Running => {
                     self.handle_events(&mut events);
-                    overflow_cycles = self.c64.run_frame(overflow_cycles);
-                    if !self.options.warp_mode {
-                        self.sync_frame();
-                    }
-                    if self.c64.is_cpu_jam() {
-                        self.handle_cpu_jam();
-                    }
-                    let rt = self.c64.get_frame_buffer();
-                    if rt.borrow().get_sync() {
-                        {
-                            let frame_buffer = rt.borrow();
-                            self.renderer.render(&frame_buffer)?;
-                        }
-                        rt.borrow_mut().set_sync(false);
-                    }
+                    overflow_cycles = self.run_frame(overflow_cycles)?;
                 }
                 State::Paused => {
                     self.handle_events(&mut events);
@@ -172,7 +165,7 @@ impl App {
             JamAction::Continue => true,
             JamAction::Quit => {
                 warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
-                self.state = State::Stopped;
+                self.set_state(State::Stopped);
                 false
             }
             JamAction::Reset => {
@@ -187,6 +180,32 @@ impl App {
         self.c64.reset(false);
         self.next_frame_ns = 0;
         self.next_keyboard_event = 0;
+    }
+
+    fn run_frame(&mut self, prev_overflow: i32) -> Result<i32, String> {
+        let overflow = self.c64.run_frame(prev_overflow);
+        if self.c64.is_cpu_jam() {
+            self.handle_cpu_jam();
+        }
+        if !self.options.warp_mode {
+            self.sync_frame();
+        }
+        let rt = self.c64.get_frame_buffer();
+        if rt.borrow().get_sync() {
+            {
+                let frame_buffer = rt.borrow();
+                self.renderer.render(&frame_buffer)?;
+            }
+            rt.borrow_mut().set_sync(false);
+        }
+        Ok(overflow)
+    }
+
+    fn set_state(&mut self, new_state: State) {
+        if self.state != new_state {
+            self.state = new_state;
+            self.update_audio_state();
+        }
     }
 
     fn sync_frame(&mut self) {
@@ -214,20 +233,30 @@ impl App {
         }
     }
 
+    fn toggle_mute(&mut self) {
+        self.audio_device.lock().toggle_mute();
+    }
+
     fn toggle_pause(&mut self) {
-        let new_state = match self.state {
-            State::Running => Some(State::Paused),
-            State::Paused => Some(State::Running),
-            _ => None
+        match self.state {
+            State::Running => self.set_state(State::Paused),
+            State::Paused => self.set_state(State::Running),
+            _ => (),
         };
-        if let Some(state) = new_state {
-            self.state = state;
-        }
     }
 
     fn toggle_warp(&mut self) {
         let warp_mode = self.options.warp_mode;
         self.options.warp_mode = !warp_mode;
+    }
+
+    fn update_audio_state(&mut self) {
+        match self.state {
+            State::Paused => self.audio_device.pause(),
+            State::Running => self.audio_device.resume(),
+            State::Stopped => self.audio_device.pause(),
+            _ => (),
+        }
     }
 
     // -- Event Handling
@@ -240,7 +269,16 @@ impl App {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => {
-                    self.state = State::Stopped;
+                    self.set_state(State::Stopped);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::M),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                {
+                    self.toggle_mute();
                 }
                 Event::KeyDown {
                     keycode: Some(Keycode::P),
@@ -258,7 +296,7 @@ impl App {
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
                 {
-                    self.state = State::Stopped;
+                    self.set_state(State::Stopped);
                 }
                 Event::KeyDown {
                     keycode: Some(Keycode::W),

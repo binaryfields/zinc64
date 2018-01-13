@@ -1,17 +1,18 @@
 extern crate zinc64;
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use zinc64::core::{
     Chip,
+    Clock,
     Cpu,
     IoPort,
     IrqLine,
     MemoryController,
     Ram,
-    SoundBuffer,
+    CircularBuffer,
     TickFn,
     SystemModel,
 };
@@ -68,14 +69,15 @@ static CODE_OFFSET: u16 = 0x1000;
 #[test]
 fn exec_sid_player() {
     let model = SystemModel::c64_pal();
+    let clock = Rc::new(Clock::new());
     let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
     let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
     let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
-    let sound_buffer = Arc::new(Mutex::new(SoundBuffer::new(4096)));
+    let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(4096)));
 
     // Setup chipset
     let sid = Rc::new(RefCell::new(
-        Sid::new(model.sid_model, sound_buffer.clone())
+        Sid::new(model.sid_model, clock.clone(), sound_buffer.clone())
     ));
     sid.borrow_mut().set_sampling_parameters(
         sid::SamplingMethod::ResampleFast,
@@ -100,10 +102,9 @@ fn exec_sid_player() {
     cpu.set_pc(CODE_OFFSET);
 
     // Run it
-    let clock = Rc::new(Cell::new(0u64));
     let clock_clone = clock.clone();
     let tick_fn: TickFn = Box::new(move || {
-        clock_clone.set(clock_clone.get().wrapping_add(1));
+        clock_clone.tick();
     });
 
     let mut frames = 50;
@@ -111,16 +112,13 @@ fn exec_sid_player() {
     while frames > 0 {
         // Run frame
         delta += model.cycles_per_frame as i32;
-        let mut cycles = 0;
         while delta > 0 {
-            let prev_clk = clock.get();
+            let prev_clock = clock.get();
             cpu.step(&tick_fn);
-            let elapsed = (clock.get() - prev_clk) as u32;
-            cycles += elapsed;
-            delta -= elapsed as i32;
+            delta -= clock.elapsed(prev_clock) as i32
         }
         // Produce audio (roughly 20ms)
-        sid.borrow_mut().clock_delta(cycles);
+        sid.borrow_mut().process_vsync();
         // ... do something with sound_buffer ...
 
         frames -= 1;

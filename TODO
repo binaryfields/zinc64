@@ -1,7 +1,5 @@
 # TODO
 
-- cpu: fix page boundary cycle accounting
-- sound: add fragment size
 - app: add screenshot support
 - app: add ui/menus
 - app: add debugger support

@@ -17,54 +17,66 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub struct SoundBuffer {
+pub struct CircularBuffer {
     buffer: Vec<i16>,
+    capacity: usize,
+    count: usize,
     head: usize,
     tail: usize,
 }
 
-impl SoundBuffer {
-    pub fn new(capacity: usize) -> SoundBuffer {
-        SoundBuffer {
+impl CircularBuffer {
+    pub fn new(capacity: usize) -> CircularBuffer {
+        CircularBuffer {
             buffer: vec![0; capacity],
+            capacity,
+            count: 0,
             head: 0,
             tail: 0,
         }
     }
 
-    pub fn clear(&mut self) {
-        for i in 0..self.buffer.len() {
-            self.buffer[i] = 0;
-        }
-        self.head = 0;
-        self.tail = 0;
-    }
-
     pub fn len(&self) -> usize {
-        if self.tail > self.head {
-            self.tail - self.head
-        } else {
-            self.buffer.len() - self.head + self.tail
-        }
+        self.count
     }
 
     #[inline]
     pub fn pop(&mut self) -> i16 {
-        let value = self.buffer[self.head];
-        self.head += 1;
-        if self.head == self.buffer.len() {
-            self.head = 0;
+        if self.count == 0 {
+            0
+        } else {
+            let value = self.buffer[self.head];
+            self.count -= 1;
+            self.head += 1;
+            if self.head == self.buffer.len() {
+                self.head = 0;
+            }
+            value
         }
-        value
     }
 
     #[inline]
-    pub fn push(&mut self, value: i16) {
-        self.buffer[self.tail] = value;
-        self.tail += 1;
-        if self.tail == self.buffer.len() {
-            self.tail = 0;
+    pub fn push(&mut self, value: i16) -> bool {
+        if self.count == self.capacity {
+            false
+        } else {
+            self.buffer[self.tail] = value;
+            self.count += 1;
+            self.tail += 1;
+            if self.tail == self.buffer.len() {
+                self.tail = 0;
+            }
+            true
         }
+    }
+
+    pub fn reset(&mut self) {
+        for i in 0..self.buffer.len() {
+            self.buffer[i] = 0;
+        }
+        self.count = 0;
+        self.head = 0;
+        self.tail = 0;
     }
 }
 
@@ -74,7 +86,7 @@ mod tests {
 
     #[test]
     fn len() {
-        let mut buffer = SoundBuffer::new(4);
+        let mut buffer = CircularBuffer::new(4);
         buffer.push(1);
         buffer.push(2);
         buffer.push(3);
@@ -83,7 +95,7 @@ mod tests {
 
     #[test]
     fn len_with_overflow() {
-        let mut buffer = SoundBuffer::new(4);
+        let mut buffer = CircularBuffer::new(4);
         buffer.push(1);
         buffer.push(2);
         buffer.push(3);
@@ -97,7 +109,7 @@ mod tests {
 
     #[test]
     fn push_and_pop() {
-        let mut buffer = SoundBuffer::new(4);
+        let mut buffer = CircularBuffer::new(4);
         buffer.push(1);
         buffer.push(2);
         buffer.push(3);
@@ -108,7 +120,7 @@ mod tests {
 
     #[test]
     fn push_overflow() {
-        let mut buffer = SoundBuffer::new(2);
+        let mut buffer = CircularBuffer::new(2);
         buffer.push(1);
         buffer.push(2);
         buffer.push(3);

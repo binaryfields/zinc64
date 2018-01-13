@@ -79,3 +79,9 @@
 
 - landed modularized emulator design
 
+### Week 10 - 20180113
+
+- fixed sound playback artifacts, hello pure sid playback
+- milestone 7: run musicirq.prg without static/noise
+
+

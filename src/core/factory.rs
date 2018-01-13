@@ -26,6 +26,8 @@ use std::sync::{Arc, Mutex};
 use core::{
     Addressable,
     Chip,
+    CircularBuffer,
+    Clock,
     Cpu,
     FrameBuffer,
     IrqLine,
@@ -35,7 +37,6 @@ use core::{
     Pin,
     Ram,
     Rom,
-    SoundBuffer,
     VicModel,
 };
 
@@ -68,7 +69,8 @@ pub trait Factory {
     fn new_sid(
         &self,
         system_model: &SystemModel,
-        sound_buffer: Arc<Mutex<SoundBuffer>>,
+        clock: Rc<Clock>,
+        sound_buffer: Arc<Mutex<CircularBuffer>>,
     ) -> Rc<RefCell<Chip>>;
 
     fn new_vic(
