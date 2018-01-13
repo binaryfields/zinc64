@@ -7,7 +7,7 @@ readme = "README.md"
 keywords = ["c64", "commodore", "emulator"]
 repository = "https://github.com/digitalstreamio/zinc64"
 homepage = "https://github.com/digitalstreamio/zinc64"
-categories = ["c64", "emulator"]
+categories = ["emulators"]
 description = """
 Commodore 64 emulator toolkit with batteries included but swappable
 """
