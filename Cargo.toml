@@ -11,6 +11,11 @@ categories = ["c64", "emulator"]
 description = """
 Commodore 64 emulator toolkit with batteries included but swappable
 """
+exclude = [
+    "bin/*",
+    "doc/*",
+    "res/*",
+]
 
 [dependencies]
 bit_field = "0.9"
