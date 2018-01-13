@@ -83,5 +83,6 @@
 
 - fixed sound playback artifacts, hello pure sid playback
 - milestone 7: run musicirq.prg without static/noise
+- milestone 8: publish zinc64 crate
 
 

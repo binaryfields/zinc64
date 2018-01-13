@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ * Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
  *
  * This file is part of zinc64.
  *
@@ -121,10 +121,8 @@ mod tests {
     #[test]
     fn push_overflow() {
         let mut buffer = CircularBuffer::new(2);
-        buffer.push(1);
-        buffer.push(2);
-        buffer.push(3);
-        assert_eq!(3, buffer.pop());
-        assert_eq!(2, buffer.pop());
+        assert_eq!(true, buffer.push(1));
+        assert_eq!(true, buffer.push(2));
+        assert_eq!(false, buffer.push(3));
     }
 }

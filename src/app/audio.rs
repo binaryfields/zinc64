@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ * Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
  *
  * This file is part of zinc64.
  *
@@ -22,6 +22,8 @@ use std::sync::{Arc, Mutex};
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use zinc64::core::CircularBuffer;
+
+// TODO app: audio warp handling
 
 const SCALER_MAX: i32 = 4096;
 const SCALER_SHIFT: usize = 12;

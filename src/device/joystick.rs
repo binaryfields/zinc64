@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ * Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
  *
  * This file is part of zinc64.
  *
@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 use bit_field::BitField;
 
-// TODO device: joystick test cases
+// DEFERRED device: joystick test cases
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Button {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ * Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
  *
  * This file is part of zinc64.
  *
@@ -25,7 +25,7 @@ use core::{Addressable, IoPort};
 
 use super::cartridge::Cartridge;
 
-// TODO device: expansion port test cases
+// DEFERRED device: expansion port test cases
 
 #[derive(Copy, Clone)]
 enum IoLine {

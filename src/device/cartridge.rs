@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ * Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
  *
  * This file is part of zinc64.
  *
@@ -23,7 +23,7 @@ use core::Addressable;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
-// TODO device: cartridge test cases
+// DEFERRED device: cartridge test cases
 
 pub enum ChipType {
     Rom,

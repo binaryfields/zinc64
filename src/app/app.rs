@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Sebastian Jastrzebski. All rights reserved.
+ * Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
  *
  * This file is part of zinc64.
  *
@@ -35,8 +35,6 @@ use zinc64::system::C64;
 use super::audio::AppAudio;
 use super::io::Io;
 use super::renderer::Renderer;
-
-// TODO app: audio warp handling
 
 pub enum JamAction {
     Continue,
