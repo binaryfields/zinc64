@@ -138,95 +138,95 @@ impl Cpu6510 {
     fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) {
         match *instr {
             //  Data Movement
-            Instruction::LDA(ref op, _) => {
+            Instruction::LDA(ref op) => {
                 let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.a = value;
             }
-            Instruction::LDX(ref op, _) => {
+            Instruction::LDX(ref op) => {
                 let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.x = value;
             }
-            Instruction::LDY(ref op, _) => {
+            Instruction::LDY(ref op) => {
                 let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.y = value;
             }
-            Instruction::PHA(_) => {
+            Instruction::PHA => {
                 let value = self.a;
                 self.push(value, tick_fn);
                 tick_fn();
             }
-            Instruction::PHP(_) => {
+            Instruction::PHP => {
                 // NOTE undocumented behavior
                 let value = self.p | (Flag::Break as u8) | (Flag::Reserved as u8);
                 self.push(value, tick_fn);
                 tick_fn();
             }
-            Instruction::PLA(_) => {
+            Instruction::PLA => {
                 let value = self.pop(tick_fn);
                 self.update_nz(value);
                 self.a = value;
                 tick_fn();
                 tick_fn();
             }
-            Instruction::PLP(_) => {
+            Instruction::PLP => {
                 let value = self.pop(tick_fn);
                 self.p = value;
                 tick_fn();
                 tick_fn();
             }
-            Instruction::STA(ref op, _) => {
+            Instruction::STA(ref op) => {
                 let value = self.a;
                 op.set(self, value, true, tick_fn);
             }
-            Instruction::STX(ref op, _) => {
+            Instruction::STX(ref op) => {
                 let value = self.x;
                 op.set(self, value, true, tick_fn);
             }
-            Instruction::STY(ref op, _) => {
+            Instruction::STY(ref op) => {
                 let value = self.y;
                 op.set(self, value, true, tick_fn);
             }
-            Instruction::TAX(_) => {
+            Instruction::TAX => {
                 let value = self.a;
                 self.update_nz(value);
                 self.x = value;
                 tick_fn();
             }
-            Instruction::TAY(_) => {
+            Instruction::TAY => {
                 let value = self.a;
                 self.update_nz(value);
                 self.y = value;
                 tick_fn();
             }
-            Instruction::TSX(_) => {
+            Instruction::TSX => {
                 let value = self.sp;
                 self.update_nz(value);
                 self.x = value;
                 tick_fn();
             }
-            Instruction::TXA(_) => {
+            Instruction::TXA => {
                 let value = self.x;
                 self.update_nz(value);
                 self.a = value;
                 tick_fn();
             }
-            Instruction::TXS(_) => {
+            Instruction::TXS => {
                 let value = self.x;
                 // NOTE do not set nz
                 self.sp = value;
                 tick_fn();
             }
-            Instruction::TYA(_) => {
+            Instruction::TYA => {
                 let value = self.y;
                 self.update_nz(value);
                 self.a = value;
                 tick_fn();
             }
             // Arithmetic
-            Instruction::ADC(ref op, _) => {
+            Instruction::ADC(ref op) => {
                 let ac = self.a as u16;
                 let value = op.get(self, tick_fn) as u16;
                 let carry = if self.test_flag(Flag::Carry) { 1 } else { 0 };
@@ -252,7 +252,7 @@ impl Cpu6510 {
                 self.update_nz(result);
                 self.a = result;
             }
-            Instruction::SBC(ref op, _) => {
+            Instruction::SBC(ref op) => {
                 let ac = self.a as u16;
                 let value = op.get(self, tick_fn) as u16;
                 let carry = if self.test_flag(Flag::Carry) { 0 } else { 1 };
@@ -280,75 +280,75 @@ impl Cpu6510 {
                 self.update_nz(result);
                 self.a = result;
             }
-            Instruction::CMP(ref op, _) => {
+            Instruction::CMP(ref op) => {
                 let result = (self.a as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
             }
-            Instruction::CPX(ref op, _) => {
+            Instruction::CPX(ref op) => {
                 let result = (self.x as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
             }
-            Instruction::CPY(ref op, _) => {
+            Instruction::CPY(ref op) => {
                 let result = (self.y as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
             }
-            Instruction::DEC(ref op, _) => {
+            Instruction::DEC(ref op) => {
                 let result = op.get(self, tick_fn).wrapping_sub(1);
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
             }
-            Instruction::DEX(_) => {
+            Instruction::DEX => {
                 let result = self.x.wrapping_sub(1);
                 self.update_nz(result);
                 self.x = result;
                 tick_fn();
             }
-            Instruction::DEY(_) => {
+            Instruction::DEY => {
                 let result = self.y.wrapping_sub(1);
                 self.update_nz(result);
                 self.y = result;
                 tick_fn();
             }
-            Instruction::INC(ref op, _) => {
+            Instruction::INC(ref op) => {
                 let result = op.get(self, tick_fn).wrapping_add(1);
                 self.update_nz(result);
                 op.set(self, result, true, tick_fn);
                 tick_fn();
             }
-            Instruction::INX(_) => {
+            Instruction::INX => {
                 let result = self.x.wrapping_add(1);
                 self.update_nz(result);
                 self.x = result;
                 tick_fn();
             }
-            Instruction::INY(_) => {
+            Instruction::INY => {
                 let result = self.y.wrapping_add(1);
                 self.update_nz(result);
                 self.y = result;
                 tick_fn();
             }
             // Logical
-            Instruction::AND(ref op, _) => {
+            Instruction::AND(ref op) => {
                 let result = op.get(self, tick_fn) & self.a;
                 self.update_nz(result);
                 self.a = result;
             }
-            Instruction::EOR(ref op, _) => {
+            Instruction::EOR(ref op) => {
                 let result = op.get(self, tick_fn) ^ self.a;
                 self.update_nz(result);
                 self.a = result;
             }
-            Instruction::ORA(ref op, _) => {
+            Instruction::ORA(ref op) => {
                 let result = op.get(self, tick_fn) | self.a;
                 self.update_nz(result);
                 self.a = result;
             }
             // Shift and Rotate
-            Instruction::ASL(ref op, _) => {
+            Instruction::ASL(ref op) => {
                 let value = op.get(self, tick_fn);
                 self.set_flag(Flag::Carry, (value & 0x80) != 0);
                 let result = value << 1;
@@ -356,7 +356,7 @@ impl Cpu6510 {
                 op.set(self, result, true, tick_fn);
                 tick_fn();
             }
-            Instruction::LSR(ref op, _) => {
+            Instruction::LSR(ref op) => {
                 let value = op.get(self, tick_fn);
                 self.set_flag(Flag::Carry, (value & 0x01) != 0);
                 let result = value >> 1;
@@ -364,7 +364,7 @@ impl Cpu6510 {
                 op.set(self, result, true, tick_fn);
                 tick_fn();
             }
-            Instruction::ROL(ref op, _) => {
+            Instruction::ROL(ref op) => {
                 let value = op.get(self, tick_fn);
                 let mut temp = (value as u16) << 1;
                 if self.test_flag(Flag::Carry) {
@@ -376,7 +376,7 @@ impl Cpu6510 {
                 op.set(self, result, true, tick_fn);
                 tick_fn();
             }
-            Instruction::ROR(ref op, _) => {
+            Instruction::ROR(ref op) => {
                 let value = op.get(self, tick_fn) as u16;
                 let mut temp = if self.test_flag(Flag::Carry) {
                     value | 0x100
@@ -391,57 +391,57 @@ impl Cpu6510 {
                 tick_fn();
             }
             // Control Flow
-            Instruction::BCC(ref op, _) => {
+            Instruction::BCC(ref op) => {
                 if !self.test_flag(Flag::Carry) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BCS(ref op, _) => {
+            Instruction::BCS(ref op) => {
                 if self.test_flag(Flag::Carry) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BEQ(ref op, _) => {
+            Instruction::BEQ(ref op) => {
                 if self.test_flag(Flag::Zero) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BMI(ref op, _) => {
+            Instruction::BMI(ref op) => {
                 if self.test_flag(Flag::Negative) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BNE(ref op, _) => {
+            Instruction::BNE(ref op) => {
                 if !self.test_flag(Flag::Zero) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BPL(ref op, _) => {
+            Instruction::BPL(ref op) => {
                 if !self.test_flag(Flag::Negative) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BVC(ref op, _) => {
+            Instruction::BVC(ref op) => {
                 if !self.test_flag(Flag::Overflow) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::BVS(ref op, _) => {
+            Instruction::BVS(ref op) => {
                 if self.test_flag(Flag::Overflow) {
                     self.pc = op.ea(self, false, tick_fn);
                 }
             }
-            Instruction::JMP(ref op, _) => {
+            Instruction::JMP(ref op) => {
                 self.pc = op.ea(self, false, tick_fn);
             }
-            Instruction::JSR(ref op, _) => {
+            Instruction::JSR(ref op) => {
                 let pc = self.pc.wrapping_sub(1);
                 self.push(((pc >> 8) & 0xff) as u8, tick_fn);
                 self.push((pc & 0xff) as u8, tick_fn);
                 self.pc = op.ea(self, false, tick_fn);
                 tick_fn();
             }
-            Instruction::RTS(_) => {
+            Instruction::RTS => {
                 let address = (self.pop(tick_fn) as u16) | ((self.pop(tick_fn) as u16) << 8);
                 self.pc = address.wrapping_add(1);
                 tick_fn();
@@ -449,52 +449,65 @@ impl Cpu6510 {
                 tick_fn();
             }
             // Misc
-            Instruction::BIT(ref op, _) => {
+            Instruction::BIT(ref op) => {
                 let value = op.get(self, tick_fn);
                 let a = self.a;
                 self.set_flag(Flag::Negative, value & 0x80 != 0);
                 self.set_flag(Flag::Overflow, 0x40 & value != 0);
                 self.set_flag(Flag::Zero, value & a == 0);
             }
-            Instruction::BRK(_) => {
+            Instruction::BRK => {
                 self.interrupt(Interrupt::Break, tick_fn);
             }
-            Instruction::CLC(_) => {
+            Instruction::CLC => {
                 self.set_flag(Flag::Carry, false);
                 tick_fn();
             }
-            Instruction::CLD(_) => {
+            Instruction::CLD => {
                 self.set_flag(Flag::Decimal, false);
                 tick_fn();
             }
-            Instruction::CLI(_) => {
+            Instruction::CLI => {
                 self.set_flag(Flag::IntDisable, false);
                 tick_fn();
             }
-            Instruction::CLV(_) => {
+            Instruction::CLV => {
                 self.set_flag(Flag::Overflow, false);
                 tick_fn();
             }
-            Instruction::NOP(_) => {
+            Instruction::NOP => {
                 tick_fn();
             }
-            Instruction::SEC(_) => {
+            Instruction::SEC => {
                 self.set_flag(Flag::Carry, true);
                 tick_fn();
             }
-            Instruction::SED(_) => {
+            Instruction::SED => {
                 self.set_flag(Flag::Decimal, true);
                 tick_fn();
             }
-            Instruction::SEI(_) => {
+            Instruction::SEI => {
                 self.set_flag(Flag::IntDisable, true);
                 tick_fn();
             }
-            Instruction::RTI(_) => {
+            Instruction::RTI => {
                 self.p = self.pop(tick_fn);
                 self.pc = (self.pop(tick_fn) as u16) | ((self.pop(tick_fn) as u16) << 8);
                 tick_fn();
                 tick_fn();
+            }
+            // Undocumented
+            Instruction::AXS(ref op) => {
+                let result = ((self.a & self.x) as u16).wrapping_sub(op.get(self, tick_fn) as u16);
+                self.set_flag(Flag::Carry, result < 0x100);
+                self.update_nz((result & 0xff) as u8);
+                self.x = (result & 0xff) as u8;
+            }
+            Instruction::LAX(ref op) => {
+                let value = op.get(&self, tick_fn);
+                self.update_nz(value);
+                self.a = value;
+                self.x = value;
             }
         };
     }
@@ -619,9 +632,9 @@ impl Cpu for Cpu6510 {
         self.p = 0;
         self.pc = 0;
         self.sp = 0;
+        self.io_port.borrow_mut().set_value(0xff);
         self.irq.borrow_mut().reset();
         self.nmi.borrow_mut().reset();
-        self.io_port.borrow_mut().set_value(0xff);
         let tick_fn: TickFn = Box::new(move || {});
         self.write(0x0000, 0b0010_1111, &tick_fn);
         self.write(0x0001, 0b0001_1111, &tick_fn);
@@ -712,6 +725,7 @@ mod tests {
     use super::*;
     use super::super::operand::Operand;
     use core::Ram;
+    use std::cell::Cell;
 
 
     struct MockMemory {
@@ -750,7 +764,7 @@ mod tests {
         let mut cpu = setup_cpu();
         cpu.a = 80;
         cpu.set_flag(Flag::Carry, false);
-        cpu.execute(&Instruction::ADC(Operand::Immediate(16), 1), &tick_fn);
+        cpu.execute(&Instruction::ADC(Operand::Immediate(16)), &tick_fn);
         assert_eq!(96, cpu.a);
         assert_eq!(false, cpu.test_flag(Flag::Carry));
         assert_eq!(false, cpu.test_flag(Flag::Negative));
@@ -762,9 +776,291 @@ mod tests {
         let tick_fn: TickFn = Box::new(move || {});
         let mut cpu = setup_cpu();
         cpu.a = 0xff;
-        cpu.execute(&Instruction::INC(Operand::Accumulator, 1), &tick_fn);
+        cpu.execute(&Instruction::INC(Operand::Accumulator), &tick_fn);
         assert_eq!(0x00, cpu.a);
         assert_eq!(false, cpu.test_flag(Flag::Negative));
         assert_eq!(true, cpu.test_flag(Flag::Zero));
+    }
+
+    // Based on 65xx Processor Data from http://www.romhacking.net/documents/318/
+
+    const OPCODE_TIMING: [u8; 256] = [
+        7, // 00 BRK #$ab
+        6, // 01 ORA ($ab,X)
+        0, // 02 HLT*
+        0, // 03 ASO* ($ab,X)
+        0, // 04 SKB* $ab
+        3, // 05 ORA $ab
+        5, // 06 ASL $ab
+        0, // 07 ASO* $ab
+        3, // 08 PHP
+        2, // 09 ORA #$ab
+        2, // 0A ASL A
+        0, // 0B ANC* #$ab
+        0, // 0C SKW* $abcd
+        4, // 0D ORA $abcd
+        6, // 0E ASL $abcd
+        0, // 0F ASO* $abcd
+        2, // 10 BPL nearlabel
+        5, // 11 ORA ($ab),Y
+        0, // 12 HLT*
+        0, // 13 ASO* ($ab),Y
+        0, // 14 SKB* $ab,X
+        4, // 15 ORA $ab,X
+        6, // 16 ASL $ab,X
+        0, // 17 ASO* $ab,X
+        2, // 18 CLC
+        4, // 19 ORA $abcd,Y
+        0, // 1A NOP*
+        0, // 1B ASO* $abcd,Y
+        0, // 1C SKW* $abcd,X
+        4, // 1D ORA $abcd,X
+        7, // 1E ASL $abcd,X
+        0, // 1F ASO* $abcd,X
+        6, // 20 JSR $abcd
+        6, // 21 AND ($ab,X)
+        0, // 22 HLT*
+        0, // 23 RLA* ($ab,X)
+        3, // 24 BIT $ab
+        3, // 25 AND $ab
+        5, // 26 ROL $ab
+        0, // 27 RLA* $ab
+        4, // 28 PLP
+        2, // 29 AND #$ab
+        2, // 2A ROL A
+        0, // 2B ANC* #$ab
+        4, // 2C BIT $abcd
+        4, // 2D AND $abcd
+        6, // 2E ROL $abcd
+        0, // 2F RLA* $abcd
+        2, // 30 BMI nearlabel
+        5, // 31 AND ($ab),Y
+        0, // 32 HLT*
+        0, // 33 RLA* ($ab),Y
+        0, // 34 SKB* $ab,X
+        4, // 35 AND $ab,X
+        6, // 36 ROL $ab,X
+        0, // 37 RLA* $ab,X
+        2, // 38 SEC
+        4, // 39 AND $abcd,Y
+        0, // 3A NOP*
+        0, // 3B RLA* $abcd,Y
+        0, // 3C SKW* $abcd,X
+        4, // 3D AND $abcd,X
+        7, // 3E ROL $abcd,X
+        0, // 3F RLA* $abcd,X
+        6, // 40 RTI
+        6, // 41 EOR ($ab,X)
+        0, // 42 HLT*
+        0, // 43 LSE* ($ab,X)
+        0, // 44 SKB* $ab
+        3, // 45 EOR $ab
+        5, // 46 LSR $ab
+        0, // 47 LSE* $ab
+        3, // 48 PHA
+        2, // 49 EOR #$ab
+        2, // 4A LSR A
+        0, // 4B ALR* #$ab
+        3, // 4C JMP $abcd
+        4, // 4D EOR $abcd
+        6, // 4E LSR $abcd
+        0, // 4F LSE* $abcd
+        2, // 50 BVC nearlabel
+        5, // 51 EOR ($ab),Y
+        0, // 52 HLT*
+        0, // 53 LSE* ($ab),Y
+        0, // 54 SKB* $ab,X
+        4, // 55 EOR $ab,X
+        6, // 56 LSR $ab,X
+        0, // 57 LSE* $ab,X
+        2, // 58 CLI
+        4, // 59 EOR $abcd,Y
+        0, // 5A NOP*
+        0, // 5B LSE* $abcd,Y
+        0, // 5C SKW* $abcd,X
+        4, // 5D EOR $abcd,X
+        7, // 5E LSR $abcd,X
+        0, // 5F LSE* $abcd,X
+        6, // 60 RTS
+        6, // 61 ADC ($ab,X)
+        0, // 62 HLT*
+        0, // 63 RRA* ($ab,X)
+        0, // 64 SKB* $ab
+        3, // 65 ADC $ab
+        5, // 66 ROR $ab
+        0, // 67 RRA* $ab
+        4, // 68 PLA
+        2, // 69 ADC #$ab
+        2, // 6A ROR A
+        0, // 6B ARR* #$ab
+        5, // 6C JMP ($abcd)
+        4, // 6D ADC $abcd
+        6, // 6E ROR $abcd
+        0, // 6F RRA* $abcd
+        2, // 70 BVS nearlabel
+        5, // 71 ADC ($ab),Y
+        0, // 72 HLT*
+        0, // 73 RRA* ($ab),Y
+        0, // 74 SKB* $ab,X
+        4, // 75 ADC $ab,X
+        6, // 76 ROR $ab,X
+        0, // 77 RRA* $ab,X
+        2, // 78 SEI
+        4, // 79 ADC $abcd,Y
+        0, // 7A NOP*
+        0, // 7B RRA* $abcd,Y
+        0, // 7C SKW* $abcd,X
+        4, // 7D ADC $abcd,X
+        7, // 7E ROR $abcd,X
+        0, // 7F RRA* $abcd,X
+        0, // 80 SKB* #$ab
+        6, // 81 STA ($ab,X)
+        0, // 82 SKB* #$ab
+        0, // 83 SAX* ($ab,X)
+        3, // 84 STY $ab
+        3, // 85 STA $ab
+        3, // 86 STX $ab
+        0, // 87 SAX* $ab
+        2, // 88 DEY
+        0, // 89 SKB* #$ab
+        2, // 8A TXA
+        0, // 8B ANE* #$ab
+        4, // 8C STY $abcd
+        4, // 8D STA $abcd
+        4, // 8E STX $abcd
+        0, // 8F SAX* $abcd
+        2, // 90 BCC nearlabel
+        6, // 91 STA ($ab),Y
+        0, // 92 HLT*
+        0, // 93 SHA* ($ab),Y
+        3, // FIXME 4 cycles 94 STY $ab,X
+        3, // FIXME 4 cycles 95 STA $ab,X
+        4, // 96 STX $ab,Y
+        0, // 97 SAX* $ab,Y
+        2, // 98 TYA
+        5, // 99 STA $abcd,Y
+        2, // 9A TXS
+        0, // 9B SHS* $abcd,Y
+        0, // 9C SHY* $abcd,X
+        5, // 9D STA $abcd,X
+        0, // 9E SHX* $abcd,Y
+        0, // 9F SHA* $abcd,Y
+        2, // A0 LDY #$ab
+        6, // A1 LDA ($ab,X)
+        2, // A2 LDX #$ab
+        0, // A3 LAX* ($ab,X)
+        3, // A4 LDY $ab
+        3, // A5 LDA $ab
+        3, // A6 LDX $ab
+        3, // A7 LAX* $ab
+        2, // A8 TAY
+        2, // A9 LDA #$ab
+        2, // AA TAX
+        0, // AB ANX* #$ab
+        4, // AC LDY $abcd
+        4, // AD LDA $abcd
+        4, // AE LDX $abcd
+        0, // AF LAX* $abcd
+        2, // B0 BCS nearlabel
+        5, // B1 LDA ($ab),Y
+        0, // B2 HLT*
+        5, // B3 LAX* ($ab),Y
+        4, // B4 LDY $ab,X
+        4, // B5 LDA $ab,X
+        4, // B6 LDX $ab,Y
+        0, // B7 LAX* $ab,Y
+        2, // B8 CLV
+        4, // B9 LDA $abcd,Y
+        2, // BA TSX
+        0, // BB LAS* $abcd,Y
+        4, // BC LDY $abcd,X
+        4, // BD LDA $abcd,X
+        4, // BE LDX $abcd,Y
+        0, // BF LAX* $abcd,Y
+        2, // C0 CPY #$ab
+        6, // C1 CMP ($ab,X)
+        0, // C2 SKB* #$ab
+        0, // C3 DCM* ($ab,X)
+        3, // C4 CPY $ab
+        3, // C5 CMP $ab
+        5, // C6 DEC $ab
+        0, // C7 DCM* $ab
+        2, // C8 INY
+        2, // C9 CMP #$ab
+        2, // CA DEX
+        2, // CB SBX* #$ab
+        4, // CC CPY $abcd
+        4, // CD CMP $abcd
+        6, // CE DEC $abcd
+        0, // CF DCM* $abcd
+        2, // D0 BNE nearlabel
+        5, // D1 CMP ($ab),Y
+        0, // D2 HLT*
+        0, // D3 DCM* ($ab),Y
+        0, // D4 SKB* $ab,X
+        4, // D5 CMP $ab,X
+        6, // D6 DEC $ab,X
+        0, // D7 DCM* $ab,X
+        2, // D8 CLD
+        4, // D9 CMP $abcd,Y
+        0, // DA NOP*
+        0, // DB DCM* $abcd,Y
+        0, // DC SKW* $abcd,X
+        4, // DD CMP $abcd,X
+        7, // DE DEC $abcd,X
+        0, // DF DCM* $abcd,X
+        2, // E0 CPX #$ab
+        6, // E1 SBC ($ab,X)
+        0, // E2 SKB* #$ab
+        0, // E3 INS* ($ab,X)
+        3, // E4 CPX $ab
+        3, // E5 SBC $ab
+        5, // E6 INC $ab
+        0, // E7 INS* $ab
+        2, // E8 INX
+        2, // E9 SBC #$ab
+        2, // EA NOP
+        0, // EB SBC* #$ab
+        4, // EC CPX $abcd
+        4, // ED SBC $abcd
+        6, // EE INC $abcd
+        0, // EF INS* $abcd
+        2, // F0 BEQ nearlabel
+        5, // F1 SBC ($ab),Y
+        0, // F2 HLT*
+        0, // F3 INS* ($ab),Y
+        0, // F4 SKB* $ab,X
+        4, // F5 SBC $ab,X
+        6, // F6 INC $ab,X
+        0, // F7 INS* $ab,X
+        2, // F8 SED
+        4, // F9 SBC $abcd,Y
+        0, // FA NOP*
+        0, // FB INS* $abcd,Y
+        0, // FC SKW* $abcd,X
+        4, // FD SBC $abcd,X
+        7, // FE INC $abcd,X
+        0, // FF INS* $abcd,X
+    ];
+
+    #[test]
+    fn opcode_timing() {
+        let mut cpu = setup_cpu();
+        for opcode in 0..256 {
+            let cycles = OPCODE_TIMING[opcode];
+            if cycles > 0 {
+                let clock = Rc::new(Cell::new(0u8));
+                let clock_clone = clock.clone();
+                let tick_fn: TickFn = Box::new(move || {
+                    clock_clone.set(clock_clone.get().wrapping_add(1));
+                });
+                cpu.write_debug(0x1000, opcode as u8);
+                cpu.write_debug(0x1001, 0x00);
+                cpu.write_debug(0x1002, 0x10);
+                cpu.set_pc(0x1000);
+                cpu.step(&tick_fn);
+                assert_eq!(cycles, clock.get(), "opcode {:02x} timing failed", opcode as u8);
+            }
+        }
     }
 }
