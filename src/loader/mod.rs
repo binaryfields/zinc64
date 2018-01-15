@@ -21,6 +21,7 @@ mod bin;
 mod crt;
 //mod hex;
 mod loaders;
+mod p00;
 mod prg;
 mod tap;
 

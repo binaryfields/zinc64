@@ -52,7 +52,7 @@ impl Operand {
             Operand::ZeroPage(address) => address as u16,
             Operand::ZeroPageX(address) => {
                 if !rmw {
-                    // FIXME rmw
+                    // FIXME cpu: rmw
                     tick_fn();
                 }
                 address.wrapping_add(cpu.get_x()) as u16

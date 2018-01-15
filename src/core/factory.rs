@@ -49,8 +49,7 @@ pub trait Factory {
         cia_flag: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
-        cpu_irq: Rc<RefCell<IrqLine>>,
-        cpu_nmi: Rc<RefCell<IrqLine>>,
+        irq_line: Rc<RefCell<IrqLine>>,
         joystick_1: Rc<Cell<u8>>,
         joystick_2: Rc<Cell<u8>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
@@ -61,8 +60,7 @@ pub trait Factory {
         cia_flag: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
-        cpu_irq: Rc<RefCell<IrqLine>>,
-        cpu_nmi: Rc<RefCell<IrqLine>>,
+        irq_line: Rc<RefCell<IrqLine>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
     ) -> Rc<RefCell<Chip>>;
 

@@ -21,6 +21,7 @@ use std::path::Path;
 
 use loader::Loader;
 use loader::crt;
+use loader::p00;
 use loader::prg;
 use loader::tap;
 
@@ -31,6 +32,8 @@ impl Loaders {
         match ext {
             Some("crt") => Box::new(crt::CrtLoader::new()),
             //Some("hex") => Box::new(hex::HexLoader::new()),
+            Some("p00") => Box::new(p00::P00Loader::new()),
+            Some("P00") => Box::new(p00::P00Loader::new()),
             Some("prg") => Box::new(prg::PrgLoader::new()),
             Some("tap") => Box::new(tap::TapLoader::new()),
             _ => panic!("invalid loader {}", ext.unwrap_or("")),

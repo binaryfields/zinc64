@@ -151,7 +151,6 @@ impl C64 {
             cia_1_port_a.clone(),
             cia_1_port_b.clone(),
             cpu_irq.clone(),
-            cpu_nmi.clone(),
             joystick_1_state.clone(),
             joystick_2_state.clone(),
             keyboard_matrix.clone(),
@@ -160,7 +159,6 @@ impl C64 {
             cia_2_flag.clone(),
             cia_2_port_a.clone(),
             cia_2_port_b.clone(),
-            cpu_irq.clone(),
             cpu_nmi.clone(),
             keyboard_matrix.clone(),
         );

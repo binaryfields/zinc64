@@ -116,7 +116,7 @@ The cpu validation was performed with the help of [Klaus2m5 functional tests](ht
 |---------|---------------|-------------|
 | Chipset | 6510 CPU      | Done
 | Chipset | Memory        | Done
-| Chipset | 6526 CIA      | In Progress
+| Chipset | 6526 CIA      | Done
 | Chipset | 6581 SID      | Done
 | Chipset | 6567 VIC      | In Progress
 | Device  | Cartridge     | Done
@@ -134,8 +134,8 @@ The cpu validation was performed with the help of [Klaus2m5 functional tests](ht
 ## Roadmap
 
 - v0.1 - zinc64 lib crate
-- v0.2 - zinc64 ui
-- v0.3 - cia rewrite
+- v0.2 - cia rewrite
+- v0.3 - zinc64 ui
 - v0.4 - vic rewrite
 - v0.5 - floppy support
 

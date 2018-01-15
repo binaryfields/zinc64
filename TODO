@@ -3,6 +3,5 @@
 - app: add screenshot support
 - app: add ui/menus
 - app: add debugger support
-- chipset: rewrite cia
 - chipset: rewrite vic
 - device: add floppy support

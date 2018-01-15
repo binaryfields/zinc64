@@ -20,6 +20,7 @@
 pub mod cia;
 mod icr;
 mod rtc;
+mod shift_delay;
 mod timer;
 
 pub use self::cia::Cia;
