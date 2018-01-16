@@ -24,15 +24,20 @@ use bit_field::BitField;
 use core::{Chip, IoPort, IrqLine, Pin};
 use log::LogLevel;
 
+use super::cycle_counter::CycleCounter;
 use super::icr::Icr;
 use super::rtc::Rtc;
-use super::shift_delay::ShiftDelay;
 use super::timer;
 use super::timer::Timer;
 
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
+
+enum IntDelay {
+    Interrupt0 = 1 << 0,
+    Interrupt1 = 1 << 1,
+}
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Mode {
@@ -107,7 +112,7 @@ pub struct Cia {
     keyboard_matrix: Rc<RefCell<[u8; 8]>>,
     // Functional Units
     int_control: Icr,
-    int_delay: ShiftDelay,
+    int_delay: CycleCounter,
     timer_a: Timer,
     timer_b: Timer,
     tod_alarm: Rtc,
@@ -131,6 +136,7 @@ impl Cia {
         joystick_2: Option<Rc<Cell<u8>>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
     ) -> Cia {
+        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
         Cia {
             mode,
             irq_line,
@@ -138,13 +144,13 @@ impl Cia {
             joystick_2,
             keyboard_matrix,
             int_control: Icr::new(),
-            int_delay: ShiftDelay::new(1),
-            timer_a: Timer::new(timer::Mode::TimerA),
-            timer_b: Timer::new(timer::Mode::TimerB),
+            int_delay: CycleCounter::new(0xffff),
+            timer_a: Timer::new(timer::Mode::TimerA, cnt_pin.clone()),
+            timer_b: Timer::new(timer::Mode::TimerB, cnt_pin.clone()),
             tod_alarm: Rtc::new(),
             tod_clock: Rtc::new(),
             tod_set_alarm: false,
-            cnt_pin: Rc::new(RefCell::new(Pin::new_high())),
+            cnt_pin: cnt_pin.clone(),
             flag_pin: cia_flag,
             port_a: cia_port_a,
             port_b: cia_port_b,
@@ -221,9 +227,9 @@ impl Cia {
 impl Chip for Cia {
     fn clock(&mut self) {
         // Process timers
-        self.timer_a.feed_source(&self.cnt_pin, false);
+        self.timer_a.feed_source(false);
         let timer_a_output = self.timer_a.clock();
-        self.timer_b.feed_source(&self.cnt_pin, timer_a_output);
+        self.timer_b.feed_source(timer_a_output);
         let timer_b_output = self.timer_b.clock();
 
         // Process interrupts
@@ -247,9 +253,9 @@ impl Chip for Cia {
             int_event = true;
         }
         if int_event && self.int_control.get_interrupt_request() {
-            self.int_delay.start();
+            self.int_delay.feed(IntDelay::Interrupt0 as u16);
         }
-        if self.int_delay.is_done() {
+        if self.int_delay.has_cycle(IntDelay::Interrupt1 as u16) {
             self.set_interrupt(true);
         }
         self.int_delay.clock();
@@ -434,7 +440,7 @@ s                */
                 if self.int_control.get_interrupt_request() {
                     // FIXME cia: check source in irq_line
                     // && !self.irq_line.borrow().is_low()
-                    self.int_delay.start();
+                    self.int_delay.feed(IntDelay::Interrupt0 as u16);
                 }
             }
             Reg::CRA => {

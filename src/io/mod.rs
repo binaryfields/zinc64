@@ -18,9 +18,9 @@
  */
 
 pub mod cia;
+mod cycle_counter;
 mod icr;
 mod rtc;
-mod shift_delay;
 mod timer;
 
 pub use self::cia::Cia;
