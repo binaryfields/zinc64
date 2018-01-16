@@ -280,6 +280,10 @@ impl C64 {
         })
     }
 
+    pub fn get_clock(&self) -> Rc<Clock> {
+        self.clock.clone()
+    }
+
     pub fn get_config(&self) -> &Config {
         &self.config
     }
@@ -290,6 +294,14 @@ impl C64 {
 
     pub fn get_cycles(&self) -> u64 {
         self.clock.get()
+    }
+
+    pub fn get_cia_1(&self) -> Rc<RefCell<Chip>> {
+        self.cia1.clone()
+    }
+
+    pub fn get_cia_2(&self) -> Rc<RefCell<Chip>> {
+        self.cia2.clone()
     }
 
     pub fn get_datasette(&self) -> Rc<RefCell<Datassette>> {
@@ -326,8 +338,16 @@ impl C64 {
         self.keyboard.clone()
     }
 
+    pub fn get_sid(&self) -> Rc<RefCell<Chip>> {
+        self.sid.clone()
+    }
+
     pub fn get_sound_buffer(&self) -> Arc<Mutex<CircularBuffer>> {
         self.sound_buffer.clone()
+    }
+
+    pub fn get_vic(&self) -> Rc<RefCell<Chip>> {
+        self.vic.clone()
     }
 
     pub fn is_cpu_jam(&self) -> bool {

@@ -22,22 +22,36 @@ to assemble various accessories required to get software onto it. Soon enough I
 had picked up a copy of C64 Programmer's Reference Guide and the rest is now
 history.
 
-### Rust
+## Status
 
-I have been following Rust development for a while and since it has reached its
-first stability milestone, version 1.0 back in May 2015, I have been meaning to
-write something more substantial with it. Exploring Rust and its features is
-really the second driver behind this emulator. Coming from Scala background, a
-lot of concepts and features in Rust felt right at home. Things like type
-inference, immutable by default, traits, ADTs, pattern matching all contribute
-to writing code that parallels many of the things I've done in Scala. The
-biggest departure between the two languages is quite obviously memory
-management. While ownership/borrowing is not conceptually hard, it takes a bit
-of practice to fully appreciate its application in the code base.
+| Class   | Component     | Status      |
+|---------|---------------|-------------|
+| Chipset | 6510 CPU      | Done
+| Chipset | Memory        | Done
+| Chipset | 6526 CIA      | Done
+| Chipset | 6581 SID      | Done
+| Chipset | 6567 VIC      | In Progress
+| Device  | Cartridge     | Done
+| Device  | Floppy        | Not Started
+| Device  | Datassette    | Done
+| Device  | Keyboard      | Done
+| Device  | Joystick      | Done
+| Format  | Bin           | Done
+| Format  | Crt           | Done
+| Format  | D64           | Not Started
+| Format  | P00           | Done
+| Format  | Prg           | Done
+| Format  | Tap           | Done
+| Format  | T64           | Not Started
 
-The experience I had with the language while writing code for the emulator
-can be largely summarized as "if it compiles, it works" (except for pieces
-that didn't ;). Big props to Rust folks for creating a great language.
+## Roadmap
+
+- v0.1 - zinc64 lib crate
+- v0.2 - cia rewrite
+- v0.3 - vic rewrite
+- v0.4 - debugger support
+- v0.5 - zinc64 ui
+- v0.6 - floppy support
 
 ## Getting Started
 
@@ -110,38 +124,9 @@ The cpu validation was performed with the help of [Klaus2m5 functional tests](ht
 
         ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
 
-## Status
-
-| Class   | Component     | Status      |
-|---------|---------------|-------------|
-| Chipset | 6510 CPU      | Done
-| Chipset | Memory        | Done
-| Chipset | 6526 CIA      | Done
-| Chipset | 6581 SID      | Done
-| Chipset | 6567 VIC      | In Progress
-| Device  | Cartridge     | Done
-| Device  | Floppy        | Not Started
-| Device  | Datassette    | Done
-| Device  | Keyboard      | Done
-| Device  | Joystick      | Done
-| Format  | Bin           | Done
-| Format  | Crt           | Done
-| Format  | D64           | Not Started
-| Format  | Prg           | Done
-| Format  | Tap           | Done
-| Format  | T64           | Not Started
-
-## Roadmap
-
-- v0.1 - zinc64 lib crate
-- v0.2 - cia rewrite
-- v0.3 - zinc64 ui
-- v0.4 - vic rewrite
-- v0.5 - floppy support
-
 ## Issues
 
-- VIC sprite implementation is currently hacked up and needs more work
+- VIC implementation is currently hacked up and needs more work
 - VIC bad line handling needs work
 
 ## Keyboard Shortcuts

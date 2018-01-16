@@ -27,46 +27,49 @@ use super::shift_delay::ShiftDelay;
 
 // SPEC: A Software Model of the CIA6526 by Wolfgang Lorenz
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Mode {
     TimerA,
     TimerB,
 }
 
-
-#[derive(PartialEq)]
-pub enum InputMode {
+#[derive(Debug, PartialEq)]
+enum InputMode {
     SystemClock = 0,
     External = 1,
     TimerA = 2,
     TimerAWithCNT = 3,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum OutputMode {
-    Toggle,
     Pulse,
+    Toggle,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum RunMode {
-    OneShot,
     Continuous,
+    OneShot,
 }
 
+#[derive(Debug)]
 pub struct Timer {
     // Configuration
     mode: Mode,
     enabled: bool,
     input_mode: InputMode,
     output_mode: OutputMode,
-    output_enabled: bool,
+    pb_on: bool,
     run_mode: RunMode,
     // Runtime State
     count_delay: ShiftDelay,
     counter: u16,
     latch: u16,
     load_delay: ShiftDelay,
+    pb_low_delay: ShiftDelay,
+    pb_output: bool,
+    pb_toggle: bool,
 }
 
 impl Timer {
@@ -76,12 +79,15 @@ impl Timer {
             enabled: false,
             input_mode: InputMode::SystemClock,
             output_mode: OutputMode::Pulse,
-            output_enabled: false,
+            pb_on: false,
             run_mode: RunMode::OneShot,
             count_delay: ShiftDelay::new(3),
             counter: 0,
             latch: 0,
             load_delay: ShiftDelay::new(1),
+            pb_low_delay: ShiftDelay::new(1),
+            pb_output: false,
+            pb_toggle: false,
         }
     }
 
@@ -89,7 +95,7 @@ impl Timer {
         let mut config = 0;
         config
             .set_bit(0, self.enabled)
-            .set_bit(1, self.output_enabled)
+            .set_bit(1, self.pb_on)
             .set_bit(2, self.output_mode == OutputMode::Toggle)
             .set_bit(3, self.run_mode == RunMode::OneShot);
         match self.input_mode {
@@ -127,7 +133,22 @@ impl Timer {
         self.latch
     }
 
+    pub fn is_pb_on(&self) -> bool {
+        self.pb_on
+    }
+
+    pub fn get_pb_output(&self) -> bool {
+        self.pb_output
+    }
+
     pub fn set_config(&mut self, value: u8) {
+        let prev_enabled = self.enabled;
+        self.pb_on = value.get_bit(1);
+        self.output_mode = if value.get_bit(2) {
+            OutputMode::Toggle
+        } else {
+            OutputMode::Pulse
+        };
         self.run_mode = if value.get_bit(3) {
             RunMode::OneShot
         } else {
@@ -148,6 +169,16 @@ impl Timer {
             _ => panic!("invalid timer input"),
         };
         self.enable(value.get_bit(0));
+        // Update PB output
+        if self.enabled && !prev_enabled {
+            self.pb_toggle = true;
+        }
+        if self.pb_on {
+            self.pb_output = match self.output_mode {
+                OutputMode::Pulse => self.pb_low_delay.is_done(),
+                OutputMode::Toggle => self.pb_toggle,
+            };
+        }
     }
 
     pub fn set_latch_hi(&mut self, value: u8) {
@@ -171,6 +202,17 @@ impl Timer {
         }
         // Underflow counter
         let underflow = if self.counter == 0 && self.count_delay.has_cycle(2) {
+            // Update PB output
+            self.pb_toggle = !self.pb_toggle;
+            if self.pb_on {
+                self.pb_output = match self.output_mode {
+                    OutputMode::Toggle => !self.pb_output,
+                    OutputMode::Pulse => {
+                        self.pb_low_delay.start();
+                        true
+                    }
+                };
+            }
             /*
             A control bit selects either timer mode. In one-shot
             mode, the timer will count down from the latched value
@@ -179,14 +221,10 @@ impl Timer {
             the latched value to zero, generate an interrupt, reload
             the latched value and repeatthe procedure continuously
             */
-            match self.run_mode {
-                RunMode::Continuous => {
-                    self.load_delay.feed(1);
-                }
-                RunMode::OneShot => {
-                    self.enable(false);
-                    self.load_delay.feed(1);
-                }
+            self.load_delay.feed(1);
+            if self.run_mode == RunMode::OneShot {
+                self.enable(false);
+                self.count_delay.remove(2);
             }
             true
         } else {
@@ -202,9 +240,14 @@ impl Timer {
             */
             self.count_delay.remove(2);
         }
+        // Reset PB output
+        if self.pb_low_delay.is_done() {
+            self.pb_output = false;
+        }
         // Shift delay counters
         self.count_delay.clock();
         self.load_delay.clock();
+        self.pb_low_delay.clock();
         underflow
     }
 
@@ -236,12 +279,15 @@ impl Timer {
         self.enabled = false;
         self.input_mode = InputMode::SystemClock;
         self.output_mode = OutputMode::Pulse;
-        self.output_enabled = false;
+        self.pb_on = false;
         self.run_mode = RunMode::OneShot;
         self.count_delay.reset();
         self.counter = 0;
         self.latch = 0xffff;
         self.load_delay.reset();
+        self.pb_low_delay.reset();
+        self.pb_output = false;
+        self.pb_toggle = false;
     }
 
     fn enable(&mut self, enabled: bool) {
@@ -276,5 +322,124 @@ mod tests {
         let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0b_0010_1001);
         assert_eq!(0b_0010_1001, timer.get_config());
+    }
+
+    #[test]
+    fn count_delay_2c() {
+        let mut timer = Timer::new(Mode::TimerA);
+        timer.set_config(0x00);
+        timer.set_latch_lo(0x02);
+        timer.set_latch_hi(0x00);
+        timer.clock();
+        timer.clock();
+        timer.set_config(0x01);
+        timer.clock(); // Count0|Count1
+        assert_eq!(timer.get_counter(), 0x02);
+        timer.clock(); // Count2
+        assert_eq!(timer.get_counter(), 0x02);
+        timer.clock(); // Count3
+        assert_eq!(timer.get_counter(), 0x01);
+    }
+
+    #[test]
+    fn load_delay_1c() {
+        let mut timer = Timer::new(Mode::TimerA);
+        timer.set_config(0x00);
+        timer.set_latch_lo(0x02);
+        timer.set_latch_hi(0x00);
+        timer.clock(); // Load0
+        assert_eq!(timer.get_counter(), 0x00);
+        timer.clock(); // Load1
+        assert_eq!(timer.get_counter(), 0x02);
+   }
+
+    #[test]
+    fn pb_output_pulse() {
+        let mut timer = Timer::new(Mode::TimerA);
+        timer.set_config(0x00);
+        timer.set_latch_lo(0x02);
+        timer.set_latch_hi(0x00);
+        timer.clock();
+        timer.clock();
+        timer.set_config(0x03);
+        timer.clock(); // Count0|Count1
+        timer.clock(); // Count2
+        assert_eq!(timer.get_counter(), 0x02);
+        assert_eq!(timer.get_pb_output(), false);
+        timer.clock(); // Count3
+        assert_eq!(timer.get_counter(), 0x01);
+        assert_eq!(timer.get_pb_output(), false);
+        timer.clock(); // Count3|Underflow|Load1
+        assert_eq!(timer.get_counter(), 0x02);
+        assert_eq!(timer.get_pb_output(), true);
+        timer.clock(); // Count2
+        assert_eq!(timer.get_counter(), 0x02);
+        assert_eq!(timer.get_pb_output(), false);
+        timer.clock(); // Count3
+        assert_eq!(timer.get_counter(), 0x01);
+        assert_eq!(timer.get_pb_output(), false);
+        timer.clock(); // Count3|Underflow|Load1
+        assert_eq!(timer.get_counter(), 0x02);
+        assert_eq!(timer.get_pb_output(), true);
+    }
+
+    #[test]
+    fn reload_delay_0c() {
+        let mut timer = Timer::new(Mode::TimerA);
+        timer.set_config(0x00);
+        timer.set_latch_lo(0x02);
+        timer.set_latch_hi(0x00);
+        timer.clock();
+        timer.clock();
+        timer.set_config(0x01);
+        timer.clock(); // Count0|Count1
+        timer.clock(); // Count2
+        timer.clock(); // Count3
+        assert_eq!(timer.get_counter(), 0x01);
+        let output = timer.clock(); // Count3|Underflow|Load1
+        assert_eq!(output, true);
+        assert_eq!(timer.get_counter(), 0x02);
+    }
+
+    #[test]
+    fn reload_count_delay_1c() {
+        let mut timer = Timer::new(Mode::TimerA);
+        timer.set_config(0x00);
+        timer.set_latch_lo(0x02);
+        timer.set_latch_hi(0x00);
+        timer.clock();
+        timer.clock();
+        timer.set_config(0x01);
+        timer.clock(); // Count0|Count1
+        timer.clock(); // Count2
+        timer.clock(); // Count3
+        timer.clock(); // Count3|Underflow|Load1
+        assert_eq!(timer.get_counter(), 0x02);
+        timer.clock(); // Count2
+        assert_eq!(timer.get_counter(), 0x02);
+    }
+
+    #[test]
+    fn reload_scenario() {
+        let mut timer = Timer::new(Mode::TimerA);
+        timer.set_config(0x00);
+        timer.set_latch_lo(0x02);
+        timer.set_latch_hi(0x00);
+        timer.clock();
+        timer.clock();
+        timer.set_config(0x01);
+        timer.clock(); // Count0|Count1
+        timer.clock(); // Count2
+        assert_eq!(timer.get_counter(), 0x02);
+        timer.clock(); // Count3
+        assert_eq!(timer.get_counter(), 0x01);
+        timer.clock(); // Count3|Underflow|Load1
+        assert_eq!(timer.get_counter(), 0x02);
+        timer.clock(); // Count2
+        assert_eq!(timer.get_counter(), 0x02);
+        timer.clock(); // Count3
+        assert_eq!(timer.get_counter(), 0x01);
+        timer.clock(); // Count3|Underflow|Load1
+        assert_eq!(timer.get_counter(), 0x02);
     }
 }

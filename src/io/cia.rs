@@ -165,7 +165,14 @@ impl Cia {
             _ => self.scan_keyboard(!self.port_a.borrow().get_value()),
         };
         let joystick_state = self.scan_joystick(&self.joystick_1);
-        self.port_b.borrow().get_value() & keyboard_state & joystick_state
+        let mut result = self.port_b.borrow().get_value() & keyboard_state & joystick_state;
+        if self.timer_a.is_pb_on() {
+            result.set_bit(6, self.timer_a.get_pb_output());
+        }
+        if self.timer_b.is_pb_on() {
+            result.set_bit(7, self.timer_b.get_pb_output());
+        }
+        result
     }
 
     fn read_cia2_port_a(&self) -> u8 {
@@ -174,7 +181,14 @@ impl Cia {
     }
 
     fn read_cia2_port_b(&self) -> u8 {
-        self.port_b.borrow().get_value()
+        let mut result = self.port_b.borrow().get_value();
+        if self.timer_a.is_pb_on() {
+            result.set_bit(6, self.timer_a.get_pb_output());
+        }
+        if self.timer_b.is_pb_on() {
+            result.set_bit(7, self.timer_b.get_pb_output());
+        }
+        result
     }
 
     fn scan_joystick(&self, joystick: &Option<Rc<Cell<u8>>>) -> u8 {
@@ -219,23 +233,21 @@ impl Chip for Cia {
         register will set the IR bit (MSB) of the DATA register
         and bring the IRQ pin low.
         */
+        let mut int_event = false;
         if timer_a_output {
             self.int_control.set_event(0);
-            if self.int_control.get_interrupt_request() {
-                self.int_delay.start();
-            }
+            int_event = true;
         }
         if timer_b_output {
             self.int_control.set_event(1);
-            if self.int_control.get_interrupt_request() {
-                self.int_delay.start();
-            }
+            int_event = true;
         }
         if self.flag_pin.borrow().is_falling() {
             self.int_control.set_event(4);
-            if self.int_control.get_interrupt_request() {
-                self.int_delay.start();
-            }
+            int_event = true;
+        }
+        if int_event && self.int_control.get_interrupt_request() {
+            self.int_delay.start();
         }
         if self.int_delay.is_done() {
             self.set_interrupt(true);
@@ -272,11 +284,11 @@ impl Chip for Cia {
         are set to zero and the timer latches to all ones. All other
         registers are reset to zero.
         */
+        self.int_control.reset();
+        self.int_delay.reset();
         self.timer_a.reset();
         self.timer_b.reset();
         self.tod_set_alarm = false;
-        self.int_control.reset();
-        self.int_delay.reset();
         self.cnt_pin.borrow_mut().set_active(true);
         self.flag_pin.borrow_mut().set_active(false);
         self.port_a.borrow_mut().reset();
@@ -511,24 +523,8 @@ mod tests {
         assert_eq!(0x08, cia.read(Reg::CRB.addr()));
     }
 
-    /*
     #[test]
-    fn read_keyboard_s() {
-        let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
-        let keyboard = Rc::new(RefCell::new(Keyboard::new(keyboard_matrix.clone())));
-        keyboard.borrow_mut().reset();
-        let mut cia = setup_cia_with_keyboard(keyboard_matrix.clone());
-        keyboard.borrow_mut().enqueue("S");
-        keyboard.borrow_mut().drain_event();
-        cia.write(Reg::DDRA.addr(), 0xff);
-        cia.write(Reg::DDRB.addr(), 0x00);
-        cia.write(Reg::PRA.addr(), 0xfd);
-        assert_eq!(!(1 << 5), cia.read(Reg::PRB.addr()));
-    }
-    */
-
-    #[test]
-    fn trigger_timer_a_interrupt() {
+    fn timer_a_interrupt() {
         let mut cia = setup_cia();
         cia.write(Reg::TALO.addr(), 0x01);
         cia.write(Reg::TAHI.addr(), 0x00);
@@ -560,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn trigger_timer_b_interrupt() {
+    fn timer_b_interrupt() {
         let mut cia = setup_cia();
         cia.write(Reg::TBLO.addr(), 0x01);
         cia.write(Reg::TBHI.addr(), 0x00);
@@ -682,35 +678,93 @@ mod tests {
     }
 
     /*
-    ; This program waits until the key "S" was pushed.
-    ; Start with SYS 49152
+    Program CIA1TAB - TA, TB, PB67 and ICR in cascaded mode
 
-    *=$c000                  ; startaddress
+    Both latches are set to 2. TA counts system clocks, TB counts TA underflows (cascaded).
+    PB6 is high for one cycle when TA underflows, PB7 is toggled when TB underflows. IMR is $02.
 
-    PRA  =  $dc00            ; CIA#1 (Port Register A)
-    DDRA =  $dc02            ; CIA#1 (Data Direction Register A)
-
-    PRB  =  $dc01            ; CIA#1 (Port Register B)
-    DDRB =  $dc03            ; CIA#1 (Data Direction Register B)
-
-
-    start    sei             ; interrupts deactivated
-
-             lda #%11111111  ; CIA#1 port A = outputs
-             sta DDRA
-
-             lda #%00000000  ; CIA#1 port B = inputs
-             sta DDRB
-
-             lda #%11111101  ; testing column 1 (COL1) of the matrix
-             sta PRA
-
-    loop     lda PRB
-             and #%00100000  ; masking row 5 (ROW5)
-             bne loop        ; wait until key "S"
-
-             cli             ; interrupts activated
-
-    ende     rts             ; back to BASIC
+    TA  01 02 02 01 02 02 01 02 02 01 02 02
+    TB  02 02 02 01 01 01 00 00 02 02 02 02
+    PB  80 C0 80 80 C0 80 80 C0 00 00 40 00
+    ICR 00 01 01 01 01 01 01 01 03 83 83 83
     */
+
+    #[test]
+    fn program_cia1tab() {
+        let mut cia = setup_cia();
+        cia.write(Reg::DDRB.addr(), 0x7f);
+        cia.write(Reg::ICR.addr(), 0x82);
+        cia.write(Reg::CRA.addr(), 0x00);
+        cia.write(Reg::CRB.addr(), 0x00);
+        cia.write(Reg::TALO.addr(), 0x02);
+        cia.write(Reg::TAHI.addr(), 0x00);
+        cia.write(Reg::TBLO.addr(), 0x02);
+        cia.write(Reg::TBHI.addr(), 0x00);
+        cia.clock();
+        cia.clock();
+        cia.write(Reg::CRB.addr(), 0x47);
+        cia.write(Reg::CRA.addr(), 0x03);
+        cia.clock(); // Count0|Count1
+        cia.clock(); // Count2
+        cia.clock(); // Count3
+        assert_eq!(cia.timer_a.get_counter(), 0x01);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.int_control.get_raw_data(), 0x00);
+        cia.clock(); // Count3|Underflow|Load1
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0xc0);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count2
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count3
+        assert_eq!(cia.timer_a.get_counter(), 0x01);
+        assert_eq!(cia.timer_b.get_counter(), 0x01);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count3|Underflow|Load1
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x01);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0xc0);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count2
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x01);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count3
+        assert_eq!(cia.timer_a.get_counter(), 0x01);
+        assert_eq!(cia.timer_b.get_counter(), 0x00);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count3|Underflow|Load1
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x00);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0xc0);
+        assert_eq!(cia.int_control.get_raw_data(), 0x01);
+        cia.clock(); // Count2
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x00);
+        assert_eq!(cia.int_control.get_raw_data(), 0x03);
+        cia.clock(); // Count3
+        assert_eq!(cia.timer_a.get_counter(), 0x01);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x00);
+        assert_eq!(cia.int_control.get_raw_data(), 0x03); // 0x83
+        cia.clock(); // Count3|Underflow|Load1
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x40);
+        assert_eq!(cia.int_control.get_raw_data(), 0x03); // 0x83
+        cia.clock(); // Count2
+        assert_eq!(cia.timer_a.get_counter(), 0x02);
+        assert_eq!(cia.timer_b.get_counter(), 0x02);
+        assert_eq!(cia.read(Reg::PRB.addr()), 0x00);
+        assert_eq!(cia.int_control.get_raw_data(), 0x03); // 0x83
+    }
 }

@@ -58,6 +58,12 @@ impl Icr {
         self.mask
     }
 
+    #[allow(dead_code)]
+    #[inline]
+    pub fn get_raw_data(&self) -> u8 {
+        self.data
+    }
+
     #[inline]
     pub fn set_event(&mut self, bit: u8) {
         self.data.set_bit(bit as usize, true);

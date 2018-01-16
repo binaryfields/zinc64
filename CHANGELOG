@@ -85,4 +85,9 @@
 - milestone 7: run musicirq.prg without static/noise
 - milestone 8: publish zinc64 crate
 
+### Week 11 - 20180120
+
+- landed revised cia clock emulation
+- miletone 9: run cia1tab.p00
+
 

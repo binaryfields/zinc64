@@ -1,5 +1,13 @@
 # TODO
 
+- s/irq/irq_line
+- s/nmi/nmi_line
+- s/cia1/cia_1
+- s/cia2/cia_2
+- s/flag/flag_line
+- s/cpu_irq/irq_line
+- reconcile use of flag (should be 1 instance)
+
 - app: add screenshot support
 - app: add ui/menus
 - app: add debugger support

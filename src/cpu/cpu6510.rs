@@ -727,7 +727,6 @@ mod tests {
     use super::*;
     use super::super::operand::Operand;
     use core::Ram;
-    use std::cell::Cell;
 
     struct MockMemory {
         ram: Ram,

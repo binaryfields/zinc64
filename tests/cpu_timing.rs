@@ -206,8 +206,8 @@ const OPCODE_TIMING: [u8; 256] = [
     6, // 91 STA ($ab),Y
     0, // 92 HLT*
     0, // 93 SHA* ($ab),Y
-    3, // FIXME 4 cycles 94 STY $ab,X
-    3, // FIXME 4 cycles 95 STA $ab,X
+    4, // 94 STY $ab,X
+    4, // 95 STA $ab,X
     4, // 96 STX $ab,Y
     0, // 97 SAX* $ab,Y
     2, // 98 TYA

@@ -19,6 +19,7 @@
 
 use bit_field::BitField;
 
+#[derive(Debug)]
 pub struct ShiftDelay {
     // Configuration
     delay: usize,
