@@ -90,4 +90,7 @@
 - landed revised cia clock emulation
 - miletone 9: run cia1tab.p00
 
+### Week 12 - 20180127
+
+- landed debugger support
 

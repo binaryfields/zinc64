@@ -46,6 +46,7 @@ impl FrameBuffer {
         unsafe { mem::transmute::<&[u32], &[u8]>(self.pixels.as_ref()) }
     }
 
+    #[inline]
     pub fn get_sync(&self) -> bool {
         self.sync
     }

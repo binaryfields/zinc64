@@ -19,8 +19,13 @@
 
 mod app;
 mod audio;
+mod charset;
 mod cli;
+mod command;
 mod console;
+mod debugger;
+mod disassembler;
+mod execution;
 mod io;
 mod keymap;
 mod logger;

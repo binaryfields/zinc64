@@ -22,3 +22,5 @@ mod instruction;
 mod operand;
 
 pub use self::cpu6510::Cpu6510;
+pub use self::instruction::Instruction;
+pub use self::operand::Operand;

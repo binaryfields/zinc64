@@ -31,9 +31,8 @@ impl ConsoleApp {
     }
 
     pub fn run(&mut self) {
-        let mut overflow_cycles = 0i32;
         loop {
-            overflow_cycles = self.c64.run_frame(overflow_cycles);
+            self.c64.run_frame();
             if self.c64.is_cpu_jam() {
                 let cpu = self.c64.get_cpu();
                 warn!(target: "main", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());

@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+extern crate bit_field;
+extern crate byteorder;
 extern crate getopts;
 #[macro_use]
 extern crate log;

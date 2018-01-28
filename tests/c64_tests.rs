@@ -83,7 +83,7 @@ fn program_cia1tab() {
     c64.load(&CIA1TAB_PRG.to_vec()[2..].to_vec(), 0x4000);
     cpu.borrow_mut().set_pc(0x4000);
     while test_cycle.get() < 13 {
-        c64.step(&tick_fn);
+        c64.step_internal(&tick_fn);
         if cpu.borrow().get_pc() == 0x402d {
             test_flag.set(true);
         }
@@ -109,7 +109,6 @@ fn exec_keyboard_read() {
         0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d,
         0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
     ];
-    let tick_fn: TickFn = Box::new(move || {});
     let config = Rc::new(Config::new(SystemModel::from("pal")));
     let factory = Box::new(ChipFactory::new(config.clone()));
     let mut c64 = C64::new(config.clone(), factory).unwrap();
@@ -121,7 +120,7 @@ fn exec_keyboard_read() {
     cpu.borrow_mut().set_pc(0xc000);
     let mut branch_count = 0;
     loop {
-        c64.step(&tick_fn);
+        c64.step();
         if cpu.borrow().get_pc() == 0xc018 {
             break;
         }
