@@ -18,10 +18,10 @@
  */
 
 use std::result::Result;
+use std::sync::mpsc;
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::Duration;
-
-use time;
 
 use sdl2;
 use sdl2::{EventPump, Sdl};
@@ -29,10 +29,14 @@ use sdl2::audio::AudioDevice;
 use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
+use time;
 use zinc64::core::geo;
 use zinc64::system::C64;
 
 use super::audio::AppAudio;
+use super::command::Command;
+use super::debugger::Debugger;
+use super::execution::{ExecutionEngine, State};
 use super::io::Io;
 use super::renderer::Renderer;
 
@@ -62,25 +66,18 @@ pub struct Options {
 
 }
 
-#[derive(Debug, PartialEq)]
-enum State {
-    Starting,
-    Running,
-    Paused,
-    Stopped,
-}
-
 pub struct App {
     // Dependencies
-    c64: C64,
     options: Options,
     // Components
-    sdl_context: Sdl,
     audio_device: AudioDevice<AppAudio>,
+    command_rx: mpsc::Receiver<Command>,
+    debugger: JoinHandle<()>,
+    execution_engine: ExecutionEngine,
     io: Io,
     renderer: Renderer,
+    sdl_context: Sdl,
     // Runtime State
-    state: State,
     next_frame_ns: u64,
     next_keyboard_event: u64,
 }
@@ -95,7 +92,7 @@ impl App {
             &sdl_video,
             options.window_size,
             geo::Size::from_tuple(c64.get_config().model.frame_buffer_size),
-            options.fullscreen
+            options.fullscreen,
         )?;
         // Initialize audio
         let sdl_audio = sdl_context.audio()?;
@@ -104,7 +101,7 @@ impl App {
             c64.get_config().sound.sample_rate as i32,
             1,
             c64.get_config().sound.buffer_size as u16,
-            c64.get_sound_buffer()
+            c64.get_sound_buffer(),
         )?;
         audio_device.lock().set_volume(100);
         // Initialize I/O
@@ -115,14 +112,21 @@ impl App {
             c64.get_joystick1(),
             c64.get_joystick2(),
         )?;
+        // Initialize debugger
+        let (command_tx, command_rx) = mpsc::channel::<Command>();
+        let debugger = thread::spawn(move || {
+            let debugger = Debugger::new(command_tx);
+            debugger.start();
+        });
         let app = App {
-            c64,
             options,
-            sdl_context,
             audio_device,
+            command_rx,
+            debugger,
+            execution_engine: ExecutionEngine::new(c64),
             io,
             renderer,
-            state: State::Starting,
+            sdl_context,
             next_frame_ns: 0,
             next_keyboard_event: 0,
         };
@@ -132,33 +136,67 @@ impl App {
     pub fn run(&mut self) -> Result<(), String> {
         info!(target: "ui", "Running main loop");
         let mut events = self.sdl_context.event_pump().unwrap();
-        let mut overflow_cycles = 0i32;
         'running: loop {
-            match self.state {
+            match self.execution_engine.get_state() {
                 State::Starting => {
-                    overflow_cycles = self.run_frame(overflow_cycles)?;
                     self.set_state(State::Running);
                 }
                 State::Running => {
-                    self.handle_events(&mut events);
-                    overflow_cycles = self.run_frame(overflow_cycles)?;
+                    let vsync = self.execution_engine.get_c64_mut().run_frame();
+                    if vsync {
+                        self.process_vsync();
+                    } else {
+                        self.execution_engine.execute(&Command::Break);
+                    }
                 }
                 State::Paused => {
-                    self.handle_events(&mut events);
-                    let wait = Duration::from_millis(20);
-                    thread::sleep(wait);
+                    self.process_vsync();
+                    thread::sleep(Duration::from_millis(20));
                 }
                 State::Stopped => {
-                    info!(target: "ui", "State {:?}", self.state);
+                    info!(target: "ui", "State {:?}", self.execution_engine.get_state());
                     break 'running;
                 }
             }
+            self.handle_events(&mut events);
+            self.handle_commands();
         }
         Ok(())
     }
 
+    fn process_vsync(&mut self) {
+        let rt = self.execution_engine.get_c64().get_frame_buffer();
+        if rt.borrow().get_sync() {
+            if !self.options.warp_mode {
+                self.sync_frame();
+            }
+            {
+                let frame_buffer = rt.borrow();
+                self.renderer.render(&frame_buffer);
+            }
+            rt.borrow_mut().set_sync(false);
+        }
+    }
+
+    pub fn sync_frame(&mut self) {
+        let refresh_rate = self.execution_engine.get_c64().get_config().model.refresh_rate;
+        let frame_duration_ns = (1_000_000_000.0 / refresh_rate) as u32;
+        let frame_duration_scaled_ns = frame_duration_ns * 100 / self.options.speed as u32;
+        let time_ns = time::precise_time_ns();
+        let wait_ns = if self.next_frame_ns > time_ns {
+            (self.next_frame_ns - time_ns) as u32
+        } else {
+            0
+        };
+        if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
+            thread::sleep(Duration::new(0, wait_ns));
+        }
+        self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
+    }
+
+    #[allow(dead_code)]
     fn handle_cpu_jam(&mut self) -> bool {
-        let cpu = self.c64.get_cpu();
+        let cpu = self.execution_engine.get_c64().get_cpu();
         match self.options.jam_action {
             JamAction::Continue => true,
             JamAction::Quit => {
@@ -175,20 +213,20 @@ impl App {
     }
 
     fn reset(&mut self) {
-        self.c64.reset(false);
-        self.next_frame_ns = 0;
+        self.execution_engine.execute(&Command::Reset(false)); // FIXME debugger
         self.next_keyboard_event = 0;
     }
 
+    /*
     fn run_frame(&mut self, prev_overflow: i32) -> Result<i32, String> {
-        let overflow = self.c64.run_frame(prev_overflow);
-        if self.c64.is_cpu_jam() {
+        let overflow = self.execution_engine.run_frame(prev_overflow);
+        if self.execution_engine.get_c64().is_cpu_jam() {
             self.handle_cpu_jam();
         }
         if !self.options.warp_mode {
-            self.sync_frame();
+            self.execution_engine.sync_frame();
         }
-        let rt = self.c64.get_frame_buffer();
+        let rt = self.execution_engine.get_c64().get_frame_buffer();
         if rt.borrow().get_sync() {
             {
                 let frame_buffer = rt.borrow();
@@ -197,33 +235,17 @@ impl App {
             rt.borrow_mut().set_sync(false);
         }
         Ok(overflow)
-    }
+    }*/
 
     fn set_state(&mut self, new_state: State) {
-        if self.state != new_state {
-            self.state = new_state;
+        if self.execution_engine.get_state() != new_state {
+            self.execution_engine.set_state(new_state);
             self.update_audio_state();
         }
     }
 
-    fn sync_frame(&mut self) {
-        let refresh_rate = self.c64.get_config().model.refresh_rate;
-        let frame_duration_ns = (1_000_000_000.0 / refresh_rate) as u32;
-        let frame_duration_scaled_ns = frame_duration_ns * 100 / self.options.speed as u32;
-        let time_ns = time::precise_time_ns();
-        let wait_ns = if self.next_frame_ns > time_ns {
-            (self.next_frame_ns - time_ns) as u32
-        } else {
-            0
-        };
-        if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
-            thread::sleep(Duration::new(0, wait_ns));
-        }
-        self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
-    }
-
     fn toggle_datassette_play(&mut self) {
-        let datassette = self.c64.get_datasette();
+        let datassette = self.execution_engine.get_c64().get_datasette();
         if !datassette.borrow().is_playing() {
             datassette.borrow_mut().play();
         } else {
@@ -236,7 +258,7 @@ impl App {
     }
 
     fn toggle_pause(&mut self) {
-        match self.state {
+        match self.execution_engine.get_state() {
             State::Running => self.set_state(State::Paused),
             State::Paused => self.set_state(State::Running),
             _ => (),
@@ -249,7 +271,7 @@ impl App {
     }
 
     fn update_audio_state(&mut self) {
-        match self.state {
+        match self.execution_engine.get_state() {
             State::Paused => self.audio_device.pause(),
             State::Running => self.audio_device.resume(),
             State::Stopped => self.audio_device.pause(),
@@ -258,6 +280,13 @@ impl App {
     }
 
     // -- Event Handling
+
+    fn handle_commands(&mut self) {
+        match self.command_rx.try_recv() {
+            Ok(command) => self.execution_engine.execute(&command),
+            _ => Ok(()),
+        };
+    }
 
     fn handle_events(&mut self, events: &mut EventPump) {
         for event in events.poll_iter() {
@@ -275,72 +304,72 @@ impl App {
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.toggle_mute();
-                }
+                    {
+                        self.toggle_mute();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::P),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.toggle_pause();
-                }
+                    {
+                        self.toggle_pause();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::Q),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.set_state(State::Stopped);
-                }
+                    {
+                        self.set_state(State::Stopped);
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::W),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.toggle_warp();
-                }
+                    {
+                        self.toggle_warp();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::F9),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.reset();
-                }
+                    {
+                        self.reset();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::F1),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LCTRLMOD) =>
-                {
-                    self.toggle_datassette_play();
-                }
+                    {
+                        self.toggle_datassette_play();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::Return),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.renderer.toggle_fullscreen();
-                }
+                    {
+                        self.renderer.toggle_fullscreen();
+                    }
                 _ => {
                     self.io.handle_event(&event);
                 }
             }
         }
-        let keyboard = self.c64.get_keyboard();
-        if keyboard.borrow().has_events() && self.c64.get_cycles() >= self.next_keyboard_event {
+        let keyboard = self.execution_engine.get_c64().get_keyboard();
+        if keyboard.borrow().has_events() && self.execution_engine.get_c64().get_cycles() >= self.next_keyboard_event {
             keyboard.borrow_mut().drain_event();
-            self.next_keyboard_event = self.c64.get_cycles().wrapping_add(20000);
+            self.next_keyboard_event = self.execution_engine.get_c64().get_cycles().wrapping_add(20000);
         }
     }
 }

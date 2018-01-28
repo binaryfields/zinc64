@@ -22,6 +22,7 @@ use std::path::Path;
 use std::io;
 use std::rc::Rc;
 use std::result::Result;
+use std::slice::Iter;
 use std::sync::{Arc, Mutex};
 
 use core::{
@@ -48,6 +49,7 @@ use device::{
 use device::joystick;
 
 use super::{Autostart, Config, Palette};
+use super::breakpoint::{Breakpoint, BreakpointManager};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -91,7 +93,8 @@ pub struct C64 {
     sound_buffer: Arc<Mutex<CircularBuffer>>,
     // Configuration
     autostart: Option<Autostart>,
-    breakpoints: Vec<u16>,
+    breakpoints: BreakpointManager,
+    bp_present: bool,
     // Runtime State
     clock: Rc<Clock>,
     frames: u32,
@@ -273,7 +276,8 @@ impl C64 {
             frame_buffer: frame_buffer.clone(),
             sound_buffer: sound_buffer.clone(),
             autostart: None,
-            breakpoints: Vec::new(),
+            breakpoints: BreakpointManager::new(),
+            bp_present: false,
             clock,
             frames: 0,
             last_pc: 0,
@@ -403,7 +407,7 @@ impl C64 {
         self.last_pc = 0;
     }
 
-    pub fn run_frame(&mut self, prev_overflow: i32) -> i32 {
+    pub fn run_frame(&mut self) -> bool {
         let cia1_clone = self.cia1.clone();
         let cia2_clone = self.cia2.clone();
         let clock_clone = self.clock.clone();
@@ -416,21 +420,47 @@ impl C64 {
             datassette_clone.borrow_mut().clock();
             clock_clone.tick();
         });
-        let mut delta = self.config.model.cycles_per_frame as i32 + prev_overflow;
-        while delta > 0 {
-            let prev_clock = self.clock.get();
-            self.step(&tick_fn);
-            delta -= self.clock.elapsed(prev_clock) as i32;
+        let mut vsync = false;
+        while !vsync {
+            self.step_internal(&tick_fn);
+            if self.bp_present && self.check_breakpoints() {
+                break;
+            }
+            vsync = self.frame_buffer.borrow().get_sync();
         }
-        self.sid.borrow_mut().process_vsync();
-        self.cia1.borrow_mut().process_vsync();
-        self.cia2.borrow_mut().process_vsync();
-        self.frames = self.frames.wrapping_add(1);
-        delta
+        if vsync {
+            self.sid.borrow_mut().process_vsync();
+            self.cia1.borrow_mut().process_vsync();
+            self.cia2.borrow_mut().process_vsync();
+            self.frames = self.frames.wrapping_add(1);
+        }
+        vsync
+    }
+
+    pub fn step(&mut self) {
+        let cia1_clone = self.cia1.clone();
+        let cia2_clone = self.cia2.clone();
+        let clock_clone = self.clock.clone();
+        let datassette_clone = self.datassette.clone();
+        let vic_clone = self.vic.clone();
+        let tick_fn: TickFn = Box::new(move || {
+            vic_clone.borrow_mut().clock();
+            cia1_clone.borrow_mut().clock();
+            cia2_clone.borrow_mut().clock();
+            datassette_clone.borrow_mut().clock();
+            clock_clone.tick();
+        });
+        self.step_internal(&tick_fn);
+        if self.frame_buffer.borrow().get_sync() {
+            self.sid.borrow_mut().process_vsync();
+            self.cia1.borrow_mut().process_vsync();
+            self.cia2.borrow_mut().process_vsync();
+            self.frames = self.frames.wrapping_add(1);
+        }
     }
 
     #[inline]
-    pub fn step(&mut self, tick_fn: &TickFn) {
+    pub fn step_internal(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.borrow().get_pc();
         self.cpu.borrow_mut().step(&tick_fn);
         if self.autostart.is_some() {
@@ -444,14 +474,38 @@ impl C64 {
 
     // -- Debug Ops
 
-    pub fn add_breakpoint(&mut self, breakpoint: u16) {
-        self.breakpoints.push(breakpoint);
+    pub fn add_breakpoint(&mut self, address: u16, autodelete: bool) -> u16 {
+        let index = self.breakpoints.add(address, autodelete);
+        self.bp_present = self.breakpoints.is_active();
+        index
     }
 
-    #[allow(dead_code)]
-    pub fn check_breakpoints(&self) -> bool {
+    #[inline]
+    pub fn check_breakpoints(&mut self) -> bool {
         let pc = self.cpu.borrow().get_pc();
-        !self.breakpoints.is_empty() && self.breakpoints.contains(&pc)
+        self.breakpoints.check(pc)
+    }
+
+    pub fn enable_breakpoint(&mut self, index: Option<u16>, enabled: bool) -> bool {
+        let result = self.breakpoints.enable(index, enabled);
+        self.bp_present = self.breakpoints.is_active();
+        result
+    }
+
+    pub fn ignore_breakpoint(&mut self, index: u16, count: u16) -> bool {
+        let result = self.breakpoints.ignore(index, count);
+        self.bp_present = self.breakpoints.is_active();
+        result
+    }
+
+    pub fn list_breakpoints(&self) -> Iter<Breakpoint> {
+        self.breakpoints.list()
+    }
+
+    pub fn remove_breakpoint(&mut self, index: Option<u16>) -> bool {
+        let result = self.breakpoints.remove(index);
+        self.bp_present = self.breakpoints.is_active();
+        result
     }
 
     // -- Peripherals Ops

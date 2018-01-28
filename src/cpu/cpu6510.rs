@@ -101,22 +101,6 @@ impl Cpu6510 {
         }
     }
 
-    pub fn get_a(&self) -> u8 {
-        self.a
-    }
-
-    pub fn get_x(&self) -> u8 {
-        self.x
-    }
-
-    pub fn get_y(&self) -> u8 {
-        self.y
-    }
-
-    pub fn set_a(&mut self, value: u8) {
-        self.a = value;
-    }
-
     #[inline]
     fn set_flag(&mut self, flag: Flag, value: bool) {
         if value {
@@ -124,14 +108,6 @@ impl Cpu6510 {
         } else {
             self.p &= !(flag as u8);
         }
-    }
-
-    pub fn set_x(&mut self, value: u8) {
-        self.x = value;
-    }
-
-    pub fn set_y(&mut self, value: u8) {
-        self.y = value;
     }
 
     #[inline]
@@ -617,12 +593,44 @@ impl Cpu6510 {
 }
 
 impl Cpu for Cpu6510 {
+    fn get_a(&self) -> u8 {
+        self.a
+    }
+
+    fn get_p(&self) -> u8 {
+        self.p
+    }
+
     fn get_pc(&self) -> u16 {
         self.pc
     }
 
+    fn get_sp(&self) -> u8 {
+        self.sp
+    }
+
+    fn get_x(&self) -> u8 {
+        self.x
+    }
+
+    fn get_y(&self) -> u8 {
+        self.y
+    }
+
+    fn set_a(&mut self, value: u8) {
+        self.a = value;
+    }
+
     fn set_pc(&mut self, value: u16) {
         self.pc = value;
+    }
+
+    fn set_x(&mut self, value: u8) {
+        self.x = value;
+    }
+
+    fn set_y(&mut self, value: u8) {
+        self.y = value;
     }
 
     fn reset(&mut self) {

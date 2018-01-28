@@ -18,12 +18,14 @@
  */
 
 pub mod autostart;
+mod breakpoint;
 pub mod c64;
 mod chip_factory;
 pub mod config;
 mod palette;
 
 pub use self::autostart::{Autostart, AutostartMethod, Image};
+pub use self::breakpoint::Breakpoint;
 pub use self::c64::C64;
 pub use self::chip_factory::ChipFactory;
 pub use self::config::Config;

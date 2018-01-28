@@ -58,8 +58,16 @@ pub trait Chip {
 pub type TickFn = Box<Fn()>;
 
 pub trait Cpu {
+    fn get_a(&self) -> u8;
+    fn get_p(&self) -> u8;
     fn get_pc(&self) -> u16;
+    fn get_sp(&self) -> u8;
+    fn get_x(&self) -> u8;
+    fn get_y(&self) -> u8;
+    fn set_a(&mut self, value: u8);
     fn set_pc(&mut self, value: u16);
+    fn set_x(&mut self, value: u8);
+    fn set_y(&mut self, value: u8);
     fn reset(&mut self);
     fn step(&mut self, tick_fn: &TickFn);
     // I/O

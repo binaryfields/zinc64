@@ -194,7 +194,7 @@ impl Cli {
             .iter()
             .map(|s| s.parse::<u16>().unwrap());
         for bp in bps {
-            c64.add_breakpoint(bp);
+            c64.add_breakpoint(bp, false);
         }
         Ok(())
     }
