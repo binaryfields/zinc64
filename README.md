@@ -22,6 +22,20 @@ to assemble various accessories required to get software onto it. Soon enough I
 had picked up a copy of C64 Programmer's Reference Guide and the rest is now
 history.
 
+### Extensibility
+
+The emulator components may be swapped out by providing custom core::Factory trait
+implementation. The default implementation of the core::Factory trait is done through
+system::ChipFactory. The chip factory object is passed into system::C64 component
+that provides core emulator functionality.
+
+Here is an example how these components are used together:
+
+        let config = Rc::new(Config::new(SystemModel::from("pal")));
+        let factory = Box::new(ChipFactory::new(config.clone()));
+        let mut c64 = C64::new(config.clone(), factory).unwrap();
+        c64.reset(false);
+
 ## Status
 
 | Class   | Component     | Status      |
@@ -46,12 +60,13 @@ history.
 
 ## Roadmap
 
-- v0.1 - zinc64 lib crate
-- v0.2 - cia rewrite
-- v0.3 - vic rewrite
-- v0.4 - debugger support
-- v0.5 - zinc64 ui
-- v0.6 - floppy support
+- v0.09 - modular design [DONE]
+- v0.1  - zinc64 lib crate [DONE]
+- v0.2  - cia rewrite [DONE]
+- v0.3  - debugger support
+- v0.4  - vic rewrite
+- v0.5  - zinc64 ui
+- v0.6  - floppy support
 
 ## Getting Started
 

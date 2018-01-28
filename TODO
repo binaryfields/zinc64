@@ -8,12 +8,8 @@
 - s/cpu_irq/irq_line
 - reconcile use of flag (should be 1 instance)
 
-- document timer code
-- test performance of bitfield vs bit ops
-- write up interesting bugs
-
+- app: add debugger support
 - app: add screenshot support
 - app: add ui/menus
-- app: add debugger support
 - chipset: rewrite vic
 - device: add floppy support

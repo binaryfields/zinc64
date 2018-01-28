@@ -69,7 +69,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         Cli::print_version();
     } else {
         init_logging(&matches)?;
-        info!("Staring {}", NAME);
+        info!("Starting {}", NAME);
         let config = Rc::new(Cli::parse_system_config(&matches)?);
         let factory = Box::new(ChipFactory::new(config.clone()));
         let mut c64 = C64::new(config.clone(), factory).unwrap();
