@@ -267,6 +267,14 @@ impl Timer {
                 // Already fed through by Count0 in self.feed
             }
             InputMode::External => {
+                /*
+                In CNT mode, the input must be synchronized with ø2. When there
+                is a rising edge on the CNT line, the bit CountA0 in dwDelay
+                is set to 1. At each system clock, dwDelay is shift left by one
+                and the shift out bits are filled from dwFeed. Because dwFeed & CountA0
+                is always 0, a single 1 is shifted through the pipeline until it reaches
+                CountA3, which will then decrement the counter.
+                */
                 if self.cnt_pin.borrow().is_rising() {
                     self.delay.feed(Delay::Count0 as u16);
                 }
@@ -300,6 +308,10 @@ impl Timer {
     fn enable(&mut self, enabled: bool) {
         self.enabled = enabled;
         if enabled && self.input_mode == InputMode::SystemClock {
+            /*
+            Two clocks after bit 0 in the CRA has been set to 1, the timer will
+            start counting from its current value back to zero.
+            */
             self.delay.feed(Delay::Count0 as u16);
             self.delay.feed(Delay::Count1 as u16);
             self.delay.autofeed(Delay::Count0 as u16, true);
