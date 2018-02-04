@@ -38,32 +38,34 @@ Here is an example how these components are used together:
 
 ## Status
 
-| Class   | Component     | Status      |
-|---------|---------------|-------------|
-| Chipset | 6510 CPU      | Done
-| Chipset | Memory        | Done
-| Chipset | 6526 CIA      | Done
-| Chipset | 6581 SID      | Done
-| Chipset | 6567 VIC      | In Progress
-| Device  | Cartridge     | Done
-| Device  | Floppy        | Not Started
-| Device  | Datassette    | Done
-| Device  | Keyboard      | Done
-| Device  | Joystick      | Done
-| Format  | Bin           | Done
-| Format  | Crt           | Done
-| Format  | D64           | Not Started
-| Format  | P00           | Done
-| Format  | Prg           | Done
-| Format  | Tap           | Done
-| Format  | T64           | Not Started
+| Class    | Component     | Status      |
+|----------|---------------|-------------|
+| Chipset  | 6510 CPU      | Done
+| Chipset  | Memory        | Done
+| Chipset  | 6526 CIA      | Done
+| Chipset  | 6581 SID      | Done
+| Chipset  | 6567 VIC      | In Progress
+| Device   | Cartridge     | Done
+| Device   | Floppy        | Not Started
+| Device   | Datassette    | Done
+| Device   | Keyboard      | Done
+| Device   | Joystick      | Done
+| Debugger | Remote        | Done
+| Debugger | Radare2       | Done
+| Format   | Bin           | Done
+| Format   | Crt           | Done
+| Format   | D64           | Not Started
+| Format   | P00           | Done
+| Format   | Prg           | Done
+| Format   | Tap           | Done
+| Format   | T64           | Not Started
 
 ## Roadmap
 
 - v0.09 - modular design [DONE]
 - v0.1  - zinc64 lib crate [DONE]
 - v0.2  - cia rewrite [DONE]
-- v0.3  - debugger support
+- v0.3  - debugger support [DONE]
 - v0.4  - vic rewrite
 - v0.5  - zinc64 ui
 - v0.6  - floppy support
@@ -150,6 +152,7 @@ The cpu validation was performed with the help of [Klaus2m5 functional tests](ht
 |-----------|-------------------|
 | Alt-Enter | Toggle Full Screen
 | Alt-F9    | Reset
+| Alt-H     | Activate Debugger
 | Alt-M     | Toggle Mute
 | Alt-P     | Toggle Pause
 | Alt-Q     | Quit

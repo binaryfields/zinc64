@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::net::SocketAddr;
 use std::result::Result;
 use std::path::Path;
 
@@ -55,16 +56,29 @@ impl Cli {
             .unwrap_or(600);
         let options = app::Options {
             fullscreen: matches.opt_present("fullscreen"),
-            jam_action: matches
-                .opt_str("jamaction")
-                .map(|s| app::JamAction::from(&s))
-                .unwrap_or(app::JamAction::Continue),
             window_size: geo::Size::new(width, height),
             speed: matches
                 .opt_str("speed")
                 .map(|s| s.parse::<u8>().unwrap())
                 .unwrap_or(100),
             warp_mode: matches.opt_present("warp"),
+            debug: matches.opt_present("debug"),
+            dbg_address: matches
+                .opt_str("debugaddress")
+                .map(|s| {
+                    let addr: SocketAddr = s.parse().unwrap();
+                    addr
+                }),
+            jam_action: matches
+                .opt_str("jamaction")
+                .map(|s| app::JamAction::from(&s))
+                .unwrap_or(app::JamAction::Continue),
+            rap_address: matches
+                .opt_str("rap")
+                .map(|s| {
+                    let addr: SocketAddr = s.parse().unwrap();
+                    addr
+                }),
         };
         Ok(options)
     }
@@ -123,7 +137,10 @@ impl Cli {
             .optopt("", "soundrate", "set sound sample rate in Hz", "44100")
             // Debug
             .optmulti("", "bp", "set breakpoint at this address", "address")
+            .optflag("d", "debug", "start debugger")
+            .optopt("", "debugaddress", "start debugger bound to the specified address", "127.0.0.1:9999")
             .optopt("", "jamaction", "set cpu jam handling", "[continue|quit|reset]")
+            .optopt("", "rap", "start rap server bound to the specified address", "127.0.0.1:9999")
             // Logging
             .optopt("", "loglevel", "set log level", "[error|warn|info|debug|trace]")
             .optmulti("", "log", "set log level for a target", "target=level")
@@ -194,7 +211,7 @@ impl Cli {
             .iter()
             .map(|s| s.parse::<u16>().unwrap());
         for bp in bps {
-            c64.add_breakpoint(bp, false);
+            c64.get_bpm_mut().set(bp, false);
         }
         Ok(())
     }

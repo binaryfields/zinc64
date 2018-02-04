@@ -1,9 +1,9 @@
 # TODO
 
-- app: add screenshot support
-- app: add ui/menus
 - chipset: rewrite vic
 - device: add floppy support
+- app: add screenshot support
+- app: add ui/menus
 
 - s/irq/irq_line
 - s/nmi/nmi_line

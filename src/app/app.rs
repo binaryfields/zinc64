@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::net::SocketAddr;
 use std::result::Result;
 use std::sync::mpsc;
 use std::thread;
-use std::thread::JoinHandle;
 use std::time::Duration;
 
 use sdl2;
@@ -38,6 +38,7 @@ use super::command::Command;
 use super::debugger::Debugger;
 use super::execution::{ExecutionEngine, State};
 use super::io::Io;
+use super::rap_server::RapServer;
 use super::renderer::Renderer;
 
 pub enum JamAction {
@@ -59,11 +60,14 @@ impl JamAction {
 
 pub struct Options {
     pub fullscreen: bool,
-    pub jam_action: JamAction,
     pub window_size: geo::Size,
     pub speed: u8,
     pub warp_mode: bool,
-
+    // Debug
+    pub debug: bool,
+    pub dbg_address: Option<SocketAddr>,
+    pub jam_action: JamAction,
+    pub rap_address: Option<SocketAddr>,
 }
 
 pub struct App {
@@ -72,7 +76,6 @@ pub struct App {
     // Components
     audio_device: AudioDevice<AppAudio>,
     command_rx: mpsc::Receiver<Command>,
-    debugger: JoinHandle<()>,
     execution_engine: ExecutionEngine,
     io: Io,
     renderer: Renderer,
@@ -112,17 +115,30 @@ impl App {
             c64.get_joystick1(),
             c64.get_joystick2(),
         )?;
-        // Initialize debugger
+        // Initialize debuggers
         let (command_tx, command_rx) = mpsc::channel::<Command>();
-        let debugger = thread::spawn(move || {
-            let debugger = Debugger::new(command_tx);
-            debugger.start();
-        });
+        if options.debug {
+            let address = options.dbg_address
+                .unwrap_or(SocketAddr::from(([127, 0, 0, 1], 9999)));
+            info!(target: "ui", "Starting debugger at {}", address);
+            let command_tx_clone = command_tx.clone();
+            thread::spawn(move || {
+                let debugger = Debugger::new(command_tx_clone);
+                debugger.start(address);
+            });
+        }
+        if let Some(address) = options.rap_address {
+            info!(target: "ui", "Starting rap server at {}", address);
+            let command_tx_clone = command_tx.clone();
+            thread::spawn(move || {
+                let rap_server = RapServer::new(command_tx_clone);
+                rap_server.start(address);
+            });
+        }
         let app = App {
             options,
             audio_device,
             command_rx,
-            debugger,
             execution_engine: ExecutionEngine::new(c64),
             io,
             renderer,
@@ -146,10 +162,15 @@ impl App {
                     if vsync {
                         self.process_vsync();
                     } else {
-                        self.execution_engine.execute(&Command::Break);
+                        self.execution_engine.halt();
                     }
                 }
                 State::Paused => {
+                    self.process_vsync();
+                    thread::sleep(Duration::from_millis(20));
+                }
+                State::Halted => {
+                    self.handle_commands(true);
                     self.process_vsync();
                     thread::sleep(Duration::from_millis(20));
                 }
@@ -159,7 +180,7 @@ impl App {
                 }
             }
             self.handle_events(&mut events);
-            self.handle_commands();
+            self.handle_commands(false);
         }
         Ok(())
     }
@@ -213,29 +234,9 @@ impl App {
     }
 
     fn reset(&mut self) {
-        self.execution_engine.execute(&Command::Reset(false)); // FIXME debugger
+        self.execution_engine.execute(&Command::SysReset(false)); // FIXME
         self.next_keyboard_event = 0;
     }
-
-    /*
-    fn run_frame(&mut self, prev_overflow: i32) -> Result<i32, String> {
-        let overflow = self.execution_engine.run_frame(prev_overflow);
-        if self.execution_engine.get_c64().is_cpu_jam() {
-            self.handle_cpu_jam();
-        }
-        if !self.options.warp_mode {
-            self.execution_engine.sync_frame();
-        }
-        let rt = self.execution_engine.get_c64().get_frame_buffer();
-        if rt.borrow().get_sync() {
-            {
-                let frame_buffer = rt.borrow();
-                self.renderer.render(&frame_buffer)?;
-            }
-            rt.borrow_mut().set_sync(false);
-        }
-        Ok(overflow)
-    }*/
 
     fn set_state(&mut self, new_state: State) {
         if self.execution_engine.get_state() != new_state {
@@ -272,8 +273,9 @@ impl App {
 
     fn update_audio_state(&mut self) {
         match self.execution_engine.get_state() {
-            State::Paused => self.audio_device.pause(),
             State::Running => self.audio_device.resume(),
+            State::Paused => self.audio_device.pause(),
+            State::Halted => self.audio_device.pause(),
             State::Stopped => self.audio_device.pause(),
             _ => (),
         }
@@ -281,11 +283,25 @@ impl App {
 
     // -- Event Handling
 
-    fn handle_commands(&mut self) {
-        match self.command_rx.try_recv() {
-            Ok(command) => self.execution_engine.execute(&command),
-            _ => Ok(()),
-        };
+    fn handle_commands(&mut self, debugging: bool) {
+        if !debugging {
+            match self.command_rx.try_recv() {
+                Ok(command) => self.execution_engine.execute(&command),
+                _ => Ok(()),
+            };
+        } else {
+            let mut done = false;
+            while !done {
+                match self.command_rx.recv_timeout(Duration::from_millis(1)) {
+                    Ok(command) => {
+                        self.execution_engine.execute(&command);
+                    },
+                    _ => {
+                        done = true;
+                    },
+                }
+            }
+        }
     }
 
     fn handle_events(&mut self, events: &mut EventPump) {
@@ -298,6 +314,15 @@ impl App {
                 } => {
                     self.set_state(State::Stopped);
                 }
+                Event::KeyDown {
+                    keycode: Some(Keycode::H),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(keyboard::LALTMOD) =>
+                    {
+                        self.execution_engine.halt();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::M),
                     keymod,

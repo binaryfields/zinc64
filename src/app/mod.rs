@@ -29,6 +29,7 @@ mod execution;
 mod io;
 mod keymap;
 mod logger;
+mod rap_server;
 mod renderer;
 
 pub use self::app::{App, JamAction, Options};

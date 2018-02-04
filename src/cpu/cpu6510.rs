@@ -621,8 +621,16 @@ impl Cpu for Cpu6510 {
         self.a = value;
     }
 
+    fn set_p(&mut self, value: u8) {
+        self.p = value;
+    }
+
     fn set_pc(&mut self, value: u16) {
         self.pc = value;
+    }
+
+    fn set_sp(&mut self, value: u8) {
+        self.sp = value;
     }
 
     fn set_x(&mut self, value: u8) {

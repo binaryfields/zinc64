@@ -22,7 +22,6 @@ use std::path::Path;
 use std::io;
 use std::rc::Rc;
 use std::result::Result;
-use std::slice::Iter;
 use std::sync::{Arc, Mutex};
 
 use core::{
@@ -49,7 +48,7 @@ use device::{
 use device::joystick;
 
 use super::{Autostart, Config, Palette};
-use super::breakpoint::{Breakpoint, BreakpointManager};
+use super::breakpoint::BreakpointManager;
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -94,7 +93,6 @@ pub struct C64 {
     // Configuration
     autostart: Option<Autostart>,
     breakpoints: BreakpointManager,
-    bp_present: bool,
     // Runtime State
     clock: Rc<Clock>,
     frames: u32,
@@ -277,11 +275,18 @@ impl C64 {
             sound_buffer: sound_buffer.clone(),
             autostart: None,
             breakpoints: BreakpointManager::new(),
-            bp_present: false,
             clock,
             frames: 0,
             last_pc: 0,
         })
+    }
+
+    pub fn get_bpm(&self) -> &BreakpointManager {
+        &self.breakpoints
+    }
+
+    pub fn get_bpm_mut(&mut self) -> &mut BreakpointManager {
+        &mut self.breakpoints
     }
 
     pub fn get_clock(&self) -> Rc<Clock> {
@@ -362,6 +367,11 @@ impl C64 {
         self.autostart = autostart;
     }
 
+    #[inline]
+    pub fn check_breakpoints(&mut self) -> bool {
+        self.breakpoints.check(&self.cpu).is_some()
+    }
+
     pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
         let mut mem = self.ram.borrow_mut();
         let mut address = offset;
@@ -420,10 +430,11 @@ impl C64 {
             datassette_clone.borrow_mut().clock();
             clock_clone.tick();
         });
+        let bp_present = self.breakpoints.is_bp_present();
         let mut vsync = false;
         while !vsync {
             self.step_internal(&tick_fn);
-            if self.bp_present && self.check_breakpoints() {
+            if bp_present && self.check_breakpoints() {
                 break;
             }
             vsync = self.frame_buffer.borrow().get_sync();
@@ -470,42 +481,6 @@ impl C64 {
                 }
             }
         }
-    }
-
-    // -- Debug Ops
-
-    pub fn add_breakpoint(&mut self, address: u16, autodelete: bool) -> u16 {
-        let index = self.breakpoints.add(address, autodelete);
-        self.bp_present = self.breakpoints.is_active();
-        index
-    }
-
-    #[inline]
-    pub fn check_breakpoints(&mut self) -> bool {
-        let pc = self.cpu.borrow().get_pc();
-        self.breakpoints.check(pc)
-    }
-
-    pub fn enable_breakpoint(&mut self, index: Option<u16>, enabled: bool) -> bool {
-        let result = self.breakpoints.enable(index, enabled);
-        self.bp_present = self.breakpoints.is_active();
-        result
-    }
-
-    pub fn ignore_breakpoint(&mut self, index: u16, count: u16) -> bool {
-        let result = self.breakpoints.ignore(index, count);
-        self.bp_present = self.breakpoints.is_active();
-        result
-    }
-
-    pub fn list_breakpoints(&self) -> Iter<Breakpoint> {
-        self.breakpoints.list()
-    }
-
-    pub fn remove_breakpoint(&mut self, index: Option<u16>) -> bool {
-        let result = self.breakpoints.remove(index);
-        self.bp_present = self.breakpoints.is_active();
-        result
     }
 
     // -- Peripherals Ops

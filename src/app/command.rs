@@ -19,75 +19,64 @@
 
 use std::sync::mpsc::Sender;
 
-pub struct CpuState {
+#[allow(dead_code)]
+pub enum Command {
+    Attach(Sender<CommandResult>),
+    Detach,
+    // Breakpoint
+    BpClear,
+    BpCondition(u16, String, u32),
+    BpDisable(u16),
+    BpDisableAll,
+    BpEnable(u16),
+    BpEnableAll,
+    BpIgnore(u16, u16),
+    BpList,
+    BpRemove(u16),
+    BpSet(u16, bool),
+    // Debugger
+    Continue,
+    RegRead,
+    RegWrite(Vec<RegOp>),
+    Step,
+    // Memory
+    MemRead(u16, u16),
+    MemWrite(u16, Vec<u8>),
+    // System
+    SysIo(u16),
+    SysQuit,
+    SysReset(bool),
+    SysScreen,
+    SysStopwatch(bool),
+}
+
+#[allow(dead_code)]
+pub enum CommandResult {
+    Await,
+    Buffer(Vec<u8>),
+    Error(String),
+    Number(u16),
+    Registers(RegData),
+    Text(String),
+    Unit,
+}
+
+pub struct RegData {
     pub a: u8,
     pub x: u8,
     pub y: u8,
-    pub sp: u8,
     pub p: u8,
+    pub sp: u8,
     pub pc: u16,
     pub port_00: u8,
     pub port_01: u8,
 }
 
-pub struct InstructionInfo {
-    pub opcode: u8,
-    pub instr_bytes: Vec<u8>,
-    pub instr_text: String,
+pub enum RegOp {
+    SetA(u8),
+    SetX(u8),
+    SetY(u8),
+    SetP(u8),
+    SetSP(u8),
+    SetPC(u16),
 }
-
-pub struct SystemState {
-    pub pc: u16,
-}
-
-#[allow(dead_code)]
-pub enum Command {
-    Attach(Sender<Response>),
-    Detach,
-    Break,
-    // Machine
-    Goto(u16),
-    Io(u16),
-    Next(u16),
-    Registers,
-    Reset(bool),
-    Return,
-    Screen,
-    Step(u16),
-    Stopwatch(bool),
-    // Memory
-    Disassemble(Option<u16>, Option<u16>),
-    Compare(u16, u16, u16),
-    Fill(u16, u16, Vec<u8>),
-    Hunt(u16, u16, Vec<u8>),
-    MemChar(u16),
-    MemPetscii(u16, Option<u16>),
-    Move(u16, u16, u16),
-    Read(u16, Option<u16>),
-    Write(u16, Vec<u8>),
-    // Monitor
-    Exit,
-    Quit,
-    Radix(Option<u16>),
-    // Breakpoints
-    BpDelete(Option<u16>),
-    BpDisable(Option<u16>),
-    BpEnable(Option<u16>),
-    BpIgnore(u16, u16),
-    BpList,
-    BpSet(u16),
-    BpUntil(u16),
-}
-
-#[allow(dead_code)]
-pub enum CommandResult {
-    Empty,
-    Error(String),
-    Deferred,
-    ExecutionState(CpuState, InstructionInfo),
-    Memory(u16, Vec<u8>),
-    Registers(CpuState),
-    Text(Vec<String>),
-}
-
-pub struct Response(pub CommandResult, pub SystemState);

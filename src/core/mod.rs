@@ -65,7 +65,9 @@ pub trait Cpu {
     fn get_x(&self) -> u8;
     fn get_y(&self) -> u8;
     fn set_a(&mut self, value: u8);
+    fn set_p(&mut self, value: u8);
     fn set_pc(&mut self, value: u16);
+    fn set_sp(&mut self, value: u8);
     fn set_x(&mut self, value: u8);
     fn set_y(&mut self, value: u8);
     fn reset(&mut self);
