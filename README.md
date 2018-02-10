@@ -22,6 +22,8 @@ to assemble various accessories required to get software onto it. Soon enough I
 had picked up a copy of C64 Programmer's Reference Guide and the rest is now
 history.
 
+## Design
+
 ### Extensibility
 
 The emulator components may be swapped out by providing custom core::Factory trait
@@ -117,6 +119,36 @@ Here is an example how these components are used together:
 
 	to zinc64 project directory
 
+## Debugger
+
+To start the debugger, run the emulator with '-d' or '--debug' option. Optionally, you can specify '--debugaddress'
+to bind to a specific address.
+
+        ./target/release/zinc64 --debug
+
+To connect to the debugger, telnet to the address and port used by the debugger.
+
+        telnet localhost 9999
+
+Debugger commands and syntax are modeled after Vice emulator.  To see a list of available commands,
+type in the debugging session:
+
+        help
+
+or to get help on a specific command:
+
+        help <command>
+
+### Radare2
+
+Initial support for radare2 has been merged in version 0.3. To start the emulator with RAP server support, run
+
+        ./target/release/zinc64 --rap 127.0.0.1:9999
+
+and connect with
+
+        radare2 -a 6502 -d rap://localhost:9999/1
+
 ## Examples
 
 I've included a number of examples from Kick Assembler that I've used to test various components of the emulator. They can be found in the bin folder of this repository and started with the emulator's autostart option.
@@ -140,11 +172,6 @@ I've included a number of examples from Kick Assembler that I've used to test va
 The cpu validation was performed with the help of [Klaus2m5 functional tests](https://github.com/Klaus2m5/6502_65C02_functional_tests) for the 6502 processor 
 
         ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
-
-## Issues
-
-- VIC implementation is currently hacked up and needs more work
-- VIC bad line handling needs work
 
 ## Keyboard Shortcuts
 
