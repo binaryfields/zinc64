@@ -18,8 +18,6 @@
  */
 
 pub mod cia;
-mod cycle_counter;
-mod icr;
 mod rtc;
 mod timer;
 

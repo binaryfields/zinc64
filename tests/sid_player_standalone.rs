@@ -11,6 +11,7 @@ use zinc64::core::{
     IoPort,
     IrqLine,
     MemoryController,
+    Pin,
     Ram,
     CircularBuffer,
     TickFn,
@@ -70,6 +71,7 @@ static CODE_OFFSET: u16 = 0x1000;
 fn exec_sid_player() {
     let model = SystemModel::c64_pal();
     let clock = Rc::new(Clock::new());
+    let ba_line = Rc::new(RefCell::new(Pin::new_high()));
     let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
     let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
     let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
@@ -91,6 +93,7 @@ fn exec_sid_player() {
         SimpleMemory::new(ram.clone(), sid.clone())
     ));
     let mut cpu = Cpu6510::new(
+        ba_line,
         cpu_io_port,
         cpu_irq,
         cpu_nmi,

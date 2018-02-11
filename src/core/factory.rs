@@ -74,6 +74,7 @@ pub trait Factory {
     fn new_vic(
         &self,
         chip_model: VicModel,
+        ba_line: Rc<RefCell<Pin>>,
         charset: Rc<RefCell<Rom>>,
         cia_2_port_a: Rc<RefCell<IoPort>>,
         color_ram: Rc<RefCell<Ram>>,
@@ -118,6 +119,7 @@ pub trait Factory {
 
     fn new_cpu(
         &self,
+        ba_line: Rc<RefCell<Pin>>,
         io_port: Rc<RefCell<IoPort>>,
         irq: Rc<RefCell<IrqLine>>,
         nmi: Rc<RefCell<IrqLine>>,

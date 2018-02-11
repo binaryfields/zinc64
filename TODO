@@ -1,5 +1,12 @@
 # TODO
 
+- system/condition keep fmt together
+- migrate to euclid
+- integrate github ci
+- add linux and windows builds
+- publish to crates
+- upgrade license to gpl3
+
 - chipset: rewrite vic
 - device: add floppy support
 - app: add screenshot support

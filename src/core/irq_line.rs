@@ -22,40 +22,37 @@ use log::LogLevel;
 
 pub struct IrqLine {
     kind: &'static str,
-    line: u8,
+    signal: u8,
 }
 
 impl IrqLine {
     pub fn new(kind: &'static str) -> IrqLine {
         IrqLine {
             kind,
-            line: 0,
+            signal: 0,
         }
-    }
-
-    #[inline]
-    pub fn clear(&mut self, source: usize) {
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::int", "Clear {}, source {:?}", self.kind, source);
-        }
-        self.line.set_bit(source, false);
     }
 
     #[inline]
     pub fn is_low(&self) -> bool {
-        self.line != 0
+        self.signal != 0
     }
 
     #[inline]
     pub fn reset(&mut self) {
-        self.line = 0;
+        self.signal = 0;
     }
 
     #[inline]
-    pub fn set(&mut self, source: usize) {
+    pub fn set_low(&mut self, source: usize, value: bool) {
         if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::int", "Set {}, source {:?}", self.kind, source);
+            trace!(
+                target: "cpu::int", "{}.{:?} {}",
+                self.kind,
+                source,
+                if value { "set " } else { "cleared " }
+            );
         }
-        self.line.set_bit(source, true);
+        self.signal.set_bit(source, value);
     }
 }

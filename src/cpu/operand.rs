@@ -152,7 +152,7 @@ impl fmt::Display for Operand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::{IoPort, IrqLine, MemoryController, Ram};
+    use core::{IoPort, IrqLine, MemoryController, Pin, Ram};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -179,11 +179,12 @@ mod tests {
     }
 
     fn setup_cpu() -> Cpu6510 {
+        let ba_line = Rc::new(RefCell::new(Pin::new_high()));
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
-        Cpu6510::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
+        Cpu6510::new(ba_line, cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
     #[test]

@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use core::{Cpu, IoPort, IrqLine, MemoryController, TickFn};
+use core::{Cpu, IoPort, IrqLine, MemoryController, Pin, TickFn};
 use log::LogLevel;
 
 use super::instruction::Instruction;
@@ -77,16 +77,20 @@ pub struct Cpu6510 {
     pc: u16,
     sp: u8,
     // I/O
+    ba_line: Rc<RefCell<Pin>>,
     io_port: Rc<RefCell<IoPort>>,
     irq: Rc<RefCell<IrqLine>>,
     nmi: Rc<RefCell<IrqLine>>,
 }
 
 impl Cpu6510 {
-    pub fn new(io_port: Rc<RefCell<IoPort>>,
-               irq: Rc<RefCell<IrqLine>>,
-               nmi: Rc<RefCell<IrqLine>>,
-               mem: Rc<RefCell<MemoryController>>) -> Cpu6510 {
+    pub fn new(
+        ba_line: Rc<RefCell<Pin>>,
+        io_port: Rc<RefCell<IoPort>>,
+        irq: Rc<RefCell<IrqLine>>,
+        nmi: Rc<RefCell<IrqLine>>,
+        mem: Rc<RefCell<MemoryController>>,
+    ) -> Cpu6510 {
         Cpu6510 {
             mem,
             a: 0,
@@ -95,6 +99,7 @@ impl Cpu6510 {
             p: 0,
             pc: 0,
             sp: 0,
+            ba_line,
             io_port,
             irq,
             nmi,
@@ -658,6 +663,9 @@ impl Cpu for Cpu6510 {
     }
 
     fn step(&mut self, tick_fn: &TickFn) {
+        while self.ba_line.borrow().is_low() {
+            tick_fn();
+        }
         if self.nmi.borrow().is_low() {
             self.interrupt(Interrupt::Nmi, tick_fn);
         } else if self.irq.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
@@ -699,41 +707,13 @@ impl fmt::Display for Cpu6510 {
             self.x,
             self.y,
             self.sp,
-            if (self.p & Flag::Negative as u8) != 0 {
-                "N"
-            } else {
-                "n"
-            },
-            if (self.p & Flag::Overflow as u8) != 0 {
-                "V"
-            } else {
-                "v"
-            },
-            if (self.p & Flag::Decimal as u8) != 0 {
-                "B"
-            } else {
-                "b"
-            },
-            if (self.p & Flag::Decimal as u8) != 0 {
-                "D"
-            } else {
-                "d"
-            },
-            if (self.p & Flag::IntDisable as u8) != 0 {
-                "I"
-            } else {
-                "i"
-            },
-            if (self.p & Flag::Zero as u8) != 0 {
-                "Z"
-            } else {
-                "z"
-            },
-            if (self.p & Flag::Carry as u8) != 0 {
-                "C"
-            } else {
-                "c"
-            }
+            if (self.p & Flag::Negative as u8) != 0 { "N" } else { "n" },
+            if (self.p & Flag::Overflow as u8) != 0 { "V" } else { "v" },
+            if (self.p & Flag::Decimal as u8) != 0 { "B" } else { "b" },
+            if (self.p & Flag::Decimal as u8) != 0 { "D" } else { "d" },
+            if (self.p & Flag::IntDisable as u8) != 0 { "I" } else { "i" },
+            if (self.p & Flag::Zero as u8) != 0 { "Z" } else { "z" },
+            if (self.p & Flag::Carry as u8) != 0 { "C" } else { "c" }
         )
     }
 }
@@ -767,11 +747,12 @@ mod tests {
     }
 
     fn setup_cpu() -> Cpu6510 {
+        let ba_line = Rc::new(RefCell::new(Pin::new_high()));
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
-        Cpu6510::new(cpu_io_port, cpu_irq, cpu_nmi, mem)
+        Cpu6510::new(ba_line, cpu_io_port, cpu_irq, cpu_nmi, mem)
     }
 
     #[test]

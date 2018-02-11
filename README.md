@@ -163,7 +163,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 | Message.prg              | Pass    |
 | MusicIrq.prg             | Pass    |
 | Scroll.prg               | Pass    |
-| SID_Player.prg           | Fails   |
+| SID_Player.prg           | Pass    |
 | SimpleSplits.prg         | Fails   |
 | SineAndGraphics.prg      | Pass    |
 

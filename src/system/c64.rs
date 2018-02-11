@@ -119,6 +119,7 @@ impl C64 {
         ));
 
         // I/O Lines
+        let ba_line = Rc::new(RefCell::new(Pin::new_high()));
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
@@ -170,6 +171,7 @@ impl C64 {
         );
         let vic = factory.new_vic(
             config.model.vic_model,
+            ba_line.clone(),
             charset.clone(),
             cia_2_port_a.clone(),
             color_ram.clone(),
@@ -197,6 +199,7 @@ impl C64 {
             vic.clone(),
         );
         let cpu = factory.new_cpu(
+            ba_line.clone(),
             cpu_io_port.clone(),
             cpu_irq.clone(),
             cpu_nmi.clone(),

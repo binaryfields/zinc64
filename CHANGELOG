@@ -98,3 +98,7 @@
 
 - landed nicer debugging support
 
+### Week 14 - 20180210
+
+- landed vic rewrite part 1
+- milestone 10: run sid_player.prg

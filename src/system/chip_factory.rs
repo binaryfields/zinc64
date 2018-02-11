@@ -130,6 +130,7 @@ impl Factory for ChipFactory {
     fn new_vic(
         &self,
         chip_model: VicModel,
+        ba_line: Rc<RefCell<Pin>>,
         charset: Rc<RefCell<Rom>>,
         cia_2_port_a: Rc<RefCell<IoPort>>,
         color_ram: Rc<RefCell<Ram>>,
@@ -147,6 +148,7 @@ impl Factory for ChipFactory {
         Rc::new(RefCell::new(
             Vic::new(
                 chip_model,
+                ba_line,
                 color_ram,
                 cpu_irq,
                 frame_buffer,
@@ -222,6 +224,7 @@ impl Factory for ChipFactory {
 
     fn new_cpu(
         &self,
+        ba_line: Rc<RefCell<Pin>>,
         io_port: Rc<RefCell<IoPort>>,
         irq: Rc<RefCell<IrqLine>>,
         nmi: Rc<RefCell<IrqLine>>,
@@ -229,6 +232,7 @@ impl Factory for ChipFactory {
     ) -> Rc<RefCell<Cpu>> {
         Rc::new(RefCell::new(
             Cpu6510::new(
+                ba_line,
                 io_port,
                 irq,
                 nmi,

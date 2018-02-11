@@ -21,9 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::Pin;
-
-use super::cycle_counter::CycleCounter;
+use core::{CycleCounter, Pin};
 
 // SPEC: A Software Model of the CIA6526 by Wolfgang Lorenz
 

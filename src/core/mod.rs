@@ -19,11 +19,13 @@
 
 mod circular_buffer;
 mod clock;
+mod cycle_counter;
 mod factory;
 mod frame_buffer;
 pub mod geo;
-mod ioport;
-mod irqline;
+mod io_port;
+mod irq_control;
+mod irq_line;
 mod system_model;
 mod pin;
 mod ram;
@@ -31,10 +33,12 @@ mod rom;
 
 pub use self::circular_buffer::CircularBuffer;
 pub use self::clock::Clock;
+pub use self::cycle_counter::CycleCounter;
 pub use self::factory::Factory;
 pub use self::frame_buffer::FrameBuffer;
-pub use self::ioport::IoPort;
-pub use self::irqline::IrqLine;
+pub use self::io_port::IoPort;
+pub use self::irq_control::IrqControl;
+pub use self::irq_line::IrqLine;
 pub use self::system_model::{SystemModel, SidModel, VicModel};
 pub use self::pin::Pin;
 pub use self::ram::Ram;
