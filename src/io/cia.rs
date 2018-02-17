@@ -246,7 +246,9 @@ impl Chip for Cia {
             self.interrupt_delay.feed(IntDelay::Interrupt0 as u16);
         }
         if self.interrupt_delay.has_cycle(IntDelay::Interrupt1 as u16) {
-            self.irq_line.borrow_mut().set_low(self.mode.irq_source(), true);
+            self.irq_line
+                .borrow_mut()
+                .set_low(self.mode.irq_source(), true);
         }
         self.interrupt_delay.clock();
     }
@@ -331,12 +333,12 @@ impl Chip for Cia {
                 let data = self.interrupt_control.get_data();
                 self.interrupt_control.clear();
                 self.interrupt_delay.reset();
-                self.irq_line.borrow_mut().set_low(self.mode.irq_source(), false);
+                self.irq_line
+                    .borrow_mut()
+                    .set_low(self.mode.irq_source(), false);
                 data
             }
-            Reg::CRA => {
-                self.timer_a.get_config()
-            }
+            Reg::CRA => self.timer_a.get_config(),
             Reg::CRB => {
                 let mut config = self.timer_b.get_config();
                 config.set_bit(7, self.tod_set_alarm);

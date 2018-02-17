@@ -24,49 +24,48 @@ use zinc64::device::keyboard::{Key, KeyEvent};
 pub struct KeyMap;
 
 impl KeyMap {
-
     pub fn map_key(keycode: Keycode, keymod: Mod) -> Option<KeyEvent> {
         match keycode {
             // Numerical
             Keycode::Num0
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num9))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num9))
+            }
             Keycode::Num0 => Some(KeyEvent::new(Key::Num0)),
             Keycode::Num1 => Some(KeyEvent::new(Key::Num1)),
             Keycode::Num2
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::At))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::At))
+            }
             Keycode::Num2 => Some(KeyEvent::new(Key::Num2)),
             Keycode::Num3 => Some(KeyEvent::new(Key::Num3)),
             Keycode::Num4 => Some(KeyEvent::new(Key::Num4)),
             Keycode::Num5 => Some(KeyEvent::new(Key::Num5)),
             Keycode::Num6
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num7))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num7))
+            }
             Keycode::Num6 => Some(KeyEvent::new(Key::Num6)),
             Keycode::Num7
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num6))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num6))
+            }
             Keycode::Num7 => Some(KeyEvent::new(Key::Num7)),
             Keycode::Num8
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::Asterisk))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::Asterisk))
+            }
             Keycode::Num8 => Some(KeyEvent::new(Key::Num8)),
             Keycode::Num9
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num8))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num8))
+            }
             Keycode::Num9 => Some(KeyEvent::new(Key::Num9)),
             // Alpha
             Keycode::A => Some(KeyEvent::new(Key::A)),
@@ -99,38 +98,38 @@ impl KeyMap {
             Keycode::Asterisk => Some(KeyEvent::new(Key::Asterisk)),
             Keycode::At => Some(KeyEvent::new(Key::At)),
             Keycode::Backslash
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_mod(Key::Minus, Key::LShift))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_mod(Key::Minus, Key::LShift))
+            }
             Keycode::Backspace => Some(KeyEvent::new(Key::Backspace)),
             Keycode::Caret => Some(KeyEvent::new(Key::Caret)),
             Keycode::Colon => Some(KeyEvent::new(Key::Colon)),
             Keycode::Comma => Some(KeyEvent::new(Key::Comma)),
             Keycode::Dollar => Some(KeyEvent::new(Key::Dollar)),
             Keycode::Equals
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::Plus))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::Plus))
+            }
             Keycode::Equals => Some(KeyEvent::new(Key::Equals)),
             Keycode::LeftBracket => Some(KeyEvent::with_mod(Key::Colon, Key::LShift)),
             Keycode::Minus => Some(KeyEvent::new(Key::Minus)),
             Keycode::Period => Some(KeyEvent::new(Key::Period)),
             Keycode::Plus => Some(KeyEvent::new(Key::Plus)),
             Keycode::Quote
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num2))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num2))
+            }
             Keycode::Quote => Some(KeyEvent::with_mod(Key::Num7, Key::LShift)),
             Keycode::Return => Some(KeyEvent::new(Key::Return)),
             Keycode::RightBracket => Some(KeyEvent::with_mod(Key::Semicolon, Key::LShift)),
             Keycode::Semicolon
-            if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::Colon))
-                }
+                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::Colon))
+            }
             Keycode::Semicolon => Some(KeyEvent::new(Key::Semicolon)),
             Keycode::Slash => Some(KeyEvent::new(Key::Slash)),
             Keycode::Space => Some(KeyEvent::new(Key::Space)),

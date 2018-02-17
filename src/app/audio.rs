@@ -42,7 +42,7 @@ impl AppAudio {
         sample_rate: i32,
         channels: u8,
         buffer_size: u16,
-        buffer: Arc<Mutex<CircularBuffer>>
+        buffer: Arc<Mutex<CircularBuffer>>,
     ) -> Result<AudioDevice<AppAudio>, String> {
         let audio_spec = AudioSpecDesired {
             freq: Some(sample_rate),
@@ -55,7 +55,7 @@ impl AppAudio {
                 buffer,
                 mute: false,
                 scaler: SCALER_MAX,
-                volume: VOLUME_MAX
+                volume: VOLUME_MAX,
             }
         })?;
         Ok(audio_device)

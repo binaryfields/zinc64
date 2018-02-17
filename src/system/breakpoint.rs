@@ -91,9 +91,7 @@ impl BreakpointManager {
     }
 
     pub fn is_bp_present(&self) -> bool {
-        self.breakpoints.iter()
-            .position(|bp| bp.enabled)
-            .is_some()
+        self.breakpoints.iter().position(|bp| bp.enabled).is_some()
     }
 
     pub fn ignore(&mut self, index: u16, count: u16) -> Result<(), String> {
@@ -135,7 +133,12 @@ impl BreakpointManager {
         index
     }
 
-    pub fn set_condition(&mut self, index: u16, expr: &String, radix: Option<u32>) -> Result<(), String> {
+    pub fn set_condition(
+        &mut self,
+        index: u16,
+        expr: &String,
+        radix: Option<u32>,
+    ) -> Result<(), String> {
         match self.find_mut(index) {
             Some(bp) => {
                 let condition = Condition::parse(expr.as_str(), radix)?;

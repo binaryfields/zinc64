@@ -43,15 +43,13 @@ impl Io {
         sdl_joystick: &sdl2::JoystickSubsystem,
         keyboard: Rc<RefCell<Keyboard>>,
         joystick1: Option<Rc<RefCell<Joystick>>>,
-        joystick2: Option<Rc<RefCell<Joystick>>>
+        joystick2: Option<Rc<RefCell<Joystick>>>,
     ) -> Result<Io, String> {
         sdl_joystick.set_event_state(true);
         let sdl_joystick1 = joystick1.as_ref().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
                 info!(target: "ui", "Opening joystick {}", joystick.borrow().get_index());
-                sdl_joystick
-                    .open(joystick.borrow().get_index() as u32)
-                    .ok()
+                sdl_joystick.open(joystick.borrow().get_index() as u32).ok()
             } else {
                 None
             }
@@ -59,9 +57,7 @@ impl Io {
         let sdl_joystick2 = joystick2.as_ref().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
                 info!(target: "ui", "Opening joystick {}", joystick.borrow().get_index());
-                sdl_joystick
-                    .open(joystick.borrow().get_index() as u32)
-                    .ok()
+                sdl_joystick.open(joystick.borrow().get_index() as u32).ok()
             } else {
                 None
             }

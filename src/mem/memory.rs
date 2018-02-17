@@ -81,7 +81,6 @@ impl Memory {
             ram,
         }
     }
-
 }
 
 impl MemoryController for Memory {
@@ -146,7 +145,11 @@ mod tests {
     fn setup_memory() -> Memory {
         let basic = Rc::new(RefCell::new(Rom::new(0x1000, BaseAddr::Basic.addr(), 0x10)));
         let charset = Rc::new(RefCell::new(Rom::new(0x1000, 0x0000, 0x11)));
-        let kernal = Rc::new(RefCell::new(Rom::new(0x1000, BaseAddr::Kernal.addr(), 0x12)));
+        let kernal = Rc::new(RefCell::new(Rom::new(
+            0x1000,
+            BaseAddr::Kernal.addr(),
+            0x12,
+        )));
         let mut mmio = Box::new(Ram::new(0x10000));
         mmio.fill(0x22);
         let expansion_port = Rc::new(RefCell::new(Ram::new(0x1000)));

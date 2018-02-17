@@ -67,11 +67,9 @@ impl Loader for BinLoader {
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
-        Ok(Box::new(
-            BinImage {
-                data,
-                offset: self.offset,
-            }
-        ))
+        Ok(Box::new(BinImage {
+            data,
+            offset: self.offset,
+        }))
     }
 }

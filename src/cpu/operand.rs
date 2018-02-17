@@ -97,7 +97,7 @@ impl Operand {
                     tick_fn();
                 }
                 ea
-            },
+            }
         }
     }
 

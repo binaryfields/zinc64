@@ -35,10 +35,7 @@ pub struct Autostart {
 
 impl Autostart {
     pub fn new(mode: Mode, image: Box<Image>) -> Autostart {
-        Autostart {
-            mode,
-            image,
-        }
+        Autostart { mode, image }
     }
 
     pub fn execute(&mut self, c64: &mut C64) {

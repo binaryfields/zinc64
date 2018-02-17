@@ -25,9 +25,7 @@ pub struct ConsoleApp {
 
 impl ConsoleApp {
     pub fn new(c64: C64) -> ConsoleApp {
-        ConsoleApp {
-            c64
-        }
+        ConsoleApp { c64 }
     }
 
     pub fn run(&mut self) {

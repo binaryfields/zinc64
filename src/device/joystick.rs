@@ -105,27 +105,27 @@ impl Joystick {
             0 if value < -self.threshold => {
                 self.set_state(Button::Left.bit(), true);
                 self.set_state(Button::Right.bit(), false);
-            },
+            }
             0 if value > self.threshold => {
                 self.set_state(Button::Left.bit(), false);
                 self.set_state(Button::Right.bit(), true);
-            },
+            }
             0 => {
                 self.set_state(Button::Left.bit(), false);
                 self.set_state(Button::Right.bit(), false);
-            },
+            }
             1 if value < -self.threshold => {
                 self.set_state(Button::Up.bit(), false);
                 self.set_state(Button::Down.bit(), true);
-            },
+            }
             1 if value > self.threshold => {
                 self.set_state(Button::Up.bit(), true);
                 self.set_state(Button::Down.bit(), false);
-            },
+            }
             1 => {
                 self.set_state(Button::Up.bit(), false);
                 self.set_state(Button::Down.bit(), false);
-            },
+            }
             _ => panic!("invalid axis {}", axis_idx),
         }
     }

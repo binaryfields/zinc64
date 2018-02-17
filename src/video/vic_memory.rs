@@ -32,7 +32,7 @@ impl VicMemory {
     pub fn new(
         charset: Rc<RefCell<Rom>>,
         cia_2_port_a: Rc<RefCell<IoPort>>,
-        ram: Rc<RefCell<Ram>>
+        ram: Rc<RefCell<Ram>>,
     ) -> VicMemory {
         VicMemory {
             charset,

@@ -34,10 +34,7 @@ impl Rom {
         for i in 0..data.len() {
             data[i] = pattern;
         }
-        Rom {
-            data,
-            offset,
-        }
+        Rom { data, offset }
     }
 
     pub fn load(path: &Path, offset: u16) -> Result<Rom, io::Error> {

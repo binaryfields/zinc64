@@ -27,10 +27,7 @@ pub struct IrqLine {
 
 impl IrqLine {
     pub fn new(kind: &'static str) -> IrqLine {
-        IrqLine {
-            kind,
-            signal: 0,
-        }
+        IrqLine { kind, signal: 0 }
     }
 
     #[inline]

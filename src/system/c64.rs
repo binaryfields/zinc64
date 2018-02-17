@@ -24,27 +24,9 @@ use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
-use core::{
-    Chip,
-    CircularBuffer,
-    Clock,
-    Cpu,
-    Factory,
-    FrameBuffer,
-    IoPort,
-    IrqLine,
-    Pin,
-    Ram,
-    TickFn,
-};
-use device::{
-    Cartridge,
-    Datassette,
-    ExpansionPort,
-    Joystick,
-    Keyboard,
-    Tape,
-};
+use core::{Chip, CircularBuffer, Clock, Cpu, Factory, FrameBuffer, IoPort, IrqLine, Pin, Ram,
+           TickFn};
+use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 use device::joystick;
 
 use super::{Autostart, Config, Palette};
@@ -104,19 +86,17 @@ impl C64 {
         info!(target: "c64", "Initializing system");
         // Buffers
         let clock = Rc::new(Clock::new());
-        let frame_buffer = Rc::new(RefCell::new(
-            FrameBuffer::new(
-                config.model.frame_buffer_size.0,
-                config.model.frame_buffer_size.1,
-                Palette::default(),
-            )
-        ));
+        let frame_buffer = Rc::new(RefCell::new(FrameBuffer::new(
+            config.model.frame_buffer_size.0,
+            config.model.frame_buffer_size.1,
+            Palette::default(),
+        )));
         let joystick_1_state = Rc::new(Cell::new(0u8));
         let joystick_2_state = Rc::new(Cell::new(0u8));
         let keyboard_matrix = Rc::new(RefCell::new([0; 8]));
-        let sound_buffer = Arc::new(Mutex::new(
-            CircularBuffer::new(config.sound.buffer_size << 2),
-        ));
+        let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(
+            config.sound.buffer_size << 2,
+        )));
 
         // I/O Lines
         let ba_line = Rc::new(RefCell::new(Pin::new_high()));
@@ -134,18 +114,9 @@ impl C64 {
         // Memory
         let color_ram = factory.new_ram(config.model.color_ram);
         let ram = factory.new_ram(config.model.memory_size);
-        let basic = factory.new_rom(
-            Path::new("res/rom/basic.rom"),
-            BaseAddr::Basic.addr(),
-        )?;
-        let charset = factory.new_rom(
-            Path::new("res/rom/characters.rom"),
-            0,
-        )?;
-        let kernal = factory.new_rom(
-            Path::new("res/rom/kernal.rom"),
-            BaseAddr::Kernal.addr(),
-        )?;
+        let basic = factory.new_rom(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?;
+        let charset = factory.new_rom(Path::new("res/rom/characters.rom"), 0)?;
+        let kernal = factory.new_rom(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?;
 
         // Chipset
         let cia1 = factory.new_cia1(
@@ -164,11 +135,7 @@ impl C64 {
             cpu_nmi.clone(),
             keyboard_matrix.clone(),
         );
-        let sid = factory.new_sid(
-            &config.model,
-            clock.clone(),
-            sound_buffer.clone(),
-        );
+        let sid = factory.new_sid(&config.model, clock.clone(), sound_buffer.clone());
         let vic = factory.new_vic(
             config.model.vic_model,
             ba_line.clone(),
@@ -181,11 +148,7 @@ impl C64 {
         );
 
         // Memory Controller and Processor
-        let expansion_port = Rc::new(RefCell::new(
-            ExpansionPort::new(
-                exp_io_line.clone()
-            )
-        ));
+        let expansion_port = Rc::new(RefCell::new(ExpansionPort::new(exp_io_line.clone())));
         let mem = factory.new_memory(
             cia1.clone(),
             cia2.clone(),
@@ -207,37 +170,29 @@ impl C64 {
         );
 
         // Peripherals
-        let datassette = Rc::new(RefCell::new(
-            Datassette::new(
-                cia_1_flag.clone(),
-                cpu_io_port.clone(),
-            )
-        ));
+        let datassette = Rc::new(RefCell::new(Datassette::new(
+            cia_1_flag.clone(),
+            cpu_io_port.clone(),
+        )));
         let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(
-                Joystick::new(
-                    config.joystick.joystick_1,
-                    config.joystick.axis_motion_threshold,
-                    joystick_1_state.clone(),
-                )
-            )))
+            Some(Rc::new(RefCell::new(Joystick::new(
+                config.joystick.joystick_1,
+                config.joystick.axis_motion_threshold,
+                joystick_1_state.clone(),
+            ))))
         } else {
             None
         };
         let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(
-                Joystick::new(
-                    config.joystick.joystick_2,
-                    config.joystick.axis_motion_threshold,
-                    joystick_2_state.clone(),
-                )
-            )))
+            Some(Rc::new(RefCell::new(Joystick::new(
+                config.joystick.joystick_2,
+                config.joystick.axis_motion_threshold,
+                joystick_2_state.clone(),
+            ))))
         } else {
             None
         };
-        let keyboard = Rc::new(RefCell::new(
-            Keyboard::new(keyboard_matrix.clone())
-        ));
+        let keyboard = Rc::new(RefCell::new(Keyboard::new(keyboard_matrix.clone())));
 
         // Observers
         let exp_io_line_clone_1 = exp_io_line.clone();

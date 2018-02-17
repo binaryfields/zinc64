@@ -23,26 +23,11 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{
-    Addressable,
-    Chip,
-    CircularBuffer,
-    Clock,
-    Cpu,
-    Factory,
-    FrameBuffer,
-    IrqLine,
-    IoPort,
-    MemoryController,
-    SystemModel,
-    Pin,
-    Ram,
-    Rom,
-    VicModel,
-};
+use core::{Addressable, Chip, CircularBuffer, Clock, Cpu, Factory, FrameBuffer, IoPort, IrqLine,
+           MemoryController, Pin, Ram, Rom, SystemModel, VicModel};
 use cpu::Cpu6510;
 use device::ExpansionPort;
-use mem::{Mmio, Memory};
+use mem::{Memory, Mmio};
 use io::Cia;
 use io::cia;
 use sound::Sid;
@@ -62,7 +47,6 @@ impl ChipFactory {
 }
 
 impl Factory for ChipFactory {
-
     // -- Chipset
 
     fn new_cia1(
@@ -75,18 +59,16 @@ impl Factory for ChipFactory {
         joystick_2: Rc<Cell<u8>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
     ) -> Rc<RefCell<Chip>> {
-        Rc::new(RefCell::new(
-            Cia::new(
-                cia::Mode::Cia1,
-                cia_flag,
-                cia_port_a,
-                cia_port_b,
-                irq_line,
-                Some(joystick_1),
-                Some(joystick_2),
-                keyboard_matrix,
-            )
-        ))
+        Rc::new(RefCell::new(Cia::new(
+            cia::Mode::Cia1,
+            cia_flag,
+            cia_port_a,
+            cia_port_b,
+            irq_line,
+            Some(joystick_1),
+            Some(joystick_2),
+            keyboard_matrix,
+        )))
     }
 
     fn new_cia2(
@@ -97,18 +79,16 @@ impl Factory for ChipFactory {
         irq_line: Rc<RefCell<IrqLine>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
     ) -> Rc<RefCell<Chip>> {
-        Rc::new(RefCell::new(
-            Cia::new(
-                cia::Mode::Cia2,
-                cia_flag,
-                cia_port_a,
-                cia_port_b,
-                irq_line,
-                None,
-                None,
-                keyboard_matrix,
-            )
-        ))
+        Rc::new(RefCell::new(Cia::new(
+            cia::Mode::Cia2,
+            cia_flag,
+            cia_port_a,
+            cia_port_b,
+            irq_line,
+            None,
+            None,
+            keyboard_matrix,
+        )))
     }
 
     fn new_sid(
@@ -138,34 +118,21 @@ impl Factory for ChipFactory {
         frame_buffer: Rc<RefCell<FrameBuffer>>,
         ram: Rc<RefCell<Ram>>,
     ) -> Rc<RefCell<Chip>> {
-        let vic_mem = Rc::new(RefCell::new(
-            VicMemory::new(
-                charset,
-                cia_2_port_a,
-                ram,
-            )
-        ));
-        Rc::new(RefCell::new(
-            Vic::new(
-                chip_model,
-                ba_line,
-                color_ram,
-                cpu_irq,
-                frame_buffer,
-                vic_mem,
-            )
-        ))
+        let vic_mem = Rc::new(RefCell::new(VicMemory::new(charset, cia_2_port_a, ram)));
+        Rc::new(RefCell::new(Vic::new(
+            chip_model,
+            ba_line,
+            color_ram,
+            cpu_irq,
+            frame_buffer,
+            vic_mem,
+        )))
     }
 
     // -- Memory
 
-    fn new_expansion_port(
-        &self,
-        exp_io_line: Rc<RefCell<IoPort>>,
-    ) -> Rc<RefCell<Addressable>> {
-        Rc::new(RefCell::new(
-            ExpansionPort::new(exp_io_line)
-        ))
+    fn new_expansion_port(&self, exp_io_line: Rc<RefCell<IoPort>>) -> Rc<RefCell<Addressable>> {
+        Rc::new(RefCell::new(ExpansionPort::new(exp_io_line)))
     }
 
     fn new_memory(
@@ -181,41 +148,29 @@ impl Factory for ChipFactory {
         sid: Rc<RefCell<Chip>>,
         vic: Rc<RefCell<Chip>>,
     ) -> Rc<RefCell<MemoryController>> {
-        let io = Box::new(
-            Mmio::new(
-                cia1,
-                cia2,
-                color_ram,
-                expansion_port.clone(),
-                sid,
-                vic,
-            )
-        );
-        Rc::new(RefCell::new(
-            Memory::new(
-                expansion_port.clone(),
-                io,
-                ram,
-                rom_basic,
-                rom_charset,
-                rom_kernal,
-            )
-        ))
+        let io = Box::new(Mmio::new(
+            cia1,
+            cia2,
+            color_ram,
+            expansion_port.clone(),
+            sid,
+            vic,
+        ));
+        Rc::new(RefCell::new(Memory::new(
+            expansion_port.clone(),
+            io,
+            ram,
+            rom_basic,
+            rom_charset,
+            rom_kernal,
+        )))
     }
 
-    fn new_ram(
-        &self,
-        capacity: usize,
-    ) -> Rc<RefCell<Ram>> {
-        Rc::new(RefCell::new(
-            Ram::new(capacity)
-        ))
+    fn new_ram(&self, capacity: usize) -> Rc<RefCell<Ram>> {
+        Rc::new(RefCell::new(Ram::new(capacity)))
     }
 
-    fn new_rom(&self,
-               path: &Path,
-               offset: u16,
-    ) -> Result<Rc<RefCell<Rom>>, io::Error> {
+    fn new_rom(&self, path: &Path, offset: u16) -> Result<Rc<RefCell<Rom>>, io::Error> {
         let rom = Rom::load(path, offset)?;
         Ok(Rc::new(RefCell::new(rom)))
     }
@@ -230,14 +185,6 @@ impl Factory for ChipFactory {
         nmi: Rc<RefCell<IrqLine>>,
         mem: Rc<RefCell<MemoryController>>,
     ) -> Rc<RefCell<Cpu>> {
-        Rc::new(RefCell::new(
-            Cpu6510::new(
-                ba_line,
-                io_port,
-                irq,
-                nmi,
-                mem,
-            )
-        ))
+        Rc::new(RefCell::new(Cpu6510::new(ba_line, io_port, irq, nmi, mem)))
     }
 }

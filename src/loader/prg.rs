@@ -67,11 +67,6 @@ impl Loader for PrgLoader {
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
-        Ok(Box::new(
-            PrgImage {
-                data,
-                offset,
-            }
-        ))
+        Ok(Box::new(PrgImage { data, offset }))
     }
 }

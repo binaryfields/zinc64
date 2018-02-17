@@ -39,7 +39,7 @@ pub use self::frame_buffer::FrameBuffer;
 pub use self::io_port::IoPort;
 pub use self::irq_control::IrqControl;
 pub use self::irq_line::IrqLine;
-pub use self::system_model::{SystemModel, SidModel, VicModel};
+pub use self::system_model::{SidModel, SystemModel, VicModel};
 pub use self::pin::Pin;
 pub use self::ram::Ram;
 pub use self::rom::Rom;

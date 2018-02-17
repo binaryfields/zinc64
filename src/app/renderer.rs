@@ -40,7 +40,7 @@ impl Renderer {
         sdl_video: &sdl2::VideoSubsystem,
         window_size: geo::Size,
         screen_size: geo::Size,
-        fullscreen: bool
+        fullscreen: bool,
     ) -> Result<Renderer, String> {
         let mut builder = sdl_video.window("zinc64", window_size.width, window_size.height);
         builder.opengl();
@@ -72,7 +72,11 @@ impl Renderer {
 
     pub fn render(&mut self, frame_buffer: &FrameBuffer) -> Result<(), String> {
         self.texture
-            .update(None, frame_buffer.get_pixel_data(), frame_buffer.get_pitch())
+            .update(
+                None,
+                frame_buffer.get_pixel_data(),
+                frame_buffer.get_pitch(),
+            )
             .map_err(|_| "failed to update texture")?;
         self.canvas.clear();
         self.canvas.copy(&self.texture, None, None)?;

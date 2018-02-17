@@ -23,25 +23,10 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{
-    Addressable,
-    Chip,
-    CircularBuffer,
-    Clock,
-    Cpu,
-    FrameBuffer,
-    IrqLine,
-    IoPort,
-    MemoryController,
-    SystemModel,
-    Pin,
-    Ram,
-    Rom,
-    VicModel,
-};
+use core::{Addressable, Chip, CircularBuffer, Clock, Cpu, FrameBuffer, IoPort, IrqLine,
+           MemoryController, Pin, Ram, Rom, SystemModel, VicModel};
 
 pub trait Factory {
-
     // -- Chipset
 
     fn new_cia1(
@@ -85,10 +70,7 @@ pub trait Factory {
 
     // -- Memory
 
-    fn new_expansion_port(
-        &self,
-        exp_io_line: Rc<RefCell<IoPort>>,
-    ) -> Rc<RefCell<Addressable>>;
+    fn new_expansion_port(&self, exp_io_line: Rc<RefCell<IoPort>>) -> Rc<RefCell<Addressable>>;
 
     fn new_memory(
         &self,
@@ -104,16 +86,9 @@ pub trait Factory {
         vic: Rc<RefCell<Chip>>,
     ) -> Rc<RefCell<MemoryController>>;
 
-    fn new_ram(
-        &self,
-        capacity: usize,
-    ) -> Rc<RefCell<Ram>>;
+    fn new_ram(&self, capacity: usize) -> Rc<RefCell<Ram>>;
 
-    fn new_rom(
-        &self,
-        path: &Path,
-        offset: u16,
-    ) -> Result<Rc<RefCell<Rom>>, io::Error>;
+    fn new_rom(&self, path: &Path, offset: u16) -> Result<Rc<RefCell<Rom>>, io::Error>;
 
     // -- Processor
 

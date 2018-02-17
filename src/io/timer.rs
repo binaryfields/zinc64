@@ -36,7 +36,7 @@ enum Delay {
     PbLow1 = 1 << 7,
 }
 
-const CYCLE_DELAY_MASK: u16 = !(Delay::Load0  as u16 | Delay::PbLow0 as u16);
+const CYCLE_DELAY_MASK: u16 = !(Delay::Load0 as u16 | Delay::PbLow0 as u16);
 
 #[derive(PartialEq)]
 pub enum Mode {
@@ -110,16 +110,8 @@ impl Timer {
         match self.input_mode {
             InputMode::SystemClock => config.set_bit(5, false),
             InputMode::External => config.set_bit(5, true),
-            InputMode::TimerA => {
-                config
-                    .set_bit(5, false)
-                    .set_bit(6, true)
-            }
-            InputMode::TimerAWithCNT => {
-                config
-                    .set_bit(5, true)
-                    .set_bit(6, true)
-            }
+            InputMode::TimerA => config.set_bit(5, false).set_bit(6, true),
+            InputMode::TimerAWithCNT => config.set_bit(5, true).set_bit(6, true),
         };
         config
     }
@@ -167,7 +159,11 @@ impl Timer {
             self.delay.feed(Delay::Load0 as u16);
         }
         let input_mode = match self.mode {
-            Mode::TimerA => if value.get_bit(5) { 1 } else { 0 },
+            Mode::TimerA => if value.get_bit(5) {
+                1
+            } else {
+                0
+            },
             Mode::TimerB => (value & 0x60) >> 5,
         };
         self.input_mode = match input_mode {

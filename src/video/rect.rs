@@ -25,10 +25,7 @@ pub struct Dimension {
 
 impl Dimension {
     pub fn new(width: u16, height: u16) -> Dimension {
-        Dimension {
-            width,
-            height,
-        }
+        Dimension { width, height }
     }
 }
 

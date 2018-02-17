@@ -83,9 +83,7 @@ pub struct Debugger {
 
 impl Debugger {
     pub fn new(command_tx: mpsc::Sender<Command>) -> Self {
-        Self {
-            command_tx,
-        }
+        Self { command_tx }
     }
 
     pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
@@ -95,9 +93,7 @@ impl Debugger {
                 Ok(stream) => {
                     let mut conn = Connection::new(self.command_tx.clone(), stream).unwrap();
                     match conn.handle() {
-                        Ok(_) => {
-                            info!(target: "debugger", "Connection closed")
-                        }
+                        Ok(_) => info!(target: "debugger", "Connection closed"),
                         Err(error) => {
                             error!(target: "debugger", "Connection failed, error - {}", error)
                         }
@@ -265,7 +261,10 @@ impl Connection {
 
     fn cmd_bp_ignore(&mut self, index: u16, count: u16) -> io::Result<String> {
         self.execute_unit_cmd(Command::BpIgnore(index, count))?;
-        Ok(format!("Ignoring the next {} hits of breakpoint {}\n", count, index))
+        Ok(format!(
+            "Ignoring the next {} hits of breakpoint {}\n",
+            count, index
+        ))
     }
 
     fn cmd_bp_list(&mut self) -> io::Result<String> {
@@ -333,7 +332,10 @@ impl Connection {
         let mem = self.read_mem(regs.pc, regs.pc.wrapping_add(10))?;
         let dis = Disassembler::new(mem.clone(), regs.pc);
         let (instr, instr_len) = dis.disassemble(regs.pc);
-        buffer.push_str(self.format_instr(&regs, &instr, &mem[0..instr_len]).as_str());
+        buffer.push_str(
+            self.format_instr(&regs, &instr, &mem[0..instr_len])
+                .as_str(),
+        );
         Ok(buffer)
     }
 
@@ -370,7 +372,10 @@ impl Connection {
         let mem = self.read_mem(regs.pc, regs.pc.wrapping_add(10))?;
         let dis = Disassembler::new(mem.clone(), regs.pc);
         let (instr, instr_len) = dis.disassemble(regs.pc);
-        buffer.push_str(self.format_instr(&regs, &instr, &mem[0..instr_len]).as_str());
+        buffer.push_str(
+            self.format_instr(&regs, &instr, &mem[0..instr_len])
+                .as_str(),
+        );
         Ok(buffer)
     }
 
@@ -390,7 +395,10 @@ impl Connection {
         let mem = self.read_mem(regs.pc, regs.pc.wrapping_add(10))?;
         let dis = Disassembler::new(mem.clone(), regs.pc);
         let (instr, instr_len) = dis.disassemble(regs.pc);
-        buffer.push_str(self.format_instr(&regs, &instr, &mem[0..instr_len]).as_str());
+        buffer.push_str(
+            self.format_instr(&regs, &instr, &mem[0..instr_len])
+                .as_str(),
+        );
         Ok(buffer)
     }
 
@@ -410,7 +418,8 @@ impl Connection {
                     start.wrapping_add(i as u16),
                     target.wrapping_add(i as u16),
                     source,
-                    dest);
+                    dest
+                );
                 buffer.push_str(s.as_str());
             }
         }
@@ -432,12 +441,9 @@ impl Connection {
                 instr_bytes.push_str(format!("{:02x} ", byte).as_str());
             }
             let instr_text = format!("{}", instr);
-            buffer.push_str(format!(
-                "${:04x}  {:12} {}\n",
-                address,
-                instr_bytes,
-                instr_text
-            ).as_str());
+            buffer.push_str(
+                format!("${:04x}  {:12} {}\n", address, instr_bytes, instr_text).as_str(),
+            );
             address = address.wrapping_add(instr_len as u16);
         }
         Ok(buffer)
@@ -599,7 +605,8 @@ impl Connection {
 
     fn execute_emu(&mut self, command: Command) -> io::Result<CommandResult> {
         self.command_tx.send(command).unwrap();
-        self.response_rx.recv()
+        self.response_rx
+            .recv()
             .map_err(|error| Error::new(ErrorKind::Other, error))
     }
 
@@ -641,46 +648,106 @@ impl Connection {
         for byte in instr_bytes {
             instr_bytes2.push_str(format!("{:02x} ", byte).as_str());
         }
-        buffer.push_str(format!(
-            "${:04x}: {:12} {:16} A:{:02x} X:{:02x} Y:{:02x} SP:{:02x} {}{}{}{}{}{}{}\n",
-            regs.pc,
-            instr_bytes2,
-            format!("{}", instr),
-            regs.a,
-            regs.x,
-            regs.y,
-            regs.sp,
-            if (regs.p & CpuFlag::Negative as u8) != 0 { "N" } else { "n" },
-            if (regs.p & CpuFlag::Overflow as u8) != 0 { "V" } else { "v" },
-            if (regs.p & CpuFlag::Decimal as u8) != 0 { "B" } else { "b" },
-            if (regs.p & CpuFlag::Decimal as u8) != 0 { "D" } else { "d" },
-            if (regs.p & CpuFlag::IntDisable as u8) != 0 { "I" } else { "i" },
-            if (regs.p & CpuFlag::Zero as u8) != 0 { "Z" } else { "z" },
-            if (regs.p & CpuFlag::Carry as u8) != 0 { "C" } else { "c" }
-        ).as_str());
+        buffer.push_str(
+            format!(
+                "${:04x}: {:12} {:16} A:{:02x} X:{:02x} Y:{:02x} SP:{:02x} {}{}{}{}{}{}{}\n",
+                regs.pc,
+                instr_bytes2,
+                format!("{}", instr),
+                regs.a,
+                regs.x,
+                regs.y,
+                regs.sp,
+                if (regs.p & CpuFlag::Negative as u8) != 0 {
+                    "N"
+                } else {
+                    "n"
+                },
+                if (regs.p & CpuFlag::Overflow as u8) != 0 {
+                    "V"
+                } else {
+                    "v"
+                },
+                if (regs.p & CpuFlag::Decimal as u8) != 0 {
+                    "B"
+                } else {
+                    "b"
+                },
+                if (regs.p & CpuFlag::Decimal as u8) != 0 {
+                    "D"
+                } else {
+                    "d"
+                },
+                if (regs.p & CpuFlag::IntDisable as u8) != 0 {
+                    "I"
+                } else {
+                    "i"
+                },
+                if (regs.p & CpuFlag::Zero as u8) != 0 {
+                    "Z"
+                } else {
+                    "z"
+                },
+                if (regs.p & CpuFlag::Carry as u8) != 0 {
+                    "C"
+                } else {
+                    "c"
+                }
+            ).as_str(),
+        );
         buffer
     }
 
     fn format_regs(&self, regs: RegData) -> String {
         let mut buffer = String::new();
         buffer.push_str("PC   A  X  Y  SP 00 01 NV-BDIZC\n");
-        buffer.push_str(format!(
-            "{:04x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {}{}1{}{}{}{}{}\n",
-            regs.pc,
-            regs.a,
-            regs.x,
-            regs.y,
-            regs.sp,
-            regs.port_00,
-            regs.port_01,
-            if (regs.p & CpuFlag::Negative as u8) != 0 { "1" } else { "0" },
-            if (regs.p & CpuFlag::Overflow as u8) != 0 { "1" } else { "0" },
-            if (regs.p & CpuFlag::Break as u8) != 0 { "1" } else { "0" },
-            if (regs.p & CpuFlag::Decimal as u8) != 0 { "1" } else { "0" },
-            if (regs.p & CpuFlag::IntDisable as u8) != 0 { "1" } else { "0" },
-            if (regs.p & CpuFlag::Zero as u8) != 0 { "1" } else { "0" },
-            if (regs.p & CpuFlag::Carry as u8) != 0 { "1" } else { "0" }
-        ).as_str());
+        buffer.push_str(
+            format!(
+                "{:04x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {}{}1{}{}{}{}{}\n",
+                regs.pc,
+                regs.a,
+                regs.x,
+                regs.y,
+                regs.sp,
+                regs.port_00,
+                regs.port_01,
+                if (regs.p & CpuFlag::Negative as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Overflow as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Break as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Decimal as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::IntDisable as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Zero as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Carry as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                }
+            ).as_str(),
+        );
         buffer
     }
 }
@@ -691,9 +758,7 @@ struct CommandParser {
 
 impl CommandParser {
     pub fn new() -> Self {
-        Self {
-            radix: 16,
-        }
+        Self { radix: 16 }
     }
 
     pub fn get_radix(&self) -> u32 {
@@ -740,7 +805,7 @@ impl CommandParser {
                 "help" | "?" => self.parse_help(&mut tokens),
                 "quit" => self.parse_quit(&mut tokens),
                 "radix" => self.parse_radix(&mut tokens),
-                _ => Err(format!("Invalid command {}", input))
+                _ => Err(format!("Invalid command {}", input)),
             }
         } else {
             Err(format!("Invalid command {}", input))
@@ -749,7 +814,7 @@ impl CommandParser {
 
     // -- Breakpoint
 
-    fn parse_break(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_break(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         match address {
@@ -758,7 +823,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_condition(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_condition(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num(tokens.next())?;
         self.ensure_keyword("if", tokens)?;
         let expr = tokens.next();
@@ -770,32 +835,32 @@ impl CommandParser {
         }
     }
 
-    fn parse_delete(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_delete(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpDelete(index))
     }
 
-    fn parse_disable(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_disable(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpDisable(index))
     }
 
-    fn parse_enable(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_enable(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpEnable(index))
     }
 
-    fn parse_ignore(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_ignore(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num(tokens.next())?;
         let count = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpIgnore(index, count.unwrap_or(1)))
     }
 
-    fn parse_until(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_until(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         match address {
@@ -806,19 +871,19 @@ impl CommandParser {
 
     // -- Debugger
 
-    fn parse_goto(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_goto(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Goto(address))
     }
 
-    fn parse_next(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_next(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let count = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Next(count.unwrap_or(1)))
     }
 
-    fn parse_registers(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_registers(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let mut ops = Vec::new();
         while let Some(op) = self.parse_reg_op(tokens)? {
             ops.push(op);
@@ -833,7 +898,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_reg_op(&self, tokens: &mut Iterator<Item=&str>) -> Result<Option<RegOp>, String> {
+    fn parse_reg_op(&self, tokens: &mut Iterator<Item = &str>) -> Result<Option<RegOp>, String> {
         if let (Some(name), Some(op), Some(value)) = (tokens.next(), tokens.next(), tokens.next()) {
             match op.trim() {
                 "=" => {
@@ -847,7 +912,7 @@ impl CommandParser {
                         RegName::PC => RegOp::SetPC(self.parse_word(value.trim())?),
                     };
                     Ok(Some(op))
-                },
+                }
                 _ => Err(format!("invalid operator {}", op)),
             }
         } else {
@@ -855,23 +920,23 @@ impl CommandParser {
         }
     }
 
-    fn parse_reg_sep(&self, tokens: &mut Iterator<Item=&str>) -> Result<bool, String> {
+    fn parse_reg_sep(&self, tokens: &mut Iterator<Item = &str>) -> Result<bool, String> {
         if let Some(sep) = tokens.next() {
             match sep.trim() {
                 "," => Ok(true),
-                _ => Err(format!("invalid token {}", sep))
+                _ => Err(format!("invalid token {}", sep)),
             }
         } else {
             Ok(false)
         }
     }
 
-    fn parse_return(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_return(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Return)
     }
 
-    fn parse_step(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_step(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let count = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Step(count.unwrap_or(1)))
@@ -879,7 +944,7 @@ impl CommandParser {
 
     // -- Memory
 
-    fn parse_compare(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_compare(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let target = self.parse_num(tokens.next())?;
@@ -887,14 +952,14 @@ impl CommandParser {
         Ok(Cmd::Compare(start, end, target))
     }
 
-    fn parse_disassemble(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_disassemble(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num_maybe(tokens.next())?;
         let end = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Disassemble(start, end))
     }
 
-    fn parse_fill(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_fill(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let mut data: Vec<u8> = Vec::new();
@@ -914,7 +979,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_hunt(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_hunt(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let mut data: Vec<u8> = Vec::new();
@@ -934,20 +999,20 @@ impl CommandParser {
         }
     }
 
-    fn parse_memory(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_memory(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num_maybe(tokens.next())?;
         let end = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Memory(start, end))
     }
 
-    fn parse_mem_char(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_mem_char(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::MemChar(address))
     }
 
-    fn parse_move(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_move(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let target = self.parse_num(tokens.next())?;
@@ -955,7 +1020,7 @@ impl CommandParser {
         Ok(Cmd::Move(start, end, target))
     }
 
-    fn parse_petscii(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_petscii(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
@@ -964,18 +1029,18 @@ impl CommandParser {
 
     // -- System
 
-    fn parse_reset(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_reset(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let mode = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Reset(mode.unwrap_or(0) == 1))
     }
 
-    fn parse_screen(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_screen(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Screen)
     }
 
-    fn parse_stopwatch(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_stopwatch(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let reset = if let Some(token) = tokens.next() {
             token == "reset"
         } else {
@@ -986,23 +1051,23 @@ impl CommandParser {
 
     // -- Monitor
 
-    fn parse_help(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_help(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let command = tokens.next().map(|s| s.to_string());
         self.ensure_eos(tokens)?;
         Ok(Cmd::Help(command))
     }
 
-    fn parse_exit(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_exit(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Exit)
     }
 
-    fn parse_quit(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_quit(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Quit)
     }
 
-    fn parse_radix(&self, tokens: &mut Iterator<Item=&str>) -> Result<Cmd, String> {
+    fn parse_radix(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
         let radix = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Radix(radix))
@@ -1010,14 +1075,18 @@ impl CommandParser {
 
     // -- Helpers
 
-    fn ensure_eos(&self, tokens: &mut Iterator<Item=&str>) -> Result<(), String> {
+    fn ensure_eos(&self, tokens: &mut Iterator<Item = &str>) -> Result<(), String> {
         match tokens.next() {
             Some(token) => Err(format!("Unexpected token {}", token)),
             None => Ok(()),
         }
     }
 
-    fn ensure_keyword(&self, keyword: &str, tokens: &mut Iterator<Item=&str>) -> Result<(), String> {
+    fn ensure_keyword(
+        &self,
+        keyword: &str,
+        tokens: &mut Iterator<Item = &str>,
+    ) -> Result<(), String> {
         match tokens.next() {
             Some(token) if token.to_string().to_lowercase() == keyword => Ok(()),
             _ => Err(format!("Missing keyword {}", keyword)),
@@ -1025,14 +1094,12 @@ impl CommandParser {
     }
 
     fn parse_byte(&self, value: &str) -> Result<u8, String> {
-        u8::from_str_radix(value, self.radix)
-            .map_err(|_| format!("Invalid number {}", value))
+        u8::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
     }
 
     fn parse_num(&self, input: Option<&str>) -> Result<u16, String> {
         if let Some(value) = input {
-            u16::from_str_radix(value, self.radix)
-                .map_err(|_| format!("Invalid number {}", value))
+            u16::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
         } else {
             Err("missing argument".to_string())
         }
@@ -1049,21 +1116,21 @@ impl CommandParser {
     }
 
     fn parse_word(&self, value: &str) -> Result<u16, String> {
-        u16::from_str_radix(value, self.radix)
-            .map_err(|_| format!("Invalid number {}", value))
+        u16::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
     }
 }
 
 struct CommandHelp;
 
 impl CommandHelp {
-
     pub fn help(command: Option<String>) -> io::Result<String> {
         if let Some(command) = command {
             match command.trim().to_lowercase().as_str() {
                 // Breakpoint
                 "break" | "bk" => CommandHelp::help_cmd("break [address]", "bk"),
-                "condition" | "cond" => CommandHelp::help_cmd("condition <index> if <cond_exp>", "cond"),
+                "condition" | "cond" => {
+                    CommandHelp::help_cmd("condition <index> if <cond_exp>", "cond")
+                }
                 "enable" | "en" => CommandHelp::help_cmd("enable [<index>]", "en"),
                 "delete" | "del" => CommandHelp::help_cmd("delete [<index>]", "del"),
                 "disable" | "dis" => CommandHelp::help_cmd("disable [<index>]", "dis"),
@@ -1072,7 +1139,9 @@ impl CommandHelp {
                 // Debugger
                 "goto" | "g" => CommandHelp::help_cmd("goto <address>", "g"),
                 "next" | "n" => CommandHelp::help_cmd("next [<count>]", "n"),
-                "registers" | "r" => CommandHelp::help_cmd("registers [<reg> = <num>[, <reg> = <num>]*]", "r"),
+                "registers" | "r" => {
+                    CommandHelp::help_cmd("registers [<reg> = <num>[, <reg> = <num>]*]", "r")
+                }
                 "return" | "ret" => CommandHelp::help_cmd("return", "ret"),
                 "step" | "z" => CommandHelp::help_cmd("step [<count>]", "z"),
                 // Memory
@@ -1093,7 +1162,10 @@ impl CommandHelp {
                 "help" | "?" => CommandHelp::help_cmd("help", "?"),
                 "quit" => CommandHelp::help_cmd("quit", ""),
                 "radix" => CommandHelp::help_cmd("radix <num>", ""),
-                _ => Err(Error::new(ErrorKind::Other, format!("Invalid command {}", command)))
+                _ => Err(Error::new(
+                    ErrorKind::Other,
+                    format!("Invalid command {}", command),
+                )),
             }
         } else {
             CommandHelp::help_star()

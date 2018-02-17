@@ -707,13 +707,41 @@ impl fmt::Display for Cpu6510 {
             self.x,
             self.y,
             self.sp,
-            if (self.p & Flag::Negative as u8) != 0 { "N" } else { "n" },
-            if (self.p & Flag::Overflow as u8) != 0 { "V" } else { "v" },
-            if (self.p & Flag::Decimal as u8) != 0 { "B" } else { "b" },
-            if (self.p & Flag::Decimal as u8) != 0 { "D" } else { "d" },
-            if (self.p & Flag::IntDisable as u8) != 0 { "I" } else { "i" },
-            if (self.p & Flag::Zero as u8) != 0 { "Z" } else { "z" },
-            if (self.p & Flag::Carry as u8) != 0 { "C" } else { "c" }
+            if (self.p & Flag::Negative as u8) != 0 {
+                "N"
+            } else {
+                "n"
+            },
+            if (self.p & Flag::Overflow as u8) != 0 {
+                "V"
+            } else {
+                "v"
+            },
+            if (self.p & Flag::Decimal as u8) != 0 {
+                "B"
+            } else {
+                "b"
+            },
+            if (self.p & Flag::Decimal as u8) != 0 {
+                "D"
+            } else {
+                "d"
+            },
+            if (self.p & Flag::IntDisable as u8) != 0 {
+                "I"
+            } else {
+                "i"
+            },
+            if (self.p & Flag::Zero as u8) != 0 {
+                "Z"
+            } else {
+                "z"
+            },
+            if (self.p & Flag::Carry as u8) != 0 {
+                "C"
+            } else {
+                "c"
+            }
         )
     }
 }

@@ -87,10 +87,7 @@ impl P00Loader {
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorKind::InvalidData,
-                "invalid P00 signature",
-            ))
+            Err(Error::new(ErrorKind::InvalidData, "invalid P00 signature"))
         }
     }
 }
@@ -113,11 +110,6 @@ impl Loader for P00Loader {
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
-        Ok(Box::new(
-            P00Image {
-                data,
-                offset,
-            }
-        ))
+        Ok(Box::new(P00Image { data, offset }))
     }
 }

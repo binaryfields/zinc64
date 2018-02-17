@@ -302,7 +302,9 @@ impl Vic {
                        source
                 );
             }
-            self.irq_line.borrow_mut().set_low(IrqSource::Vic.value(), true);
+            self.irq_line
+                .borrow_mut()
+                .set_low(IrqSource::Vic.value(), true);
         }
     }
 
@@ -332,8 +334,8 @@ impl Vic {
     #[inline]
     fn map_sprite_to_screen(&self, x: u16) -> u16 {
         let x_trans = match x {
-            0x000 ... 0x193 => x + 0x64,
-            0x194 ... 0x1ff => x - 0x194,
+            0x000...0x193 => x + 0x64,
+            0x194...0x1ff => x - 0x194,
             _ => panic!("invalid sprite coords {}", x),
         };
         x_trans
@@ -452,7 +454,15 @@ impl Vic {
     */
 
     #[inline]
-    fn draw_bitmap_mc(&self, x_start: u16, y: u16, pixels: u8, color_01: u8, color_10: u8, color_11: u8) {
+    fn draw_bitmap_mc(
+        &self,
+        x_start: u16,
+        y: u16,
+        pixels: u8,
+        color_01: u8,
+        color_10: u8,
+        color_11: u8,
+    ) {
         let mut rt = self.frame_buffer.borrow_mut();
         let mut data = pixels;
         let mut x = x_start;
@@ -488,7 +498,11 @@ impl Vic {
         let mut rt = self.frame_buffer.borrow_mut();
         let mut data = pixels;
         for x in x_start..x_start + 8 {
-            let color = if data.get_bit(7) { color_1 } else { self.background_color[0] };
+            let color = if data.get_bit(7) {
+                color_1
+            } else {
+                self.background_color[0]
+            };
             rt.write(x, y, color);
             data = data << 1;
         }
@@ -666,20 +680,20 @@ impl Vic {
     fn g_access(&mut self) {
         self.g_data = match self.mode {
             Mode::Text | Mode::McText => {
-                let address = self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
+                let address =
+                    self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
                 self.mem.borrow().read(address)
             }
             Mode::EcmText => {
-                let address = self.char_base | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3) | self.rc as u16;
+                let address = self.char_base | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3)
+                    | self.rc as u16;
                 self.mem.borrow().read(address)
             }
             Mode::Bitmap | Mode::McBitmap => {
                 let address = self.char_base & 0x2000 | (self.vc << 3) | self.rc as u16;
                 self.mem.borrow().read(address)
             }
-            Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => {
-                0
-            }
+            Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
             _ => panic!("unsupported graphics mode {}", self.mode.value()),
         };
         self.c_data = self.vm_data_line[self.vmli];
@@ -714,9 +728,7 @@ impl Vic {
     #[inline]
     fn update_bad_line(&mut self) {
         self.is_bad_line = match self.raster {
-            0x30 ... 0xf7 => {
-                (self.raster & 0x07) as u8 == self.y_scroll && self.display_on
-            }
+            0x30...0xf7 => (self.raster & 0x07) as u8 == self.y_scroll && self.display_on,
             _ => false,
         };
     }
@@ -788,7 +800,8 @@ impl Chip for Vic {
                 self.set_ba(false);
                 self.p_access(3);
             }
-            2 => { // TODO vic: cycle 2 logic
+            2 => {
+                // TODO vic: cycle 2 logic
                 if self.raster == self.raster_compare && self.raster == 0 {
                     self.trigger_irq(0);
                 }
@@ -827,7 +840,7 @@ impl Chip for Vic {
                 self.set_ba(false);
                 self.draw_border();
             }
-            12 ... 13 => {
+            12...13 => {
                 // "3. If there is a Bad Line Condition in cycles 12-54, BA is set low and the
                 //     c-accesses are started. Once started, one c-access is done in the second
                 //     phase of every clock cycle in the range 15-54."
@@ -863,7 +876,7 @@ impl Chip for Vic {
                 self.c_access();
                 self.draw();
             }
-            17 ... 54 => {
+            17...54 => {
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
                 self.g_access();
@@ -884,7 +897,8 @@ impl Chip for Vic {
                 self.set_ba(false);
                 self.draw_border();
             }
-            58 => { // TODO vic: cycle 58 display logic
+            58 => {
+                // TODO vic: cycle 58 display logic
                 // "5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
                 //    logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE). If
                 //    the video logic is in display state afterwards (this is always the case
@@ -924,7 +938,7 @@ impl Chip for Vic {
                 let raster = self.raster;
                 self.draw_sprites(raster);
             }
-            _ => panic!("invalid cycle")
+            _ => panic!("invalid cycle"),
         }
         if self.raster == 0x30 && self.den {
             self.display_on = true;
@@ -1100,11 +1114,11 @@ impl Chip for Vic {
             // Reg::EC
             0x20 => self.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
-            0x21 ... 0x24 => self.background_color[(reg - 0x21) as usize] | 0xf0,
+            0x21...0x24 => self.background_color[(reg - 0x21) as usize] | 0xf0,
             // Reg::MM0 - Reg::MM1
-            0x25 ... 0x26 => self.sprite_multicolor[(reg - 0x25) as usize] | 0xf0,
+            0x25...0x26 => self.sprite_multicolor[(reg - 0x25) as usize] | 0xf0,
             // Reg::M0C - Reg::M7C
-            0x27 ... 0x2e => self.sprites[(reg - 0x27) as usize].color | 0xf0,
+            0x27...0x2e => self.sprites[(reg - 0x27) as usize].color | 0xf0,
             _ => 0xff,
         };
         if log_enabled!(LogLevel::Trace) {
@@ -1129,17 +1143,14 @@ impl Chip for Vic {
                 self.sprites[n].y = value;
             }
             // Reg::MX8
-            0x10 => {
-                for i in 0..8 as usize {
-                    self.sprites[i].x.set_bit(8, value.get_bit(i));
-                }
-            }
+            0x10 => for i in 0..8 as usize {
+                self.sprites[i].x.set_bit(8, value.get_bit(i));
+            },
             // Reg::CR1
             0x11 => {
                 self.raster_compare.set_bit(8, value.get_bit(7));
                 let mut mode = self.mode.value();
-                mode
-                    .set_bit(2, value.get_bit(6))
+                mode.set_bit(2, value.get_bit(6))
                     .set_bit(1, value.get_bit(5));
                 self.mode = Mode::from(mode);
                 self.den = value.get_bit(4);
@@ -1163,11 +1174,9 @@ impl Chip for Vic {
             // Reg::LPY
             0x14 => self.light_pen_pos[1] = value,
             // Reg::ME
-            0x15 => {
-                for i in 0..8 as usize {
-                    self.sprites[i].enabled = value.get_bit(i);
-                }
-            }
+            0x15 => for i in 0..8 as usize {
+                self.sprites[i].enabled = value.get_bit(i);
+            },
             // Reg::CR2
             0x16 => {
                 let mut mode = self.mode.value();
@@ -1177,11 +1186,9 @@ impl Chip for Vic {
                 self.x_scroll = value & 0x07;
             }
             // Reg::MYE
-            0x17 => {
-                for i in 0..8 as usize {
-                    self.sprites[i].expand_y = value.get_bit(i);
-                }
-            }
+            0x17 => for i in 0..8 as usize {
+                self.sprites[i].expand_y = value.get_bit(i);
+            },
             // Reg::MEMPTR
             0x18 => {
                 self.video_matrix = (((value & 0xf0) >> 4) as u16) << 10;
@@ -1190,34 +1197,33 @@ impl Chip for Vic {
             // Reg::IRR
             0x19 => {
                 self.interrupt_control.clear_events(value);
-                if !self.interrupt_control.is_triggered() || value == 0xe2 { // FIXME
-                    self.irq_line.borrow_mut().set_low(IrqSource::Vic.value(), false);
+                if !self.interrupt_control.is_triggered() || value == 0xe2 {
+                    // FIXME
+                    self.irq_line
+                        .borrow_mut()
+                        .set_low(IrqSource::Vic.value(), false);
                 }
             }
             // Reg::IMR
             0x1a => {
                 self.interrupt_control.set_mask(value & 0x0f);
-                self.irq_line.borrow_mut()
-                    .set_low(IrqSource::Vic.value(), self.interrupt_control.is_triggered());
+                self.irq_line.borrow_mut().set_low(
+                    IrqSource::Vic.value(),
+                    self.interrupt_control.is_triggered(),
+                );
             }
             // Reg::MDP
-            0x1b => {
-                for i in 0..8 as usize {
-                    self.sprites[i].priority = value.get_bit(i);
-                }
-            }
+            0x1b => for i in 0..8 as usize {
+                self.sprites[i].priority = value.get_bit(i);
+            },
             // Reg::MMC
-            0x1c => {
-                for i in 0..8 as usize {
-                    self.sprites[i].multicolor = value.get_bit(i);
-                }
-            }
+            0x1c => for i in 0..8 as usize {
+                self.sprites[i].multicolor = value.get_bit(i);
+            },
             // Reg::MXE
-            0x1d => {
-                for i in 0..8 as usize {
-                    self.sprites[i].expand_x = value.get_bit(i);
-                }
-            }
+            0x1d => for i in 0..8 as usize {
+                self.sprites[i].expand_x = value.get_bit(i);
+            },
             // Reg::MM
             0x1e => {}
             // Reg::MD
@@ -1225,11 +1231,11 @@ impl Chip for Vic {
             // Reg::EC
             0x20 => self.border_color = value & 0x0f,
             // Reg::B0C - Reg::B3C
-            0x21 ... 0x24 => self.background_color[reg as usize - 0x21] = value & 0x0f,
+            0x21...0x24 => self.background_color[reg as usize - 0x21] = value & 0x0f,
             // Reg::MM0  - Reg::MM1
-            0x25 ... 0x26 => self.sprite_multicolor[reg as usize - 0x25] = value & 0x0f,
+            0x25...0x26 => self.sprite_multicolor[reg as usize - 0x25] = value & 0x0f,
             // Reg::M0C - Reg::M7C
-            0x27 ... 0x2e => self.sprites[reg as usize - 0x27].color = value & 0x0f,
+            0x27...0x2e => self.sprites[reg as usize - 0x27].color = value & 0x0f,
             _ => {}
         }
     }

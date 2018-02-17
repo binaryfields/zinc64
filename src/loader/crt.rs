@@ -220,10 +220,8 @@ impl Loader for CrtLoader {
                 }
             }
         }
-        Ok(Box::new(
-            CrtImage {
-                cartridge: Some(cartridge),
-            }
-        ))
+        Ok(Box::new(CrtImage {
+            cartridge: Some(cartridge),
+        }))
     }
 }

@@ -116,7 +116,8 @@ impl ExecutionEngine {
 
     fn send_result(&self, result: CommandResult) -> Result<(), String> {
         if let Some(ref debugger) = self.debugger {
-            debugger.send(result)
+            debugger
+                .send(result)
                 .map_err(|_| format!("Failed to send result"))
         } else {
             Ok(())
@@ -145,7 +146,12 @@ impl ExecutionEngine {
         Ok(CommandResult::Unit)
     }
 
-    fn bp_condition(&mut self, index: u16, expr: &String, radix: u32) -> Result<CommandResult, String> {
+    fn bp_condition(
+        &mut self,
+        index: u16,
+        expr: &String,
+        radix: u32,
+    ) -> Result<CommandResult, String> {
         let bpm = self.c64.get_bpm_mut();
         bpm.set_condition(index, expr, Some(radix))?;
         let bp = bpm.get(index)?;
@@ -182,15 +188,17 @@ impl ExecutionEngine {
         let bpm = self.c64.get_bpm();
         let mut buffer = String::new();
         for bp in bpm.list() {
-            buffer.push_str(format!(
-                "Bp {}: ${:04x}{}{}\n",
-                bp.index,
-                bp.address,
-                bp.condition
-                    .as_ref()
-                    .map_or(String::new(), |cond| format!(" if {}", cond)),
-                if bp.enabled { "" } else { " disabled" },
-            ).as_str());
+            buffer.push_str(
+                format!(
+                    "Bp {}: ${:04x}{}{}\n",
+                    bp.index,
+                    bp.address,
+                    bp.condition
+                        .as_ref()
+                        .map_or(String::new(), |cond| format!(" if {}", cond)),
+                    if bp.enabled { "" } else { " disabled" },
+                ).as_str(),
+            );
         }
         if buffer.is_empty() {
             buffer.push_str("No breakpoints are set\n");
@@ -299,7 +307,8 @@ impl ExecutionEngine {
             clock.reset();
         }
         let mut buffer = Vec::new();
-        buffer.write_u64::<BigEndian>(clock.get())
+        buffer
+            .write_u64::<BigEndian>(clock.get())
             .map_err(|_| "Op failed")?;
         Ok(CommandResult::Buffer(buffer))
     }

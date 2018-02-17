@@ -118,11 +118,9 @@ impl Loader for TapLoader {
             data,
             pos: 0,
         };
-        Ok(Box::new(
-            TapImage {
-                tape: Some(Box::new(tape)),
-            }
-        ))
+        Ok(Box::new(TapImage {
+            tape: Some(Box::new(tape)),
+        }))
     }
 }
 

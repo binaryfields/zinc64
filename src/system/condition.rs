@@ -96,7 +96,6 @@ impl fmt::Display for Condition {
 }
 
 impl Condition {
-
     pub fn parse(expr: &str, radix: Option<u32>) -> Result<Condition, String> {
         let parser = Parser::new(radix.unwrap_or(16));
         parser.parse(expr)
@@ -105,18 +104,14 @@ impl Condition {
     #[inline]
     pub fn eval(&self, cpu: &RefCell<Cpu>) -> bool {
         match self.op {
-            Operator::Equal =>
-                self.eval_reg(&self.reg, cpu) == self.eval_val(&self.val, cpu),
-            Operator::NotEqual =>
-                self.eval_reg(&self.reg, cpu) != self.eval_val(&self.val, cpu),
-            Operator::Greater =>
-                self.eval_reg(&self.reg, cpu) > self.eval_val(&self.val, cpu),
-            Operator::GreaterEqual =>
-                self.eval_reg(&self.reg, cpu) >= self.eval_val(&self.val, cpu),
-            Operator::Less =>
-                self.eval_reg(&self.reg, cpu) < self.eval_val(&self.val, cpu),
-            Operator::LessEqual =>
-                self.eval_reg(&self.reg, cpu) <= self.eval_val(&self.val, cpu),
+            Operator::Equal => self.eval_reg(&self.reg, cpu) == self.eval_val(&self.val, cpu),
+            Operator::NotEqual => self.eval_reg(&self.reg, cpu) != self.eval_val(&self.val, cpu),
+            Operator::Greater => self.eval_reg(&self.reg, cpu) > self.eval_val(&self.val, cpu),
+            Operator::GreaterEqual => {
+                self.eval_reg(&self.reg, cpu) >= self.eval_val(&self.val, cpu)
+            }
+            Operator::Less => self.eval_reg(&self.reg, cpu) < self.eval_val(&self.val, cpu),
+            Operator::LessEqual => self.eval_reg(&self.reg, cpu) <= self.eval_val(&self.val, cpu),
         }
     }
 
@@ -153,21 +148,15 @@ impl Parser {
     pub fn parse(&self, expr: &str) -> Result<Condition, String> {
         let mut tokenizer = Tokenizer::new(expr.chars());
         let reg = match tokenizer.next() {
-            Some(Token::Atom(token)) => {
-                self.parse_reg(token.as_str())
-            },
+            Some(Token::Atom(token)) => self.parse_reg(token.as_str()),
             _ => Err(format!("Invalid expression {}", expr)),
         }?;
         let op = match tokenizer.next() {
-            Some(Token::Op(token)) => {
-                self.parse_op(token.as_str())
-            },
+            Some(Token::Op(token)) => self.parse_op(token.as_str()),
             _ => Err(format!("Invalid expression {}", expr)),
         }?;
         let val = match tokenizer.next() {
-            Some(Token::Atom(token)) => {
-                self.parse_val(token.as_str())
-            },
+            Some(Token::Atom(token)) => self.parse_val(token.as_str()),
             _ => Err(format!("Invalid expression {}", expr)),
         }?;
         let condition = Condition { op, reg, val };
@@ -175,8 +164,7 @@ impl Parser {
     }
 
     fn parse_num(&self, num: &str) -> Result<u16, String> {
-        u16::from_str_radix(num, self.radix)
-            .map_err(|_| format!("Invalid number {}", num))
+        u16::from_str_radix(num, self.radix).map_err(|_| format!("Invalid number {}", num))
     }
 
     fn parse_op(&self, op: &str) -> Result<Operator, String> {
@@ -218,10 +206,10 @@ pub enum Token {
 }
 
 pub struct Tokenizer<'a> {
-    iter: Peekable<Chars<'a>>
+    iter: Peekable<Chars<'a>>,
 }
 
-impl <'a> Tokenizer<'a> {
+impl<'a> Tokenizer<'a> {
     pub fn new(input: Chars<'a>) -> Tokenizer<'a> {
         Tokenizer {
             iter: input.peekable(),
@@ -229,15 +217,15 @@ impl <'a> Tokenizer<'a> {
     }
 }
 
-impl <'a> Iterator for Tokenizer<'a> {
+impl<'a> Iterator for Tokenizer<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
         match *self.iter.peek().unwrap_or(&'⊥') {
-            c if c.is_alphanumeric() => Some(Token::Atom(
-                consume_while(&mut self.iter, |c| c.is_alphanumeric()))),
-            c if is_symbol(c) => Some(Token::Op(
-                consume_while(&mut self.iter, |c| is_symbol(c)))),
+            c if c.is_alphanumeric() => Some(Token::Atom(consume_while(&mut self.iter, |c| {
+                c.is_alphanumeric()
+            }))),
+            c if is_symbol(c) => Some(Token::Op(consume_while(&mut self.iter, |c| is_symbol(c)))),
             c if c.is_whitespace() => self.next(),
             '⊥' => None,
             _ => self.next(),
@@ -246,7 +234,9 @@ impl <'a> Iterator for Tokenizer<'a> {
 }
 
 fn consume_while<F>(iter: &mut Peekable<Chars>, predicate: F) -> String
-    where F : Fn(char) -> bool {
+where
+    F: Fn(char) -> bool,
+{
     let mut s = String::new();
     while let Some(&c) = iter.peek() {
         if !predicate(c) {

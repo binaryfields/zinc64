@@ -29,6 +29,9 @@ impl Size {
     }
 
     pub fn from_tuple(size: (u32, u32)) -> Size {
-        Size { width: size.0, height: size.1 }
+        Size {
+            width: size.0,
+            height: size.1,
+        }
     }
 }

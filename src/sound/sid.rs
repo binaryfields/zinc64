@@ -80,7 +80,8 @@ impl Sid {
             SamplingMethod::Resample => resid::SamplingMethod::Resample,
             SamplingMethod::ResampleFast => resid::SamplingMethod::ResampleFast,
         };
-        self.resid.set_sampling_parameters(resid_sampling_method, clock_freq, sample_freq);
+        self.resid
+            .set_sampling_parameters(resid_sampling_method, clock_freq, sample_freq);
     }
 
     fn sync(&mut self) {

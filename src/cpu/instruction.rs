@@ -274,12 +274,12 @@ impl Instruction {
             0x94 => {
                 tick_fn(); // HACK
                 Instruction::STY(Operand::ZeroPageX(cpu.fetch_byte(tick_fn)))
-            },
+            }
             // STA Oper,X
             0x95 => {
                 tick_fn(); // HACK
                 Instruction::STA(Operand::ZeroPageX(cpu.fetch_byte(tick_fn)))
-            },
+            }
             // STX Oper,Y
             0x96 => Instruction::STX(Operand::ZeroPageY(cpu.fetch_byte(tick_fn))),
             // TYA

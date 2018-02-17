@@ -36,11 +36,9 @@ static VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub struct Cli;
 
 impl Cli {
-
     pub fn parse_args(args: &Vec<String>) -> Result<getopts::Matches, String> {
         let opts = Cli::build_options();
-        let matches = opts
-            .parse(&args[1..])
+        let matches = opts.parse(&args[1..])
             .map_err(|f| format!("Invalid options\n{}", f))?;
         Ok(matches)
     }
@@ -63,32 +61,24 @@ impl Cli {
                 .unwrap_or(100),
             warp_mode: matches.opt_present("warp"),
             debug: matches.opt_present("debug"),
-            dbg_address: matches
-                .opt_str("debugaddress")
-                .map(|s| {
-                    let addr: SocketAddr = s.parse().unwrap();
-                    addr
-                }),
+            dbg_address: matches.opt_str("debugaddress").map(|s| {
+                let addr: SocketAddr = s.parse().unwrap();
+                addr
+            }),
             jam_action: matches
                 .opt_str("jamaction")
                 .map(|s| app::JamAction::from(&s))
                 .unwrap_or(app::JamAction::Continue),
-            rap_address: matches
-                .opt_str("rap")
-                .map(|s| {
-                    let addr: SocketAddr = s.parse().unwrap();
-                    addr
-                }),
+            rap_address: matches.opt_str("rap").map(|s| {
+                let addr: SocketAddr = s.parse().unwrap();
+                addr
+            }),
         };
         Ok(options)
     }
 
     pub fn parse_system_config(matches: &getopts::Matches) -> Result<Config, String> {
-        let model = SystemModel::from(
-            &matches
-                .opt_str("model")
-                .unwrap_or(String::from("pal"))
-        );
+        let model = SystemModel::from(&matches.opt_str("model").unwrap_or(String::from("pal")));
         let mut config = Config::new(model);
         Cli::parse_device_config(&mut config, matches)?;
         Cli::parse_sound_config(&mut config, matches)?;
@@ -179,27 +169,21 @@ impl Cli {
             Some(image_path) => {
                 let path = Path::new(&image_path);
                 let loader = Loaders::from_path(path);
-                let mut autostart = loader
-                    .autostart(path)
-                    .map_err(|err| format!("{}", err))?;
+                let mut autostart = loader.autostart(path).map_err(|err| format!("{}", err))?;
                 autostart.execute(c64);
             }
-            None => {
-                match matches.opt_str("binary") {
-                    Some(binary_path) => {
-                        let offset = matches
-                            .opt_str("offset")
-                            .map(|s| s.parse::<u16>().unwrap())
-                            .unwrap_or(0);
-                        let path = Path::new(&binary_path);
-                        let loader = BinLoader::new(offset);
-                        let mut image = loader
-                            .load(path)
-                            .map_err(|err| format!("{}", err))?;
-                        image.mount(c64);
-                    }
-                    None => {}
+            None => match matches.opt_str("binary") {
+                Some(binary_path) => {
+                    let offset = matches
+                        .opt_str("offset")
+                        .map(|s| s.parse::<u16>().unwrap())
+                        .unwrap_or(0);
+                    let path = Path::new(&binary_path);
+                    let loader = BinLoader::new(offset);
+                    let mut image = loader.load(path).map_err(|err| format!("{}", err))?;
+                    image.mount(c64);
                 }
+                None => {}
             },
         }
         Ok(())
@@ -207,9 +191,7 @@ impl Cli {
 
     fn set_debug_options(c64: &mut C64, matches: &getopts::Matches) -> Result<(), String> {
         let bps_strs = matches.opt_strs("bp");
-        let bps = bps_strs
-            .iter()
-            .map(|s| s.parse::<u16>().unwrap());
+        let bps = bps_strs.iter().map(|s| s.parse::<u16>().unwrap());
         for bp in bps {
             c64.get_bpm_mut().set(bp, false);
         }

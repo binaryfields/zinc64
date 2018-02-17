@@ -25,7 +25,9 @@ pub struct Clock {
 
 impl Clock {
     pub fn new() -> Clock {
-        Clock { counter: Cell::new(0) }
+        Clock {
+            counter: Cell::new(0),
+        }
     }
 
     #[inline]

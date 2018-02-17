@@ -118,7 +118,8 @@ impl App {
         // Initialize debuggers
         let (command_tx, command_rx) = mpsc::channel::<Command>();
         if options.debug {
-            let address = options.dbg_address
+            let address = options
+                .dbg_address
                 .unwrap_or(SocketAddr::from(([127, 0, 0, 1], 9999)));
             info!(target: "ui", "Starting debugger at {}", address);
             let command_tx_clone = command_tx.clone();
@@ -200,7 +201,11 @@ impl App {
     }
 
     pub fn sync_frame(&mut self) {
-        let refresh_rate = self.execution_engine.get_c64().get_config().model.refresh_rate;
+        let refresh_rate = self.execution_engine
+            .get_c64()
+            .get_config()
+            .model
+            .refresh_rate;
         let frame_duration_ns = (1_000_000_000.0 / refresh_rate) as u32;
         let frame_duration_scaled_ns = frame_duration_ns * 100 / self.options.speed as u32;
         let time_ns = time::precise_time_ns();
@@ -295,10 +300,10 @@ impl App {
                 match self.command_rx.recv_timeout(Duration::from_millis(1)) {
                     Ok(command) => {
                         self.execution_engine.execute(&command);
-                    },
+                    }
                     _ => {
                         done = true;
-                    },
+                    }
                 }
             }
         }
@@ -320,81 +325,86 @@ impl App {
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.execution_engine.halt();
-                    }
+                {
+                    self.execution_engine.halt();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::M),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.toggle_mute();
-                    }
+                {
+                    self.toggle_mute();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::P),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.toggle_pause();
-                    }
+                {
+                    self.toggle_pause();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::Q),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.set_state(State::Stopped);
-                    }
+                {
+                    self.set_state(State::Stopped);
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::W),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.toggle_warp();
-                    }
+                {
+                    self.toggle_warp();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::F9),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.reset();
-                    }
+                {
+                    self.reset();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::F1),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LCTRLMOD) =>
-                    {
-                        self.toggle_datassette_play();
-                    }
+                {
+                    self.toggle_datassette_play();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::Return),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.renderer.toggle_fullscreen();
-                    }
+                {
+                    self.renderer.toggle_fullscreen();
+                }
                 _ => {
                     self.io.handle_event(&event);
                 }
             }
         }
         let keyboard = self.execution_engine.get_c64().get_keyboard();
-        if keyboard.borrow().has_events() && self.execution_engine.get_c64().get_cycles() >= self.next_keyboard_event {
+        if keyboard.borrow().has_events()
+            && self.execution_engine.get_c64().get_cycles() >= self.next_keyboard_event
+        {
             keyboard.borrow_mut().drain_event();
-            self.next_keyboard_event = self.execution_engine.get_c64().get_cycles().wrapping_add(20000);
+            self.next_keyboard_event = self.execution_engine
+                .get_c64()
+                .get_cycles()
+                .wrapping_add(20000);
         }
     }
 }

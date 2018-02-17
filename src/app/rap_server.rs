@@ -90,9 +90,7 @@ pub struct RapServer {
 
 impl RapServer {
     pub fn new(command_tx: Sender<Command>) -> Self {
-        Self {
-            command_tx,
-        }
+        Self { command_tx }
     }
 
     pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
@@ -102,9 +100,7 @@ impl RapServer {
                 Ok(stream) => {
                     let mut conn = Connection::new(self.command_tx.clone(), stream).unwrap();
                     match conn.handle() {
-                        Ok(_) => {
-                            info!(target: "debugger", "Connection closed")
-                        }
+                        Ok(_) => info!(target: "debugger", "Connection closed"),
                         Err(error) => {
                             error!(target: "debugger", "Connection failed, error - {}", error)
                         }
@@ -151,8 +147,7 @@ impl Connection {
     pub fn handle(&mut self) -> io::Result<()> {
         while self.running {
             let opcode = self.reader.read_u8()?;
-            let op = RapOp::from(opcode)
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
+            let op = RapOp::from(opcode).map_err(|e| Error::new(ErrorKind::Other, e))?;
             match op {
                 RapOp::Open => self.handle_open(),
                 RapOp::Read => self.handle_read(),
@@ -181,7 +176,8 @@ impl Connection {
         }?;
         info!(target: "rap", "Cmd result len {}", result.len());
         self.writer.write_u8(RapOp::Cmd as u8 | RapOp::Reply as u8)?;
-        self.writer.write_u32::<BigEndian>((result.len() + 1) as u32)?;
+        self.writer
+            .write_u32::<BigEndian>((result.len() + 1) as u32)?;
         if result.len() > 0 {
             self.writer.write_all(&mut result.as_bytes())?;
             self.writer.write_u8(0)?;
@@ -196,7 +192,8 @@ impl Connection {
             result => Err(self.invalid_response(result)),
         }?;
         self.running = false;
-        self.writer.write_u8(RapOp::Close as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u8(RapOp::Close as u8 | RapOp::Reply as u8)?;
         self.writer.write_u32::<BigEndian>(0)?;
         self.writer.flush()
     }
@@ -211,7 +208,8 @@ impl Connection {
             CommandResult::Unit => Ok(()),
             result => Err(self.invalid_response(result)),
         }?;
-        self.writer.write_u8(RapOp::Open as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u8(RapOp::Open as u8 | RapOp::Reply as u8)?;
         self.writer.write_u32::<BigEndian>(1000)?;
         self.writer.flush()
     }
@@ -229,7 +227,8 @@ impl Connection {
             CommandResult::Buffer(data) => Ok(data),
             result => Err(self.invalid_response(result)),
         }?;
-        self.writer.write_u8(RapOp::Read as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u8(RapOp::Read as u8 | RapOp::Reply as u8)?;
         self.writer.write_u32::<BigEndian>(data.len() as u32)?;
         self.writer.write_all(&mut data)?;
         self.writer.flush()
@@ -245,7 +244,8 @@ impl Connection {
             2 => (0xffff_u16).wrapping_add(offset),
             _ => self.offset,
         };
-        self.writer.write_u8(RapOp::Seek as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u8(RapOp::Seek as u8 | RapOp::Reply as u8)?;
         self.writer.write_u64::<BigEndian>(self.offset as u64)?;
         self.writer.flush()
     }
@@ -263,7 +263,8 @@ impl Connection {
             CommandResult::Unit => Ok(()),
             result => Err(self.invalid_response(result)),
         }?;
-        self.writer.write_u8(RapOp::Write as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u8(RapOp::Write as u8 | RapOp::Reply as u8)?;
         self.writer.write_u32::<BigEndian>(len)?;
         self.writer.flush()
     }
@@ -319,9 +320,7 @@ struct CommandParser {
 
 impl CommandParser {
     pub fn new() -> Self {
-        Self {
-            radix: 16,
-        }
+        Self { radix: 16 }
     }
 
     pub fn parse(&self, input: &String) -> Result<RapCmd, String> {
@@ -330,26 +329,26 @@ impl CommandParser {
             match command.to_lowercase().as_str() {
                 "dr" => self.parse_registers(&mut tokens),
                 "drp" => self.parse_register_profile(&mut tokens),
-                _ => Err(format!("Invalid command {}", input))
+                _ => Err(format!("Invalid command {}", input)),
             }
         } else {
             Err(format!("Invalid command {}", input))
         }
     }
 
-    fn parse_registers(&self, tokens: &mut Iterator<Item=&str>) -> Result<RapCmd, String> {
+    fn parse_registers(&self, tokens: &mut Iterator<Item = &str>) -> Result<RapCmd, String> {
         self.ensure_eos(tokens)?;
         Ok(RapCmd::Registers)
     }
 
-    fn parse_register_profile(&self, tokens: &mut Iterator<Item=&str>) -> Result<RapCmd, String> {
+    fn parse_register_profile(&self, tokens: &mut Iterator<Item = &str>) -> Result<RapCmd, String> {
         self.ensure_eos(tokens)?;
         Ok(RapCmd::RegisterProfile)
     }
 
     // Helpers
 
-    fn ensure_eos(&self, tokens: &mut Iterator<Item=&str>) -> Result<(), String> {
+    fn ensure_eos(&self, tokens: &mut Iterator<Item = &str>) -> Result<(), String> {
         match tokens.next() {
             Some(token) => Err(format!("Invalid token {}", token)),
             None => Ok(()),
@@ -359,8 +358,7 @@ impl CommandParser {
     #[allow(dead_code)]
     fn parse_num(&self, input: Option<&str>) -> Result<u16, String> {
         if let Some(value) = input {
-            u16::from_str_radix(value, self.radix)
-                .map_err(|_| format!("invalid number {}", value))
+            u16::from_str_radix(value, self.radix).map_err(|_| format!("invalid number {}", value))
         } else {
             Err("missing argument".to_string())
         }
