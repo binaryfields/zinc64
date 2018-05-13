@@ -22,10 +22,10 @@ use std::rc::Rc;
 
 use sdl2;
 use sdl2::event::Event;
-use sdl2::keyboard::{Keycode, Mod};
 use sdl2::joystick;
-use zinc64::device::{Joystick, Keyboard};
+use sdl2::keyboard::{Keycode, Mod};
 use zinc64::device::joystick::Button;
+use zinc64::device::{Joystick, Keyboard};
 
 use super::keymap::KeyMap;
 
@@ -34,8 +34,10 @@ pub struct Io {
     keyboard: Rc<RefCell<Keyboard>>,
     joystick1: Option<Rc<RefCell<Joystick>>>,
     joystick2: Option<Rc<RefCell<Joystick>>>,
-    #[allow(dead_code)] sdl_joystick1: Option<joystick::Joystick>,
-    #[allow(dead_code)] sdl_joystick2: Option<joystick::Joystick>,
+    #[allow(dead_code)]
+    sdl_joystick1: Option<joystick::Joystick>,
+    #[allow(dead_code)]
+    sdl_joystick2: Option<joystick::Joystick>,
 }
 
 impl Io {

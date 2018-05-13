@@ -24,8 +24,8 @@ use std::path::Path;
 use std::result::Result;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use system::{Autostart, AutostartMethod, C64, Image};
 use system::autostart;
+use system::{Autostart, AutostartMethod, C64, Image};
 
 use super::Loader;
 

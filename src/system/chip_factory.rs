@@ -27,9 +27,9 @@ use core::{Addressable, Chip, CircularBuffer, Clock, Cpu, Factory, FrameBuffer, 
            MemoryController, Pin, Ram, Rom, SystemModel, VicModel};
 use cpu::Cpu6510;
 use device::ExpansionPort;
-use mem::{Memory, Mmio};
 use io::Cia;
 use io::cia;
+use mem::{Memory, Mmio};
 use sound::Sid;
 use sound::sid::SamplingMethod;
 use video::{Vic, VicMemory};

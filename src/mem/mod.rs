@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod mmio;
 mod memory;
 mod memory_map;
+mod mmio;
 
-pub use self::mmio::Mmio;
 pub use self::memory::Memory;
 pub use self::memory_map::{Bank, Configuration, MemoryMap};
+pub use self::mmio::Mmio;

@@ -26,10 +26,10 @@ pub mod geo;
 mod io_port;
 mod irq_control;
 mod irq_line;
-mod system_model;
 mod pin;
 mod ram;
 mod rom;
+mod system_model;
 
 pub use self::circular_buffer::CircularBuffer;
 pub use self::clock::Clock;
@@ -39,10 +39,10 @@ pub use self::frame_buffer::FrameBuffer;
 pub use self::io_port::IoPort;
 pub use self::irq_control::IrqControl;
 pub use self::irq_line::IrqLine;
-pub use self::system_model::{SidModel, SystemModel, VicModel};
 pub use self::pin::Pin;
 pub use self::ram::Ram;
 pub use self::rom::Rom;
+pub use self::system_model::{SidModel, SystemModel, VicModel};
 
 pub trait Addressable {
     fn read(&self, address: u16) -> u8;

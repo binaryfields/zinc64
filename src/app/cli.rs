@@ -18,8 +18,8 @@
  */
 
 use std::net::SocketAddr;
-use std::result::Result;
 use std::path::Path;
+use std::result::Result;
 
 use getopts;
 use zinc64::core::SystemModel;

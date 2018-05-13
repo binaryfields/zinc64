@@ -29,7 +29,8 @@ use zinc64::core::geo;
 
 pub struct Renderer {
     canvas: render::WindowCanvas,
-    #[allow(dead_code)] creator: render::TextureCreator<video::WindowContext>,
+    #[allow(dead_code)]
+    creator: render::TextureCreator<video::WindowContext>,
     texture: render::Texture,
     frame: u32,
     last_frame_ts: u64,

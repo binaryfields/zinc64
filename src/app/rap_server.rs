@@ -21,11 +21,11 @@ use std::ffi::CStr;
 use std::io;
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::str;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
-use std::u8;
 use std::u16;
-use std::str;
+use std::u8;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 

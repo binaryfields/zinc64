@@ -26,8 +26,8 @@ use std::str;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use device::{Cartridge, Chip, ChipType, HwType};
-use system::{C64, Image};
 use system::autostart;
+use system::{C64, Image};
 
 use super::Loader;
 
@@ -43,7 +43,8 @@ struct Header {
     hw_type: u16,
     exrom_line: u8,
     game_line: u8,
-    #[allow(dead_code)] reserved: [u8; 6],
+    #[allow(dead_code)]
+    reserved: [u8; 6],
     name: [u8; 32],
 }
 

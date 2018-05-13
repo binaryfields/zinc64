@@ -748,8 +748,8 @@ impl fmt::Display for Cpu6510 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::operand::Operand;
+    use super::*;
     use core::Ram;
 
     struct MockMemory {

@@ -18,19 +18,19 @@
  */
 
 use std::cell::{Cell, RefCell};
-use std::path::Path;
 use std::io;
+use std::path::Path;
 use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
 use core::{Chip, CircularBuffer, Clock, Cpu, Factory, FrameBuffer, IoPort, IrqLine, Pin, Ram,
            TickFn};
-use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 use device::joystick;
+use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 
-use super::{Autostart, Config, Palette};
 use super::breakpoint::BreakpointManager;
+use super::{Autostart, Config, Palette};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -463,8 +463,8 @@ impl C64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::ChipFactory;
+    use super::*;
     use core::SystemModel;
 
     #[test]

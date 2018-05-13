@@ -24,11 +24,11 @@ use std::thread;
 use std::time::Duration;
 
 use sdl2;
-use sdl2::{EventPump, Sdl};
 use sdl2::audio::AudioDevice;
 use sdl2::event::Event;
 use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
+use sdl2::{EventPump, Sdl};
 use time;
 use zinc64::core::geo;
 use zinc64::system::C64;

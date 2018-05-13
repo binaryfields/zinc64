@@ -26,8 +26,8 @@ use std::str;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use device::Tape;
-use system::{Autostart, AutostartMethod, C64, Image};
 use system::autostart;
+use system::{Autostart, AutostartMethod, C64, Image};
 
 use super::Loader;
 
@@ -38,7 +38,8 @@ static HEADER_SIG: &'static str = "C64-TAPE-RAW";
 struct Header {
     signature: [u8; 12],
     version: u8,
-    #[allow(dead_code)] reserved: [u8; 3],
+    #[allow(dead_code)]
+    reserved: [u8; 3],
     size: u32,
 }
 

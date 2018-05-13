@@ -222,8 +222,10 @@ pub struct Vic {
     g_data: u8,
     is_bad_line: bool,
     sprite_ptrs: [u16; 8],
-    #[allow(dead_code)] sprite_mc: [u8; 8],
-    #[allow(dead_code)] sprite_mcbase: [u8; 8],
+    #[allow(dead_code)]
+    sprite_mc: [u8; 8],
+    #[allow(dead_code)]
+    sprite_mcbase: [u8; 8],
     vm_color_line: [u8; 40],
     vm_data_line: [u8; 40],
 }

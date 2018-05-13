@@ -25,8 +25,8 @@ use std::result::Result;
 use std::str;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use system::{Autostart, AutostartMethod, C64, Image};
 use system::autostart;
+use system::{Autostart, AutostartMethod, C64, Image};
 
 use super::Loader;
 
@@ -34,10 +34,14 @@ static HEADER_SIG: &'static str = "C64File";
 
 struct Header {
     signature: [u8; 7],
-    #[allow(dead_code)] reserved_1: u8,
-    #[allow(dead_code)] filename: [u8; 16],
-    #[allow(dead_code)] reserved_2: u8,
-    #[allow(dead_code)] reserved_3: u8,
+    #[allow(dead_code)]
+    reserved_1: u8,
+    #[allow(dead_code)]
+    filename: [u8; 16],
+    #[allow(dead_code)]
+    reserved_2: u8,
+    #[allow(dead_code)]
+    reserved_3: u8,
 }
 
 struct P00Image {

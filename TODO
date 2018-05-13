@@ -1,5 +1,7 @@
 # TODO
 
+- get rid off #[allow(unused_variables)]
+- blash
 - system/condition keep fmt together
 - migrate to euclid
 - integrate github ci
