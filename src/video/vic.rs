@@ -18,7 +18,6 @@
  */
 
 use std::cell::RefCell;
-use std::cmp;
 use std::rc::Rc;
 
 use bit_field::BitField;
@@ -26,13 +25,13 @@ use core::{Chip, FrameBuffer, IrqControl, IrqLine, Pin, Ram, VicModel};
 use log::LogLevel;
 
 use super::VicMemory;
-use super::rect::{Dimension, Rect};
+use super::gfx_sequencer::{GfxSequencer, Mode};
+use super::spec::Spec;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
 // TODO vic:
 // 1 display/idle states cycle 58
-// 2 rsel/csel
 // 3 scroll_x/y
 // 4 sprites
 
@@ -44,99 +43,6 @@ pub enum IrqSource {
 impl IrqSource {
     pub fn value(&self) -> usize {
         *self as usize
-    }
-}
-
-#[derive(Copy, Clone)]
-enum Mode {
-    // (ECM/BMM/MCM=0/0/0)
-    Text = 0x00,
-    // (ECM/BMM/MCM=0/0/1)
-    McText = 0x01,
-    // (ECM/BMM/MCM=0/1/0)
-    Bitmap = 0x02,
-    // (ECM/BMM/MCM=0/1/1)
-    McBitmap = 0x03,
-    // (ECM/BMM/MCM=1/0/0)
-    EcmText = 0x04,
-    // (ECM/BMM/MCM=1/0/1)
-    InvalidText = 0x05,
-    // (ECM/BMM/MCM=1/1/0)
-    InvalidBitmap1 = 0x06,
-    // (ECM/BMM/MCM=1/1/1)
-    InvalidBitmap2 = 0x07,
-}
-
-impl Mode {
-    pub fn from(mode: u8) -> Mode {
-        match mode {
-            0x00 => Mode::Text,
-            0x01 => Mode::McText,
-            0x02 => Mode::Bitmap,
-            0x03 => Mode::McBitmap,
-            0x04 => Mode::EcmText,
-            0x05 => Mode::InvalidText,
-            0x06 => Mode::InvalidBitmap1,
-            0x07 => Mode::InvalidBitmap2,
-            _ => panic!("invalid mode {}", mode),
-        }
-    }
-
-    pub fn value(&self) -> u8 {
-        *self as u8
-    }
-}
-
-pub struct Spec {
-    pub raster_lines: u16,
-    pub cycles_per_raster: u16,
-    pub viewport: Rect,
-    pub viewport_size: Dimension,
-}
-
-/*
-          | Video  | # of  | Visible | Cycles/ |  Visible
-   Type   | system | lines |  lines  |  line   | pixels/line
- ---------+--------+-------+---------+---------+------------
- 6567R56A | NTSC-M |  262  |   234   |   64    |    411
-  6567R8  | NTSC-M |  263  |   235   |   65    |    418
-   6569   |  PAL-B |  312  |   284   |   63    |    403
-
-          | First  |  Last  |              |   First    |   Last
-          | vblank | vblank | First X coo. |  visible   |  visible
-   Type   |  line  |  line  |  of a line   |   X coo.   |   X coo.
- ---------+--------+--------+--------------+------------+-----------
- 6567R56A |   13   |   40   |  412 ($19c)  | 488 ($1e8) | 388 ($184)
-  6567R8  |   13   |   40   |  412 ($19c)  | 489 ($1e9) | 396 ($18c)
-   6569   |  300   |   15   |  404 ($194)  | 480 ($1e0) | 380 ($17c)
-*/
-
-impl Spec {
-    pub fn new(chip_model: VicModel) -> Spec {
-        match chip_model {
-            VicModel::Mos6567 => Spec::ntsc(),
-            VicModel::Mos6569 => Spec::pal(),
-        }
-    }
-
-    fn ntsc() -> Spec {
-        let viewport_size = Dimension::new(403, 284);
-        Spec {
-            raster_lines: 278,
-            cycles_per_raster: 65,
-            viewport: Rect::new_with_dim(76 - 4, 16, viewport_size),
-            viewport_size,
-        }
-    }
-
-    fn pal() -> Spec {
-        let viewport_size = Dimension::new(403, 284);
-        Spec {
-            raster_lines: 312,
-            cycles_per_raster: 63,
-            viewport: Rect::new_with_dim(76 - 4, 16, viewport_size),
-            viewport_size,
-        }
     }
 }
 
@@ -186,22 +92,19 @@ pub struct Vic {
     irq_line: Rc<RefCell<IrqLine>>,
     frame_buffer: Rc<RefCell<FrameBuffer>>,
     mem: Rc<RefCell<VicMemory>>,
-    // Control
-    mode: Mode,
+    // Functional Units
+    gfx_seq: GfxSequencer,
+    interrupt_control: IrqControl,
+    // Configuration
+    char_base: u16,
     csel: bool,
     den: bool,
     rsel: bool,
     raster_compare: u16,
     x_scroll: u8,
     y_scroll: u8,
-    // Interrupts
-    interrupt_control: IrqControl,
-    // Memory Pointers
-    char_base: u16,
     video_matrix: u16,
     // Sprite and Color Data
-    background_color: [u8; 4],
-    border_color: u8,
     light_pen_pos: [u8; 2],
     sprite_multicolor: [u8; 2],
     sprites: [Sprite; 8],
@@ -213,13 +116,8 @@ pub struct Vic {
     vc: u16,
     vmli: usize,
     // Runtime State
-    border_flip: bool,
-    border_vflip: bool,
     display_on: bool,
     display_state: bool,
-    c_data: u8,
-    c_color: u8,
-    g_data: u8,
     is_bad_line: bool,
     sprite_ptrs: [u16; 8],
     #[allow(dead_code)]
@@ -249,22 +147,19 @@ impl Vic {
             irq_line,
             mem,
             frame_buffer,
-            // Control
-            mode: Mode::Text,
+            // Functional Units
+            gfx_seq: GfxSequencer::new(),
+            interrupt_control: IrqControl::new(),
+            // Configuration
+            char_base: 0,
             csel: false,
             den: false,
             rsel: false,
             raster_compare: 0x00,
             x_scroll: 0,
             y_scroll: 0,
-            // Interrupts
-            interrupt_control: IrqControl::new(),
-            // Memory Pointers
-            char_base: 0,
             video_matrix: 0,
             // Sprite and Color Data
-            background_color: [0; 4],
-            border_color: 0,
             light_pen_pos: [0; 2],
             sprites: [Sprite::new(); 8],
             sprite_multicolor: [0; 2],
@@ -276,13 +171,8 @@ impl Vic {
             vc: 0,
             vmli: 0,
             // Runtime State
-            border_flip: false,
-            border_vflip: false,
             display_on: false,
             display_state: false,
-            c_data: 0,
-            c_color: 0,
-            g_data: 0,
             is_bad_line: false,
             sprite_ptrs: [0; 8],
             sprite_mc: [0; 8],
@@ -291,6 +181,36 @@ impl Vic {
             vm_data_line: [0; 40],
         };
         vic
+    }
+
+    #[inline]
+    fn map_sprite_to_screen(x: u16) -> u16 {
+        match x {
+            0x000...0x193 => x + 0x64,
+            0x194...0x1ff => x - 0x194,
+            _ => panic!("invalid sprite coords {}", x),
+        }
+    }
+
+    #[inline]
+    fn draw_border(&mut self) {
+        let x_start = (self.cycle - 1) << 3;
+        for x in x_start..x_start + 8 {
+            self.update_border_main_ff(x);
+            self.gfx_seq.clock();
+            let mut rt = self.frame_buffer.borrow_mut();
+            rt.write(x, self.raster, self.gfx_seq.output());
+        }
+    }
+
+    #[inline]
+    fn draw(&mut self) {
+        let mut rt = self.frame_buffer.borrow_mut();
+        let x_start = (self.cycle - 1) << 3;
+        for x in x_start..x_start + 8 {
+            self.gfx_seq.clock();
+            rt.write(x, self.raster, self.gfx_seq.output());
+        }
     }
 
     #[inline]
@@ -315,354 +235,97 @@ impl Vic {
         self.ba_line.borrow_mut().set_active(!is_bad_line);
     }
 
-    // -- Coordinates Mapping
-
     #[inline]
-    fn get_coords(&self) -> (u16, u16) {
-        ((self.cycle - 1) << 3, self.raster)
-    }
-
-    #[inline]
-    fn get_viewport_coords(&self) -> Option<(u16, u16)> {
-        let (x, y) = self.get_coords();
-        if self.spec.viewport.contains(x, y) {
-            Some((x - self.spec.viewport.left, y - self.spec.viewport.top))
-        } else {
-            None
-        }
-    }
-
-    #[allow(dead_code)]
-    #[inline]
-    fn map_sprite_to_screen(&self, x: u16) -> u16 {
-        let x_trans = match x {
-            0x000...0x193 => x + 0x64,
-            0x194...0x1ff => x - 0x194,
-            _ => panic!("invalid sprite coords {}", x),
+    fn update_bad_line(&mut self) {
+        /*
+         "A Bad Line Condition is given at any arbitrary clock cycle, if at the
+          negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
+          <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
+          DEN bit was set during an arbitrary cycle of raster line $30."
+        */
+        self.is_bad_line = match self.raster {
+            0x30...0xf7 => {
+                self.display_on && (self.raster & 0x07) as u8 == self.y_scroll
+            },
+            _ => false,
         };
-        x_trans
     }
 
-    #[allow(dead_code)]
+    /*
+           |   CSEL=0   |   CSEL=1
+     ------+------------+-----------
+     Left  |  31 ($1f)  |  24 ($18)
+     Right | 335 ($14f) | 344 ($158)
+
+            |   RSEL=0  |  RSEL=1
+     -------+-----------+----------
+     Top    |  55 ($37) |  51 ($33)
+     Bottom | 247 ($f7) | 251 ($fb)
+    */
+
     #[inline]
-    fn map_screen_to_viewport(&self, x: u16, y: u16) -> Option<(u16, u16)> {
-        if self.spec.viewport.contains(x, y) {
-            Some((x - self.spec.viewport.left, y - self.spec.viewport.top))
+    fn update_border_main_ff(&mut self, x: u16) {
+        /*
+        1. If the X coordinate reaches the right comparison value, the main border
+           flip flop is set.
+        4. If the X coordinate reaches the left comparison value and the Y
+           coordinate reaches the bottom one, the vertical border flip flop is set.
+        5. If the X coordinate reaches the left comparison value and the Y
+           coordinate reaches the top one and the DEN bit in register $d011 is set,
+           the vertical border flip flop is reset.
+        6. If the X coordinate reaches the left comparison value and the vertical
+           border flip flop is not set, the main flip flop is reset.
+        */
+        // TODO vic: border off by 4 pixels to get around gfx shift register issue
+        if self.csel {
+            if x == Vic::map_sprite_to_screen(0x18 - 4) {
+                self.update_border_vertical_ff();
+                if !self.gfx_seq.get_border_vertical_ff() {
+                    self.gfx_seq.set_border_main_ff(false);
+                }
+            } else if x == Vic::map_sprite_to_screen(0x158 - 4) {
+                self.gfx_seq.set_border_main_ff(true);
+            }
         } else {
-            None
+            if x == Vic::map_sprite_to_screen(0x1f - 4) {
+                self.update_border_vertical_ff();
+                if !self.gfx_seq.get_border_vertical_ff() {
+                    self.gfx_seq.set_border_main_ff(false);
+                }
+            } else if x == Vic::map_sprite_to_screen(0x14f - 4) {
+                self.gfx_seq.set_border_main_ff(true);
+            }
         }
     }
 
-    // -- Graphics Ops
-
     #[inline]
-    fn draw(&self) {
-        // "The sequencer outputs the graphics data in every raster line in the area of
-        //  the display column as long as the vertical border flip-flop is reset"
-        if !self.border_vflip {
-            self.draw_graphics();
+    fn update_border_vertical_ff(&mut self) {
+        /*
+            2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
+               vertical border flip flop is set.
+            3. If the Y coordinate reaches the top comparison value in cycle 63 and the
+               DEN bit in register $d011 is set, the vertical border flip flop is
+               reset.
+        */
+        if self.rsel {
+            if self.raster == 51 && self.den {
+                self.gfx_seq.set_border_vertical_ff(false);
+            } else if self.raster == 251 {
+                self.gfx_seq.set_border_vertical_ff(true);
+            }
         } else {
-            self.draw_border();
-        }
-    }
-
-    #[inline]
-    fn draw_border(&self) {
-        if let Some((x_start, y)) = self.get_viewport_coords() {
-            let mut rt = self.frame_buffer.borrow_mut();
-            for x in x_start..cmp::min(x_start + 8, self.spec.viewport_size.width) {
-                rt.write(x, y, self.border_color);
+            if self.raster == 55 && self.den {
+                self.gfx_seq.set_border_vertical_ff(false);
+            } else if self.raster == 247 {
+                self.gfx_seq.set_border_vertical_ff(true);
             }
         }
     }
 
     #[inline]
-    fn draw_graphics(&self) {
-        if let Some((x, y)) = self.get_viewport_coords() {
-            match self.mode {
-                Mode::Text => {
-                    self.draw_text(x, y, self.g_data, self.c_color);
-                }
-                Mode::McText => {
-                    if self.c_color.get_bit(3) {
-                        self.draw_text_mc(x, y, self.g_data, self.c_color);
-                    } else {
-                        self.draw_text(x, y, self.g_data, self.c_color);
-                    }
-                }
-                Mode::Bitmap => {
-                    let color_1 = self.c_data >> 4;
-                    let color_0 = self.c_data & 0x0f;
-                    self.draw_bitmap(x, y, self.g_data, color_1, color_0);
-                }
-                Mode::McBitmap => {
-                    let color_01 = self.c_data >> 4;
-                    let color_10 = self.c_data & 0x0f;
-                    let color_11 = self.c_color;
-                    self.draw_bitmap_mc(x, y, self.g_data, color_01, color_10, color_11);
-                }
-                Mode::EcmText => {
-                    self.draw_text_ecm(x, y, self.g_data, self.c_color, self.c_data >> 6);
-                }
-                Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => {
-                    self.draw_blank(x, y);
-                }
-                _ => panic!("unsupported graphics mode {}", self.mode.value()),
-            }
-        }
-    }
-
-    #[inline]
-    fn draw_blank(&self, x_start: u16, y: u16) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        for x in x_start..x_start + 8 {
-            rt.write(x, y, 0);
-        }
-    }
-
-    /*
-     +----+----+----+----+----+----+----+----+
-     |  7 |  6 |  5 |  4 |  3 |  2 |  1 |  0 |
-     +----+----+----+----+----+----+----+----+
-     |         8 pixels (1 bit/pixel)        |
-     |                                       |
-     | "0": Color from bits 0-3 of c-data    |
-     | "1": Color from bits 4-7 of c-data    |
-     +---------------------------------------+
-    */
-
-    #[inline]
-    fn draw_bitmap(&self, x_start: u16, y: u16, pixels: u8, color_1: u8, color_0: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        let mut data = pixels;
-        for x in x_start..x_start + 8 {
-            let color = if data.get_bit(7) { color_1 } else { color_0 };
-            rt.write(x, y, color);
-            data = data << 1;
-        }
-    }
-
-    /*
-     +----+----+----+----+----+----+----+----+
-     |  7 |  6 |  5 |  4 |  3 |  2 |  1 |  0 |
-     +----+----+----+----+----+----+----+----+
-     |         4 pixels (2 bits/pixel)       |
-     |                                       |
-     | "00": Background color 0 ($d021)      |
-     | "01": Color from bits 4-7 of c-data   |
-     | "10": Color from bits 0-3 of c-data   |
-     | "11": Color from bits 8-11 of c-data  |
-     +---------------------------------------+
-    */
-
-    #[inline]
-    fn draw_bitmap_mc(
-        &self,
-        x_start: u16,
-        y: u16,
-        pixels: u8,
-        color_01: u8,
-        color_10: u8,
-        color_11: u8,
-    ) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        let mut data = pixels;
-        let mut x = x_start;
-        let x_end = x_start + 8;
-        while x < x_end {
-            let color = match data >> 6 {
-                0 => self.background_color[0],
-                1 => color_01,
-                2 => color_10,
-                3 => color_11,
-                _ => panic!("invalid color source {}", data >> 6),
-            };
-            rt.write(x, y, color);
-            rt.write(x + 1, y, color);
-            data = data << 2;
-            x += 2;
-        }
-    }
-
-    /*
-     +----+----+----+----+----+----+----+----+
-     |  7 |  6 |  5 |  4 |  3 |  2 |  1 |  0 |
-     +----+----+----+----+----+----+----+----+
-     |         8 pixels (1 bit/pixel)        |
-     |                                       |
-     | "0": Background color 0 ($d021)       |
-     | "1": Color from bits 8-11 of c-data   |
-     +---------------------------------------+
-    */
-
-    #[inline]
-    fn draw_text(&self, x_start: u16, y: u16, pixels: u8, color_1: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        let mut data = pixels;
-        for x in x_start..x_start + 8 {
-            let color = if data.get_bit(7) {
-                color_1
-            } else {
-                self.background_color[0]
-            };
-            rt.write(x, y, color);
-            data = data << 1;
-        }
-    }
-
-    /*
-     +----+----+----+----+----+----+----+----+
-     |  7 |  6 |  5 |  4 |  3 |  2 |  1 |  0 |
-     +----+----+----+----+----+----+----+----+
-     |         8 pixels (1 bit/pixel)        |
-     |                                       |
-     | "0": Depending on bits 6/7 of c-data  |
-     |      00: Background color 0 ($d021)   |
-     |      01: Background color 1 ($d022)   |
-     |      10: Background color 2 ($d023)   |
-     |      11: Background color 3 ($d024)   |
-     | "1": Color from bits 8-11 of c-data   |
-     +---------------------------------------+
-    */
-
-    #[inline]
-    fn draw_text_ecm(&self, x_start: u16, y: u16, pixels: u8, color_1: u8, color_0_src: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        let mut data = pixels;
-        for x in x_start..x_start + 8 {
-            let color = if data.get_bit(7) {
-                color_1
-            } else {
-                match color_0_src {
-                    0 => self.background_color[0],
-                    1 => self.background_color[1],
-                    2 => self.background_color[2],
-                    3 => self.background_color[3],
-                    _ => panic!("invalid color source {}", color_0_src),
-                }
-            };
-            rt.write(x, y, color);
-            data = data << 1;
-        }
-    }
-
-    /*
-     +----+----+----+----+----+----+----+----+
-     |  7 |  6 |  5 |  4 |  3 |  2 |  1 |  0 |
-     +----+----+----+----+----+----+----+----+
-     |         8 pixels (1 bit/pixel)        |
-     |                                       | MC flag = 0
-     | "0": Background color 0 ($d021)       |
-     | "1": Color from bits 8-10 of c-data   |
-     +---------------------------------------+
-     |         4 pixels (2 bits/pixel)       |
-     |                                       |
-     | "00": Background color 0 ($d021)      | MC flag = 1
-     | "01": Background color 1 ($d022)      |
-     | "10": Background color 2 ($d023)      |
-     | "11": Color from bits 8-10 of c-data  |
-     +---------------------------------------+
-    */
-
-    #[inline]
-    fn draw_text_mc(&self, x_start: u16, y: u16, pixels: u8, color_1: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        let mut data = pixels;
-        let mut x = x_start;
-        let x_end = x_start + 8;
-        while x < x_end {
-            let color = match data >> 6 {
-                0 => self.background_color[0],
-                1 => self.background_color[1],
-                2 => self.background_color[2],
-                3 => color_1 & 0x07,
-                _ => panic!("invalid color source {}", data >> 6),
-            };
-            rt.write(x, y, color);
-            rt.write(x + 1, y, color);
-            data = data << 2;
-            x += 2;
-        }
-    }
-
-    // -- Sprite Ops
-
-    #[inline]
-    fn draw_sprites(&mut self, raster: u16) {
-        for i in 0..8 {
-            let n = 7 - i;
-            if self.sprites[n].enabled {
-                if self.is_sprite(n, raster) {
-                    for j in 0..3 {
-                        let sp_data = self.fetch_sprite_pixels(n, self.sprite_mc[n]);
-                        if !self.sprites[n].multicolor {
-                            self.draw_sprite(
-                                self.map_sprite_to_screen(self.sprites[n].x) + (j << 3),
-                                raster,
-                                sp_data,
-                                self.sprites[n].color,
-                            );
-                        } else {
-                            self.draw_sprite_mc(
-                                self.map_sprite_to_screen(self.sprites[n].x) + (j << 3),
-                                raster,
-                                n,
-                                sp_data,
-                            );
-                        }
-                        self.sprite_mc[n] += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn draw_sprite(&self, x: u16, y: u16, data: u8, color: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        if let Some((x_trans, y_trans)) = self.map_screen_to_viewport(x, y) {
-            for i in 0..8u16 {
-                if data.get_bit(i as usize) {
-                    rt.write(x_trans + 7 - i, y_trans, color);
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn draw_sprite_mc(&self, x: u16, y: u16, n: usize, data: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        if let Some((x_trans, y_trans)) = self.map_screen_to_viewport(x, y) {
-            for i in 0..4u16 {
-                let source = (data >> (i as u8 * 2)) & 0x03;
-                let color = match source {
-                    0 => 0,
-                    1 => self.sprite_multicolor[0],
-                    2 => self.sprites[n].color,
-                    3 => self.sprite_multicolor[1],
-                    _ => panic!("invalid sprite color source {}", source),
-                };
-                if color != 0 {
-                    rt.write(x_trans + 7 - (i * 2), y_trans, color);
-                    rt.write(x_trans + 6 - (i * 2), y_trans, color);
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn fetch_sprite_pixels(&self, n: usize, mc: u8) -> u8 {
-        let address = self.sprite_ptrs[n] | (mc as u16);
-        self.mem.borrow().read(address)
-    }
-
-    #[inline]
-    fn is_sprite(&self, n: usize, y: u16) -> bool {
-        let sprite = &self.sprites[n];
-        if y >= (sprite.y as u16) && y < (sprite.y as u16 + 21) {
-            true
-        } else {
-            false
+    fn update_display_on(&mut self) {
+        if self.raster == 0x30 && self.den {
+            self.display_on = true; // TODO vic: when is this reset
         }
     }
 
@@ -674,13 +337,13 @@ impl Vic {
             let address = self.video_matrix | self.vc;
             self.vm_data_line[self.vmli] = self.mem.borrow().read(address);
             self.vm_color_line[self.vmli] = self.color_ram.borrow().read(self.vc) & 0x0f;
-            // TODO vic: no access unless ba down for 3 cycles
+            // TODO vic: memory no access unless ba down for 3 cycles
         }
     }
 
     #[inline]
     fn g_access(&mut self) {
-        self.g_data = match self.mode {
+        let g_data = match self.gfx_seq.get_mode() {
             Mode::Text | Mode::McText => {
                 let address =
                     self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
@@ -696,10 +359,11 @@ impl Vic {
                 self.mem.borrow().read(address)
             }
             Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-            _ => panic!("unsupported graphics mode {}", self.mode.value()),
+            _ => panic!("unsupported graphics mode {}", self.gfx_seq.get_mode().value()),
         };
-        self.c_data = self.vm_data_line[self.vmli];
-        self.c_color = self.vm_color_line[self.vmli];
+        let c_data = self.vm_data_line[self.vmli];
+        let c_color = self.vm_color_line[self.vmli];
+        self.gfx_seq.set_data(c_data, c_color, g_data);
         // "4. VC and VMLI are incremented after each g-access in display state."
         self.vc += 1;
         self.vmli += 1;
@@ -718,49 +382,79 @@ impl Vic {
         self.mem.borrow().read(address)
     }
 
-    // -- Raster Queries
+    // -- Sprite Ops
 
-    /*
-     "A Bad Line Condition is given at any arbitrary clock cycle, if at the
-      negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
-      <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
-      DEN bit was set during an arbitrary cycle of raster line $30."
-    */
-
-    #[inline]
-    fn update_bad_line(&mut self) {
-        self.is_bad_line = match self.raster {
-            0x30...0xf7 => (self.raster & 0x07) as u8 == self.y_scroll && self.display_on,
-            _ => false,
-        };
+    fn draw_sprites(&mut self, raster: u16) {
+        for i in 0..8 {
+            let n = 7 - i;
+            if self.sprites[n].enabled {
+                if self.is_sprite(n, raster) {
+                    for j in 0..3 {
+                        let sp_data = self.fetch_sprite_pixels(n, self.sprite_mc[n]);
+                        if !self.sprites[n].multicolor {
+                            self.draw_sprite(
+                                Vic::map_sprite_to_screen(self.sprites[n].x) + (j << 3),
+                                raster,
+                                sp_data,
+                                self.sprites[n].color,
+                            );
+                        } else {
+                            self.draw_sprite_mc(
+                                Vic::map_sprite_to_screen(self.sprites[n].x) + (j << 3),
+                                raster,
+                                n,
+                                sp_data,
+                            );
+                        }
+                        self.sprite_mc[n] += 1;
+                    }
+                }
+            }
+        }
     }
 
-    /*
-           |   CSEL=0   |   CSEL=1
-     ------+------------+-----------
-     Left  |  31 ($1f)  |  24 ($18)
-     Right | 335 ($14f) | 344 ($158)
-
-            |   RSEL=0  |  RSEL=1
-     -------+-----------+----------
-     Top    |  55 ($37) |  51 ($33)
-     Bottom | 247 ($f7) | 251 ($fb)
-    */
+    #[inline]
+    fn draw_sprite(&self, x: u16, y: u16, data: u8, color: u8) {
+        let mut rt = self.frame_buffer.borrow_mut();
+        for i in 0..8u16 {
+            if data.get_bit(i as usize) {
+                rt.write(x + 7 - i, y, color);
+            }
+        }
+    }
 
     #[inline]
-    fn update_border_vflip(&mut self) {
-        self.border_vflip = if self.rsel {
-            match self.raster {
-                51 if self.den => false,
-                251 => true,
-                _ => self.border_vflip,
+    fn draw_sprite_mc(&self, x: u16, y: u16, n: usize, data: u8) {
+        let mut rt = self.frame_buffer.borrow_mut();
+        for i in 0..4u16 {
+            let source = (data >> (i as u8 * 2)) & 0x03;
+            let color = match source {
+                0 => 0,
+                1 => self.sprite_multicolor[0],
+                2 => self.sprites[n].color,
+                3 => self.sprite_multicolor[1],
+                _ => panic!("invalid sprite color source {}", source),
+            };
+            if color != 0 {
+                rt.write(x + 7 - (i * 2), y, color);
+                rt.write(x + 6 - (i * 2), y, color);
             }
+        }
+    }
+
+    #[inline]
+    fn fetch_sprite_pixels(&self, n: usize, mc: u8) -> u8 {
+        let address = self.sprite_ptrs[n] | (mc as u16);
+        self.mem.borrow().read(address)
+    }
+
+    #[inline]
+    fn is_sprite(&self, n: usize, y: u16) -> bool {
+        let sprite = &self.sprites[n];
+        if y >= (sprite.y as u16) && y < (sprite.y as u16 + 21) {
+            true
         } else {
-            match self.raster {
-                55 if self.den => false,
-                247 => true,
-                _ => self.border_vflip,
-            }
+            false
         }
     }
 }
@@ -793,6 +487,7 @@ X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 impl Chip for Vic {
     fn clock(&mut self) {
+        self.update_display_on();
         match self.cycle {
             1 => {
                 if self.raster == self.raster_compare && self.raster != 0 {
@@ -803,7 +498,7 @@ impl Chip for Vic {
                 self.p_access(3);
             }
             2 => {
-                // TODO vic: cycle 2 logic
+                // TODO vic: clock cycle 2 logic
                 if self.raster == self.raster_compare && self.raster == 0 {
                     self.trigger_irq(0);
                 }
@@ -871,12 +566,11 @@ impl Chip for Vic {
             }
             // Display Column
             16 => {
-                self.update_border_vflip();
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
                 self.g_access();
                 self.c_access();
-                self.draw();
+                self.draw_border();
             }
             17...54 => {
                 let is_bad_line = self.is_bad_line;
@@ -900,7 +594,7 @@ impl Chip for Vic {
                 self.draw_border();
             }
             58 => {
-                // TODO vic: cycle 58 display logic
+                // TODO vic: clock cycle 58 display logic
                 // "5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
                 //    logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE). If
                 //    the video logic is in display state afterwards (this is always the case
@@ -931,7 +625,6 @@ impl Chip for Vic {
             }
             63 => {
                 self.set_ba(false);
-                self.update_border_vflip();
                 for i in 0..8 {
                     if self.sprites[i].y as u16 == self.raster {
                         self.sprite_mc[i] = 0;
@@ -939,11 +632,9 @@ impl Chip for Vic {
                 }
                 let raster = self.raster;
                 self.draw_sprites(raster);
+                self.update_border_vertical_ff();
             }
             _ => panic!("invalid cycle"),
-        }
-        if self.raster == 0x30 && self.den {
-            self.display_on = true;
         }
         // Update counters/vsync
         self.cycle += 1;
@@ -969,22 +660,19 @@ impl Chip for Vic {
     fn process_vsync(&mut self) {}
 
     fn reset(&mut self) {
-        // Control
-        self.mode = Mode::Text;
+        // Functional Units
+        self.gfx_seq.reset();
+        self.interrupt_control.reset();
+        // Configuration
+        self.char_base = 0x1000;
         self.csel = true;
         self.den = true;
         self.rsel = true;
         self.raster_compare = 0;
         self.x_scroll = 0;
         self.y_scroll = 3;
-        // Interrupts
-        self.interrupt_control.reset();
-        // Memory Pointers
-        self.char_base = 0x1000;
         self.video_matrix = 0x0400;
         // Sprite and Color Data
-        self.background_color = [0x06, 0, 0, 0];
-        self.border_color = 0x0e;
         self.light_pen_pos = [0; 2];
         self.sprite_multicolor = [0; 2];
         for i in 0..8 {
@@ -998,13 +686,8 @@ impl Chip for Vic {
         self.vc = 0;
         self.vmli = 0;
         // Runtime State
-        self.border_flip = false;
-        self.border_vflip = false;
         self.display_on = false;
         self.display_state = false;
-        self.c_data = 0;
-        self.c_color = 0;
-        self.g_data = 0;
         self.is_bad_line = false;
         // TODO vic: reset sprite data
         for i in 0..self.vm_data_line.len() {
@@ -1038,8 +721,8 @@ impl Chip for Vic {
                 let mut result = 0;
                 result
                     .set_bit(7, self.raster.get_bit(8))
-                    .set_bit(6, self.mode.value().get_bit(2))
-                    .set_bit(5, self.mode.value().get_bit(1))
+                    .set_bit(6, self.gfx_seq.get_mode().value().get_bit(2))
+                    .set_bit(5, self.gfx_seq.get_mode().value().get_bit(1))
                     .set_bit(4, self.den)
                     .set_bit(3, self.rsel);
                 result | (self.y_scroll & 0x07)
@@ -1063,7 +746,7 @@ impl Chip for Vic {
                 let mut result = 0;
                 result
                     .set_bit(5, true)
-                    .set_bit(4, self.mode.value().get_bit(0))
+                    .set_bit(4, self.gfx_seq.get_mode().value().get_bit(0))
                     .set_bit(3, self.csel);
                 result | (self.x_scroll & 0x07) | 0xc0
             }
@@ -1114,9 +797,9 @@ impl Chip for Vic {
             // Reg::MD
             0x1f => 0xff, // DEFERRED collision
             // Reg::EC
-            0x20 => self.border_color | 0xf0,
+            0x20 => self.gfx_seq.get_border_color() | 0xf0,
             // Reg::B0C - Reg::B3C
-            0x21...0x24 => self.background_color[(reg - 0x21) as usize] | 0xf0,
+            0x21...0x24 => self.gfx_seq.get_bg_color((reg - 0x21) as usize) | 0xf0,
             // Reg::MM0 - Reg::MM1
             0x25...0x26 => self.sprite_multicolor[(reg - 0x25) as usize] | 0xf0,
             // Reg::M0C - Reg::M7C
@@ -1151,10 +834,10 @@ impl Chip for Vic {
             // Reg::CR1
             0x11 => {
                 self.raster_compare.set_bit(8, value.get_bit(7));
-                let mut mode = self.mode.value();
+                let mut mode = self.gfx_seq.get_mode().value();
                 mode.set_bit(2, value.get_bit(6))
                     .set_bit(1, value.get_bit(5));
-                self.mode = Mode::from(mode);
+                self.gfx_seq.set_mode(Mode::from(mode));
                 self.den = value.get_bit(4);
                 self.rsel = value.get_bit(3);
                 self.y_scroll = value & 0x07;
@@ -1181,9 +864,9 @@ impl Chip for Vic {
             },
             // Reg::CR2
             0x16 => {
-                let mut mode = self.mode.value();
+                let mut mode = self.gfx_seq.get_mode().value();
                 mode.set_bit(0, value.get_bit(4));
-                self.mode = Mode::from(mode);
+                self.gfx_seq.set_mode(Mode::from(mode));
                 self.csel = value.get_bit(3);
                 self.x_scroll = value & 0x07;
             }
@@ -1200,7 +883,7 @@ impl Chip for Vic {
             0x19 => {
                 self.interrupt_control.clear_events(value);
                 if !self.interrupt_control.is_triggered() || value == 0xe2 {
-                    // FIXME
+                    // TODO vic: check interrupt reset logic
                     self.irq_line
                         .borrow_mut()
                         .set_low(IrqSource::Vic.value(), false);
@@ -1231,9 +914,9 @@ impl Chip for Vic {
             // Reg::MD
             0x1f => {}
             // Reg::EC
-            0x20 => self.border_color = value & 0x0f,
+            0x20 => self.gfx_seq.set_border_color(value & 0x0f),
             // Reg::B0C - Reg::B3C
-            0x21...0x24 => self.background_color[reg as usize - 0x21] = value & 0x0f,
+            0x21...0x24 => self.gfx_seq.set_bg_color(reg as usize - 0x21, value & 0x0f),
             // Reg::MM0  - Reg::MM1
             0x25...0x26 => self.sprite_multicolor[reg as usize - 0x25] = value & 0x0f,
             // Reg::M0C - Reg::M7C

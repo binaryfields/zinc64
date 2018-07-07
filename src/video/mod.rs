@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod rect;
-pub mod vic;
+mod gfx_sequencer;
+mod spec;
+mod vic;
 mod vic_memory;
 
-pub use self::rect::Dimension;
 pub use self::vic::Vic;
 pub use self::vic_memory::VicMemory;

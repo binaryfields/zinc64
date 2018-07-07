@@ -23,6 +23,7 @@ use sdl2;
 use sdl2::pixels;
 use sdl2::render;
 use sdl2::video;
+use sdl2::rect::Rect;
 use time;
 use zinc64::core::FrameBuffer;
 use zinc64::core::geo;
@@ -80,7 +81,10 @@ impl Renderer {
             )
             .map_err(|_| "failed to update texture")?;
         self.canvas.clear();
-        self.canvas.copy(&self.texture, None, None)?;
+        self.canvas.copy(
+            &self.texture,
+            Some(Rect::new(76, 16, 403, 284)), // FIXME vic
+            None)?;
         self.canvas.present();
         self.frame = self.frame.wrapping_add(1);
         self.last_frame_ts = time::precise_time_ns();
