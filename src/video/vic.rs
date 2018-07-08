@@ -89,8 +89,8 @@ pub struct Vic {
     spec: Spec,
     ba_line: Rc<RefCell<Pin>>,
     color_ram: Rc<RefCell<Ram>>,
-    irq_line: Rc<RefCell<IrqLine>>,
     frame_buffer: Rc<RefCell<FrameBuffer>>,
+    irq_line: Rc<RefCell<IrqLine>>,
     mem: Rc<RefCell<VicMemory>>,
     // Functional Units
     gfx_seq: GfxSequencer,
@@ -101,29 +101,25 @@ pub struct Vic {
     den: bool,
     rsel: bool,
     raster_compare: u16,
+    sprite_multicolor: [u8; 2],
+    sprites: [Sprite; 8],
     x_scroll: u8,
     y_scroll: u8,
     video_matrix: u16,
-    // Sprite and Color Data
-    light_pen_pos: [u8; 2],
-    sprite_multicolor: [u8; 2],
-    sprites: [Sprite; 8],
     // Registers
-    cycle: u16,
-    raster: u16,
+    mc: [u8; 8],
+    mc_base: [u8; 8],
+    raster_cycle: u16,
+    raster_y: u16,
     rc: u8,
-    vc_base: u16,
     vc: u16,
+    vc_base: u16,
     vmli: usize,
     // Runtime State
     display_on: bool,
     display_state: bool,
     is_bad_line: bool,
     sprite_ptrs: [u16; 8],
-    #[allow(dead_code)]
-    sprite_mc: [u8; 8],
-    #[allow(dead_code)]
-    sprite_mcbase: [u8; 8],
     vm_color_line: [u8; 40],
     vm_data_line: [u8; 40],
 }
@@ -144,9 +140,9 @@ impl Vic {
             spec,
             ba_line,
             color_ram,
+            frame_buffer,
             irq_line,
             mem,
-            frame_buffer,
             // Functional Units
             gfx_seq: GfxSequencer::new(),
             interrupt_control: IrqControl::new(),
@@ -156,16 +152,16 @@ impl Vic {
             den: false,
             rsel: false,
             raster_compare: 0x00,
+            sprite_multicolor: [0; 2],
+            sprites: [Sprite::new(); 8],
             x_scroll: 0,
             y_scroll: 0,
             video_matrix: 0,
-            // Sprite and Color Data
-            light_pen_pos: [0; 2],
-            sprites: [Sprite::new(); 8],
-            sprite_multicolor: [0; 2],
             // Registers
-            cycle: 1,
-            raster: 0,
+            mc: [0; 8],
+            mc_base: [0; 8],
+            raster_cycle: 1,
+            raster_y: 0,
             rc: 0,
             vc_base: 0,
             vc: 0,
@@ -175,8 +171,6 @@ impl Vic {
             display_state: false,
             is_bad_line: false,
             sprite_ptrs: [0; 8],
-            sprite_mc: [0; 8],
-            sprite_mcbase: [0; 8],
             vm_color_line: [0; 40],
             vm_data_line: [0; 40],
         };
@@ -194,22 +188,22 @@ impl Vic {
 
     #[inline]
     fn draw_border(&mut self) {
-        let x_start = (self.cycle - 1) << 3;
+        let x_start = (self.raster_cycle - 1) << 3;
         for x in x_start..x_start + 8 {
             self.update_border_main_ff(x);
             self.gfx_seq.clock();
             let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, self.raster, self.gfx_seq.output());
+            rt.write(x, self.raster_y, self.gfx_seq.output());
         }
     }
 
     #[inline]
     fn draw(&mut self) {
         let mut rt = self.frame_buffer.borrow_mut();
-        let x_start = (self.cycle - 1) << 3;
+        let x_start = (self.raster_cycle - 1) << 3;
         for x in x_start..x_start + 8 {
             self.gfx_seq.clock();
-            rt.write(x, self.raster, self.gfx_seq.output());
+            rt.write(x, self.raster_y, self.gfx_seq.output());
         }
     }
 
@@ -243,9 +237,9 @@ impl Vic {
           <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
           DEN bit was set during an arbitrary cycle of raster line $30."
         */
-        self.is_bad_line = match self.raster {
+        self.is_bad_line = match self.raster_y {
             0x30...0xf7 => {
-                self.display_on && (self.raster & 0x07) as u8 == self.y_scroll
+                self.display_on && (self.raster_y & 0x07) as u8 == self.y_scroll
             },
             _ => false,
         };
@@ -308,15 +302,15 @@ impl Vic {
                reset.
         */
         if self.rsel {
-            if self.raster == 51 && self.den {
+            if self.raster_y == 51 && self.den {
                 self.gfx_seq.set_border_vertical_ff(false);
-            } else if self.raster == 251 {
+            } else if self.raster_y == 251 {
                 self.gfx_seq.set_border_vertical_ff(true);
             }
         } else {
-            if self.raster == 55 && self.den {
+            if self.raster_y == 55 && self.den {
                 self.gfx_seq.set_border_vertical_ff(false);
-            } else if self.raster == 247 {
+            } else if self.raster_y == 247 {
                 self.gfx_seq.set_border_vertical_ff(true);
             }
         }
@@ -324,7 +318,7 @@ impl Vic {
 
     #[inline]
     fn update_display_on(&mut self) {
-        if self.raster == 0x30 && self.den {
+        if self.raster_y == 0x30 && self.den {
             self.display_on = true; // TODO vic: when is this reset
         }
     }
@@ -390,7 +384,7 @@ impl Vic {
             if self.sprites[n].enabled {
                 if self.is_sprite(n, raster) {
                     for j in 0..3 {
-                        let sp_data = self.fetch_sprite_pixels(n, self.sprite_mc[n]);
+                        let sp_data = self.fetch_sprite_pixels(n, self.mc[n]);
                         if !self.sprites[n].multicolor {
                             self.draw_sprite(
                                 Vic::map_sprite_to_screen(self.sprites[n].x) + (j << 3),
@@ -406,7 +400,7 @@ impl Vic {
                                 sp_data,
                             );
                         }
-                        self.sprite_mc[n] += 1;
+                        self.mc[n] += 1;
                     }
                 }
             }
@@ -488,9 +482,9 @@ X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 impl Chip for Vic {
     fn clock(&mut self) {
         self.update_display_on();
-        match self.cycle {
+        match self.raster_cycle {
             1 => {
-                if self.raster == self.raster_compare && self.raster != 0 {
+                if self.raster_y == self.raster_compare && self.raster_y != 0 {
                     self.trigger_irq(0);
                 }
                 self.update_bad_line();
@@ -499,7 +493,7 @@ impl Chip for Vic {
             }
             2 => {
                 // TODO vic: clock cycle 2 logic
-                if self.raster == self.raster_compare && self.raster == 0 {
+                if self.raster_y == self.raster_compare && self.raster_y == 0 {
                     self.trigger_irq(0);
                 }
                 self.set_ba(false);
@@ -626,23 +620,23 @@ impl Chip for Vic {
             63 => {
                 self.set_ba(false);
                 for i in 0..8 {
-                    if self.sprites[i].y as u16 == self.raster {
-                        self.sprite_mc[i] = 0;
+                    if self.sprites[i].y as u16 == self.raster_y {
+                        self.mc[i] = 0;
                     }
                 }
-                let raster = self.raster;
+                let raster = self.raster_y;
                 self.draw_sprites(raster);
                 self.update_border_vertical_ff();
             }
             _ => panic!("invalid cycle"),
         }
         // Update counters/vsync
-        self.cycle += 1;
-        if self.cycle > self.spec.cycles_per_raster {
-            self.cycle = 1;
-            self.raster += 1;
-            if self.raster >= self.spec.raster_lines {
-                self.raster = 0;
+        self.raster_cycle += 1;
+        if self.raster_cycle > self.spec.cycles_per_raster {
+            self.raster_cycle = 1;
+            self.raster_y += 1;
+            if self.raster_y >= self.spec.raster_lines {
+                self.raster_y = 0;
                 // 1. VCBASE is reset to zero in raster line 0.
                 self.vc_base = 0;
                 let mut rt = self.frame_buffer.borrow_mut();
@@ -669,27 +663,33 @@ impl Chip for Vic {
         self.den = true;
         self.rsel = true;
         self.raster_compare = 0;
+        self.sprite_multicolor = [0; 2];
+        for i in 0..self.sprites.len() {
+            self.sprites[i].reset();
+        }
         self.x_scroll = 0;
         self.y_scroll = 3;
         self.video_matrix = 0x0400;
-        // Sprite and Color Data
-        self.light_pen_pos = [0; 2];
-        self.sprite_multicolor = [0; 2];
-        for i in 0..8 {
-            self.sprites[i].reset();
-        }
         // Registers
-        self.cycle = 1;
-        self.raster = 0x0100;
+        for i in 0..self.mc.len() {
+            self.mc[i] = 0;
+        }
+        for i in 0..self.mc_base.len() {
+            self.mc_base[i] = 0;
+        }
+        self.raster_cycle = 1;
+        self.raster_y = 0x0100;
         self.rc = 0;
-        self.vc_base = 0;
         self.vc = 0;
+        self.vc_base = 0;
         self.vmli = 0;
         // Runtime State
         self.display_on = false;
         self.display_state = false;
         self.is_bad_line = false;
-        // TODO vic: reset sprite data
+        for i in 0..self.sprite_ptrs.len() {
+            self.sprite_ptrs[i] = 0;
+        }
         for i in 0..self.vm_data_line.len() {
             self.vm_color_line[i] = 0;
             self.vm_data_line[i] = 0;
@@ -720,7 +720,7 @@ impl Chip for Vic {
             0x11 => {
                 let mut result = 0;
                 result
-                    .set_bit(7, self.raster.get_bit(8))
+                    .set_bit(7, self.raster_y.get_bit(8))
                     .set_bit(6, self.gfx_seq.get_mode().value().get_bit(2))
                     .set_bit(5, self.gfx_seq.get_mode().value().get_bit(1))
                     .set_bit(4, self.den)
@@ -728,11 +728,11 @@ impl Chip for Vic {
                 result | (self.y_scroll & 0x07)
             }
             // Reg::RASTER
-            0x12 => (self.raster & 0x00ff) as u8,
+            0x12 => (self.raster_y & 0x00ff) as u8,
             // Reg::LPX
-            0x13 => self.light_pen_pos[0],
+            0x13 => 0,
             // Reg::LPY
-            0x14 => self.light_pen_pos[1],
+            0x14 => 0,
             // Reg::ME
             0x15 => {
                 let mut result = 0;
@@ -842,22 +842,22 @@ impl Chip for Vic {
                 self.rsel = value.get_bit(3);
                 self.y_scroll = value & 0x07;
                 self.update_bad_line();
-                if self.raster == self.raster_compare {
+                if self.raster_y == self.raster_compare {
                     self.trigger_irq(0);
                 }
             }
             // Reg::RASTER
             0x12 => {
                 let new_value = (self.raster_compare & 0xff00) | (value as u16);
-                if self.raster_compare != new_value && self.raster == new_value {
+                if self.raster_compare != new_value && self.raster_y == new_value {
                     self.trigger_irq(0);
                 }
                 self.raster_compare = new_value;
             }
             // Reg::LPX
-            0x13 => self.light_pen_pos[0] = value,
+            0x13 => {},
             // Reg::LPY
-            0x14 => self.light_pen_pos[1] = value,
+            0x14 => {},
             // Reg::ME
             0x15 => for i in 0..8 as usize {
                 self.sprites[i].enabled = value.get_bit(i);
