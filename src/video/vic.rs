@@ -48,6 +48,7 @@ impl IrqSource {
 
 #[derive(Copy, Clone)]
 struct Sprite {
+    // Configuration
     enabled: bool,
     x: u16,
     y: u8,
@@ -56,11 +57,17 @@ struct Sprite {
     expand_y: bool,
     multicolor: bool,
     priority: bool,
+    // Runtime State
+    data: u32,
+    display: bool,
+    dma: bool,
+    expansion_ff: bool,
 }
 
 impl Sprite {
     pub fn new() -> Sprite {
         Sprite {
+            // Configuration
             enabled: false,
             x: 0,
             y: 0,
@@ -69,10 +76,20 @@ impl Sprite {
             expand_y: false,
             multicolor: false,
             priority: false,
+            // Runtime State
+            data: 0,
+            display: false,
+            dma: false,
+            expansion_ff: true,
         }
     }
 
+    pub fn set_data(&mut self, byte: usize, data: u8) {
+        // FIXME vic/sprite: set data logic
+    }
+
     pub fn reset(&mut self) {
+        // Configuration
         self.enabled = false;
         self.x = 0;
         self.y = 0;
@@ -81,6 +98,11 @@ impl Sprite {
         self.expand_y = false;
         self.multicolor = false;
         self.priority = true;
+        // Runtime State
+        self.data = 0;
+        self.display = false;
+        self.dma = false;
+        self.expansion_ff = true;
     }
 }
 
@@ -204,6 +226,8 @@ impl Vic {
         for x in x_start..x_start + 8 {
             self.gfx_seq.clock();
             rt.write(x, self.raster_y, self.gfx_seq.output());
+            // FIXME vic/sprite: draw logic
+            // FIXME vic/sprite: mux logic
         }
     }
 
@@ -260,6 +284,7 @@ impl Vic {
     #[inline]
     fn update_border_main_ff(&mut self, x: u16) {
         /*
+        Section: 3.9. The border unit
         1. If the X coordinate reaches the right comparison value, the main border
            flip flop is set.
         4. If the X coordinate reaches the left comparison value and the Y
@@ -295,11 +320,12 @@ impl Vic {
     #[inline]
     fn update_border_vertical_ff(&mut self) {
         /*
-            2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
-               vertical border flip flop is set.
-            3. If the Y coordinate reaches the top comparison value in cycle 63 and the
-               DEN bit in register $d011 is set, the vertical border flip flop is
-               reset.
+        Section: 3.9. The border unit
+        2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
+           vertical border flip flop is set.
+        3. If the Y coordinate reaches the top comparison value in cycle 63 and the
+           DEN bit in register $d011 is set, the vertical border flip flop is
+           reset.
         */
         if self.rsel {
             if self.raster_y == 51 && self.den {
@@ -318,11 +344,67 @@ impl Vic {
 
     #[inline]
     fn update_display_on(&mut self) {
+        // TODO vic: add spec ref
         if self.raster_y == 0x30 && self.den {
             self.display_on = true; // TODO vic: when is this reset
         }
     }
 
+    #[inline]
+    fn update_sprite_display(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        4. In the first phase of cycle 58, the MC of every sprite is loaded from
+           its belonging MCBASE (MCBASE->MC) and it is checked if the DMA for the
+           sprite is turned on and the Y coordinate of the sprite matches the lower
+           8 bits of RASTER. If this is the case, the display of the sprite is
+           turned on.
+        */
+        for sprite in self.sprites.iter_mut() {
+            // FIXME vic/sprite: raster + 1
+            if sprite.dma && sprite.y == (self.raster_y as u8) {
+                sprite.display = true;
+            }
+        }
+    }
+
+    #[inline]
+    fn update_sprite_dma(&mut self, n: usize) {
+        /*
+        Section: 3.8. Sprites
+        3. In the first phases of cycle 55 and 56, the VIC checks for every sprite
+           if the corresponding MxE bit in register $d015 is set and the Y
+           coordinate of the sprite (odd registers $d001-$d00f) match the lower 8
+           bits of RASTER. If this is the case and the DMA for the sprite is still
+           off, the DMA is switched on, MCBASE is cleared, and if the MxYE bit is
+           set the expansion flip flip is reset.
+        */
+        let sprite = &mut self.sprites[n];
+        // FIXME vic/sprite: raster + 1
+        if sprite.enabled && sprite.y == (self.raster_y as u8) {
+            if !sprite.dma {
+                sprite.dma = true;
+                self.mc_base[n] = 0;
+                if sprite.expand_y {
+                    sprite.expansion_ff = false;
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn update_sprite_expansion_ff(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        2. If the MxYE bit is set in the first phase of cycle 55, the expansion
+           flip flop is inverted.
+        */
+        for sprite in self.sprites.iter_mut() {
+            if sprite.expand_y {
+                sprite.expansion_ff = !sprite.expansion_ff;
+            }
+        }
+    }
     // -- Memory Ops
 
     #[inline]
@@ -358,7 +440,10 @@ impl Vic {
         let c_data = self.vm_data_line[self.vmli];
         let c_color = self.vm_color_line[self.vmli];
         self.gfx_seq.set_data(c_data, c_color, g_data);
-        // "4. VC and VMLI are incremented after each g-access in display state."
+        /*
+        Section: 3.7.2. VC and RC
+        4. VC and VMLI are incremented after each g-access in display state.
+        */
         self.vc += 1;
         self.vmli += 1;
     }
@@ -369,87 +454,22 @@ impl Vic {
         self.sprite_ptrs[n] = (self.mem.borrow().read(address) as u16) << 6;
     }
 
-    #[allow(dead_code)]
     #[inline]
-    fn s_access(&self, n: usize, mc: u8) -> u8 {
-        let address = self.sprite_ptrs[n] | (mc as u16);
-        self.mem.borrow().read(address)
-    }
-
-    // -- Sprite Ops
-
-    fn draw_sprites(&mut self, raster: u16) {
-        for i in 0..8 {
-            let n = 7 - i;
-            if self.sprites[n].enabled {
-                if self.is_sprite(n, raster) {
-                    for j in 0..3 {
-                        let sp_data = self.fetch_sprite_pixels(n, self.mc[n]);
-                        if !self.sprites[n].multicolor {
-                            self.draw_sprite(
-                                Vic::map_sprite_to_screen(self.sprites[n].x) + (j << 3),
-                                raster,
-                                sp_data,
-                                self.sprites[n].color,
-                            );
-                        } else {
-                            self.draw_sprite_mc(
-                                Vic::map_sprite_to_screen(self.sprites[n].x) + (j << 3),
-                                raster,
-                                n,
-                                sp_data,
-                            );
-                        }
-                        self.mc[n] += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn draw_sprite(&self, x: u16, y: u16, data: u8, color: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        for i in 0..8u16 {
-            if data.get_bit(i as usize) {
-                rt.write(x + 7 - i, y, color);
-            }
-        }
-    }
-
-    #[inline]
-    fn draw_sprite_mc(&self, x: u16, y: u16, n: usize, data: u8) {
-        let mut rt = self.frame_buffer.borrow_mut();
-        for i in 0..4u16 {
-            let source = (data >> (i as u8 * 2)) & 0x03;
-            let color = match source {
-                0 => 0,
-                1 => self.sprite_multicolor[0],
-                2 => self.sprites[n].color,
-                3 => self.sprite_multicolor[1],
-                _ => panic!("invalid sprite color source {}", source),
-            };
-            if color != 0 {
-                rt.write(x + 7 - (i * 2), y, color);
-                rt.write(x + 6 - (i * 2), y, color);
-            }
-        }
-    }
-
-    #[inline]
-    fn fetch_sprite_pixels(&self, n: usize, mc: u8) -> u8 {
-        let address = self.sprite_ptrs[n] | (mc as u16);
-        self.mem.borrow().read(address)
-    }
-
-    #[inline]
-    fn is_sprite(&self, n: usize, y: u16) -> bool {
-        let sprite = &self.sprites[n];
-        if y >= (sprite.y as u16) && y < (sprite.y as u16 + 21) {
-            true
-        } else {
-            false
-        }
+    fn s_access(&mut self, n: usize, byte: usize) {
+        /*
+        Section: 3.8. Sprites
+        5. If the DMA for a sprite is turned on, three s-accesses are done in
+           sequence in the corresponding cycles assigned to the sprite (see the
+           diagrams in section 3.6.3.). The p-accesses are always done, even if the
+           sprite is turned off. The read data of the first access is stored in the
+           upper 8 bits of the shift register, that of the second one in the middle
+           8 bits and that of the third one in the lower 8 bits. MC is incremented
+           by one after each s-access.
+        */
+        let address = self.sprite_ptrs[n] | (self.mc[n] as u16);
+        let data = self.mem.borrow().read(address);
+        self.sprites[n].set_data(byte, data);
+        self.mc[n] += 1;
     }
 }
 
@@ -490,6 +510,9 @@ impl Chip for Vic {
                 self.update_bad_line();
                 self.set_ba(false);
                 self.p_access(3);
+                if self.sprites[3].dma {
+                    self.s_access(3, 0);
+                }
             }
             2 => {
                 // TODO vic: clock cycle 2 logic
@@ -497,34 +520,66 @@ impl Chip for Vic {
                     self.trigger_irq(0);
                 }
                 self.set_ba(false);
+                if self.sprites[3].dma {
+                    self.s_access(3, 1);
+                    self.s_access(3, 2);
+                }
             }
             3 => {
                 self.set_ba(false);
                 self.p_access(4);
+                if self.sprites[4].dma {
+                    self.s_access(4, 0);
+                }
             }
             4 => {
                 self.set_ba(false);
+                if self.sprites[4].dma {
+                    self.s_access(4, 1);
+                    self.s_access(4, 2);
+                }
             }
             5 => {
                 self.set_ba(false);
                 self.p_access(5);
+                if self.sprites[5].dma {
+                    self.s_access(5, 0);
+                }
             }
             6 => {
                 self.set_ba(false);
+                if self.sprites[5].dma {
+                    self.s_access(5, 1);
+                    self.s_access(5, 2);
+                }
             }
             7 => {
                 self.set_ba(false);
                 self.p_access(6);
+                if self.sprites[6].dma {
+                    self.s_access(6, 0);
+                }
             }
             8 => {
                 self.set_ba(false);
+                if self.sprites[6].dma {
+                    self.s_access(6, 1);
+                    self.s_access(6, 2);
+                }
             }
             9 => {
                 self.set_ba(false);
                 self.p_access(7);
+                if self.sprites[7].dma {
+                    self.s_access(7, 0);
+                }
             }
             10 => {
                 self.set_ba(false);
+                if self.sprites[7].dma {
+                    self.s_access(7, 1);
+                    self.s_access(7, 2);
+                }
                 self.draw_border();
             }
             11 => {
@@ -532,17 +587,23 @@ impl Chip for Vic {
                 self.draw_border();
             }
             12...13 => {
-                // "3. If there is a Bad Line Condition in cycles 12-54, BA is set low and the
-                //     c-accesses are started. Once started, one c-access is done in the second
-                //     phase of every clock cycle in the range 15-54."
+                /*
+                Section: 3.7.2. VC and RC
+                3. If there is a Bad Line Condition in cycles 12-54, BA is set low and the
+                   c-accesses are started. Once started, one c-access is done in the second
+                   phase of every clock cycle in the range 15-54.
+                */
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
                 self.draw_border();
             }
             14 => {
-                // "2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
-                //     (VCBASE->VC) and VMLI is cleared. If there is a Bad Line Condition in
-                //     this phase, RC is also reset to zero."
+                /*
+                Section: 3.7.2. VC and RC
+                2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
+                   (VCBASE->VC) and VMLI is cleared. If there is a Bad Line Condition in
+                   this phase, RC is also reset to zero.
+                */
                 self.vc = self.vc_base;
                 self.vmli = 0;
                 if self.is_bad_line {
@@ -553,13 +614,39 @@ impl Chip for Vic {
                 self.draw_border();
             }
             15 => {
+                /*
+                Section: 3.8. Sprites
+                7. In the first phase of cycle 15, it is checked if the expansion flip flop
+                   is set. If so, MCBASE is incremented by 2.
+                */
+                for i in 0..8 {
+                    if self.sprites[i].expansion_ff {
+                        self.mc_base[i] += 2;
+                    }
+                }
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
                 self.c_access();
                 self.draw_border();
             }
-            // Display Column
             16 => {
+                /*
+                Section: 3.8. Sprites
+                8. In the first phase of cycle 16, it is checked if the expansion flip flop
+                   is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
+                   MCBASE is equal to 63 and turns of the DMA and the display of the sprite
+                   if it is.
+                */
+                for i in 0..8 {
+                    if self.sprites[i].expansion_ff {
+                        self.mc_base[i] += 1;
+                        if self.mc_base[i] == 63 {
+                            let mut sprite = &mut self.sprites[i];
+                            sprite.dma = false;
+                            sprite.display = false;
+                        }
+                    }
+                }
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
                 self.g_access();
@@ -575,12 +662,20 @@ impl Chip for Vic {
             }
             55 => {
                 self.set_ba(false);
+                self.update_sprite_expansion_ff();
+                self.update_sprite_dma(0);
+                self.update_sprite_dma(1);
+                self.update_sprite_dma(2);
+                self.update_sprite_dma(3);
                 self.g_access();
                 self.draw();
             }
-            // Display Column End
             56 => {
                 self.set_ba(false);
+                self.update_sprite_dma(4);
+                self.update_sprite_dma(5);
+                self.update_sprite_dma(6);
+                self.update_sprite_dma(7);
                 self.draw_border();
             }
             57 => {
@@ -589,43 +684,69 @@ impl Chip for Vic {
             }
             58 => {
                 // TODO vic: clock cycle 58 display logic
-                // "5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
-                //    logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE). If
-                //    the video logic is in display state afterwards (this is always the case
-                //    if there is a Bad Line Condition), RC is incremented."
+                /*
+                Section: 3.7.2. VC and RC
+                5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
+                   logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE). If
+                   the video logic is in display state afterwards (this is always the case
+                   if there is a Bad Line Condition), RC is incremented.
+                */
                 if self.rc == 7 {
                     self.vc_base = self.vc;
                 }
                 self.rc += 1;
+                /*
+                Section: 3.8. Sprites
+                4. In the first phase of cycle 58, the MC of every sprite is loaded from
+                   its belonging MCBASE (MCBASE->MC) ...
+                */
+                for i in 0..8 {
+                    self.mc[i] = self.mc_base[i];
+                }
+                self.update_sprite_display();
                 self.set_ba(false);
                 self.p_access(0);
+                if self.sprites[0].dma {
+                    self.s_access(0, 0);
+                }
                 self.draw_border();
             }
             59 => {
                 self.set_ba(false);
+                if self.sprites[0].dma {
+                    self.s_access(0, 1);
+                    self.s_access(0, 2);
+                }
                 self.draw_border();
             }
             60 => {
                 self.set_ba(false);
                 self.p_access(1);
+                if self.sprites[1].dma {
+                    self.s_access(1, 0);
+                }
                 self.draw_border();
             }
             61 => {
                 self.set_ba(false);
+                if self.sprites[1].dma {
+                    self.s_access(1, 1);
+                    self.s_access(1, 2);
+                }
             }
             62 => {
                 self.set_ba(false);
                 self.p_access(2);
+                if self.sprites[2].dma {
+                    self.s_access(2, 0);
+                }
             }
             63 => {
                 self.set_ba(false);
-                for i in 0..8 {
-                    if self.sprites[i].y as u16 == self.raster_y {
-                        self.mc[i] = 0;
-                    }
+                if self.sprites[2].dma {
+                    self.s_access(2, 1);
+                    self.s_access(2, 2);
                 }
-                let raster = self.raster_y;
-                self.draw_sprites(raster);
                 self.update_border_vertical_ff();
             }
             _ => panic!("invalid cycle"),
@@ -637,7 +758,13 @@ impl Chip for Vic {
             self.raster_y += 1;
             if self.raster_y >= self.spec.raster_lines {
                 self.raster_y = 0;
-                // 1. VCBASE is reset to zero in raster line 0.
+                /*
+                Section: 3.7.2. VC and RC
+                1. Once somewhere outside of the range of raster lines $30-$f7 (i.e.
+                   outside of the Bad Line range), VCBASE is reset to zero. This is
+                   presumably done in raster line 0, the exact moment cannot be determined
+                   and is irrelevant.
+                */
                 self.vc_base = 0;
                 let mut rt = self.frame_buffer.borrow_mut();
                 rt.set_sync(true);
@@ -873,6 +1000,12 @@ impl Chip for Vic {
             // Reg::MYE
             0x17 => for i in 0..8 as usize {
                 self.sprites[i].expand_y = value.get_bit(i);
+                /*
+                Section: 3.8. Sprites
+                1. The expansion flip flip is set as long as the bit in MxYE in register
+                   $d017 corresponding to the sprite is cleared.
+                */
+                self.sprites[i].expansion_ff = !self.sprites[i].expand_y;
             },
             // Reg::MEMPTR
             0x18 => {
