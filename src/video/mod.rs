@@ -19,6 +19,7 @@
 
 mod gfx_sequencer;
 mod spec;
+mod sprite_sequencer;
 mod vic;
 mod vic_memory;
 

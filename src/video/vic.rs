@@ -27,13 +27,39 @@ use log::LogLevel;
 use super::VicMemory;
 use super::gfx_sequencer::{GfxSequencer, Mode};
 use super::spec::Spec;
+use super::sprite_sequencer::SpriteSequencer;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
+
+/*
+6569, Bad Line, no sprites:
+
+Cycl-# 6                   1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5 5 5 6 6 6 6
+       3 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 1
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    ø0 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+       __
+   IRQ   ________________________________________________________________________________________________________________________________
+       ________________________                                                                                      ____________________
+    BA                         ______________________________________________________________________________________
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _                                                                                 _ _ _ _ _ _ _ _ _ _
+   AEC _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _________________________________________________________________________________ _ _ _ _ _ _ _ _ _
+
+   VIC i 3 i 4 i 5 i 6 i 7 i r r r r rcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcg i i 0 i 1 i 2 i 3
+  6510  x x x x x x x x x x x x X X X                                                                                 x x x x x x x x x x
+
+Graph.                      |===========01020304050607080910111213141516171819202122232425262728293031323334353637383940=========
+
+X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+       1111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000111111111111111111111111111111111111111
+       89999aaaabbbbccccddddeeeeff0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff000011112222333344445555666677778888999
+       c048c048c048c048c048c048c04048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048
+
+*/
 
 // TODO vic:
 // 1 display/idle states cycle 58
 // 3 scroll_x/y
-// 4 sprites
 
 #[derive(Copy, Clone)]
 pub enum IrqSource {
@@ -43,66 +69,6 @@ pub enum IrqSource {
 impl IrqSource {
     pub fn value(&self) -> usize {
         *self as usize
-    }
-}
-
-#[derive(Copy, Clone)]
-struct Sprite {
-    // Configuration
-    enabled: bool,
-    x: u16,
-    y: u8,
-    color: u8,
-    expand_x: bool,
-    expand_y: bool,
-    multicolor: bool,
-    priority: bool,
-    // Runtime State
-    data: u32,
-    display: bool,
-    dma: bool,
-    expansion_ff: bool,
-}
-
-impl Sprite {
-    pub fn new() -> Sprite {
-        Sprite {
-            // Configuration
-            enabled: false,
-            x: 0,
-            y: 0,
-            color: 0,
-            expand_x: false,
-            expand_y: false,
-            multicolor: false,
-            priority: false,
-            // Runtime State
-            data: 0,
-            display: false,
-            dma: false,
-            expansion_ff: true,
-        }
-    }
-
-    pub fn set_data(&mut self, byte: usize, data: u8) {
-        // FIXME vic/sprite: set data logic
-    }
-
-    pub fn reset(&mut self) {
-        // Configuration
-        self.enabled = false;
-        self.x = 0;
-        self.y = 0;
-        self.color = 0;
-        self.expand_x = false;
-        self.expand_y = false;
-        self.multicolor = false;
-        self.priority = true;
-        // Runtime State
-        self.data = 0;
-        self.display = false;
-        self.dma = false;
-        self.expansion_ff = true;
     }
 }
 
@@ -117,14 +83,13 @@ pub struct Vic {
     // Functional Units
     gfx_seq: GfxSequencer,
     interrupt_control: IrqControl,
+    sprites: [SpriteSequencer; 8],
     // Configuration
     char_base: u16,
     csel: bool,
     den: bool,
     rsel: bool,
     raster_compare: u16,
-    sprite_multicolor: [u8; 2],
-    sprites: [Sprite; 8],
     x_scroll: u8,
     y_scroll: u8,
     video_matrix: u16,
@@ -157,6 +122,16 @@ impl Vic {
     ) -> Vic {
         info!(target: "video", "Initializing VIC");
         let spec = Spec::new(chip_model);
+        let sprites = [
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+            SpriteSequencer::new(),
+        ];
         let vic = Vic {
             // Dependencies
             spec,
@@ -168,14 +143,13 @@ impl Vic {
             // Functional Units
             gfx_seq: GfxSequencer::new(),
             interrupt_control: IrqControl::new(),
+            sprites,
             // Configuration
             char_base: 0,
             csel: false,
             den: false,
             rsel: false,
             raster_compare: 0x00,
-            sprite_multicolor: [0; 2],
-            sprites: [Sprite::new(); 8],
             x_scroll: 0,
             y_scroll: 0,
             video_matrix: 0,
@@ -214,8 +188,27 @@ impl Vic {
         for x in x_start..x_start + 8 {
             self.update_border_main_ff(x);
             self.gfx_seq.clock();
+            for sprite in self.sprites.iter_mut() {
+                sprite.clock(x);
+            }
+            let mut i = 0;
+            let sprite_output = loop {
+                if i >= 8 {
+                    break None;
+                }
+                let sprite = &self.sprites[i];
+                if sprite.display && sprite.output().is_some() {
+                    break sprite.output();
+                }
+                i += 1;
+            };
+            let pixel = if let Some(output) = sprite_output {
+                output
+            } else {
+                self.gfx_seq.output()
+            };
             let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, self.raster_y, self.gfx_seq.output());
+            rt.write(x, self.raster_y, pixel);
         }
     }
 
@@ -225,8 +218,26 @@ impl Vic {
         let x_start = (self.raster_cycle - 1) << 3;
         for x in x_start..x_start + 8 {
             self.gfx_seq.clock();
-            rt.write(x, self.raster_y, self.gfx_seq.output());
-            // FIXME vic/sprite: draw logic
+            for sprite in self.sprites.iter_mut() {
+                sprite.clock(x);
+            }
+            let mut i = 0;
+            let sprite_output = loop {
+                if i >= 8 {
+                    break None;
+                }
+                let sprite = &self.sprites[i];
+                if sprite.display && sprite.output().is_some() {
+                    break sprite.output();
+                }
+                i += 1;
+            };
+            let pixel = if let Some(output) = sprite_output {
+                output
+            } else {
+                self.gfx_seq.output()
+            };
+            rt.write(x, self.raster_y, pixel);
             // FIXME vic/sprite: mux logic
         }
     }
@@ -361,8 +372,7 @@ impl Vic {
            turned on.
         */
         for sprite in self.sprites.iter_mut() {
-            // FIXME vic/sprite: raster + 1
-            if sprite.dma && sprite.y == (self.raster_y as u8) {
+            if sprite.dma && sprite.config.y == (self.raster_y as u8) {
                 sprite.display = true;
             }
         }
@@ -380,12 +390,11 @@ impl Vic {
            set the expansion flip flip is reset.
         */
         let sprite = &mut self.sprites[n];
-        // FIXME vic/sprite: raster + 1
-        if sprite.enabled && sprite.y == (self.raster_y as u8) {
+        if sprite.config.enabled && sprite.config.y == (self.raster_y as u8) {
             if !sprite.dma {
                 sprite.dma = true;
                 self.mc_base[n] = 0;
-                if sprite.expand_y {
+                if sprite.config.expand_y {
                     sprite.expansion_ff = false;
                 }
             }
@@ -400,7 +409,7 @@ impl Vic {
            flip flop is inverted.
         */
         for sprite in self.sprites.iter_mut() {
-            if sprite.expand_y {
+            if sprite.config.expand_y {
                 sprite.expansion_ff = !sprite.expansion_ff;
             }
         }
@@ -472,32 +481,6 @@ impl Vic {
         self.mc[n] += 1;
     }
 }
-
-/*
-6569, Bad Line, no sprites:
-
-Cycl-# 6                   1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3 3 3 3 3 3 3 3 3 4 4 4 4 4 4 4 4 4 4 5 5 5 5 5 5 5 5 5 5 6 6 6 6
-       3 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 1
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-    ø0 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-       __
-   IRQ   ________________________________________________________________________________________________________________________________
-       ________________________                                                                                      ____________________
-    BA                         ______________________________________________________________________________________
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _                                                                                 _ _ _ _ _ _ _ _ _ _
-   AEC _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _________________________________________________________________________________ _ _ _ _ _ _ _ _ _
-
-   VIC i 3 i 4 i 5 i 6 i 7 i r r r r rcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcgcg i i 0 i 1 i 2 i 3
-  6510  x x x x x x x x x x x x X X X                                                                                 x x x x x x x x x x
-
-Graph.                      |===========01020304050607080910111213141516171819202122232425262728293031323334353637383940=========
-
-X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-       1111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000111111111111111111111111111111111111111
-       89999aaaabbbbccccddddeeeeff0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff000011112222333344445555666677778888999
-       c048c048c048c048c048c048c04048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048c048
-
-*/
 
 impl Chip for Vic {
     fn clock(&mut self) {
@@ -784,16 +767,15 @@ impl Chip for Vic {
         // Functional Units
         self.gfx_seq.reset();
         self.interrupt_control.reset();
+        for sprite in self.sprites.iter_mut() {
+            sprite.reset();
+        }
         // Configuration
         self.char_base = 0x1000;
         self.csel = true;
         self.den = true;
         self.rsel = true;
         self.raster_compare = 0;
-        self.sprite_multicolor = [0; 2];
-        for i in 0..self.sprites.len() {
-            self.sprites[i].reset();
-        }
         self.x_scroll = 0;
         self.y_scroll = 3;
         self.video_matrix = 0x0400;
@@ -829,17 +811,17 @@ impl Chip for Vic {
         let value = match reg {
             // Reg::M0X - Reg::M7X
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
-                (self.sprites[(reg >> 1) as usize].x & 0x00ff) as u8
+                (self.sprites[(reg >> 1) as usize].config.x & 0x00ff) as u8
             }
             // Reg::M0Y - Reg::M7Y
             0x01 | 0x03 | 0x05 | 0x07 | 0x09 | 0x0b | 0x0d | 0x0f => {
-                self.sprites[((reg - 1) >> 1) as usize].y
+                self.sprites[((reg - 1) >> 1) as usize].config.y
             }
             // Reg::MX8
             0x10 => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].x.get_bit(8));
+                    result.set_bit(i, self.sprites[i].config.x.get_bit(8));
                 }
                 result
             }
@@ -864,7 +846,7 @@ impl Chip for Vic {
             0x15 => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].enabled);
+                    result.set_bit(i, self.sprites[i].config.enabled);
                 }
                 result
             }
@@ -881,7 +863,7 @@ impl Chip for Vic {
             0x17 => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].expand_y);
+                    result.set_bit(i, self.sprites[i].config.expand_y);
                 }
                 result
             }
@@ -899,7 +881,7 @@ impl Chip for Vic {
             0x1b => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].priority);
+                    result.set_bit(i, self.sprites[i].config.data_priority);
                 }
                 result
             }
@@ -907,7 +889,7 @@ impl Chip for Vic {
             0x1c => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].multicolor);
+                    result.set_bit(i, self.sprites[i].config.mode);
                 }
                 result
             }
@@ -915,7 +897,7 @@ impl Chip for Vic {
             0x1d => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].expand_x);
+                    result.set_bit(i, self.sprites[i].config.expand_x);
                 }
                 result
             }
@@ -928,9 +910,9 @@ impl Chip for Vic {
             // Reg::B0C - Reg::B3C
             0x21...0x24 => self.gfx_seq.get_bg_color((reg - 0x21) as usize) | 0xf0,
             // Reg::MM0 - Reg::MM1
-            0x25...0x26 => self.sprite_multicolor[(reg - 0x25) as usize] | 0xf0,
+            0x25...0x26 => self.sprites[0].config.multicolor[(reg - 0x25) as usize] | 0xf0,
             // Reg::M0C - Reg::M7C
-            0x27...0x2e => self.sprites[(reg - 0x27) as usize].color | 0xf0,
+            0x27...0x2e => self.sprites[(reg - 0x27) as usize].config.color | 0xf0,
             _ => 0xff,
         };
         if log_enabled!(LogLevel::Trace) {
@@ -947,16 +929,18 @@ impl Chip for Vic {
             // Reg::M0X - Reg::M7X
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
                 let n = (reg >> 1) as usize;
-                self.sprites[n].x = (self.sprites[n].x & 0xff00) | (value as u16)
+                self.sprites[n].config.x = (self.sprites[n].config.x & 0xff00) | (value as u16);
+                self.sprites[n].config.x_screen = Self::map_sprite_to_screen(self.sprites[n].config.x);
             }
             // Reg::M0Y - Reg::M7Y
             0x01 | 0x03 | 0x05 | 0x07 | 0x09 | 0x0b | 0x0d | 0x0f => {
                 let n = ((reg - 1) >> 1) as usize;
-                self.sprites[n].y = value;
+                self.sprites[n].config.y = value;
             }
             // Reg::MX8
             0x10 => for i in 0..8 as usize {
-                self.sprites[i].x.set_bit(8, value.get_bit(i));
+                self.sprites[i].config.x.set_bit(8, value.get_bit(i));
+                self.sprites[i].config.x_screen = Self::map_sprite_to_screen(self.sprites[i].config.x);
             },
             // Reg::CR1
             0x11 => {
@@ -987,7 +971,7 @@ impl Chip for Vic {
             0x14 => {},
             // Reg::ME
             0x15 => for i in 0..8 as usize {
-                self.sprites[i].enabled = value.get_bit(i);
+                self.sprites[i].config.enabled = value.get_bit(i);
             },
             // Reg::CR2
             0x16 => {
@@ -999,13 +983,13 @@ impl Chip for Vic {
             }
             // Reg::MYE
             0x17 => for i in 0..8 as usize {
-                self.sprites[i].expand_y = value.get_bit(i);
+                self.sprites[i].config.expand_y = value.get_bit(i);
                 /*
                 Section: 3.8. Sprites
                 1. The expansion flip flip is set as long as the bit in MxYE in register
                    $d017 corresponding to the sprite is cleared.
                 */
-                self.sprites[i].expansion_ff = !self.sprites[i].expand_y;
+                self.sprites[i].expansion_ff = !self.sprites[i].config.expand_y;
             },
             // Reg::MEMPTR
             0x18 => {
@@ -1032,15 +1016,15 @@ impl Chip for Vic {
             }
             // Reg::MDP
             0x1b => for i in 0..8 as usize {
-                self.sprites[i].priority = value.get_bit(i);
+                self.sprites[i].config.data_priority = value.get_bit(i);
             },
             // Reg::MMC
             0x1c => for i in 0..8 as usize {
-                self.sprites[i].multicolor = value.get_bit(i);
+                self.sprites[i].config.mode = value.get_bit(i);
             },
             // Reg::MXE
             0x1d => for i in 0..8 as usize {
-                self.sprites[i].expand_x = value.get_bit(i);
+                self.sprites[i].config.expand_x = value.get_bit(i);
             },
             // Reg::MM
             0x1e => {}
@@ -1051,9 +1035,11 @@ impl Chip for Vic {
             // Reg::B0C - Reg::B3C
             0x21...0x24 => self.gfx_seq.set_bg_color(reg as usize - 0x21, value & 0x0f),
             // Reg::MM0  - Reg::MM1
-            0x25...0x26 => self.sprite_multicolor[reg as usize - 0x25] = value & 0x0f,
+            0x25...0x26 => for i in 0..8 as usize {
+                self.sprites[i].config.multicolor[reg as usize - 0x25] = value & 0x0f;
+            },
             // Reg::M0C - Reg::M7C
-            0x27...0x2e => self.sprites[reg as usize - 0x27].color = value & 0x0f,
+            0x27...0x2e => self.sprites[reg as usize - 0x27].config.color = value & 0x0f,
             _ => {}
         }
     }
