@@ -130,6 +130,8 @@ impl SpriteSequencer {
                 } else {
                     self.mc_cycle = false;
                 }
+            } else {
+                self.output = None;
             }
         }
     }
