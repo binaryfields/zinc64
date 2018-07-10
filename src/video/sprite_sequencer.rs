@@ -19,13 +19,19 @@
 
 use bit_field::BitField;
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum Mode {
+    Standard = 0,
+    Multicolor = 1,
+}
+
 pub struct Config {
     pub color: u8,
     pub data_priority: bool,
     pub enabled: bool,
     pub expand_x: bool,
     pub expand_y: bool,
-    pub mode: bool,
+    pub mode: Mode,
     pub multicolor: [u8; 2],
     pub x: u16,
     pub x_screen: u16,
@@ -40,7 +46,7 @@ impl Config {
             enabled: false,
             expand_x: false,
             expand_y: false,
-            mode: false,
+            mode: Mode::Standard,
             multicolor: [0; 2],
             x: 0,
             x_screen: 0,
@@ -54,7 +60,7 @@ impl Config {
         self.enabled = false;
         self.expand_x = false;
         self.expand_y = false;
-        self.mode = false;
+        self.mode = Mode::Standard;
         self.multicolor = [0; 2];
         self.x = 0;
         self.x_screen = 0;
@@ -68,10 +74,10 @@ pub struct SpriteSequencer {
     // Runtime State
     counter: u32,
     data: u32,
+    delay_cycles: u8,
     pub display: bool,
     pub dma: bool,
     pub expansion_ff: bool,
-    mc_cycle: bool,
     output: Option<u8>,
 }
 
@@ -83,10 +89,10 @@ impl SpriteSequencer {
             // Runtime State
             counter: 0,
             data: 0,
+            delay_cycles: 0,
             display: false,
             dma: false,
             expansion_ff: true,
-            mc_cycle: false,
             output: None,
         }
     }
@@ -95,13 +101,13 @@ impl SpriteSequencer {
         match byte {
             0 => {
                 self.data.set_bits(24..32, value as u32);
-            },
+            }
             1 => {
                 self.data.set_bits(16..24, value as u32);
-            },
+            }
             2 => {
                 self.data.set_bits(8..16, value as u32);
-            },
+            }
             _ => panic!("invalid sprite data index {}", byte),
         }
     }
@@ -109,29 +115,36 @@ impl SpriteSequencer {
     #[inline]
     pub fn clock(&mut self, x: u16) {
         if self.display {
-            if x == self.config.x_screen && self.counter == 0 {
-                self.counter = 0xffffff00;
-            }
-            if x >= self.config.x_screen && self.counter != 0 {
-                if !self.mc_cycle {
-                    self.output = if !self.config.mode {
-                        self.output_pixel()
-                    } else {
-                        self.mc_cycle = true;
-                        self.output_mc_pixel()
-                    };
-                    if !self.mc_cycle {
-                        self.data = self.data << 1;
-                        self.counter = self.counter << 1;
-                    } else {
-                        self.data = self.data << 2;
-                        self.counter = self.counter << 2;
+            if self.delay_cycles == 0 {
+                if x == self.config.x_screen && self.counter == 0 {
+                    self.counter = 0xffffff00;
+                }
+                if x >= self.config.x_screen && self.counter != 0 {
+                    match self.config.mode {
+                        Mode::Standard => {
+                            self.output = self.output_pixel();
+                            self.counter = self.counter << 1;
+                            self.data = self.data << 1;
+                            if self.config.expand_x {
+                                self.delay_cycles = 0b0001;
+                            }
+                        },
+                        Mode::Multicolor => {
+                            self.output = self.output_mc_pixel();
+                            self.counter = self.counter << 2;
+                            self.data = self.data << 2;
+                            self.delay_cycles = if self.config.expand_x {
+                                0b0111
+                            } else {
+                                0b0001
+                            }
+                        }
                     }
                 } else {
-                    self.mc_cycle = false;
+                    self.output = None;
                 }
             } else {
-                self.output = None;
+                self.delay_cycles = self.delay_cycles >> 1;
             }
         }
     }
@@ -147,10 +160,10 @@ impl SpriteSequencer {
         // Runtime State
         self.counter = 0;
         self.data = 0;
+        self.delay_cycles = 0;
         self.display = false;
         self.dma = false;
         self.expansion_ff = true;
-        self.mc_cycle = false;
         self.output = None;
     }
 

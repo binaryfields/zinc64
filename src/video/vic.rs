@@ -27,7 +27,7 @@ use log::LogLevel;
 use super::VicMemory;
 use super::gfx_sequencer::{GfxSequencer, Mode};
 use super::spec::Spec;
-use super::sprite_sequencer::SpriteSequencer;
+use super::sprite_sequencer::{SpriteSequencer, Mode as SpriteMode};
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
@@ -889,7 +889,7 @@ impl Chip for Vic {
             0x1c => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].config.mode);
+                    result.set_bit(i, self.sprites[i].config.mode == SpriteMode::Multicolor);
                 }
                 result
             }
@@ -1020,7 +1020,11 @@ impl Chip for Vic {
             },
             // Reg::MMC
             0x1c => for i in 0..8 as usize {
-                self.sprites[i].config.mode = value.get_bit(i);
+                self.sprites[i].config.mode = if !value.get_bit(i) {
+                    SpriteMode::Standard
+                } else {
+                    SpriteMode::Multicolor
+                };
             },
             // Reg::MXE
             0x1d => for i in 0..8 as usize {
