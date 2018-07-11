@@ -98,6 +98,7 @@ impl SpriteSequencer {
     }
 
     pub fn set_data(&mut self, byte: usize, value: u8) {
+        self.counter = 0;
         match byte {
             0 => {
                 self.data.set_bits(24..32, value as u32);
