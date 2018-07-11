@@ -62,9 +62,6 @@ impl Mode {
 pub struct GfxSequencer {
     mode: Mode,
     bg_color: [u8; 4],
-    border_color: u8,
-    border_mff: bool,
-    border_vff: bool,
     c_data: u8,
     c_color: u8,
     g_data: u8,
@@ -77,9 +74,6 @@ impl GfxSequencer {
         GfxSequencer {
             mode: Mode::Text,
             bg_color: [0; 4],
-            border_color: 0,
-            border_mff: false,
-            border_vff: false,
             c_data: 0,
             c_color: 0,
             g_data: 0,
@@ -92,32 +86,12 @@ impl GfxSequencer {
         self.bg_color[index]
     }
 
-    pub fn get_border_color(&self) -> u8 {
-        self.border_color
-    }
-
-    pub fn get_border_vertical_ff(&self) -> bool {
-        self.border_vff
-    }
-
-    pub fn get_mode(&self) -> Mode {
-        self.mode
-    }
-
     pub fn set_bg_color(&mut self, index: usize, color: u8) {
         self.bg_color[index] = color;
     }
 
-    pub fn set_border_color(&mut self, color: u8) {
-        self.border_color = color;
-    }
-
-    pub fn set_border_main_ff(&mut self, value: bool) {
-        self.border_mff = value;
-    }
-
-    pub fn set_border_vertical_ff(&mut self, value: bool) {
-        self.border_vff = value;
+    pub fn get_mode(&self) -> Mode {
+        self.mode
     }
 
     pub fn set_data(&mut self, c_data: u8, c_color: u8, g_data: u8) {
@@ -132,33 +106,29 @@ impl GfxSequencer {
 
     #[inline]
     pub fn clock(&mut self) {
-        if !self.border_vff && !self.border_mff {
-            if !self.mc_cycle {
-                self.output = match self.mode {
-                    Mode::Text => self.output_text(),
-                    Mode::McText => {
-                        self.mc_cycle = self.c_color.get_bit(3);
-                        self.output_text_mc()
-                    },
-                    Mode::Bitmap => self.output_bitmap(),
-                    Mode::McBitmap => {
-                        self.mc_cycle = true;
-                        self.output_bitmap_mc()
-                    },
-                    Mode::EcmText => self.output_text_ecm(),
-                    Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-                    _ => panic!("unsupported graphics mode {}", self.mode.value()),
-                };
-                self.g_data = if !self.mc_cycle {
-                    self.g_data << 1
-                } else {
-                    self.g_data << 2
-                }
+        if !self.mc_cycle {
+            self.output = match self.mode {
+                Mode::Text => self.output_text(),
+                Mode::McText => {
+                    self.mc_cycle = self.c_color.get_bit(3);
+                    self.output_text_mc()
+                },
+                Mode::Bitmap => self.output_bitmap(),
+                Mode::McBitmap => {
+                    self.mc_cycle = true;
+                    self.output_bitmap_mc()
+                },
+                Mode::EcmText => self.output_text_ecm(),
+                Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
+                _ => panic!("unsupported graphics mode {}", self.mode.value()),
+            };
+            self.g_data = if !self.mc_cycle {
+                self.g_data << 1
             } else {
-                self.mc_cycle = false;
+                self.g_data << 2
             }
         } else {
-            self.output = self.border_color;
+            self.mc_cycle = false;
         }
     }
 
@@ -170,9 +140,6 @@ impl GfxSequencer {
     pub fn reset(&mut self) {
         self.mode = Mode::Text;
         self.bg_color = [0x06, 0, 0, 0];
-        self.border_color = 0x0e;
-        self.border_mff = false;
-        self.border_vff = false;
         self.c_data = 0;
         self.c_color = 0;
         self.g_data = 0;
@@ -300,5 +267,4 @@ impl GfxSequencer {
             self.output_text()
         }
     }
-
 }

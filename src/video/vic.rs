@@ -25,6 +25,7 @@ use core::{Chip, FrameBuffer, IrqControl, IrqLine, Pin, Ram, VicModel};
 use log::LogLevel;
 
 use super::VicMemory;
+use super::border_unit::BorderUnit;
 use super::gfx_sequencer::{GfxSequencer, Mode};
 use super::spec::Spec;
 use super::sprite_sequencer::{SpriteSequencer, Mode as SpriteMode};
@@ -81,14 +82,13 @@ pub struct Vic {
     irq_line: Rc<RefCell<IrqLine>>,
     mem: Rc<RefCell<VicMemory>>,
     // Functional Units
+    border_unit: BorderUnit,
     gfx_seq: GfxSequencer,
     interrupt_control: IrqControl,
     sprites: [SpriteSequencer; 8],
     // Configuration
     char_base: u16,
-    csel: bool,
     den: bool,
-    rsel: bool,
     raster_compare: u16,
     x_scroll: u8,
     y_scroll: u8,
@@ -141,14 +141,13 @@ impl Vic {
             irq_line,
             mem,
             // Functional Units
+            border_unit: BorderUnit::new(),
             gfx_seq: GfxSequencer::new(),
             interrupt_control: IrqControl::new(),
             sprites,
             // Configuration
             char_base: 0,
-            csel: false,
             den: false,
-            rsel: false,
             raster_compare: 0x00,
             x_scroll: 0,
             y_scroll: 0,
@@ -186,29 +185,34 @@ impl Vic {
     fn draw_border(&mut self) {
         let x_start = (self.raster_cycle - 1) << 3;
         for x in x_start..x_start + 8 {
-            self.update_border_main_ff(x);
-            self.gfx_seq.clock();
+            self.border_unit.update_main_ff(x, self.raster_y, self.den);
             for sprite in self.sprites.iter_mut() {
                 sprite.clock(x);
             }
-            let mut i = 0;
-            let sprite_output = loop {
-                if i >= 8 {
-                    break None;
-                }
-                let sprite = &self.sprites[i];
-                if sprite.display && sprite.output().is_some() {
-                    break sprite.output();
-                }
-                i += 1;
-            };
-            let pixel = if let Some(output) = sprite_output {
-                output
+            if !self.border_unit.is_enabled() {
+                self.gfx_seq.clock();
+                let mut i = 0;
+                let sprite_output = loop {
+                    if i >= 8 {
+                        break None;
+                    }
+                    let sprite = &self.sprites[i];
+                    if sprite.display && sprite.output().is_some() {
+                        break sprite.output();
+                    }
+                    i += 1;
+                };
+                let pixel = if let Some(output) = sprite_output {
+                    output
+                } else {
+                    self.gfx_seq.output()
+                };
+                let mut rt = self.frame_buffer.borrow_mut();
+                rt.write(x, self.raster_y, pixel);
             } else {
-                self.gfx_seq.output()
-            };
-            let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, self.raster_y, pixel);
+                let mut rt = self.frame_buffer.borrow_mut();
+                rt.write(x, self.raster_y, self.border_unit.config.border_color);
+            }
         }
     }
 
@@ -217,27 +221,31 @@ impl Vic {
         let mut rt = self.frame_buffer.borrow_mut();
         let x_start = (self.raster_cycle - 1) << 3;
         for x in x_start..x_start + 8 {
-            self.gfx_seq.clock();
             for sprite in self.sprites.iter_mut() {
                 sprite.clock(x);
             }
-            let mut i = 0;
-            let sprite_output = loop {
-                if i >= 8 {
-                    break None;
-                }
-                let sprite = &self.sprites[i];
-                if sprite.display && sprite.output().is_some() {
-                    break sprite.output();
-                }
-                i += 1;
-            };
-            let pixel = if let Some(output) = sprite_output {
-                output
+            if !self.border_unit.is_enabled() {
+                self.gfx_seq.clock();
+                let mut i = 0;
+                let sprite_output = loop {
+                    if i >= 8 {
+                        break None;
+                    }
+                    let sprite = &self.sprites[i];
+                    if sprite.display && sprite.output().is_some() {
+                        break sprite.output();
+                    }
+                    i += 1;
+                };
+                let pixel = if let Some(output) = sprite_output {
+                    output
+                } else {
+                    self.gfx_seq.output()
+                };
+                rt.write(x, self.raster_y, pixel);
             } else {
-                self.gfx_seq.output()
-            };
-            rt.write(x, self.raster_y, pixel);
+                rt.write(x, self.raster_y, self.border_unit.config.border_color);
+            }
             // FIXME vic/sprite: mux logic
         }
     }
@@ -278,79 +286,6 @@ impl Vic {
             },
             _ => false,
         };
-    }
-
-    /*
-           |   CSEL=0   |   CSEL=1
-     ------+------------+-----------
-     Left  |  31 ($1f)  |  24 ($18)
-     Right | 335 ($14f) | 344 ($158)
-
-            |   RSEL=0  |  RSEL=1
-     -------+-----------+----------
-     Top    |  55 ($37) |  51 ($33)
-     Bottom | 247 ($f7) | 251 ($fb)
-    */
-
-    #[inline]
-    fn update_border_main_ff(&mut self, x: u16) {
-        /*
-        Section: 3.9. The border unit
-        1. If the X coordinate reaches the right comparison value, the main border
-           flip flop is set.
-        4. If the X coordinate reaches the left comparison value and the Y
-           coordinate reaches the bottom one, the vertical border flip flop is set.
-        5. If the X coordinate reaches the left comparison value and the Y
-           coordinate reaches the top one and the DEN bit in register $d011 is set,
-           the vertical border flip flop is reset.
-        6. If the X coordinate reaches the left comparison value and the vertical
-           border flip flop is not set, the main flip flop is reset.
-        */
-        // TODO vic: border off by 4 pixels to get around gfx shift register issue
-        if self.csel {
-            if x == Vic::map_sprite_to_screen(0x18 - 4) {
-                self.update_border_vertical_ff();
-                if !self.gfx_seq.get_border_vertical_ff() {
-                    self.gfx_seq.set_border_main_ff(false);
-                }
-            } else if x == Vic::map_sprite_to_screen(0x158 - 4) {
-                self.gfx_seq.set_border_main_ff(true);
-            }
-        } else {
-            if x == Vic::map_sprite_to_screen(0x1f - 4) {
-                self.update_border_vertical_ff();
-                if !self.gfx_seq.get_border_vertical_ff() {
-                    self.gfx_seq.set_border_main_ff(false);
-                }
-            } else if x == Vic::map_sprite_to_screen(0x14f - 4) {
-                self.gfx_seq.set_border_main_ff(true);
-            }
-        }
-    }
-
-    #[inline]
-    fn update_border_vertical_ff(&mut self) {
-        /*
-        Section: 3.9. The border unit
-        2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
-           vertical border flip flop is set.
-        3. If the Y coordinate reaches the top comparison value in cycle 63 and the
-           DEN bit in register $d011 is set, the vertical border flip flop is
-           reset.
-        */
-        if self.rsel {
-            if self.raster_y == 51 && self.den {
-                self.gfx_seq.set_border_vertical_ff(false);
-            } else if self.raster_y == 251 {
-                self.gfx_seq.set_border_vertical_ff(true);
-            }
-        } else {
-            if self.raster_y == 55 && self.den {
-                self.gfx_seq.set_border_vertical_ff(false);
-            } else if self.raster_y == 247 {
-                self.gfx_seq.set_border_vertical_ff(true);
-            }
-        }
     }
 
     #[inline]
@@ -414,6 +349,7 @@ impl Vic {
             }
         }
     }
+
     // -- Memory Ops
 
     #[inline]
@@ -730,7 +666,7 @@ impl Chip for Vic {
                     self.s_access(2, 1);
                     self.s_access(2, 2);
                 }
-                self.update_border_vertical_ff();
+                self.border_unit.update_vertical_ff(self.raster_y, self.den);
             }
             _ => panic!("invalid cycle"),
         }
@@ -765,6 +701,7 @@ impl Chip for Vic {
 
     fn reset(&mut self) {
         // Functional Units
+        self.border_unit.reset();
         self.gfx_seq.reset();
         self.interrupt_control.reset();
         for sprite in self.sprites.iter_mut() {
@@ -772,9 +709,7 @@ impl Chip for Vic {
         }
         // Configuration
         self.char_base = 0x1000;
-        self.csel = true;
         self.den = true;
-        self.rsel = true;
         self.raster_compare = 0;
         self.x_scroll = 0;
         self.y_scroll = 3;
@@ -833,7 +768,7 @@ impl Chip for Vic {
                     .set_bit(6, self.gfx_seq.get_mode().value().get_bit(2))
                     .set_bit(5, self.gfx_seq.get_mode().value().get_bit(1))
                     .set_bit(4, self.den)
-                    .set_bit(3, self.rsel);
+                    .set_bit(3, self.border_unit.config.rsel);
                 result | (self.y_scroll & 0x07)
             }
             // Reg::RASTER
@@ -856,7 +791,7 @@ impl Chip for Vic {
                 result
                     .set_bit(5, true)
                     .set_bit(4, self.gfx_seq.get_mode().value().get_bit(0))
-                    .set_bit(3, self.csel);
+                    .set_bit(3, self.border_unit.config.csel);
                 result | (self.x_scroll & 0x07) | 0xc0
             }
             // Reg::MYE
@@ -906,7 +841,7 @@ impl Chip for Vic {
             // Reg::MD
             0x1f => 0xff, // DEFERRED collision
             // Reg::EC
-            0x20 => self.gfx_seq.get_border_color() | 0xf0,
+            0x20 => self.border_unit.config.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
             0x21...0x24 => self.gfx_seq.get_bg_color((reg - 0x21) as usize) | 0xf0,
             // Reg::MM0 - Reg::MM1
@@ -950,7 +885,7 @@ impl Chip for Vic {
                     .set_bit(1, value.get_bit(5));
                 self.gfx_seq.set_mode(Mode::from(mode));
                 self.den = value.get_bit(4);
-                self.rsel = value.get_bit(3);
+                self.border_unit.config.rsel = value.get_bit(3);
                 self.y_scroll = value & 0x07;
                 self.update_bad_line();
                 if self.raster_y == self.raster_compare {
@@ -978,7 +913,7 @@ impl Chip for Vic {
                 let mut mode = self.gfx_seq.get_mode().value();
                 mode.set_bit(0, value.get_bit(4));
                 self.gfx_seq.set_mode(Mode::from(mode));
-                self.csel = value.get_bit(3);
+                self.border_unit.config.csel = value.get_bit(3);
                 self.x_scroll = value & 0x07;
             }
             // Reg::MYE
@@ -1035,7 +970,7 @@ impl Chip for Vic {
             // Reg::MD
             0x1f => {}
             // Reg::EC
-            0x20 => self.gfx_seq.set_border_color(value & 0x0f),
+            0x20 => self.border_unit.config.border_color = value & 0x0f,
             // Reg::B0C - Reg::B3C
             0x21...0x24 => self.gfx_seq.set_bg_color(reg as usize - 0x21, value & 0x0f),
             // Reg::MM0  - Reg::MM1

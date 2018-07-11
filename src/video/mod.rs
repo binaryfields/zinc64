@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+mod border_unit;
 mod gfx_sequencer;
 mod spec;
 mod sprite_sequencer;
