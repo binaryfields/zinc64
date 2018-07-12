@@ -77,7 +77,7 @@ pub struct SpriteSequencer {
     delay_cycles: u8,
     pub display: bool,
     pub dma: bool,
-    pub expansion_ff: bool,
+    pub expansion_flop: bool,
     output: Option<u8>,
 }
 
@@ -92,7 +92,7 @@ impl SpriteSequencer {
             delay_cycles: 0,
             display: false,
             dma: false,
-            expansion_ff: true,
+            expansion_flop: true,
             output: None,
         }
     }
@@ -164,7 +164,7 @@ impl SpriteSequencer {
         self.delay_cycles = 0;
         self.display = false;
         self.dma = false;
-        self.expansion_ff = true;
+        self.expansion_flop = true;
         self.output = None;
     }
 

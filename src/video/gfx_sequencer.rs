@@ -59,9 +59,27 @@ impl Mode {
     }
 }
 
+pub struct Config {
+    pub mode: Mode,
+    pub bg_color: [u8; 4],
+}
+
+impl Config {
+    pub fn new() -> Self {
+        Config {
+            mode: Mode::Text,
+            bg_color: [0; 4],
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.mode = Mode::Text;
+        self.bg_color = [0x06, 0, 0, 0];
+    }
+}
+
 pub struct GfxSequencer {
-    mode: Mode,
-    bg_color: [u8; 4],
+    pub config: Config,
     c_data: u8,
     c_color: u8,
     g_data: u8,
@@ -72,8 +90,7 @@ pub struct GfxSequencer {
 impl GfxSequencer {
     pub fn new() -> Self {
         GfxSequencer {
-            mode: Mode::Text,
-            bg_color: [0; 4],
+            config: Config::new(),
             c_data: 0,
             c_color: 0,
             g_data: 0,
@@ -82,32 +99,16 @@ impl GfxSequencer {
         }
     }
 
-    pub fn get_bg_color(&self, index: usize) -> u8 {
-        self.bg_color[index]
-    }
-
-    pub fn set_bg_color(&mut self, index: usize, color: u8) {
-        self.bg_color[index] = color;
-    }
-
-    pub fn get_mode(&self) -> Mode {
-        self.mode
-    }
-
     pub fn set_data(&mut self, c_data: u8, c_color: u8, g_data: u8) {
         self.c_data = c_data;
         self.c_color = c_color;
         self.g_data = g_data;
     }
 
-    pub fn set_mode(&mut self, mode: Mode) {
-        self.mode = mode;
-    }
-
     #[inline]
     pub fn clock(&mut self) {
         if !self.mc_cycle {
-            self.output = match self.mode {
+            self.output = match self.config.mode {
                 Mode::Text => self.output_text(),
                 Mode::McText => {
                     self.mc_cycle = self.c_color.get_bit(3);
@@ -120,7 +121,7 @@ impl GfxSequencer {
                 },
                 Mode::EcmText => self.output_text_ecm(),
                 Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-                _ => panic!("unsupported graphics mode {}", self.mode.value()),
+                _ => panic!("unsupported graphics mode {}", self.config.mode.value()),
             };
             self.g_data = if !self.mc_cycle {
                 self.g_data << 1
@@ -138,8 +139,7 @@ impl GfxSequencer {
     }
 
     pub fn reset(&mut self) {
-        self.mode = Mode::Text;
-        self.bg_color = [0x06, 0, 0, 0];
+        self.config.reset();
         self.c_data = 0;
         self.c_color = 0;
         self.g_data = 0;
@@ -183,7 +183,7 @@ impl GfxSequencer {
     #[inline]
     fn output_bitmap_mc(&self) -> u8 {
         match self.g_data >> 6 {
-            0 => self.bg_color[0],
+            0 => self.config.bg_color[0],
             1 => self.c_data >> 4,
             2 => self.c_data & 0x0f,
             3 => self.c_color,
@@ -207,7 +207,7 @@ impl GfxSequencer {
         if self.g_data.get_bit(7) {
             self.c_color
         } else {
-            self.bg_color[0]
+            self.config.bg_color[0]
         }
     }
 
@@ -231,7 +231,7 @@ impl GfxSequencer {
         if self.g_data.get_bit(7) {
             self.c_color
         } else {
-            self.bg_color[(self.c_data >> 6) as usize]
+            self.config.bg_color[(self.c_data >> 6) as usize]
         }
     }
 
@@ -257,9 +257,9 @@ impl GfxSequencer {
     fn output_text_mc(&self) -> u8 {
         if self.c_color.get_bit(3) {
             match self.g_data >> 6 {
-                0 => self.bg_color[0],
-                1 => self.bg_color[1],
-                2 => self.bg_color[2],
+                0 => self.config.bg_color[0],
+                1 => self.config.bg_color[1],
+                2 => self.config.bg_color[2],
                 3 => self.c_color & 0x07,
                 _ => panic!("invalid color source {}", self.g_data >> 6),
             }

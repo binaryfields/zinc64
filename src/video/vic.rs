@@ -185,7 +185,7 @@ impl Vic {
     fn draw_border(&mut self) {
         let x_start = (self.raster_cycle - 1) << 3;
         for x in x_start..x_start + 8 {
-            self.border_unit.update_main_ff(x, self.raster_y, self.den);
+            self.border_unit.update_main_flop(x, self.raster_y, self.den);
             for sprite in self.sprites.iter_mut() {
                 sprite.clock(x);
             }
@@ -211,7 +211,7 @@ impl Vic {
                 rt.write(x, self.raster_y, pixel);
             } else {
                 let mut rt = self.frame_buffer.borrow_mut();
-                rt.write(x, self.raster_y, self.border_unit.config.border_color);
+                rt.write(x, self.raster_y, self.border_unit.output());
             }
         }
     }
@@ -244,7 +244,7 @@ impl Vic {
                 };
                 rt.write(x, self.raster_y, pixel);
             } else {
-                rt.write(x, self.raster_y, self.border_unit.config.border_color);
+                rt.write(x, self.raster_y, self.border_unit.output());
             }
             // FIXME vic/sprite: mux logic
         }
@@ -322,7 +322,7 @@ impl Vic {
     }
 
     #[inline]
-    fn update_sprite_dma(&mut self) {
+    fn update_sprite_dma_on(&mut self) {
         /*
         Section: 3.8. Sprites
         3. In the first phases of cycle 55 and 56, the VIC checks for every sprite
@@ -339,8 +339,29 @@ impl Vic {
                     sprite.dma = true;
                     self.mc_base[n] = 0;
                     if sprite.config.expand_y {
-                        sprite.expansion_ff = false;
+                        sprite.expansion_flop = false;
                     }
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn update_sprite_dma_off(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        8. In the first phase of cycle 16, it is checked if the expansion flip flop
+           is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
+           MCBASE is equal to 63 and turns of the DMA and the display of the sprite
+           if it is.
+        */
+        for i in 0..8 {
+            if self.sprites[i].expansion_flop {
+                self.mc_base[i] += 1;
+                if self.mc_base[i] == 63 {
+                    let mut sprite = &mut self.sprites[i];
+                    sprite.dma = false;
+                    sprite.display = false;
                 }
             }
         }
@@ -355,7 +376,7 @@ impl Vic {
         */
         for sprite in self.sprites.iter_mut() {
             if sprite.config.expand_y {
-                sprite.expansion_ff = !sprite.expansion_ff;
+                sprite.expansion_flop = !sprite.expansion_flop;
             }
         }
     }
@@ -374,7 +395,7 @@ impl Vic {
 
     #[inline]
     fn g_access(&mut self) {
-        let g_data = match self.gfx_seq.get_mode() {
+        let g_data = match self.gfx_seq.config.mode {
             Mode::Text | Mode::McText => {
                 let address =
                     self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
@@ -390,7 +411,7 @@ impl Vic {
                 self.mem.borrow().read(address)
             }
             Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-            _ => panic!("unsupported graphics mode {}", self.gfx_seq.get_mode().value()),
+            _ => panic!("unsupported graphics mode {}", self.gfx_seq.config.mode.value()),
         };
         let c_data = self.vm_data_line[self.vmli];
         let c_color = self.vm_color_line[self.vmli];
@@ -558,7 +579,7 @@ impl Chip for Vic {
                    is set. If so, MCBASE is incremented by 2.
                 */
                 for i in 0..8 {
-                    if self.sprites[i].expansion_ff {
+                    if self.sprites[i].expansion_flop {
                         self.mc_base[i] += 2;
                     }
                 }
@@ -568,23 +589,7 @@ impl Chip for Vic {
                 self.set_ba(is_bad_line);
             }
             16 => {
-                /*
-                Section: 3.8. Sprites
-                8. In the first phase of cycle 16, it is checked if the expansion flip flop
-                   is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
-                   MCBASE is equal to 63 and turns of the DMA and the display of the sprite
-                   if it is.
-                */
-                for i in 0..8 {
-                    if self.sprites[i].expansion_ff {
-                        self.mc_base[i] += 1;
-                        if self.mc_base[i] == 63 {
-                            let mut sprite = &mut self.sprites[i];
-                            sprite.dma = false;
-                            sprite.display = false;
-                        }
-                    }
-                }
+                self.update_sprite_dma_off();
                 self.g_access();
                 self.c_access();
                 self.draw_border();
@@ -599,7 +604,7 @@ impl Chip for Vic {
                 self.set_ba(is_bad_line);
             }
             55 => {
-                self.update_sprite_dma();
+                self.update_sprite_dma_on();
                 self.update_sprite_expansion_ff();
                 self.g_access();
                 self.draw();
@@ -607,7 +612,7 @@ impl Chip for Vic {
                 self.set_ba(sprite_dma);
             }
             56 => {
-                self.update_sprite_dma();
+                self.update_sprite_dma_on();
                 self.draw_border();
                 let sprite_dma = self.sprites[0].dma;
                 self.set_ba(sprite_dma);
@@ -688,7 +693,7 @@ impl Chip for Vic {
                 }
                 let sprite_dma = self.sprites[3].dma | self.sprites[4].dma;
                 self.set_ba(sprite_dma);
-                self.border_unit.update_vertical_ff(self.raster_y, self.den);
+                self.border_unit.update_vertical_flop(self.raster_y, self.den);
             }
             _ => panic!("invalid cycle"),
         }
@@ -789,8 +794,8 @@ impl Chip for Vic {
                 let mut result = 0;
                 result
                     .set_bit(7, self.raster_y.get_bit(8))
-                    .set_bit(6, self.gfx_seq.get_mode().value().get_bit(2))
-                    .set_bit(5, self.gfx_seq.get_mode().value().get_bit(1))
+                    .set_bit(6, self.gfx_seq.config.mode.value().get_bit(2))
+                    .set_bit(5, self.gfx_seq.config.mode.value().get_bit(1))
                     .set_bit(4, self.den)
                     .set_bit(3, self.border_unit.config.rsel);
                 result | (self.y_scroll & 0x07)
@@ -814,7 +819,7 @@ impl Chip for Vic {
                 let mut result = 0;
                 result
                     .set_bit(5, true)
-                    .set_bit(4, self.gfx_seq.get_mode().value().get_bit(0))
+                    .set_bit(4, self.gfx_seq.config.mode.value().get_bit(0))
                     .set_bit(3, self.border_unit.config.csel);
                 result | (self.x_scroll & 0x07) | 0xc0
             }
@@ -867,7 +872,7 @@ impl Chip for Vic {
             // Reg::EC
             0x20 => self.border_unit.config.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
-            0x21...0x24 => self.gfx_seq.get_bg_color((reg - 0x21) as usize) | 0xf0,
+            0x21...0x24 => self.gfx_seq.config.bg_color[(reg - 0x21) as usize] | 0xf0,
             // Reg::MM0 - Reg::MM1
             0x25...0x26 => self.sprites[0].config.multicolor[(reg - 0x25) as usize] | 0xf0,
             // Reg::M0C - Reg::M7C
@@ -904,10 +909,10 @@ impl Chip for Vic {
             // Reg::CR1
             0x11 => {
                 self.raster_compare.set_bit(8, value.get_bit(7));
-                let mut mode = self.gfx_seq.get_mode().value();
+                let mut mode = self.gfx_seq.config.mode.value();
                 mode.set_bit(2, value.get_bit(6))
                     .set_bit(1, value.get_bit(5));
-                self.gfx_seq.set_mode(Mode::from(mode));
+                self.gfx_seq.config.mode = Mode::from(mode);
                 self.den = value.get_bit(4);
                 self.border_unit.config.rsel = value.get_bit(3);
                 self.y_scroll = value & 0x07;
@@ -934,9 +939,9 @@ impl Chip for Vic {
             },
             // Reg::CR2
             0x16 => {
-                let mut mode = self.gfx_seq.get_mode().value();
+                let mut mode = self.gfx_seq.config.mode.value();
                 mode.set_bit(0, value.get_bit(4));
-                self.gfx_seq.set_mode(Mode::from(mode));
+                self.gfx_seq.config.mode = Mode::from(mode);
                 self.border_unit.config.csel = value.get_bit(3);
                 self.x_scroll = value & 0x07;
             }
@@ -948,7 +953,7 @@ impl Chip for Vic {
                 1. The expansion flip flip is set as long as the bit in MxYE in register
                    $d017 corresponding to the sprite is cleared.
                 */
-                self.sprites[i].expansion_ff = !self.sprites[i].config.expand_y;
+                self.sprites[i].expansion_flop = !self.sprites[i].config.expand_y;
             },
             // Reg::MEMPTR
             0x18 => {
@@ -996,7 +1001,7 @@ impl Chip for Vic {
             // Reg::EC
             0x20 => self.border_unit.config.border_color = value & 0x0f,
             // Reg::B0C - Reg::B3C
-            0x21...0x24 => self.gfx_seq.set_bg_color(reg as usize - 0x21, value & 0x0f),
+            0x21...0x24 => self.gfx_seq.config.bg_color[reg as usize - 0x21] = value & 0x0f,
             // Reg::MM0  - Reg::MM1
             0x25...0x26 => for i in 0..8 as usize {
                 self.sprites[i].config.multicolor[reg as usize - 0x25] = value & 0x0f;

@@ -41,16 +41,16 @@ impl Config {
 
 pub struct BorderUnit {
     pub config: Config,
-    border_mff: bool,
-    border_vff: bool,
+    main_flop: bool,
+    vertical_flop: bool,
 }
 
 impl BorderUnit {
     pub fn new() -> Self {
         BorderUnit {
             config: Config::new(),
-            border_mff: false,
-            border_vff: false,
+            main_flop: false,
+            vertical_flop: false,
         }
     }
 
@@ -65,13 +65,18 @@ impl BorderUnit {
 
     #[inline]
     pub fn is_enabled(&self) -> bool {
-        self.border_mff || self.border_vff
+        self.main_flop || self.vertical_flop
+    }
+
+    #[inline]
+    pub fn output(&self) -> u8 {
+        self.config.border_color
     }
 
     pub fn reset(&mut self) {
         self.config.reset();
-        self.border_mff = false;
-        self.border_vff = false;
+        self.main_flop = false;
+        self.vertical_flop = false;
     }
 
     /*
@@ -87,7 +92,7 @@ impl BorderUnit {
     */
 
     #[inline]
-    pub fn update_main_ff(&mut self, x: u16, y: u16, den: bool) {
+    pub fn update_main_flop(&mut self, x: u16, y: u16, den: bool) {
         /*
         Section: 3.9. The border unit
         1. If the X coordinate reaches the right comparison value, the main border
@@ -103,27 +108,27 @@ impl BorderUnit {
         // TODO vic: border off by 4 pixels to get around gfx shift register issue
         if self.config.csel {
             if x == Self::map_sprite_to_screen(0x18 - 4) {
-                self.update_vertical_ff(y, den);
-                if !self.border_vff {
-                    self.border_mff = false;
+                self.update_vertical_flop(y, den);
+                if !self.vertical_flop {
+                    self.main_flop = false;
                 }
             } else if x == Self::map_sprite_to_screen(0x158 - 4) {
-                self.border_mff = true;
+                self.main_flop = true;
             }
         } else {
             if x == Self::map_sprite_to_screen(0x1f - 4) {
-                self.update_vertical_ff(y, den);
-                if !self.border_vff {
-                    self.border_mff = false;
+                self.update_vertical_flop(y, den);
+                if !self.vertical_flop {
+                    self.main_flop = false;
                 }
             } else if x == Self::map_sprite_to_screen(0x14f - 4) {
-                self.border_mff = true;
+                self.main_flop = true;
             }
         }
     }
 
     #[inline]
-    pub fn update_vertical_ff(&mut self, y: u16, den: bool) {
+    pub fn update_vertical_flop(&mut self, y: u16, den: bool) {
         /*
         Section: 3.9. The border unit
         2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
@@ -134,15 +139,15 @@ impl BorderUnit {
         */
         if self.config.rsel {
             if y == 51 && den {
-                self.border_vff = false;
+                self.vertical_flop = false;
             } else if y == 251 {
-                self.border_vff = true;
+                self.vertical_flop = true;
             }
         } else {
             if y == 55 && den {
-                self.border_vff = false;
+                self.vertical_flop = false;
             } else if y == 247 {
-                self.border_vff = true;
+                self.vertical_flop = true;
             }
         }
     }
