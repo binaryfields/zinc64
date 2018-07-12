@@ -60,7 +60,7 @@ X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 // TODO vic:
 // 1 display/idle states cycle 58
-// 3 scroll_x/y
+// 3 scroll_x
 
 #[derive(Copy, Clone)]
 pub enum IrqSource {
@@ -275,24 +275,32 @@ impl Vic {
     #[inline]
     fn update_bad_line(&mut self) {
         /*
-         "A Bad Line Condition is given at any arbitrary clock cycle, if at the
-          negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
-          <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
-          DEN bit was set during an arbitrary cycle of raster line $30."
+        Section: 3.5. Bad Lines
+         A Bad Line Condition is given at any arbitrary clock cycle, if at the
+         negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
+         <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
+         DEN bit was set during an arbitrary cycle of raster line $30.
         */
-        self.is_bad_line = match self.raster_y {
-            0x30...0xf7 => {
-                self.display_on && (self.raster_y & 0x07) as u8 == self.y_scroll
-            },
-            _ => false,
+        self.is_bad_line = if self.display_on {
+            if self.raster_y >= 0x30 && self.raster_y <= 0xf7 {
+                (self.raster_y & 0x07) as u8 == self.y_scroll
+            } else {
+                false
+            }
+        } else {
+            false
         };
     }
 
     #[inline]
     fn update_display_on(&mut self) {
-        // TODO vic: add spec ref
+        /*
+        Section: 3.10. Display Enable
+        A Bad Line Condition can only occur if the DEN bit has been set for at
+        least one cycle somewhere in raster line $30 (see section 3.5.).
+        */
         if self.raster_y == 0x30 && self.den {
-            self.display_on = true; // TODO vic: when is this reset
+            self.display_on = true;
         }
     }
 
@@ -677,6 +685,8 @@ impl Chip for Vic {
             self.raster_y += 1;
             if self.raster_y >= self.spec.raster_lines {
                 self.raster_y = 0;
+                // TODO vic: check display on reset 
+                // self.display_on = false;
                 /*
                 Section: 3.7.2. VC and RC
                 1. Once somewhere outside of the range of raster lines $30-$f7 (i.e.
