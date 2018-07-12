@@ -454,6 +454,16 @@ impl Chip for Vic {
         self.update_display_on();
         match self.raster_cycle {
             1 => {
+                /*
+                Section: 3.12. VIC interrupts
+                 Bit|Name| Trigger condition
+                 ---+----+-----------------------------------------------------------------
+                  0 | RST| Reaching a certain raster line. The line is specified by writing
+                    |    | to register $d012 and bit 7 of $d011 and internally stored by
+                    |    | the VIC for the raster compare. The test for reaching the
+                    |    | interrupt raster line is done in cycle 0 of every line (for line
+                    |    | 0, in cycle 1).
+                */
                 if self.raster_y == self.raster_compare && self.raster_y != 0 {
                     self.trigger_irq(0);
                 }
@@ -466,7 +476,6 @@ impl Chip for Vic {
                 self.set_ba(sprite_dma);
             }
             2 => {
-                // TODO vic: clock cycle 2 logic
                 if self.raster_y == self.raster_compare && self.raster_y == 0 {
                     self.trigger_irq(0);
                 }
