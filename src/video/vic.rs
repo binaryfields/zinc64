@@ -315,14 +315,14 @@ impl Vic {
            turned on.
         */
         for sprite in self.sprites.iter_mut() {
-            if sprite.dma && sprite.config.y == (self.raster_y as u8) {
-                sprite.display = true;
+            if sprite.config.y == (self.raster_y as u8) {
+                sprite.display = sprite.dma;
             }
         }
     }
 
     #[inline]
-    fn update_sprite_dma(&mut self, n: usize) {
+    fn update_sprite_dma(&mut self) {
         /*
         Section: 3.8. Sprites
         3. In the first phases of cycle 55 and 56, the VIC checks for every sprite
@@ -332,13 +332,15 @@ impl Vic {
            off, the DMA is switched on, MCBASE is cleared, and if the MxYE bit is
            set the expansion flip flip is reset.
         */
-        let sprite = &mut self.sprites[n];
-        if sprite.config.enabled && sprite.config.y == (self.raster_y as u8) {
-            if !sprite.dma {
-                sprite.dma = true;
-                self.mc_base[n] = 0;
-                if sprite.config.expand_y {
-                    sprite.expansion_ff = false;
+        for n in 0..8 {
+            let sprite = &mut self.sprites[n];
+            if sprite.config.enabled && sprite.config.y == (self.raster_y as u8) {
+                if !sprite.dma {
+                    sprite.dma = true;
+                    self.mc_base[n] = 0;
+                    if sprite.config.expand_y {
+                        sprite.expansion_ff = false;
+                    }
                 }
             }
         }
@@ -435,83 +437,92 @@ impl Chip for Vic {
                     self.trigger_irq(0);
                 }
                 self.update_bad_line();
-                self.set_ba(false);
                 self.p_access(3);
                 if self.sprites[3].dma {
                     self.s_access(3, 0);
                 }
+                let sprite_dma = self.sprites[3].dma | self.sprites[4].dma;
+                self.set_ba(sprite_dma);
             }
             2 => {
                 // TODO vic: clock cycle 2 logic
                 if self.raster_y == self.raster_compare && self.raster_y == 0 {
                     self.trigger_irq(0);
                 }
-                self.set_ba(false);
                 if self.sprites[3].dma {
                     self.s_access(3, 1);
                     self.s_access(3, 2);
                 }
+                let sprite_dma = self.sprites[4].dma | self.sprites[5].dma;
+                self.set_ba(sprite_dma);
             }
             3 => {
-                self.set_ba(false);
                 self.p_access(4);
                 if self.sprites[4].dma {
                     self.s_access(4, 0);
                 }
+                let sprite_dma = self.sprites[4].dma | self.sprites[5].dma;
+                self.set_ba(sprite_dma);
             }
             4 => {
-                self.set_ba(false);
                 if self.sprites[4].dma {
                     self.s_access(4, 1);
                     self.s_access(4, 2);
                 }
+                let sprite_dma = self.sprites[5].dma | self.sprites[6].dma;
+                self.set_ba(sprite_dma);
             }
             5 => {
-                self.set_ba(false);
                 self.p_access(5);
                 if self.sprites[5].dma {
                     self.s_access(5, 0);
                 }
+                let sprite_dma = self.sprites[5].dma | self.sprites[6].dma;
+                self.set_ba(sprite_dma);
             }
             6 => {
-                self.set_ba(false);
                 if self.sprites[5].dma {
                     self.s_access(5, 1);
                     self.s_access(5, 2);
                 }
+                let sprite_dma = self.sprites[6].dma | self.sprites[7].dma;
+                self.set_ba(sprite_dma);
             }
             7 => {
-                self.set_ba(false);
                 self.p_access(6);
                 if self.sprites[6].dma {
                     self.s_access(6, 0);
                 }
+                let sprite_dma = self.sprites[6].dma | self.sprites[7].dma;
+                self.set_ba(sprite_dma);
             }
             8 => {
-                self.set_ba(false);
                 if self.sprites[6].dma {
                     self.s_access(6, 1);
                     self.s_access(6, 2);
                 }
+                let sprite_dma = self.sprites[7].dma;
+                self.set_ba(sprite_dma);
             }
             9 => {
-                self.set_ba(false);
                 self.p_access(7);
                 if self.sprites[7].dma {
                     self.s_access(7, 0);
                 }
+                let sprite_dma = self.sprites[7].dma;
+                self.set_ba(sprite_dma);
             }
             10 => {
-                self.set_ba(false);
                 if self.sprites[7].dma {
                     self.s_access(7, 1);
                     self.s_access(7, 2);
                 }
                 self.draw_border();
+                self.set_ba(false);
             }
             11 => {
-                self.set_ba(false);
                 self.draw_border();
+                self.set_ba(false);
             }
             12...13 => {
                 /*
@@ -520,9 +531,9 @@ impl Chip for Vic {
                    c-accesses are started. Once started, one c-access is done in the second
                    phase of every clock cycle in the range 15-54.
                 */
+                self.draw_border();
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
-                self.draw_border();
             }
             14 => {
                 /*
@@ -536,9 +547,9 @@ impl Chip for Vic {
                 if self.is_bad_line {
                     self.rc = 0;
                 }
+                self.draw_border();
                 let is_bad_line = self.is_bad_line;
                 self.set_ba(is_bad_line);
-                self.draw_border();
             }
             15 => {
                 /*
@@ -551,10 +562,10 @@ impl Chip for Vic {
                         self.mc_base[i] += 2;
                     }
                 }
-                let is_bad_line = self.is_bad_line;
-                self.set_ba(is_bad_line);
                 self.c_access();
                 self.draw_border();
+                let is_bad_line = self.is_bad_line;
+                self.set_ba(is_bad_line);
             }
             16 => {
                 /*
@@ -574,40 +585,37 @@ impl Chip for Vic {
                         }
                     }
                 }
-                let is_bad_line = self.is_bad_line;
-                self.set_ba(is_bad_line);
                 self.g_access();
                 self.c_access();
                 self.draw_border();
+                let is_bad_line = self.is_bad_line;
+                self.set_ba(is_bad_line);
             }
             17...54 => {
-                let is_bad_line = self.is_bad_line;
-                self.set_ba(is_bad_line);
                 self.g_access();
                 self.c_access();
                 self.draw();
+                let is_bad_line = self.is_bad_line;
+                self.set_ba(is_bad_line);
             }
             55 => {
-                self.set_ba(false);
+                self.update_sprite_dma();
                 self.update_sprite_expansion_ff();
-                self.update_sprite_dma(0);
-                self.update_sprite_dma(1);
-                self.update_sprite_dma(2);
-                self.update_sprite_dma(3);
                 self.g_access();
                 self.draw();
+                let sprite_dma = self.sprites[0].dma;
+                self.set_ba(sprite_dma);
             }
             56 => {
-                self.set_ba(false);
-                self.update_sprite_dma(4);
-                self.update_sprite_dma(5);
-                self.update_sprite_dma(6);
-                self.update_sprite_dma(7);
+                self.update_sprite_dma();
                 self.draw_border();
+                let sprite_dma = self.sprites[0].dma;
+                self.set_ba(sprite_dma);
             }
             57 => {
-                self.set_ba(false);
                 self.draw_border();
+                let sprite_dma = self.sprites[0].dma | self.sprites[1].dma;
+                self.set_ba(sprite_dma);
             }
             58 => {
                 // TODO vic: clock cycle 58 display logic
@@ -631,49 +639,55 @@ impl Chip for Vic {
                     self.mc[i] = self.mc_base[i];
                 }
                 self.update_sprite_display();
-                self.set_ba(false);
                 self.p_access(0);
                 if self.sprites[0].dma {
                     self.s_access(0, 0);
                 }
                 self.draw_border();
+                let sprite_dma = self.sprites[0].dma | self.sprites[1].dma;
+                self.set_ba(sprite_dma);
             }
             59 => {
-                self.set_ba(false);
                 if self.sprites[0].dma {
                     self.s_access(0, 1);
                     self.s_access(0, 2);
                 }
                 self.draw_border();
+                let sprite_dma = self.sprites[1].dma | self.sprites[2].dma;
+                self.set_ba(sprite_dma);
             }
             60 => {
-                self.set_ba(false);
                 self.p_access(1);
                 if self.sprites[1].dma {
                     self.s_access(1, 0);
                 }
                 self.draw_border();
+                let sprite_dma = self.sprites[1].dma | self.sprites[2].dma;
+                self.set_ba(sprite_dma);
             }
             61 => {
-                self.set_ba(false);
                 if self.sprites[1].dma {
                     self.s_access(1, 1);
                     self.s_access(1, 2);
                 }
+                let sprite_dma = self.sprites[2].dma | self.sprites[3].dma;
+                self.set_ba(sprite_dma);
             }
             62 => {
-                self.set_ba(false);
                 self.p_access(2);
                 if self.sprites[2].dma {
                     self.s_access(2, 0);
                 }
+                let sprite_dma = self.sprites[2].dma | self.sprites[3].dma;
+                self.set_ba(sprite_dma);
             }
             63 => {
-                self.set_ba(false);
                 if self.sprites[2].dma {
                     self.s_access(2, 1);
                     self.s_access(2, 2);
                 }
+                let sprite_dma = self.sprites[3].dma | self.sprites[4].dma;
+                self.set_ba(sprite_dma);
                 self.border_unit.update_vertical_ff(self.raster_y, self.den);
             }
             _ => panic!("invalid cycle"),
@@ -685,7 +699,7 @@ impl Chip for Vic {
             self.raster_y += 1;
             if self.raster_y >= self.spec.raster_lines {
                 self.raster_y = 0;
-                // TODO vic: check display on reset 
+                // TODO vic: check display on reset
                 // self.display_on = false;
                 /*
                 Section: 3.7.2. VC and RC
