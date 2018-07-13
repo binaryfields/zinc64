@@ -83,6 +83,7 @@ pub struct GfxSequencer {
     c_data: u8,
     c_color: u8,
     g_data: u8,
+    data: u8,
     mc_cycle: bool,
     output: u8,
 }
@@ -94,6 +95,7 @@ impl GfxSequencer {
             c_data: 0,
             c_color: 0,
             g_data: 0,
+            data: 0,
             mc_cycle: false,
             output: 0,
         }
@@ -123,14 +125,19 @@ impl GfxSequencer {
                 Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
                 _ => panic!("unsupported graphics mode {}", self.config.mode.value()),
             };
-            self.g_data = if !self.mc_cycle {
-                self.g_data << 1
+            self.data = if !self.mc_cycle {
+                self.data << 1
             } else {
-                self.g_data << 2
+                self.data << 2
             }
         } else {
             self.mc_cycle = false;
         }
+    }
+
+    #[inline]
+    pub fn load_data(&mut self) {
+        self.data = self.g_data;
     }
 
     #[inline]
@@ -143,6 +150,7 @@ impl GfxSequencer {
         self.c_data = 0;
         self.c_color = 0;
         self.g_data = 0;
+        self.data = 0;
         self.mc_cycle = false;
         self.output = 0;
     }
@@ -160,7 +168,7 @@ impl GfxSequencer {
 
     #[inline]
     fn output_bitmap(&self) -> u8 {
-        if self.g_data.get_bit(7) {
+        if self.data.get_bit(7) {
             self.c_data >> 4
         } else {
             self.c_data & 0x0f
@@ -182,12 +190,12 @@ impl GfxSequencer {
 
     #[inline]
     fn output_bitmap_mc(&self) -> u8 {
-        match self.g_data >> 6 {
+        match self.data >> 6 {
             0 => self.config.bg_color[0],
             1 => self.c_data >> 4,
             2 => self.c_data & 0x0f,
             3 => self.c_color,
-            _ => panic!("invalid color source {}", self.g_data >> 6),
+            _ => panic!("invalid color source {}", self.data >> 6),
         }
     }
 
@@ -204,7 +212,7 @@ impl GfxSequencer {
 
     #[inline]
     fn output_text(&self) -> u8 {
-        if self.g_data.get_bit(7) {
+        if self.data.get_bit(7) {
             self.c_color
         } else {
             self.config.bg_color[0]
@@ -228,7 +236,7 @@ impl GfxSequencer {
 
     #[inline]
     fn output_text_ecm(&self) -> u8 {
-        if self.g_data.get_bit(7) {
+        if self.data.get_bit(7) {
             self.c_color
         } else {
             self.config.bg_color[(self.c_data >> 6) as usize]
@@ -256,12 +264,12 @@ impl GfxSequencer {
     #[inline]
     fn output_text_mc(&self) -> u8 {
         if self.c_color.get_bit(3) {
-            match self.g_data >> 6 {
+            match self.data >> 6 {
                 0 => self.config.bg_color[0],
                 1 => self.config.bg_color[1],
                 2 => self.config.bg_color[2],
                 3 => self.c_color & 0x07,
-                _ => panic!("invalid color source {}", self.g_data >> 6),
+                _ => panic!("invalid color source {}", self.data >> 6),
             }
         } else {
             self.output_text()

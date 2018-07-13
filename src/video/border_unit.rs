@@ -105,23 +105,22 @@ impl BorderUnit {
         6. If the X coordinate reaches the left comparison value and the vertical
            border flip flop is not set, the main flip flop is reset.
         */
-        // TODO vic: border off by 4 pixels to get around gfx shift register issue
         if self.config.csel {
-            if x == Self::map_sprite_to_screen(0x18 - 4) {
+            if x == Self::map_sprite_to_screen(0x18) {
                 self.update_vertical_flop(y, den);
                 if !self.vertical_flop {
                     self.main_flop = false;
                 }
-            } else if x == Self::map_sprite_to_screen(0x158 - 4) {
+            } else if x == Self::map_sprite_to_screen(0x158) {
                 self.main_flop = true;
             }
         } else {
-            if x == Self::map_sprite_to_screen(0x1f - 4) {
+            if x == Self::map_sprite_to_screen(0x1f) {
                 self.update_vertical_flop(y, den);
                 if !self.vertical_flop {
                     self.main_flop = false;
                 }
-            } else if x == Self::map_sprite_to_screen(0x14f - 4) {
+            } else if x == Self::map_sprite_to_screen(0x14f) {
                 self.main_flop = true;
             }
         }
