@@ -23,7 +23,6 @@ use std::result::Result;
 
 use getopts;
 use zinc64::core::SystemModel;
-use zinc64::core::geo;
 use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
 use zinc64::system::{C64, Config};
@@ -54,7 +53,7 @@ impl Cli {
             .unwrap_or(600);
         let options = app::Options {
             fullscreen: matches.opt_present("fullscreen"),
-            window_size: geo::Size::new(width, height),
+            window_size: (width, height),
             speed: matches
                 .opt_str("speed")
                 .map(|s| s.parse::<u8>().unwrap())

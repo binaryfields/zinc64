@@ -30,7 +30,6 @@ use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::{EventPump, Sdl};
 use time;
-use zinc64::core::geo;
 use zinc64::system::C64;
 
 use super::audio::AppAudio;
@@ -60,7 +59,7 @@ impl JamAction {
 
 pub struct Options {
     pub fullscreen: bool,
-    pub window_size: geo::Size,
+    pub window_size: (u32, u32),
     pub speed: u8,
     pub warp_mode: bool,
     // Debug
@@ -90,11 +89,13 @@ impl App {
         let sdl_context = sdl2::init()?;
         // Initialize video
         let sdl_video = sdl_context.video()?;
-        info!(target: "ui", "Opening app window {}x{}", options.window_size.width, options.window_size.height);
+        info!(target: "ui", "Opening app window {}x{}", options.window_size.0, options.window_size.1);
         let renderer = Renderer::new(
             &sdl_video,
             options.window_size,
-            geo::Size::from_tuple(c64.get_config().model.frame_buffer_size),
+            c64.get_config().model.frame_buffer_size,
+            c64.get_config().model.viewport_offset,
+            c64.get_config().model.viewport_size,
             options.fullscreen,
         )?;
         // Initialize audio

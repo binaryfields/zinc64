@@ -1,8 +1,10 @@
 use core::VicModel;
 
+#[derive(Clone, Copy)]
 pub struct Spec {
     pub raster_lines: u16,
     pub cycles_per_raster: u16,
+    pub first_x_coord: u16,
 }
 
 /*
@@ -32,8 +34,9 @@ impl Spec {
 
     fn ntsc() -> Spec {
         Spec {
-            raster_lines: 278,
+            raster_lines: 263,
             cycles_per_raster: 65,
+            first_x_coord: 0x19c,
         }
     }
 
@@ -41,6 +44,7 @@ impl Spec {
         Spec {
             raster_lines: 312,
             cycles_per_raster: 63,
+            first_x_coord: 0x194,
         }
     }
 }

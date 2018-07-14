@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use super::spec::Spec;
+
 pub struct Config {
     pub border_color: u8,
     pub csel: bool,
@@ -40,14 +42,16 @@ impl Config {
 }
 
 pub struct BorderUnit {
+    spec: Spec,
     pub config: Config,
     main_flop: bool,
     vertical_flop: bool,
 }
 
 impl BorderUnit {
-    pub fn new() -> Self {
+    pub fn new(spec: Spec) -> Self {
         BorderUnit {
+            spec,
             config: Config::new(),
             main_flop: false,
             vertical_flop: false,
@@ -55,10 +59,22 @@ impl BorderUnit {
     }
 
     #[inline]
-    fn map_sprite_to_screen(x: u16) -> u16 {
-        match x {
-            0x000...0x193 => x + 0x64,
-            0x194...0x1ff => x - 0x194,
+    fn map_sprite_to_screen(&self, x: u16) -> u16 {
+        match self.spec.first_x_coord {
+            0x194 => {
+                match x {
+                    0x000...0x193 => x + 0x64, // 0x1f7 - 0x193
+                    0x194...0x1f7 => x - 0x194,
+                    _ => panic!("invalid sprite coords {}", x),
+                }
+            },
+            0x19c => {
+                match x {
+                    0x000...0x19b => x + 0x64, // 0x1ff - 0x19b
+                    0x19c...0x1ff => x - 0x19c,
+                    _ => panic!("invalid sprite coords {}", x),
+                }
+            },
             _ => panic!("invalid sprite coords {}", x),
         }
     }
@@ -106,21 +122,21 @@ impl BorderUnit {
            border flip flop is not set, the main flip flop is reset.
         */
         if self.config.csel {
-            if x == Self::map_sprite_to_screen(0x18) {
+            if x == self.map_sprite_to_screen(0x18) {
                 self.update_vertical_flop(y, den);
                 if !self.vertical_flop {
                     self.main_flop = false;
                 }
-            } else if x == Self::map_sprite_to_screen(0x158) {
+            } else if x == self.map_sprite_to_screen(0x158) {
                 self.main_flop = true;
             }
         } else {
-            if x == Self::map_sprite_to_screen(0x1f) {
+            if x == self.map_sprite_to_screen(0x1f) {
                 self.update_vertical_flop(y, den);
                 if !self.vertical_flop {
                     self.main_flop = false;
                 }
-            } else if x == Self::map_sprite_to_screen(0x14f) {
+            } else if x == self.map_sprite_to_screen(0x14f) {
                 self.main_flop = true;
             }
         }

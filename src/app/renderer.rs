@@ -26,13 +26,13 @@ use sdl2::video;
 use sdl2::rect::Rect;
 use time;
 use zinc64::core::FrameBuffer;
-use zinc64::core::geo;
 
 pub struct Renderer {
     canvas: render::WindowCanvas,
     #[allow(dead_code)]
     creator: render::TextureCreator<video::WindowContext>,
     texture: render::Texture,
+    viewport_rect: Rect,
     frame: u32,
     last_frame_ts: u64,
 }
@@ -40,11 +40,13 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(
         sdl_video: &sdl2::VideoSubsystem,
-        window_size: geo::Size,
-        screen_size: geo::Size,
+        window_size: (u32, u32),
+        screen_size: (u32, u32),
+        viewport_offset: (u32, u32),
+        viewport_size: (u32, u32),
         fullscreen: bool,
     ) -> Result<Renderer, String> {
-        let mut builder = sdl_video.window("zinc64", window_size.width, window_size.height);
+        let mut builder = sdl_video.window("zinc64", window_size.0, window_size.1);
         builder.opengl();
         if fullscreen {
             builder.fullscreen();
@@ -58,14 +60,20 @@ impl Renderer {
         let texture = creator
             .create_texture_streaming(
                 pixels::PixelFormatEnum::ARGB8888,
-                screen_size.width,
-                screen_size.height,
+                screen_size.0,
+                screen_size.1,
             )
             .unwrap();
+        let viewport_rect = Rect::new(
+            viewport_offset.0 as i32,
+            viewport_offset.1 as i32,
+            viewport_size.0,
+            viewport_size.1);
         let renderer = Renderer {
             canvas,
             creator,
             texture,
+            viewport_rect,
             frame: 0,
             last_frame_ts: 0,
         };
@@ -83,7 +91,7 @@ impl Renderer {
         self.canvas.clear();
         self.canvas.copy(
             &self.texture,
-            Some(Rect::new(76, 16, 403, 284)), // FIXME vic
+            Some(self.viewport_rect.clone()),
             None)?;
         self.canvas.present();
         self.frame = self.frame.wrapping_add(1);

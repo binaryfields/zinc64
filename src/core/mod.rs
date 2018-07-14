@@ -22,7 +22,6 @@ mod clock;
 mod cycle_counter;
 mod factory;
 mod frame_buffer;
-pub mod geo;
 mod io_port;
 mod irq_control;
 mod irq_line;

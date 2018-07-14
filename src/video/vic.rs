@@ -59,6 +59,8 @@ X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 */
 
+// TODO vic: fix ntsc support
+
 #[derive(Copy, Clone)]
 pub enum IrqSource {
     Vic = 2,
@@ -139,7 +141,7 @@ impl Vic {
             irq_line,
             mem,
             // Functional Units
-            border_unit: BorderUnit::new(),
+            border_unit: BorderUnit::new(spec.clone()),
             gfx_seq: GfxSequencer::new(),
             interrupt_control: IrqControl::new(),
             mux_unit: MuxUnit::new(),
@@ -172,10 +174,22 @@ impl Vic {
     }
 
     #[inline]
-    fn map_sprite_to_screen(x: u16) -> u16 {
-        match x {
-            0x000...0x193 => x + 0x64,
-            0x194...0x1ff => x - 0x194,
+    fn map_sprite_to_screen(&self, x: u16) -> u16 {
+        match self.spec.first_x_coord {
+            0x194 => {
+                match x {
+                    0x000...0x193 => x + 0x64, // 0x1f7 - 0x193
+                    0x194...0x1f7 => x - 0x194,
+                    _ => panic!("invalid sprite coords {}", x),
+                }
+            },
+            0x19c => {
+                match x {
+                    0x000...0x19b => x + 0x64, // 0x1ff - 0x19b
+                    0x19c...0x1ff => x - 0x19c,
+                    _ => panic!("invalid sprite coords {}", x),
+                }
+            },
             _ => panic!("invalid sprite coords {}", x),
         }
     }
@@ -741,6 +755,8 @@ impl Chip for Vic {
                 }
                 self.border_unit.update_vertical_flop(self.raster_y, self.den);
             }
+            64 => {},
+            65 => {},
             _ => panic!("invalid cycle"),
         }
         self.update_display_state();
@@ -941,7 +957,7 @@ impl Chip for Vic {
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
                 let n = (reg >> 1) as usize;
                 self.sprites[n].config.x = (self.sprites[n].config.x & 0xff00) | (value as u16);
-                self.sprites[n].config.x_screen = Self::map_sprite_to_screen(self.sprites[n].config.x);
+                self.sprites[n].config.x_screen = self.map_sprite_to_screen(self.sprites[n].config.x);
             }
             // Reg::M0Y - Reg::M7Y
             0x01 | 0x03 | 0x05 | 0x07 | 0x09 | 0x0b | 0x0d | 0x0f => {
@@ -951,7 +967,7 @@ impl Chip for Vic {
             // Reg::MX8
             0x10 => for i in 0..8 as usize {
                 self.sprites[i].config.x.set_bit(8, value.get_bit(i));
-                self.sprites[i].config.x_screen = Self::map_sprite_to_screen(self.sprites[i].config.x);
+                self.sprites[i].config.x_screen = self.map_sprite_to_screen(self.sprites[i].config.x);
             },
             // Reg::CR1
             0x11 => {
