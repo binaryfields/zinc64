@@ -58,7 +58,6 @@ X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 */
 
-// TODO vic: display state cycle 58
 // TODO vic: mux logic
 
 #[derive(Copy, Clone)]
@@ -318,6 +317,13 @@ impl Vic {
     }
 
     #[inline]
+    fn update_display_state(&mut self) {
+        if self.is_bad_line {
+            self.display_state = true;
+        }
+    }
+
+    #[inline]
     fn update_sprite_display(&mut self) {
         /*
         Section: 3.8. Sprites
@@ -408,33 +414,38 @@ impl Vic {
 
     #[inline]
     fn g_access(&mut self) {
-        let g_data = match self.gfx_seq.config.mode {
-            Mode::Text | Mode::McText => {
-                let address =
-                    self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
-                self.mem.borrow().read(address)
-            }
-            Mode::EcmText => {
-                let address = self.char_base | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3)
-                    | self.rc as u16;
-                self.mem.borrow().read(address)
-            }
-            Mode::Bitmap | Mode::McBitmap => {
-                let address = self.char_base & 0x2000 | (self.vc << 3) | self.rc as u16;
-                self.mem.borrow().read(address)
-            }
-            Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-            _ => panic!("unsupported graphics mode {}", self.gfx_seq.config.mode.value()),
-        };
-        let c_data = self.vm_data_line[self.vmli];
-        let c_color = self.vm_color_line[self.vmli];
-        self.gfx_seq.set_data(c_data, c_color, g_data);
-        /*
-        Section: 3.7.2. VC and RC
-        4. VC and VMLI are incremented after each g-access in display state.
-        */
-        self.vc += 1;
-        self.vmli += 1;
+        if self.display_state {
+            let g_data = match self.gfx_seq.config.mode {
+                Mode::Text | Mode::McText => {
+                    let address =
+                        self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
+                    self.mem.borrow().read(address)
+                }
+                Mode::EcmText => {
+                    let address = self.char_base | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3)
+                        | self.rc as u16;
+                    self.mem.borrow().read(address)
+                }
+                Mode::Bitmap | Mode::McBitmap => {
+                    let address = self.char_base & 0x2000 | (self.vc << 3) | self.rc as u16;
+                    self.mem.borrow().read(address)
+                }
+                Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
+                _ => panic!("unsupported graphics mode {}", self.gfx_seq.config.mode.value()),
+            };
+            let c_data = self.vm_data_line[self.vmli];
+            let c_color = self.vm_color_line[self.vmli];
+            self.gfx_seq.set_data(c_data, c_color, g_data);
+            /*
+            Section: 3.7.2. VC and RC
+            4. VC and VMLI are incremented after each g-access in display state.
+            */
+            self.vc += 1;
+            self.vmli += 1;
+        } else {
+            let g_data = self.mem.borrow().read(0x3fff);
+            self.gfx_seq.set_data(0, 0, g_data);
+        }
     }
 
     #[inline]
@@ -464,7 +475,6 @@ impl Vic {
 
 impl Chip for Vic {
     fn clock(&mut self) {
-        self.update_display_on();
         match self.raster_cycle {
             1 => {
                 /*
@@ -480,6 +490,7 @@ impl Chip for Vic {
                 if self.raster_y == self.raster_compare && self.raster_y != 0 {
                     self.trigger_irq(0);
                 }
+                self.update_display_on();
                 self.update_bad_line();
                 let sprite_dma = self.sprites[3].dma | self.sprites[4].dma;
                 self.set_ba(sprite_dma);
@@ -662,8 +673,14 @@ impl Chip for Vic {
                 */
                 if self.rc == 7 {
                     self.vc_base = self.vc;
+                    if !self.is_bad_line {
+                        self.display_state = false;
+                    }
                 }
-                self.rc += 1;
+                self.update_display_state();
+                if self.display_state {
+                    self.rc += 1;
+                }
                 /*
                 Section: 3.8. Sprites
                 4. In the first phase of cycle 58, the MC of every sprite is loaded from
@@ -726,6 +743,7 @@ impl Chip for Vic {
             }
             _ => panic!("invalid cycle"),
         }
+        self.update_display_state();
         // Update counters/vsync
         self.raster_cycle += 1;
         if self.raster_cycle > self.spec.cycles_per_raster {
@@ -733,8 +751,7 @@ impl Chip for Vic {
             self.raster_y += 1;
             if self.raster_y >= self.spec.raster_lines {
                 self.raster_y = 0;
-                // DEFERRED vic: check display on reset
-                // self.display_on = false;
+                self.display_on = false;
                 /*
                 Section: 3.7.2. VC and RC
                 1. Once somewhere outside of the range of raster lines $30-$f7 (i.e.
@@ -945,6 +962,7 @@ impl Chip for Vic {
                 self.den = value.get_bit(4);
                 self.border_unit.config.rsel = value.get_bit(3);
                 self.y_scroll = value & 0x07;
+                self.update_display_on();
                 self.update_bad_line();
                 if self.raster_y == self.raster_compare {
                     self.trigger_irq(0);
