@@ -19,6 +19,7 @@
 
 mod border_unit;
 mod gfx_sequencer;
+mod mux_unit;
 mod spec;
 mod sprite_sequencer;
 mod vic;

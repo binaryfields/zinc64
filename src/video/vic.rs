@@ -27,6 +27,7 @@ use log::LogLevel;
 use super::VicMemory;
 use super::border_unit::BorderUnit;
 use super::gfx_sequencer::{GfxSequencer, Mode};
+use super::mux_unit::MuxUnit;
 use super::spec::Spec;
 use super::sprite_sequencer::{SpriteSequencer, Mode as SpriteMode};
 
@@ -58,8 +59,6 @@ X coo. \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 */
 
-// TODO vic: mux logic
-
 #[derive(Copy, Clone)]
 pub enum IrqSource {
     Vic = 2,
@@ -83,6 +82,7 @@ pub struct Vic {
     border_unit: BorderUnit,
     gfx_seq: GfxSequencer,
     interrupt_control: IrqControl,
+    mux_unit: MuxUnit,
     sprites: [SpriteSequencer; 8],
     // Configuration
     char_base: u16,
@@ -142,6 +142,7 @@ impl Vic {
             border_unit: BorderUnit::new(),
             gfx_seq: GfxSequencer::new(),
             interrupt_control: IrqControl::new(),
+            mux_unit: MuxUnit::new(),
             sprites,
             // Configuration
             char_base: 0,
@@ -192,8 +193,13 @@ impl Vic {
                     self.gfx_seq.load_data();
                 }
                 self.gfx_seq.clock();
+                self.mux_unit.feed_graphics(self.gfx_seq.output());
+            } else {
+                self.mux_unit.feed_border(self.border_unit.output());
             }
-            let pixel = self.output_pixel();
+            let sprite_output = self.output_sprites();
+            self.mux_unit.feed_sprites(sprite_output);
+            let pixel = self.mux_unit.output();
             let mut rt = self.frame_buffer.borrow_mut();
             rt.write(x, self.raster_y, pixel);
         }
@@ -213,8 +219,13 @@ impl Vic {
                     self.gfx_seq.load_data();
                 }
                 self.gfx_seq.clock();
+                self.mux_unit.feed_graphics(self.gfx_seq.output());
+            } else {
+                self.mux_unit.feed_border(self.border_unit.output());
             }
-            let pixel = self.output_pixel();
+            let sprite_output = self.output_sprites();
+            self.mux_unit.feed_sprites(sprite_output);
+            let pixel = self.mux_unit.output();
             let mut rt = self.frame_buffer.borrow_mut();
             rt.write(x, self.raster_y, pixel);
         }
@@ -222,44 +233,33 @@ impl Vic {
 
     #[inline]
     fn draw_border(&mut self) {
-        let pixel = self.border_unit.output();
-        let y = self.raster_y;
         let x_start = (self.raster_cycle << 3) - 12;
         for x in x_start..x_start + 8 {
+            self.border_unit.update_main_flop(x, self.raster_y, self.den);
             for sprite in self.sprites.iter_mut() {
                 sprite.clock(x);
             }
+            self.mux_unit.feed_border(self.border_unit.output());
+            let sprite_output = self.output_sprites();
+            self.mux_unit.feed_sprites(sprite_output);
+            let pixel = self.mux_unit.output();
             let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, y, pixel);
+            rt.write(x, self.raster_y, pixel);
         }
     }
 
     #[inline]
-    fn output_pixel(&mut self) -> u8 {
-        if !self.border_unit.is_enabled() {
-            if let Some(output) = self.output_sprite() {
-                output
-            } else {
-                self.gfx_seq.output()
-            }
-        } else {
-            self.border_unit.output()
-        }
-    }
-
-    #[inline]
-    fn output_sprite(&mut self) -> Option<u8> {
-        let mut i = 0;
-        loop {
-            if i >= 8 {
-                break None;
-            }
-            let sprite = &self.sprites[i];
-            if sprite.display && sprite.output().is_some() {
-                break sprite.output();
-            }
-            i += 1;
-        }
+    fn output_sprites(&self) -> [Option<u8>; 8] {
+        [
+            self.sprites[0].output(),
+            self.sprites[1].output(),
+            self.sprites[2].output(),
+            self.sprites[3].output(),
+            self.sprites[4].output(),
+            self.sprites[5].output(),
+            self.sprites[6].output(),
+            self.sprites[7].output(),
+        ]
     }
 
     #[inline]
@@ -779,6 +779,7 @@ impl Chip for Vic {
         self.border_unit.reset();
         self.gfx_seq.reset();
         self.interrupt_control.reset();
+        self.mux_unit.reset();
         for sprite in self.sprites.iter_mut() {
             sprite.reset();
         }
@@ -891,7 +892,7 @@ impl Chip for Vic {
             0x1b => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprites[i].config.data_priority);
+                    result.set_bit(i, self.mux_unit.data_priority[i]);
                 }
                 result
             }
@@ -1027,7 +1028,8 @@ impl Chip for Vic {
             }
             // Reg::MDP
             0x1b => for i in 0..8 as usize {
-                self.sprites[i].config.data_priority = value.get_bit(i);
+                self.mux_unit.data_priority[i] = value.get_bit(i);
+
             },
             // Reg::MMC
             0x1c => for i in 0..8 as usize {
@@ -1042,9 +1044,9 @@ impl Chip for Vic {
                 self.sprites[i].config.expand_x = value.get_bit(i);
             },
             // Reg::MM
-            0x1e => {}
+            0x1e => {},
             // Reg::MD
-            0x1f => {}
+            0x1f => {},
             // Reg::EC
             0x20 => self.border_unit.config.border_color = value & 0x0f,
             // Reg::B0C - Reg::B3C

@@ -27,7 +27,6 @@ pub enum Mode {
 
 pub struct Config {
     pub color: u8,
-    pub data_priority: bool,
     pub enabled: bool,
     pub expand_x: bool,
     pub expand_y: bool,
@@ -42,7 +41,6 @@ impl Config {
     pub fn new() -> Self {
         Config {
             color: 0,
-            data_priority: false,
             enabled: false,
             expand_x: false,
             expand_y: false,
@@ -56,7 +54,6 @@ impl Config {
 
     pub fn reset(&mut self) {
         self.color = 0;
-        self.data_priority = false;
         self.enabled = false;
         self.expand_x = false;
         self.expand_y = false;
