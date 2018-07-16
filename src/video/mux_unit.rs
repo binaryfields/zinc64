@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use bit_field::BitField;
+
 const PRIO_SCREEN_BORDER: u8 = 0;
 const PRIO_FG_SPRITE: u8 = 1;
 const PRIO_FG_GRAPHICS: u8 = 2;
@@ -25,6 +27,10 @@ const PRIO_BG_GRAPHICS: u8 = 4;
 
 pub struct MuxUnit {
     pub data_priority: [bool; 8],
+    pub mb_collision: u8,
+    pub mb_interrupt: bool,
+    pub mm_collision: u8,
+    pub mm_interrupt: bool,
     output: u8,
     output_priority: u8,
 }
@@ -33,8 +39,35 @@ impl MuxUnit {
     pub fn new() -> Self {
         MuxUnit {
             data_priority: [false; 8],
+            mb_collision: 0,
+            mb_interrupt: false,
+            mm_collision: 0,
+            mm_interrupt: false,
             output: 0,
             output_priority: 0,
+        }
+    }
+
+    #[inline]
+    pub fn compute_collisions(&mut self, sprite_output: &[Option<u8>; 8]) {
+        let fg_graphics = self.output_priority == PRIO_FG_GRAPHICS;
+        let mut mb_collision = self.mb_collision;
+        let mut mm_collision = self.mm_collision;
+        let mut mm_count = 0u8;
+        for i in 0..8 {
+            if sprite_output[i].is_some() {
+                if fg_graphics {
+                    mb_collision.set_bit(i, true);
+                }
+                mm_collision.set_bit(i, true);
+                mm_count += 1;
+            }
+        }
+        self.mb_interrupt = self.mb_collision == 0 && mb_collision != 0;
+        self.mb_collision |= mb_collision;
+        if mm_count >= 2 {
+            self.mm_interrupt = self.mm_collision == 0 && mm_collision != 0;
+            self.mm_collision |= mm_collision;
         }
     }
 
@@ -53,7 +86,7 @@ impl MuxUnit {
     }
 
     #[inline]
-    pub fn feed_sprites(&mut self, sprite_output: [Option<u8>; 8]) {
+    pub fn feed_sprites(&mut self, sprite_output: &[Option<u8>; 8]) {
         for i in 0..8 {
             if let Some(output) = sprite_output[i] {
                 if !self.data_priority[i] {
@@ -72,6 +105,10 @@ impl MuxUnit {
 
     pub fn reset(&mut self) {
         self.data_priority = [false; 8];
+        self.mb_collision = 0;
+        self.mb_interrupt = false;
+        self.mm_collision = 0;
+        self.mm_interrupt = false;
         self.output = 0;
         self.output_priority = 0;
     }

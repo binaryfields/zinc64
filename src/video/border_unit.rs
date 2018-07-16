@@ -64,7 +64,7 @@ impl BorderUnit {
             0x194 => {
                 match x {
                     0x000...0x193 => x + 0x64, // 0x1f7 - 0x193
-                    0x194...0x1f7 => x - 0x194,
+                    0x194...0x1ff => x - 0x194,
                     _ => panic!("invalid sprite coords {}", x),
                 }
             },

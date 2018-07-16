@@ -179,7 +179,7 @@ impl Vic {
             0x194 => {
                 match x {
                     0x000...0x193 => x + 0x64, // 0x1f7 - 0x193
-                    0x194...0x1f7 => x - 0x194,
+                    0x194...0x1ff => x - 0x194,
                     _ => panic!("invalid sprite coords {}", x),
                 }
             },
@@ -212,10 +212,16 @@ impl Vic {
                 self.mux_unit.feed_border(self.border_unit.output());
             }
             let sprite_output = self.output_sprites();
-            self.mux_unit.feed_sprites(sprite_output);
+            self.mux_unit.compute_collisions(&sprite_output);
+            self.mux_unit.feed_sprites(&sprite_output);
+            if self.mux_unit.mb_interrupt {
+                self.trigger_irq(1);
+            }
+            if self.mux_unit.mm_interrupt {
+                self.trigger_irq(2);
+            }
             let pixel = self.mux_unit.output();
-            let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, self.raster_y, pixel);
+            self.frame_buffer.borrow_mut().write(x, self.raster_y, pixel);
         }
     }
 
@@ -238,10 +244,16 @@ impl Vic {
                 self.mux_unit.feed_border(self.border_unit.output());
             }
             let sprite_output = self.output_sprites();
-            self.mux_unit.feed_sprites(sprite_output);
+            self.mux_unit.compute_collisions(&sprite_output);
+            self.mux_unit.feed_sprites(&sprite_output);
+            if self.mux_unit.mb_interrupt {
+                self.trigger_irq(1);
+            }
+            if self.mux_unit.mm_interrupt {
+                self.trigger_irq(2);
+            }
             let pixel = self.mux_unit.output();
-            let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, self.raster_y, pixel);
+            self.frame_buffer.borrow_mut().write(x, self.raster_y, pixel);
         }
     }
 
@@ -255,10 +267,16 @@ impl Vic {
             }
             self.mux_unit.feed_border(self.border_unit.output());
             let sprite_output = self.output_sprites();
-            self.mux_unit.feed_sprites(sprite_output);
+            self.mux_unit.compute_collisions(&sprite_output);
+            self.mux_unit.feed_sprites(&sprite_output);
+            if self.mux_unit.mb_interrupt {
+                self.trigger_irq(1);
+            }
+            if self.mux_unit.mm_interrupt {
+                self.trigger_irq(2);
+            }
             let pixel = self.mux_unit.output();
-            let mut rt = self.frame_buffer.borrow_mut();
-            rt.write(x, self.raster_y, pixel);
+            self.frame_buffer.borrow_mut().write(x, self.raster_y, pixel);
         }
     }
 
@@ -929,9 +947,17 @@ impl Chip for Vic {
                 result
             }
             // Reg::MM
-            0x1e => 0xff, // DEFERRED collision
+            0x1e => {
+                let result = self.mux_unit.mm_collision;
+                self.mux_unit.mm_collision = 0;
+                result
+            },
             // Reg::MD
-            0x1f => 0xff, // DEFERRED collision
+            0x1f => {
+                let result = self.mux_unit.mb_collision;
+                self.mux_unit.mb_collision = 0;
+                result
+            },
             // Reg::EC
             0x20 => self.border_unit.config.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
@@ -1026,21 +1052,17 @@ impl Chip for Vic {
             }
             // Reg::IRR
             0x19 => {
-                self.interrupt_control.clear_events(value);
-                if !self.interrupt_control.is_triggered() || value == 0xe2 {
-                    // DEFERRED vic: check interrupt reset logic
-                    self.irq_line
-                        .borrow_mut()
-                        .set_low(IrqSource::Vic.value(), false);
-                }
+                self.interrupt_control.clear_events(value & 0x0f);
+                self.irq_line
+                    .borrow_mut()
+                    .set_low(IrqSource::Vic.value(), false);
             }
             // Reg::IMR
             0x1a => {
                 self.interrupt_control.set_mask(value & 0x0f);
-                self.irq_line.borrow_mut().set_low(
-                    IrqSource::Vic.value(),
-                    self.interrupt_control.is_triggered(),
-                );
+                self.irq_line
+                    .borrow_mut()
+                    .set_low(IrqSource::Vic.value(), self.interrupt_control.is_triggered());
             }
             // Reg::MDP
             0x1b => for i in 0..8 as usize {

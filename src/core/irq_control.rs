@@ -35,9 +35,9 @@ impl IrqControl {
     }
 
     #[inline]
-    pub fn clear_events(&mut self, data: u8) {
-        self.data = self.data & (!data & 0x0f);
-    } // FIXME
+    pub fn clear_events(&mut self, events: u8) {
+        self.data = self.data & (!events);
+    }
 
     #[inline]
     pub fn get_data(&self) -> u8 {
