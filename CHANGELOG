@@ -102,3 +102,8 @@
 
 - landed vic rewrite part 1
 - milestone 10: run sid_player.prg
+
+### Week 15 - 20180714
+
+- landed vic border/graphics/sprite/mux units
+- milestone 11: run superball.prg

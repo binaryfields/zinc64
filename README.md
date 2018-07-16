@@ -46,7 +46,7 @@ Here is an example how these components are used together:
 | Chipset  | Memory        | Done
 | Chipset  | 6526 CIA      | Done
 | Chipset  | 6581 SID      | Done
-| Chipset  | 6567 VIC      | In Progress
+| Chipset  | 6567 VIC      | Done
 | Device   | Cartridge     | Done
 | Device   | Floppy        | Not Started
 | Device   | Datassette    | Done
@@ -64,11 +64,6 @@ Here is an example how these components are used together:
 
 ## Roadmap
 
-- v0.09 - modular design [DONE]
-- v0.1  - zinc64 lib crate [DONE]
-- v0.2  - cia rewrite [DONE]
-- v0.3  - debugger support [DONE]
-- v0.4  - vic rewrite
 - v0.5  - zinc64 ui
 - v0.6  - floppy support
 
