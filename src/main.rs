@@ -32,7 +32,7 @@ use std::env;
 use std::process;
 use std::rc::Rc;
 
-use zinc64::system::{C64, ChipFactory};
+use zinc64::system::{C64, C64Factory};
 
 use self::app::{App, Cli, ConsoleApp, Logger};
 
@@ -73,7 +73,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         init_logging(&matches)?;
         info!("Starting {}", NAME);
         let config = Rc::new(Cli::parse_system_config(&matches)?);
-        let factory = Box::new(ChipFactory::new(config.clone()));
+        let factory = Box::new(C64Factory::new(config.clone()));
         let mut c64 = C64::new(config.clone(), factory).unwrap();
         c64.reset(true);
         Cli::set_c64_options(&mut c64, &matches)?;

@@ -17,11 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod circular_buffer;
 mod clock;
-mod cycle_counter;
-mod factory;
-mod frame_buffer;
+mod chip_factory;
 mod io_port;
 mod irq_control;
 mod irq_line;
@@ -30,11 +27,8 @@ mod ram;
 mod rom;
 mod system_model;
 
-pub use self::circular_buffer::CircularBuffer;
 pub use self::clock::Clock;
-pub use self::cycle_counter::CycleCounter;
-pub use self::factory::Factory;
-pub use self::frame_buffer::FrameBuffer;
+pub use self::chip_factory::ChipFactory;
 pub use self::io_port::IoPort;
 pub use self::irq_control::IrqControl;
 pub use self::irq_line::IrqLine;
@@ -85,4 +79,13 @@ pub trait MemoryController {
     // I/O
     fn read(&self, address: u16) -> u8;
     fn write(&mut self, address: u16, value: u8);
+}
+
+pub trait SoundOutput {
+    fn write(&mut self, value: i16);
+}
+
+pub trait VideoOutput {
+    fn set_sync(&mut self, value: bool);
+    fn write(&mut self, x: u16, y: u16, color: u8);
 }

@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 use zinc64::core::{SystemModel, TickFn};
 use zinc64::io::cia;
-use zinc64::system::{C64, ChipFactory, Config};
+use zinc64::system::{C64, C64Factory, Config};
 
 /*
 Program CIA1TAB - TA, TB, PB67 and ICR in cascaded mode
@@ -55,7 +55,7 @@ static CIA1TAB_PB: [u8; 12] = [
 #[test]
 fn program_cia1tab() {
     let config = Rc::new(Config::new(SystemModel::from("pal")));
-    let factory = Box::new(ChipFactory::new(config.clone()));
+    let factory = Box::new(C64Factory::new(config.clone()));
     let mut c64 = C64::new(config.clone(), factory).unwrap();
     c64.reset(false);
     let cpu = c64.get_cpu();
@@ -110,7 +110,7 @@ fn exec_keyboard_read() {
         0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
     ];
     let config = Rc::new(Config::new(SystemModel::from("pal")));
-    let factory = Box::new(ChipFactory::new(config.clone()));
+    let factory = Box::new(C64Factory::new(config.clone()));
     let mut c64 = C64::new(config.clone(), factory).unwrap();
     c64.load(&code.to_vec(), 0xc000);
     let keyboard = c64.get_keyboard();

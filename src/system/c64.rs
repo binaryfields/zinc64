@@ -24,13 +24,12 @@ use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
-use core::{Chip, CircularBuffer, Clock, Cpu, Factory, FrameBuffer, IoPort, IrqLine, Pin, Ram,
-           TickFn};
+use core::{Chip, Clock, Cpu, ChipFactory, IoPort, IrqLine, Pin, Ram, TickFn};
 use device::joystick;
 use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 
 use super::breakpoint::BreakpointManager;
-use super::{Autostart, Config, Palette};
+use super::{Autostart, CircularBuffer, Config, FrameBuffer, Palette};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -55,11 +54,11 @@ pub struct C64 {
     // Dependencies
     config: Rc<Config>,
     // Chipset
-    cpu: Rc<RefCell<Cpu>>,
-    cia1: Rc<RefCell<Chip>>,
-    cia2: Rc<RefCell<Chip>>,
-    sid: Rc<RefCell<Chip>>,
-    vic: Rc<RefCell<Chip>>,
+    cpu: Rc<RefCell<dyn Cpu>>,
+    cia_1: Rc<RefCell<dyn Chip>>,
+    cia_2: Rc<RefCell<dyn Chip>>,
+    sid: Rc<RefCell<dyn Chip>>,
+    vic: Rc<RefCell<dyn Chip>>,
     // Memory
     color_ram: Rc<RefCell<Ram>>,
     ram: Rc<RefCell<Ram>>,
@@ -82,7 +81,7 @@ pub struct C64 {
 }
 
 impl C64 {
-    pub fn new(config: Rc<Config>, factory: Box<Factory>) -> Result<C64, io::Error> {
+    pub fn new(config: Rc<Config>, factory: Box<dyn ChipFactory>) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
         // Buffers
         let clock = Rc::new(Clock::new());
@@ -101,77 +100,77 @@ impl C64 {
         // I/O Lines
         let ba_line = Rc::new(RefCell::new(Pin::new_high()));
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
+        let cpu_irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
+        let cpu_nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let exp_io_line = Rc::new(RefCell::new(IoPort::new(0xff, 0xff)));
-        let cia_1_flag = Rc::new(RefCell::new(Pin::new_low()));
+        let cia_1_flag_pin = Rc::new(RefCell::new(Pin::new_low()));
         let cia_1_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_1_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_2_flag = Rc::new(RefCell::new(Pin::new_low()));
+        let cia_2_flag_pin = Rc::new(RefCell::new(Pin::new_low()));
         let cia_2_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_2_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
 
         // Memory
         let color_ram = factory.new_ram(config.model.color_ram);
         let ram = factory.new_ram(config.model.memory_size);
-        let basic = factory.new_rom(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?;
-        let charset = factory.new_rom(Path::new("res/rom/characters.rom"), 0)?;
-        let kernal = factory.new_rom(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?;
+        let rom_basic = factory.new_rom(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?;
+        let rom_charset = factory.new_rom(Path::new("res/rom/characters.rom"), 0)?;
+        let rom_kernal = factory.new_rom(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?;
 
         // Chipset
-        let cia1 = factory.new_cia1(
-            cia_1_flag.clone(),
+        let cia_1 = factory.new_cia_1(
+            cia_1_flag_pin.clone(),
             cia_1_port_a.clone(),
             cia_1_port_b.clone(),
-            cpu_irq.clone(),
+            cpu_irq_line.clone(),
             joystick_1_state.clone(),
             joystick_2_state.clone(),
             keyboard_matrix.clone(),
         );
-        let cia2 = factory.new_cia2(
-            cia_2_flag.clone(),
+        let cia_2 = factory.new_cia_2(
+            cia_2_flag_pin.clone(),
             cia_2_port_a.clone(),
             cia_2_port_b.clone(),
-            cpu_nmi.clone(),
+            cpu_nmi_line.clone(),
             keyboard_matrix.clone(),
         );
         let sid = factory.new_sid(&config.model, clock.clone(), sound_buffer.clone());
         let vic = factory.new_vic(
             config.model.vic_model,
             ba_line.clone(),
-            charset.clone(),
             cia_2_port_a.clone(),
             color_ram.clone(),
-            cpu_irq.clone(),
             frame_buffer.clone(),
+            cpu_irq_line.clone(),
             ram.clone(),
+            rom_charset.clone(),
         );
 
         // Memory Controller and Processor
         let expansion_port = Rc::new(RefCell::new(ExpansionPort::new(exp_io_line.clone())));
         let mem = factory.new_memory(
-            cia1.clone(),
-            cia2.clone(),
+            cia_1.clone(),
+            cia_2.clone(),
             color_ram.clone(),
             expansion_port.clone(),
             ram.clone(),
-            basic.clone(),
-            charset.clone(),
-            kernal.clone(),
+            rom_basic.clone(),
+            rom_charset.clone(),
+            rom_kernal.clone(),
             sid.clone(),
             vic.clone(),
         );
         let cpu = factory.new_cpu(
             ba_line.clone(),
             cpu_io_port.clone(),
-            cpu_irq.clone(),
-            cpu_nmi.clone(),
+            cpu_irq_line.clone(),
+            cpu_nmi_line.clone(),
             mem.clone(),
         );
 
         // Peripherals
         let datassette = Rc::new(RefCell::new(Datassette::new(
-            cia_1_flag.clone(),
+            cia_1_flag_pin.clone(),
             cpu_io_port.clone(),
         )));
         let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
@@ -220,8 +219,8 @@ impl C64 {
             cpu: cpu.clone(),
             sid: sid.clone(),
             vic: vic.clone(),
-            cia1: cia1.clone(),
-            cia2: cia2.clone(),
+            cia_1: cia_1.clone(),
+            cia_2: cia_2.clone(),
             color_ram: color_ram.clone(),
             expansion_port: expansion_port.clone(),
             ram: ram.clone(),
@@ -264,11 +263,11 @@ impl C64 {
     }
 
     pub fn get_cia_1(&self) -> Rc<RefCell<Chip>> {
-        self.cia1.clone()
+        self.cia_1.clone()
     }
 
     pub fn get_cia_2(&self) -> Rc<RefCell<Chip>> {
-        self.cia2.clone()
+        self.cia_2.clone()
     }
 
     pub fn get_datasette(&self) -> Rc<RefCell<Datassette>> {
@@ -352,8 +351,8 @@ impl C64 {
         }
         // Chipset
         self.cpu.borrow_mut().reset();
-        self.cia1.borrow_mut().reset();
-        self.cia2.borrow_mut().reset();
+        self.cia_1.borrow_mut().reset();
+        self.cia_2.borrow_mut().reset();
         self.sid.borrow_mut().reset();
         self.vic.borrow_mut().reset();
         // I/O
@@ -376,15 +375,15 @@ impl C64 {
     }
 
     pub fn run_frame(&mut self) -> bool {
-        let cia1_clone = self.cia1.clone();
-        let cia2_clone = self.cia2.clone();
+        let cia_1_clone = self.cia_1.clone();
+        let cia_2_clone = self.cia_2.clone();
         let clock_clone = self.clock.clone();
         let datassette_clone = self.datassette.clone();
         let vic_clone = self.vic.clone();
         let tick_fn: TickFn = Box::new(move || {
             vic_clone.borrow_mut().clock();
-            cia1_clone.borrow_mut().clock();
-            cia2_clone.borrow_mut().clock();
+            cia_1_clone.borrow_mut().clock();
+            cia_2_clone.borrow_mut().clock();
             datassette_clone.borrow_mut().clock();
             clock_clone.tick();
         });
@@ -399,31 +398,31 @@ impl C64 {
         }
         if vsync {
             self.sid.borrow_mut().process_vsync();
-            self.cia1.borrow_mut().process_vsync();
-            self.cia2.borrow_mut().process_vsync();
+            self.cia_1.borrow_mut().process_vsync();
+            self.cia_2.borrow_mut().process_vsync();
             self.frames = self.frames.wrapping_add(1);
         }
         vsync
     }
 
     pub fn step(&mut self) {
-        let cia1_clone = self.cia1.clone();
-        let cia2_clone = self.cia2.clone();
+        let cia_1_clone = self.cia_1.clone();
+        let cia_2_clone = self.cia_2.clone();
         let clock_clone = self.clock.clone();
         let datassette_clone = self.datassette.clone();
         let vic_clone = self.vic.clone();
         let tick_fn: TickFn = Box::new(move || {
             vic_clone.borrow_mut().clock();
-            cia1_clone.borrow_mut().clock();
-            cia2_clone.borrow_mut().clock();
+            cia_1_clone.borrow_mut().clock();
+            cia_2_clone.borrow_mut().clock();
             datassette_clone.borrow_mut().clock();
             clock_clone.tick();
         });
         self.step_internal(&tick_fn);
         if self.frame_buffer.borrow().get_sync() {
             self.sid.borrow_mut().process_vsync();
-            self.cia1.borrow_mut().process_vsync();
-            self.cia2.borrow_mut().process_vsync();
+            self.cia_1.borrow_mut().process_vsync();
+            self.cia_2.borrow_mut().process_vsync();
             self.frames = self.frames.wrapping_add(1);
         }
     }
@@ -463,14 +462,14 @@ impl C64 {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ChipFactory;
+    use super::super::C64Factory;
     use super::*;
     use core::SystemModel;
 
     #[test]
     fn verify_mem_layout() {
         let config = Rc::new(Config::new(SystemModel::from("pal")));
-        let factory = Box::new(ChipFactory::new(config.clone()));
+        let factory = Box::new(C64Factory::new(config.clone()));
         let mut c64 = C64::new(config.clone(), factory).unwrap();
         c64.reset(false);
         let cpu = c64.get_cpu();

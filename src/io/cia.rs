@@ -21,10 +21,11 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Chip, CycleCounter, IoPort, IrqControl, IrqLine, Pin};
+use core::{Chip, IoPort, IrqControl, IrqLine, Pin};
 use log::LogLevel;
 
 use super::rtc::Rtc;
+use super::cycle_counter::CycleCounter;
 use super::timer;
 use super::timer::Timer;
 

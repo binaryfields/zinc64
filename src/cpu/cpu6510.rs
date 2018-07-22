@@ -68,7 +68,7 @@ impl Interrupt {
 
 pub struct Cpu6510 {
     // Dependencies
-    mem: Rc<RefCell<MemoryController>>,
+    mem: Rc<RefCell<dyn MemoryController>>,
     // Registers
     a: u8,
     x: u8,
@@ -79,17 +79,17 @@ pub struct Cpu6510 {
     // I/O
     ba_line: Rc<RefCell<Pin>>,
     io_port: Rc<RefCell<IoPort>>,
-    irq: Rc<RefCell<IrqLine>>,
-    nmi: Rc<RefCell<IrqLine>>,
+    irq_line: Rc<RefCell<IrqLine>>,
+    nmi_line: Rc<RefCell<IrqLine>>,
 }
 
 impl Cpu6510 {
     pub fn new(
         ba_line: Rc<RefCell<Pin>>,
         io_port: Rc<RefCell<IoPort>>,
-        irq: Rc<RefCell<IrqLine>>,
-        nmi: Rc<RefCell<IrqLine>>,
-        mem: Rc<RefCell<MemoryController>>,
+        irq_line: Rc<RefCell<IrqLine>>,
+        nmi_line: Rc<RefCell<IrqLine>>,
+        mem: Rc<RefCell<dyn MemoryController>>,
     ) -> Cpu6510 {
         Cpu6510 {
             mem,
@@ -101,8 +101,8 @@ impl Cpu6510 {
             sp: 0,
             ba_line,
             io_port,
-            irq,
-            nmi,
+            irq_line,
+            nmi_line,
         }
     }
 
@@ -525,7 +525,7 @@ impl Cpu6510 {
                 self.push((pc & 0xff) as u8, tick_fn);
                 self.push(p & 0xef, tick_fn);
                 self.set_flag(Flag::IntDisable, true);
-                self.nmi.borrow_mut().reset();
+                self.nmi_line.borrow_mut().reset();
             }
             Interrupt::Break => {
                 self.push((((pc + 1) >> 8) & 0xff) as u8, tick_fn);
@@ -654,8 +654,8 @@ impl Cpu for Cpu6510 {
         self.pc = 0;
         self.sp = 0;
         self.io_port.borrow_mut().set_value(0xff);
-        self.irq.borrow_mut().reset();
-        self.nmi.borrow_mut().reset();
+        self.irq_line.borrow_mut().reset();
+        self.nmi_line.borrow_mut().reset();
         let tick_fn: TickFn = Box::new(move || {});
         self.write(0x0000, 0b_0010_1111, &tick_fn);
         self.write(0x0001, 0b_0001_1111, &tick_fn);
@@ -666,9 +666,9 @@ impl Cpu for Cpu6510 {
         while self.ba_line.borrow().is_low() {
             tick_fn();
         }
-        if self.nmi.borrow().is_low() {
+        if self.nmi_line.borrow().is_low() {
             self.interrupt(Interrupt::Nmi, tick_fn);
-        } else if self.irq.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
+        } else if self.irq_line.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
             self.interrupt(Interrupt::Irq, tick_fn);
         }
         let pc = self.pc;

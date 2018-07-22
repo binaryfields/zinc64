@@ -13,13 +13,13 @@ use zinc64::core::{
     MemoryController,
     Pin,
     Ram,
-    CircularBuffer,
     TickFn,
     SystemModel,
 };
 use zinc64::cpu::Cpu6510;
 use zinc64::sound::Sid;
 use zinc64::sound::sid;
+use zinc64::system::CircularBuffer;
 
 struct SimpleMemory {
     mode: u8,

@@ -23,68 +23,68 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{Addressable, Chip, CircularBuffer, Clock, Cpu, FrameBuffer, IoPort, IrqLine,
-           MemoryController, Pin, Ram, Rom, SystemModel, VicModel};
+use core::{Addressable, Chip, Clock, Cpu, IoPort, IrqLine,
+           MemoryController, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
 
-pub trait Factory {
+pub trait ChipFactory {
     // -- Chipset
 
-    fn new_cia1(
+    fn new_cia_1(
         &self,
-        cia_flag: Rc<RefCell<Pin>>,
+        cia_flag_pin: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
         joystick_1: Rc<Cell<u8>>,
         joystick_2: Rc<Cell<u8>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
-    ) -> Rc<RefCell<Chip>>;
+    ) -> Rc<RefCell<dyn Chip>>;
 
-    fn new_cia2(
+    fn new_cia_2(
         &self,
-        cia_flag: Rc<RefCell<Pin>>,
+        cia_flag_pin: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
-    ) -> Rc<RefCell<Chip>>;
+    ) -> Rc<RefCell<dyn Chip>>;
 
     fn new_sid(
         &self,
         system_model: &SystemModel,
         clock: Rc<Clock>,
-        sound_buffer: Arc<Mutex<CircularBuffer>>,
-    ) -> Rc<RefCell<Chip>>;
+        sound_buffer: Arc<Mutex<dyn SoundOutput>>,
+    ) -> Rc<RefCell<dyn Chip>>;
 
     fn new_vic(
         &self,
         chip_model: VicModel,
         ba_line: Rc<RefCell<Pin>>,
-        charset: Rc<RefCell<Rom>>,
         cia_2_port_a: Rc<RefCell<IoPort>>,
         color_ram: Rc<RefCell<Ram>>,
-        cpu_irq: Rc<RefCell<IrqLine>>,
-        frame_buffer: Rc<RefCell<FrameBuffer>>,
+        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+        irq_line: Rc<RefCell<IrqLine>>,
         ram: Rc<RefCell<Ram>>,
-    ) -> Rc<RefCell<Chip>>;
+        rom_charset: Rc<RefCell<Rom>>,
+    ) -> Rc<RefCell<dyn Chip>>;
 
     // -- Memory
 
-    fn new_expansion_port(&self, exp_io_line: Rc<RefCell<IoPort>>) -> Rc<RefCell<Addressable>>;
+    fn new_expansion_port(&self, exp_io_line: Rc<RefCell<IoPort>>) -> Rc<RefCell<dyn Addressable>>;
 
     fn new_memory(
         &self,
-        cia1: Rc<RefCell<Chip>>,
-        cia2: Rc<RefCell<Chip>>,
+        cia_1: Rc<RefCell<dyn Chip>>,
+        cia_2: Rc<RefCell<dyn Chip>>,
         color_ram: Rc<RefCell<Ram>>,
-        expansion_port: Rc<RefCell<Addressable>>,
+        expansion_port: Rc<RefCell<dyn Addressable>>,
         ram: Rc<RefCell<Ram>>,
         rom_basic: Rc<RefCell<Rom>>,
         rom_charset: Rc<RefCell<Rom>>,
         rom_kernal: Rc<RefCell<Rom>>,
-        sid: Rc<RefCell<Chip>>,
-        vic: Rc<RefCell<Chip>>,
-    ) -> Rc<RefCell<MemoryController>>;
+        sid: Rc<RefCell<dyn Chip>>,
+        vic: Rc<RefCell<dyn Chip>>,
+    ) -> Rc<RefCell<dyn MemoryController>>;
 
     fn new_ram(&self, capacity: usize) -> Rc<RefCell<Ram>>;
 
@@ -96,8 +96,8 @@ pub trait Factory {
         &self,
         ba_line: Rc<RefCell<Pin>>,
         io_port: Rc<RefCell<IoPort>>,
-        irq: Rc<RefCell<IrqLine>>,
-        nmi: Rc<RefCell<IrqLine>>,
-        mem: Rc<RefCell<MemoryController>>,
-    ) -> Rc<RefCell<Cpu>>;
+        irq_line: Rc<RefCell<IrqLine>>,
+        nmi_line: Rc<RefCell<IrqLine>>,
+        mem: Rc<RefCell<dyn MemoryController>>,
+    ) -> Rc<RefCell<dyn Cpu>>;
 }

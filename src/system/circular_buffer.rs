@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use core::SoundOutput;
+
 pub struct CircularBuffer {
     buffer: Vec<i16>,
     capacity: usize,
@@ -77,6 +79,12 @@ impl CircularBuffer {
         self.count = 0;
         self.head = 0;
         self.tail = 0;
+    }
+}
+
+impl SoundOutput for CircularBuffer {
+    fn write(&mut self, value: i16) {
+        self.push(value);
     }
 }
 

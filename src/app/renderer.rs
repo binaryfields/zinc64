@@ -25,7 +25,7 @@ use sdl2::render;
 use sdl2::video;
 use sdl2::rect::Rect;
 use time;
-use zinc64::core::FrameBuffer;
+use zinc64::system::FrameBuffer;
 
 pub struct Renderer {
     canvas: render::WindowCanvas,

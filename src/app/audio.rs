@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
-use zinc64::core::CircularBuffer;
+use zinc64::system::CircularBuffer;
 
 // TODO app: audio warp handling
 

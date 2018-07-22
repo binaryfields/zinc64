@@ -18,6 +18,7 @@
  */
 
 use std::mem;
+use core::VideoOutput;
 
 const PIXEL_BYTES: usize = 4;
 
@@ -71,5 +72,15 @@ impl FrameBuffer {
     #[inline]
     fn index(&self, x: u16, y: u16) -> usize {
         y as usize * self.dim.0 + x as usize
+    }
+}
+
+impl VideoOutput for FrameBuffer {
+    fn set_sync(&mut self, value: bool) {
+        FrameBuffer::set_sync(self, value);
+    }
+
+    fn write(&mut self, x: u16, y: u16, color: u8) {
+        FrameBuffer::write(self, x, y, color);
     }
 }

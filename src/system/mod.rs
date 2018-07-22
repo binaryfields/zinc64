@@ -19,16 +19,20 @@
 
 pub mod autostart;
 mod breakpoint;
+mod circular_buffer;
 pub mod c64;
-mod chip_factory;
+mod c64_factory;
 mod condition;
 pub mod config;
+mod frame_buffer;
 mod palette;
 
 pub use self::autostart::{Autostart, AutostartMethod, Image};
 pub use self::breakpoint::Breakpoint;
+pub use self::circular_buffer::CircularBuffer;
 pub use self::c64::C64;
-pub use self::chip_factory::ChipFactory;
+pub use self::c64_factory::C64Factory;
 pub use self::condition::Condition;
 pub use self::config::Config;
+pub use self::frame_buffer::FrameBuffer;
 pub use self::palette::Palette;

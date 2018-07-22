@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Chip, FrameBuffer, IrqControl, IrqLine, Pin, Ram, VicModel};
+use core::{Chip, IrqControl, IrqLine, Pin, Ram, VicModel, VideoOutput};
 use log::LogLevel;
 
 use super::VicMemory;
@@ -77,7 +77,7 @@ pub struct Vic {
     spec: Spec,
     ba_line: Rc<RefCell<Pin>>,
     color_ram: Rc<RefCell<Ram>>,
-    frame_buffer: Rc<RefCell<FrameBuffer>>,
+    frame_buffer: Rc<RefCell<dyn VideoOutput>>,
     irq_line: Rc<RefCell<IrqLine>>,
     mem: Rc<RefCell<VicMemory>>,
     // Functional Units
@@ -117,7 +117,7 @@ impl Vic {
         ba_line: Rc<RefCell<Pin>>,
         color_ram: Rc<RefCell<Ram>>,
         irq_line: Rc<RefCell<IrqLine>>,
-        frame_buffer: Rc<RefCell<FrameBuffer>>,
+        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
         mem: Rc<RefCell<VicMemory>>,
     ) -> Vic {
         info!(target: "video", "Initializing VIC");
