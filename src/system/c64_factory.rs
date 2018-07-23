@@ -23,15 +23,17 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{Addressable, Chip, Clock, Cpu, ChipFactory, IoPort, IrqLine,
-           Mmu, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
+use core::{
+    Addressable, Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SoundOutput,
+    SystemModel, VicModel, VideoOutput,
+};
 use cpu::Cpu6510;
 use device::ExpansionPort;
-use io::Cia;
 use io::cia;
+use io::Cia;
 use mem::{Memory, Mmio};
-use sound::Sid;
 use sound::sid::SamplingMethod;
+use sound::Sid;
 use video::{Vic, VicMemory};
 
 use super::Config;

@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::mem;
 use core::VideoOutput;
+use std::mem;
 
 const PIXEL_BYTES: usize = 4;
 

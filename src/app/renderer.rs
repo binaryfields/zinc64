@@ -21,9 +21,9 @@ use std::result::Result;
 
 use sdl2;
 use sdl2::pixels;
+use sdl2::rect::Rect;
 use sdl2::render;
 use sdl2::video;
-use sdl2::rect::Rect;
 use time;
 use zinc64::system::FrameBuffer;
 
@@ -68,7 +68,8 @@ impl Renderer {
             viewport_offset.0 as i32,
             viewport_offset.1 as i32,
             viewport_size.0,
-            viewport_size.1);
+            viewport_size.1,
+        );
         let renderer = Renderer {
             canvas,
             creator,
@@ -89,10 +90,8 @@ impl Renderer {
             )
             .map_err(|_| "failed to update texture")?;
         self.canvas.clear();
-        self.canvas.copy(
-            &self.texture,
-            Some(self.viewport_rect.clone()),
-            None)?;
+        self.canvas
+            .copy(&self.texture, Some(self.viewport_rect.clone()), None)?;
         self.canvas.present();
         self.frame = self.frame.wrapping_add(1);
         self.last_frame_ts = time::precise_time_ns();

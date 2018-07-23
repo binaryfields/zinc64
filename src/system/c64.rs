@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
-use core::{Chip, Clock, Cpu, ChipFactory, IoPort, IrqLine, Pin, Ram, TickFn};
+use core::{Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Pin, Ram, TickFn};
 use device::joystick;
 use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 
@@ -282,7 +282,9 @@ impl C64 {
         self.frame_buffer.clone()
     }
 
-    pub fn get_frame_count(&self) -> u32 { self.frame_count }
+    pub fn get_frame_count(&self) -> u32 {
+        self.frame_count
+    }
 
     pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
         if let Some(ref joystick) = self.joystick_1 {

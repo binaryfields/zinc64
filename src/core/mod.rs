@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-mod clock;
 mod chip_factory;
+mod clock;
 mod io_port;
 mod irq_control;
 mod irq_line;
@@ -27,8 +27,8 @@ mod ram;
 mod rom;
 mod system_model;
 
-pub use self::clock::Clock;
 pub use self::chip_factory::ChipFactory;
+pub use self::clock::Clock;
 pub use self::io_port::IoPort;
 pub use self::irq_control::IrqControl;
 pub use self::irq_line::IrqLine;

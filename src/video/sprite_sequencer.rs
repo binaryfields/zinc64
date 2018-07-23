@@ -126,16 +126,12 @@ impl SpriteSequencer {
                             if self.config.expand_x {
                                 self.delay_cycles = 0b0001;
                             }
-                        },
+                        }
                         Mode::Multicolor => {
                             self.output = self.output_mc_pixel();
                             self.counter = self.counter << 2;
                             self.data = self.data << 2;
-                            self.delay_cycles = if self.config.expand_x {
-                                0b0111
-                            } else {
-                                0b0001
-                            }
+                            self.delay_cycles = if self.config.expand_x { 0b0111 } else { 0b0001 }
                         }
                     }
                 } else {

@@ -23,8 +23,10 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{Addressable, Chip, Clock, Cpu, IoPort, IrqLine,
-           Mmu, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
+use core::{
+    Addressable, Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SoundOutput, SystemModel,
+    VicModel, VideoOutput,
+};
 
 pub trait ChipFactory {
     // -- Chipset

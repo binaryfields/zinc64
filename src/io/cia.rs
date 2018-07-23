@@ -24,8 +24,8 @@ use bit_field::BitField;
 use core::{Chip, IoPort, IrqControl, IrqLine, Pin};
 use log::LogLevel;
 
-use super::rtc::Rtc;
 use super::cycle_counter::CycleCounter;
+use super::rtc::Rtc;
 use super::timer;
 use super::timer::Timer;
 

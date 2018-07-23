@@ -24,12 +24,12 @@ use bit_field::BitField;
 use core::{Chip, IrqControl, IrqLine, Pin, Ram, VicModel, VideoOutput};
 use log::LogLevel;
 
-use super::VicMemory;
 use super::border_unit::BorderUnit;
 use super::gfx_sequencer::{GfxSequencer, Mode};
 use super::mux_unit::MuxUnit;
 use super::spec::Spec;
-use super::sprite_sequencer::{SpriteSequencer, Mode as SpriteMode};
+use super::sprite_sequencer::{Mode as SpriteMode, SpriteSequencer};
+use super::VicMemory;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 
@@ -181,14 +181,14 @@ impl Vic {
                     0x194...0x1ff => x - 0x194,
                     _ => panic!("invalid sprite coords {}", x),
                 }
-            },
+            }
             0x19c => {
                 match x {
                     0x000...0x19b => x + 0x64, // 0x1ff - 0x19b
                     0x19c...0x1ff => x - 0x19c,
                     _ => panic!("invalid sprite coords {}", x),
                 }
-            },
+            }
             _ => panic!("invalid sprite coords {}", x),
         }
     }
@@ -219,7 +219,9 @@ impl Vic {
                 self.trigger_irq(2);
             }
             let pixel = self.mux_unit.output();
-            self.frame_buffer.borrow_mut().write(x, self.raster_y, pixel);
+            self.frame_buffer
+                .borrow_mut()
+                .write(x, self.raster_y, pixel);
         }
     }
 
@@ -227,7 +229,8 @@ impl Vic {
         let x_start = (self.raster_cycle << 3) - 12;
         let x_scroll_start = x_start + self.x_scroll as u16;
         for x in x_start..x_start + 8 {
-            self.border_unit.update_main_flop(x, self.raster_y, self.den);
+            self.border_unit
+                .update_main_flop(x, self.raster_y, self.den);
             for sprite in self.sprites.iter_mut() {
                 sprite.clock(x);
             }
@@ -250,14 +253,17 @@ impl Vic {
                 self.trigger_irq(2);
             }
             let pixel = self.mux_unit.output();
-            self.frame_buffer.borrow_mut().write(x, self.raster_y, pixel);
+            self.frame_buffer
+                .borrow_mut()
+                .write(x, self.raster_y, pixel);
         }
     }
 
     fn draw_border(&mut self) {
         let x_start = (self.raster_cycle << 3) - 12;
         for x in x_start..x_start + 8 {
-            self.border_unit.update_main_flop(x, self.raster_y, self.den);
+            self.border_unit
+                .update_main_flop(x, self.raster_y, self.den);
             for sprite in self.sprites.iter_mut() {
                 sprite.clock(x);
             }
@@ -272,7 +278,9 @@ impl Vic {
                 self.trigger_irq(2);
             }
             let pixel = self.mux_unit.output();
-            self.frame_buffer.borrow_mut().write(x, self.raster_y, pixel);
+            self.frame_buffer
+                .borrow_mut()
+                .write(x, self.raster_y, pixel);
         }
     }
 
@@ -433,12 +441,14 @@ impl Vic {
         if self.display_state {
             let g_data = match self.gfx_seq.config.mode {
                 Mode::Text | Mode::McText => {
-                    let address =
-                        self.char_base | ((self.vm_data_line[self.vmli] as u16) << 3) | self.rc as u16;
+                    let address = self.char_base
+                        | ((self.vm_data_line[self.vmli] as u16) << 3)
+                        | self.rc as u16;
                     self.mem.borrow().read(address)
                 }
                 Mode::EcmText => {
-                    let address = self.char_base | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3)
+                    let address = self.char_base
+                        | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3)
                         | self.rc as u16;
                     self.mem.borrow().read(address)
                 }
@@ -447,7 +457,10 @@ impl Vic {
                     self.mem.borrow().read(address)
                 }
                 Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-                _ => panic!("unsupported graphics mode {}", self.gfx_seq.config.mode.value()),
+                _ => panic!(
+                    "unsupported graphics mode {}",
+                    self.gfx_seq.config.mode.value()
+                ),
             };
             let c_data = self.vm_data_line[self.vmli];
             let c_color = self.vm_color_line[self.vmli];
@@ -753,10 +766,11 @@ impl Chip for Vic {
                     self.s_access(2, 1);
                     self.s_access(2, 2);
                 }
-                self.border_unit.update_vertical_flop(self.raster_y, self.den);
+                self.border_unit
+                    .update_vertical_flop(self.raster_y, self.den);
             }
-            64 => {},
-            65 => {},
+            64 => {}
+            65 => {}
             _ => panic!("invalid cycle"),
         }
         self.update_display_state();
@@ -933,13 +947,13 @@ impl Chip for Vic {
                 let result = self.mux_unit.mm_collision;
                 self.mux_unit.mm_collision = 0;
                 result
-            },
+            }
             // Reg::MD
             0x1f => {
                 let result = self.mux_unit.mb_collision;
                 self.mux_unit.mb_collision = 0;
                 result
-            },
+            }
             // Reg::EC
             0x20 => self.border_unit.config.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
@@ -965,7 +979,8 @@ impl Chip for Vic {
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
                 let n = (reg >> 1) as usize;
                 self.sprites[n].config.x = (self.sprites[n].config.x & 0xff00) | (value as u16);
-                self.sprites[n].config.x_screen = self.map_sprite_to_screen(self.sprites[n].config.x);
+                self.sprites[n].config.x_screen =
+                    self.map_sprite_to_screen(self.sprites[n].config.x);
             }
             // Reg::M0Y - Reg::M7Y
             0x01 | 0x03 | 0x05 | 0x07 | 0x09 | 0x0b | 0x0d | 0x0f => {
@@ -975,7 +990,8 @@ impl Chip for Vic {
             // Reg::MX8
             0x10 => for i in 0..8 as usize {
                 self.sprites[i].config.x.set_bit(8, value.get_bit(i));
-                self.sprites[i].config.x_screen = self.map_sprite_to_screen(self.sprites[i].config.x);
+                self.sprites[i].config.x_screen =
+                    self.map_sprite_to_screen(self.sprites[i].config.x);
             },
             // Reg::CR1
             0x11 => {
@@ -1002,9 +1018,9 @@ impl Chip for Vic {
                 self.raster_compare = new_value;
             }
             // Reg::LPX
-            0x13 => {},
+            0x13 => {}
             // Reg::LPY
-            0x14 => {},
+            0x14 => {}
             // Reg::ME
             0x15 => for i in 0..8 as usize {
                 self.sprites[i].config.enabled = value.get_bit(i);
@@ -1042,14 +1058,14 @@ impl Chip for Vic {
             // Reg::IMR
             0x1a => {
                 self.interrupt_control.set_mask(value & 0x0f);
-                self.irq_line
-                    .borrow_mut()
-                    .set_low(IrqSource::Vic.value(), self.interrupt_control.is_triggered());
+                self.irq_line.borrow_mut().set_low(
+                    IrqSource::Vic.value(),
+                    self.interrupt_control.is_triggered(),
+                );
             }
             // Reg::MDP
             0x1b => for i in 0..8 as usize {
                 self.mux_unit.data_priority[i] = value.get_bit(i);
-
             },
             // Reg::MMC
             0x1c => for i in 0..8 as usize {
@@ -1064,9 +1080,9 @@ impl Chip for Vic {
                 self.sprites[i].config.expand_x = value.get_bit(i);
             },
             // Reg::MM
-            0x1e => {},
+            0x1e => {}
             // Reg::MD
-            0x1f => {},
+            0x1f => {}
             // Reg::EC
             0x20 => self.border_unit.config.border_color = value & 0x0f,
             // Reg::B0C - Reg::B3C

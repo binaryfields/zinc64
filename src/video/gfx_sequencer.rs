@@ -114,12 +114,12 @@ impl GfxSequencer {
                 Mode::McText => {
                     self.mc_cycle = self.c_color.get_bit(3);
                     self.output_text_mc()
-                },
+                }
                 Mode::Bitmap => self.output_bitmap(),
                 Mode::McBitmap => {
                     self.mc_cycle = true;
                     self.output_bitmap_mc()
-                },
+                }
                 Mode::EcmText => self.output_text_ecm(),
                 Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => (0, false),
                 _ => panic!("unsupported graphics mode {}", self.config.mode.value()),

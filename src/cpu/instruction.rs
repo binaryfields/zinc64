@@ -21,8 +21,8 @@ use std::fmt;
 
 use core::{Cpu, TickFn};
 
-use super::Cpu6510;
 use super::operand::Operand;
+use super::Cpu6510;
 
 // Spec: MCS6510 MICROPROCESSOR INSTRUCTION SET p.232
 // Design:

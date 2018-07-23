@@ -19,11 +19,11 @@
 
 use std::path::Path;
 
-use loader::Loader;
 use loader::crt;
 use loader::p00;
 use loader::prg;
 use loader::tap;
+use loader::Loader;
 
 pub struct Loaders;
 
