@@ -67,12 +67,10 @@ impl Pulse {
         }
     }
 
-    #[inline]
     pub fn is_done(&self) -> bool {
         self.remaining_cycles == 0
     }
 
-    #[inline]
     pub fn advance(&mut self) -> bool {
         self.remaining_cycles -= 1;
         if self.low_cycles == 0 {

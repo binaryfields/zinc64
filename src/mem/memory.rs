@@ -84,7 +84,6 @@ impl Memory {
 }
 
 impl Mmu for Memory {
-    #[inline]
     fn switch_banks(&mut self, mode: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "mem::banks", "Switching to {}", mode);
@@ -94,7 +93,6 @@ impl Mmu for Memory {
 
     // I/O
 
-    #[inline]
     fn read(&self, address: u16) -> u8 {
         let zone = address >> 12;
         match self.configuration.get(zone as u8) {
@@ -111,7 +109,6 @@ impl Mmu for Memory {
         }
     }
 
-    #[inline]
     fn write(&mut self, address: u16, value: u8) {
         let zone = address >> 12;
         match self.configuration.get(zone as u8) {

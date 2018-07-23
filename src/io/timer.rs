@@ -256,7 +256,6 @@ impl Timer {
         underflow
     }
 
-    #[inline]
     pub fn feed_source(&mut self, timer_a_output: bool) {
         match self.input_mode {
             InputMode::SystemClock => {

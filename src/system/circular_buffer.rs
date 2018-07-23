@@ -42,7 +42,6 @@ impl CircularBuffer {
         self.count
     }
 
-    #[inline]
     pub fn pop(&mut self) -> i16 {
         if self.count == 0 {
             0
@@ -57,7 +56,6 @@ impl CircularBuffer {
         }
     }
 
-    #[inline]
     pub fn push(&mut self, value: i16) -> bool {
         if self.count == self.capacity {
             false

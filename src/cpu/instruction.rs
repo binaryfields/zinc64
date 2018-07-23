@@ -101,7 +101,6 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    #[inline]
     pub fn decode(cpu: &mut Cpu6510, opcode: u8, tick_fn: &TickFn) -> Instruction {
         match opcode {
             // BRK

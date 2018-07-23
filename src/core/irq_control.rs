@@ -29,56 +29,46 @@ impl IrqControl {
         Self { data: 0, mask: 0 }
     }
 
-    #[inline]
     pub fn clear(&mut self) {
         self.data = 0;
     }
 
-    #[inline]
     pub fn clear_events(&mut self, events: u8) {
         self.data = self.data & (!events);
     }
 
-    #[inline]
     pub fn get_data(&self) -> u8 {
         let mut data = self.data;
         data.set_bit(7, self.is_triggered());
         data
     }
 
-    #[inline]
     pub fn get_mask(&self) -> u8 {
         self.mask
     }
 
     #[allow(dead_code)]
-    #[inline]
     pub fn get_raw_data(&self) -> u8 {
         self.data
     }
 
-    #[inline]
     pub fn is_triggered(&self) -> bool {
         (self.mask & self.data) != 0
     }
 
-    #[inline]
     pub fn reset(&mut self) {
         self.data = 0;
         self.mask = 0;
     }
 
-    #[inline]
     pub fn set_event(&mut self, bit: usize) {
         self.data.set_bit(bit, true);
     }
 
-    #[inline]
     pub fn set_mask(&mut self, mask: u8) {
         self.mask = mask;
     }
 
-    #[inline]
     pub fn update_mask(&mut self, mask: u8) {
         /*
         The MASK register provides convenient control of

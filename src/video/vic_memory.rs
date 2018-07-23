@@ -41,7 +41,6 @@ impl VicMemory {
         }
     }
 
-    #[inline]
     pub fn read(&self, address: u16) -> u8 {
         let cia2_port_a = self.cia_2_port_a.borrow().get_value();
         let full_address = ((!cia2_port_a & 0x03) as u16) << 14 | address;
@@ -53,7 +52,6 @@ impl VicMemory {
         }
     }
 
-    #[inline]
     pub fn write(&mut self, _address: u16, _value: u8) {
         panic!("writes by vic are not supported")
     }

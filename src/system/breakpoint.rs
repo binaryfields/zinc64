@@ -46,7 +46,6 @@ impl BreakpointManager {
         }
     }
 
-    #[inline]
     pub fn check(&mut self, cpu: &RefCell<Cpu>) -> Option<usize> {
         if self.breakpoints.is_empty() {
             None

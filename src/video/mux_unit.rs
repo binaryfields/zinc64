@@ -48,7 +48,6 @@ impl MuxUnit {
         }
     }
 
-    #[inline]
     pub fn compute_collisions(&mut self, sprite_output: &[Option<u8>; 8]) {
         let fg_graphics = self.output_priority == PRIO_FG_GRAPHICS;
         let mut mb_collision = self.mb_collision;
@@ -71,12 +70,10 @@ impl MuxUnit {
         }
     }
 
-    #[inline]
     pub fn feed_border(&mut self, border_output: u8) {
         self.output_pixel(border_output, PRIO_SCREEN_BORDER);
     }
 
-    #[inline]
     pub fn feed_graphics(&mut self, gfx_output: (u8, bool)) {
         if gfx_output.1 {
             self.output_pixel(gfx_output.0, PRIO_FG_GRAPHICS);
@@ -85,7 +82,6 @@ impl MuxUnit {
         }
     }
 
-    #[inline]
     pub fn feed_sprites(&mut self, sprite_output: &[Option<u8>; 8]) {
         for i in 0..8 {
             if let Some(output) = sprite_output[i] {
@@ -98,7 +94,6 @@ impl MuxUnit {
         }
     }
 
-    #[inline]
     pub fn output(&self) -> u8 {
         self.output
     }
@@ -113,13 +108,11 @@ impl MuxUnit {
         self.output_priority = 0;
     }
 
-    #[inline]
     fn output_pixel(&mut self, pixel: u8, priority: u8) {
         self.output = pixel;
         self.output_priority = priority;
     }
 
-    #[inline]
     fn output_sprite_pixel(&mut self, pixel: u8, priority: u8) {
         if priority < self.output_priority {
             self.output = pixel;

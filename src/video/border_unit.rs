@@ -58,7 +58,6 @@ impl BorderUnit {
         }
     }
 
-    #[inline]
     fn map_sprite_to_screen(&self, x: u16) -> u16 {
         match self.spec.first_x_coord {
             0x194 => {
@@ -79,12 +78,10 @@ impl BorderUnit {
         }
     }
 
-    #[inline]
     pub fn is_enabled(&self) -> bool {
         self.main_flop || self.vertical_flop
     }
 
-    #[inline]
     pub fn output(&self) -> u8 {
         self.config.border_color
     }
@@ -107,7 +104,6 @@ impl BorderUnit {
      Bottom | 247 ($f7) | 251 ($fb)
     */
 
-    #[inline]
     pub fn update_main_flop(&mut self, x: u16, y: u16, den: bool) {
         /*
         Section: 3.9. The border unit
@@ -142,7 +138,6 @@ impl BorderUnit {
         }
     }
 
-    #[inline]
     pub fn update_vertical_flop(&mut self, y: u16, den: bool) {
         /*
         Section: 3.9. The border unit

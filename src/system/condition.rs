@@ -101,7 +101,6 @@ impl Condition {
         parser.parse(expr)
     }
 
-    #[inline]
     pub fn eval(&self, cpu: &RefCell<Cpu>) -> bool {
         match self.op {
             Operator::Equal => self.eval_reg(&self.reg, cpu) == self.eval_val(&self.val, cpu),
@@ -115,7 +114,6 @@ impl Condition {
         }
     }
 
-    #[inline]
     fn eval_reg(&self, reg: &Reg, cpu: &RefCell<Cpu>) -> u16 {
         match reg {
             &Reg::A => cpu.borrow().get_a() as u16,
@@ -127,7 +125,6 @@ impl Condition {
         }
     }
 
-    #[inline]
     fn eval_val(&self, val: &Value, cpu: &RefCell<Cpu>) -> u16 {
         match val {
             &Value::Constant(value) => value,

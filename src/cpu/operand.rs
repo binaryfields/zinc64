@@ -101,7 +101,6 @@ impl Operand {
         }
     }
 
-    #[inline]
     pub fn get(&self, cpu: &Cpu6510, tick_fn: &TickFn) -> u8 {
         match *self {
             Operand::Accumulator => cpu.get_a(),
@@ -115,7 +114,6 @@ impl Operand {
         }
     }
 
-    #[inline]
     pub fn set(&self, cpu: &mut Cpu6510, value: u8, rmw: bool, tick_fn: &TickFn) {
         match *self {
             Operand::Accumulator => cpu.set_a(value),

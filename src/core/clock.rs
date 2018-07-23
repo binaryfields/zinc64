@@ -30,12 +30,10 @@ impl Clock {
         }
     }
 
-    #[inline]
     pub fn elapsed(&self, prev: u64) -> u64 {
         self.counter.get() - prev
     }
 
-    #[inline]
     pub fn get(&self) -> u64 {
         self.counter.get()
     }
@@ -44,13 +42,11 @@ impl Clock {
         self.counter.set(0);
     }
 
-    #[inline]
     pub fn tick(&self) {
         let result = self.counter.get().wrapping_add(1);
         self.counter.set(result);
     }
 
-    #[inline]
     pub fn tick_delta(&self, delta: u64) {
         let result = self.counter.get().wrapping_add(delta);
         self.counter.set(result);

@@ -47,7 +47,6 @@ impl FrameBuffer {
         unsafe { mem::transmute::<&[u32], &[u8]>(self.pixels.as_ref()) }
     }
 
-    #[inline]
     pub fn get_sync(&self) -> bool {
         self.sync
     }
@@ -63,13 +62,11 @@ impl FrameBuffer {
         self.sync = false;
     }
 
-    #[inline]
     pub fn write(&mut self, x: u16, y: u16, color: u8) {
         let index = self.index(x, y);
         self.pixels[index] = self.palette[color as usize];
     }
 
-    #[inline]
     fn index(&self, x: u16, y: u16) -> usize {
         y as usize * self.dim.0 + x as usize
     }

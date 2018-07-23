@@ -43,12 +43,10 @@ impl Ram {
         }
     }
 
-    #[inline]
     pub fn read(&self, address: u16) -> u8 {
         self.data[address as usize]
     }
 
-    #[inline]
     pub fn write(&mut self, address: u16, value: u8) {
         self.data[address as usize] = value
     }

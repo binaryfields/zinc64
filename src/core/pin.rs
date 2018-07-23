@@ -43,27 +43,22 @@ impl Pin {
         }
     }
 
-    #[inline]
     pub fn is_falling(&self) -> bool {
         self.last == State::High && self.state == State::Low
     }
 
-    #[inline]
     pub fn is_high(&self) -> bool {
         self.state == State::High
     }
 
-    #[inline]
     pub fn is_low(&self) -> bool {
         self.state == State::Low
     }
 
-    #[inline]
     pub fn is_rising(&self) -> bool {
         self.last == State::Low && self.state == State::High
     }
 
-    #[inline]
     pub fn set_active(&mut self, active: bool) {
         if active {
             self.set(State::High);
@@ -72,7 +67,6 @@ impl Pin {
         }
     }
 
-    #[inline]
     fn set(&mut self, state: State) {
         self.last = self.state;
         self.state = state;

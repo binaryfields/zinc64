@@ -107,7 +107,6 @@ impl GfxSequencer {
         self.g_data = g_data;
     }
 
-    #[inline]
     pub fn clock(&mut self) {
         if !self.mc_cycle {
             self.output = match self.config.mode {
@@ -135,12 +134,10 @@ impl GfxSequencer {
         }
     }
 
-    #[inline]
     pub fn load_data(&mut self) {
         self.data = self.g_data;
     }
 
-    #[inline]
     pub fn output(&self) -> (u8, bool) {
         self.output
     }
@@ -166,7 +163,6 @@ impl GfxSequencer {
      +---------------------------------------+
     */
 
-    #[inline]
     fn output_bitmap(&self) -> (u8, bool) {
         if self.data.get_bit(7) {
             (self.c_data >> 4, true)
@@ -188,7 +184,6 @@ impl GfxSequencer {
      +---------------------------------------+
     */
 
-    #[inline]
     fn output_bitmap_mc(&self) -> (u8, bool) {
         match self.data >> 6 {
             0 => (self.config.bg_color[0], false),
@@ -210,7 +205,6 @@ impl GfxSequencer {
      +---------------------------------------+
     */
 
-    #[inline]
     fn output_text(&self) -> (u8, bool) {
         if self.data.get_bit(7) {
             (self.c_color, true)
@@ -234,7 +228,6 @@ impl GfxSequencer {
      +---------------------------------------+
     */
 
-    #[inline]
     fn output_text_ecm(&self) -> (u8, bool) {
         if self.data.get_bit(7) {
             (self.c_color, true)
@@ -261,7 +254,6 @@ impl GfxSequencer {
      +---------------------------------------+
     */
 
-    #[inline]
     fn output_text_mc(&self) -> (u8, bool) {
         if self.c_color.get_bit(3) {
             match self.data >> 6 {

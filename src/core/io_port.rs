@@ -40,46 +40,38 @@ impl IoPort {
         }
     }
 
-    #[inline]
     pub fn get_direction(&self) -> u8 {
         self.direction
     }
 
-    #[inline]
     pub fn get_value(&self) -> u8 {
         (self.output & self.direction) | (self.input & !self.direction)
     }
 
-    #[inline]
     pub fn set_direction(&mut self, direction: u8) {
         self.direction = direction;
         self.notify_observer();
     }
 
-    #[inline]
     pub fn set_input(&mut self, value: u8) {
         self.input = value;
         self.notify_observer();
     }
 
-    #[inline]
     pub fn set_input_bit(&mut self, bit: usize, value: bool) {
         self.input.set_bit(bit, value);
         self.notify_observer();
     }
 
-    #[inline]
     pub fn set_observer(&mut self, observer: Observer) {
         self.observer = Some(observer);
     }
 
-    #[inline]
     pub fn set_value(&mut self, value: u8) {
         self.output = value;
         self.notify_observer();
     }
 
-    #[inline]
     pub fn reset(&mut self) {
         self.direction = 0x00;
         self.input = 0xff;
@@ -87,7 +79,6 @@ impl IoPort {
         self.notify_observer();
     }
 
-    #[inline]
     fn notify_observer(&self) {
         if let Some(ref observer) = self.observer {
             observer(self.get_value());

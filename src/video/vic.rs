@@ -173,7 +173,6 @@ impl Vic {
         vic
     }
 
-    #[inline]
     fn map_sprite_to_screen(&self, x: u16) -> u16 {
         match self.spec.first_x_coord {
             0x194 => {
@@ -194,7 +193,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn draw(&mut self) {
         let x_start = (self.raster_cycle << 3) - 12;
         let x_scroll_start = x_start + self.x_scroll as u16;
@@ -225,7 +223,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn draw_cycle_17_56(&mut self) {
         let x_start = (self.raster_cycle << 3) - 12;
         let x_scroll_start = x_start + self.x_scroll as u16;
@@ -257,7 +254,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn draw_border(&mut self) {
         let x_start = (self.raster_cycle << 3) - 12;
         for x in x_start..x_start + 8 {
@@ -280,7 +276,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn output_sprites(&self) -> [Option<u8>; 8] {
         [
             self.sprites[0].output(),
@@ -294,12 +289,10 @@ impl Vic {
         ]
     }
 
-    #[inline]
     fn set_ba(&mut self, is_bad_line: bool) {
         self.ba_line.borrow_mut().set_active(!is_bad_line);
     }
 
-    #[inline]
     fn trigger_irq(&mut self, source: usize) {
         self.interrupt_control.set_event(source);
         if self.interrupt_control.is_triggered() {
@@ -316,7 +309,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn update_bad_line(&mut self) {
         /*
         Section: 3.5. Bad Lines
@@ -336,7 +328,6 @@ impl Vic {
         };
     }
 
-    #[inline]
     fn update_display_on(&mut self) {
         /*
         Section: 3.10. Display Enable
@@ -348,14 +339,12 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn update_display_state(&mut self) {
         if self.is_bad_line {
             self.display_state = true;
         }
     }
 
-    #[inline]
     fn update_sprite_display(&mut self) {
         /*
         Section: 3.8. Sprites
@@ -372,7 +361,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn update_sprite_dma_on(&mut self) {
         /*
         Section: 3.8. Sprites
@@ -397,7 +385,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn update_sprite_dma_off(&mut self) {
         /*
         Section: 3.8. Sprites
@@ -418,7 +405,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn update_sprite_expansion_ff(&mut self) {
         /*
         Section: 3.8. Sprites
@@ -434,7 +420,6 @@ impl Vic {
 
     // -- Memory Ops
 
-    #[inline]
     fn c_access(&mut self) {
         if self.is_bad_line {
             let address = self.video_matrix | self.vc;
@@ -444,7 +429,6 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn g_access(&mut self) {
         if self.display_state {
             let g_data = match self.gfx_seq.config.mode {
@@ -480,13 +464,11 @@ impl Vic {
         }
     }
 
-    #[inline]
     fn p_access(&mut self, n: usize) {
         let address = self.video_matrix | 0x03f8 | n as u16;
         self.sprite_ptrs[n] = (self.mem.borrow().read(address) as u16) << 6;
     }
 
-    #[inline]
     fn s_access(&mut self, n: usize, byte: usize) {
         /*
         Section: 3.8. Sprites

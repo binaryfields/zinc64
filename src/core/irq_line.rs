@@ -30,17 +30,14 @@ impl IrqLine {
         Self { kind, signal: 0 }
     }
 
-    #[inline]
     pub fn is_low(&self) -> bool {
         self.signal != 0
     }
 
-    #[inline]
     pub fn reset(&mut self) {
         self.signal = 0;
     }
 
-    #[inline]
     pub fn set_low(&mut self, source: usize, value: bool) {
         if log_enabled!(LogLevel::Trace) {
             trace!(

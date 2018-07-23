@@ -106,7 +106,6 @@ impl Cpu6510 {
         }
     }
 
-    #[inline]
     fn set_flag(&mut self, flag: Flag, value: bool) {
         if value {
             self.p |= flag as u8;
@@ -115,7 +114,6 @@ impl Cpu6510 {
         }
     }
 
-    #[inline]
     fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) {
         match *instr {
             //  Data Movement
@@ -493,14 +491,12 @@ impl Cpu6510 {
         };
     }
 
-    #[inline]
     pub fn fetch_byte(&mut self, tick_fn: &TickFn) -> u8 {
         let byte = self.read(self.pc, tick_fn);
         self.pc = self.pc.wrapping_add(1);
         byte
     }
 
-    #[inline]
     pub fn fetch_word(&mut self, tick_fn: &TickFn) -> u16 {
         let word = self.read_word(self.pc, tick_fn);
         self.pc = self.pc.wrapping_add(2);
@@ -540,26 +536,22 @@ impl Cpu6510 {
         7
     }
 
-    #[inline]
     fn pop(&mut self, tick_fn: &TickFn) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         let addr = 0x0100 + self.sp as u16;
         self.read(addr, tick_fn)
     }
 
-    #[inline]
     fn push(&mut self, value: u8, tick_fn: &TickFn) {
         let addr = 0x0100 + self.sp as u16;
         self.sp = self.sp.wrapping_sub(1);
         self.write(addr, value, tick_fn);
     }
 
-    #[inline]
     fn test_flag(&self, flag: Flag) -> bool {
         (self.p & (flag as u8)) != 0
     }
 
-    #[inline]
     fn update_nz(&mut self, value: u8) {
         self.set_flag(Flag::Negative, value & 0x80 != 0);
         self.set_flag(Flag::Zero, value == 0);
@@ -567,7 +559,6 @@ impl Cpu6510 {
 
     // -- Memory Ops
 
-    #[inline]
     pub fn read(&self, address: u16, tick_fn: &TickFn) -> u8 {
         let value = match address {
             0x0000 => self.io_port.borrow().get_direction(),
@@ -578,14 +569,12 @@ impl Cpu6510 {
         value
     }
 
-    #[inline]
     pub fn read_word(&self, address: u16, tick_fn: &TickFn) -> u16 {
         let low = self.read(address, tick_fn);
         let high = self.read(address + 1, tick_fn);
         ((high as u16) << 8) | low as u16
     }
 
-    #[inline]
     pub fn write(&mut self, address: u16, value: u8, tick_fn: &TickFn) {
         match address {
             0x0000 => self.io_port.borrow_mut().set_direction(value),

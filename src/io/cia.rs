@@ -45,7 +45,6 @@ pub enum Mode {
 }
 
 impl Mode {
-    #[inline]
     pub fn irq_source(&self) -> usize {
         *self as usize
     }
@@ -72,7 +71,6 @@ pub enum Reg {
 }
 
 impl Reg {
-    #[inline]
     pub fn from(reg: u8) -> Reg {
         match reg {
             0x00 => Reg::PRA,
@@ -96,7 +94,6 @@ impl Reg {
     }
 
     #[allow(dead_code)]
-    #[inline]
     pub fn addr(&self) -> u8 {
         *self as u8
     }
@@ -445,12 +442,10 @@ s                */
     }
 }
 
-#[inline]
 fn from_bcd(decimal: u8) -> u8 {
     (decimal >> 4) * 10 + (decimal & 0x0f)
 }
 
-#[inline]
 fn to_bcd(num: u8) -> u8 {
     ((num / 10) << 4) | (num % 10)
 }

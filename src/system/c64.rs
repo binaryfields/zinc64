@@ -330,7 +330,6 @@ impl C64 {
         self.autostart = autostart;
     }
 
-    #[inline]
     pub fn check_breakpoints(&mut self) -> bool {
         // FIXME self.breakpoints.check(&self.cpu).is_some()
         false
@@ -434,7 +433,6 @@ impl C64 {
         }
     }
 
-    #[inline]
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.get_pc();
         self.cpu.step(&tick_fn);
