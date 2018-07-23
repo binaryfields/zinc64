@@ -128,8 +128,7 @@ impl Cartridge {
 
     // -- Device I/O
 
-    #[allow(unused_variables)]
-    fn read_io(&self, address: u16) -> u8 {
+    fn read_io(&self, _address: u16) -> u8 {
         0
     }
 

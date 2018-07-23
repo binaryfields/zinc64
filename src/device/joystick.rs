@@ -72,8 +72,8 @@ pub struct Joystick {
 }
 
 impl Joystick {
-    pub fn new(mode: Mode, threshold: i16, state: Rc<Cell<u8>>) -> Joystick {
-        Joystick {
+    pub fn new(mode: Mode, threshold: i16, state: Rc<Cell<u8>>) -> Self {
+        Self {
             mode,
             threshold,
             state,

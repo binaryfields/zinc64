@@ -74,7 +74,7 @@ pub trait Cpu {
     fn write_debug(&mut self, address: u16, value: u8);
 }
 
-pub trait MemoryController {
+pub trait Mmu {
     fn switch_banks(&mut self, mode: u8);
     // I/O
     fn read(&self, address: u16) -> u8;

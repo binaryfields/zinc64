@@ -31,9 +31,13 @@ impl ConsoleApp {
     pub fn run(&mut self) {
         loop {
             self.c64.run_frame();
+            {
+                let rt = self.c64.get_frame_buffer();
+                rt.borrow_mut().set_sync(false);
+            }
             if self.c64.is_cpu_jam() {
                 let cpu = self.c64.get_cpu();
-                warn!(target: "main", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
+                warn!(target: "main", "CPU JAM detected at 0x{:x}", cpu.get_pc());
                 break;
             }
         }

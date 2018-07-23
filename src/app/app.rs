@@ -223,16 +223,15 @@ impl App {
 
     #[allow(dead_code)]
     fn handle_cpu_jam(&mut self) -> bool {
-        let cpu = self.execution_engine.get_c64().get_cpu();
         match self.options.jam_action {
             JamAction::Continue => true,
             JamAction::Quit => {
-                warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
+                warn!(target: "ui", "CPU JAM detected at 0x{:x}", self.execution_engine.get_c64().get_cpu().get_pc());
                 self.set_state(State::Stopped);
                 false
             }
             JamAction::Reset => {
-                warn!(target: "ui", "CPU JAM detected at 0x{:x}", cpu.borrow().get_pc());
+                warn!(target: "ui", "CPU JAM detected at 0x{:x}", self.execution_engine.get_c64().get_cpu().get_pc());
                 self.reset();
                 false
             }

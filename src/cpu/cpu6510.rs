@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use core::{Cpu, IoPort, IrqLine, MemoryController, Pin, TickFn};
+use core::{Cpu, IoPort, IrqLine, Mmu, Pin, TickFn};
 use log::LogLevel;
 
 use super::instruction::Instruction;
@@ -68,7 +68,7 @@ impl Interrupt {
 
 pub struct Cpu6510 {
     // Dependencies
-    mem: Rc<RefCell<dyn MemoryController>>,
+    mem: Rc<RefCell<dyn Mmu>>,
     // Registers
     a: u8,
     x: u8,
@@ -89,9 +89,9 @@ impl Cpu6510 {
         io_port: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
         nmi_line: Rc<RefCell<IrqLine>>,
-        mem: Rc<RefCell<dyn MemoryController>>,
-    ) -> Cpu6510 {
-        Cpu6510 {
+        mem: Rc<RefCell<dyn Mmu>>,
+    ) -> Self {
+        Self {
             mem,
             a: 0,
             x: 0,
@@ -758,11 +758,11 @@ mod tests {
 
     impl MockMemory {
         pub fn new(ram: Ram) -> Self {
-            MockMemory { ram }
+            Self { ram }
         }
     }
 
-    impl MemoryController for MockMemory {
+    impl Mmu for MockMemory {
         fn switch_banks(&mut self, _mode: u8) {}
 
         fn read(&self, address: u16) -> u8 {

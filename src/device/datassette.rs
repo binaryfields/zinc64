@@ -60,8 +60,8 @@ pub struct Pulse {
 }
 
 impl Pulse {
-    pub fn new(length: u32, duty: u32) -> Pulse {
-        Pulse {
+    pub fn new(length: u32, duty: u32) -> Self {
+        Self {
             low_cycles: length * (100 - duty) / 100,
             remaining_cycles: length,
         }
@@ -86,7 +86,7 @@ impl Pulse {
 
 pub struct Datassette {
     // Dependencies
-    cia_flag: Rc<RefCell<Pin>>,
+    cia_flag_pin: Rc<RefCell<Pin>>,
     cpu_io_port: Rc<RefCell<IoPort>>,
     // Runtime State
     playing: bool,
@@ -95,9 +95,9 @@ pub struct Datassette {
 }
 
 impl Datassette {
-    pub fn new(cia_flag: Rc<RefCell<Pin>>, cpu_io_port: Rc<RefCell<IoPort>>) -> Datassette {
-        Datassette {
-            cia_flag,
+    pub fn new(cia_flag_pin: Rc<RefCell<Pin>>, cpu_io_port: Rc<RefCell<IoPort>>) -> Self {
+        Self {
+            cia_flag_pin,
             cpu_io_port,
             playing: false,
             tape: None,
@@ -124,7 +124,7 @@ impl Datassette {
                 }
             }
             if !self.current_pulse.is_done() {
-                self.cia_flag
+                self.cia_flag_pin
                     .borrow_mut()
                     .set_active(self.current_pulse.advance());
             }

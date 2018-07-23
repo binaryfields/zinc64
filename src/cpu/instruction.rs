@@ -499,7 +499,7 @@ impl fmt::Display for Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::{IoPort, IrqLine, MemoryController, Pin, Ram};
+    use core::{IoPort, IrqLine, Mmu, Pin, Ram};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -509,11 +509,11 @@ mod tests {
 
     impl MockMemory {
         pub fn new(ram: Ram) -> Self {
-            MockMemory { ram }
+            Self { ram }
         }
     }
 
-    impl MemoryController for MockMemory {
+    impl Mmu for MockMemory {
         fn switch_banks(&mut self, _mode: u8) {}
 
         fn read(&self, address: u16) -> u8 {

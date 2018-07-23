@@ -54,7 +54,7 @@ pub struct C64 {
     // Dependencies
     config: Rc<Config>,
     // Chipset
-    cpu: Rc<RefCell<dyn Cpu>>,
+    cpu: Box<dyn Cpu>,
     cia_1: Rc<RefCell<dyn Chip>>,
     cia_2: Rc<RefCell<dyn Chip>>,
     sid: Rc<RefCell<dyn Chip>>,
@@ -65,8 +65,8 @@ pub struct C64 {
     // Peripherals
     datassette: Rc<RefCell<Datassette>>,
     expansion_port: Rc<RefCell<ExpansionPort>>,
-    joystick1: Option<Rc<RefCell<Joystick>>>,
-    joystick2: Option<Rc<RefCell<Joystick>>>,
+    joystick_1: Option<Rc<RefCell<Joystick>>>,
+    joystick_2: Option<Rc<RefCell<Joystick>>>,
     keyboard: Rc<RefCell<Keyboard>>,
     // Buffers
     frame_buffer: Rc<RefCell<FrameBuffer>>,
@@ -76,7 +76,7 @@ pub struct C64 {
     breakpoints: BreakpointManager,
     // Runtime State
     clock: Rc<Clock>,
-    frames: u32,
+    frame_count: u32,
     last_pc: u16,
 }
 
@@ -100,15 +100,15 @@ impl C64 {
         // I/O Lines
         let ba_line = Rc::new(RefCell::new(Pin::new_high()));
         let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let cpu_nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
-        let exp_io_line = Rc::new(RefCell::new(IoPort::new(0xff, 0xff)));
         let cia_1_flag_pin = Rc::new(RefCell::new(Pin::new_low()));
         let cia_1_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_1_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_2_flag_pin = Rc::new(RefCell::new(Pin::new_low()));
         let cia_2_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
         let cia_2_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
+        let exp_io_line = Rc::new(RefCell::new(IoPort::new(0xff, 0xff)));
+        let irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
+        let nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
 
         // Memory
         let color_ram = factory.new_ram(config.model.color_ram);
@@ -122,7 +122,7 @@ impl C64 {
             cia_1_flag_pin.clone(),
             cia_1_port_a.clone(),
             cia_1_port_b.clone(),
-            cpu_irq_line.clone(),
+            irq_line.clone(),
             joystick_1_state.clone(),
             joystick_2_state.clone(),
             keyboard_matrix.clone(),
@@ -131,7 +131,7 @@ impl C64 {
             cia_2_flag_pin.clone(),
             cia_2_port_a.clone(),
             cia_2_port_b.clone(),
-            cpu_nmi_line.clone(),
+            nmi_line.clone(),
             keyboard_matrix.clone(),
         );
         let sid = factory.new_sid(&config.model, clock.clone(), sound_buffer.clone());
@@ -141,7 +141,7 @@ impl C64 {
             cia_2_port_a.clone(),
             color_ram.clone(),
             frame_buffer.clone(),
-            cpu_irq_line.clone(),
+            irq_line.clone(),
             ram.clone(),
             rom_charset.clone(),
         );
@@ -163,8 +163,8 @@ impl C64 {
         let cpu = factory.new_cpu(
             ba_line.clone(),
             cpu_io_port.clone(),
-            cpu_irq_line.clone(),
-            cpu_nmi_line.clone(),
+            irq_line.clone(),
+            nmi_line.clone(),
             mem.clone(),
         );
 
@@ -216,7 +216,7 @@ impl C64 {
 
         Ok(C64 {
             config,
-            cpu: cpu.clone(),
+            cpu,
             sid: sid.clone(),
             vic: vic.clone(),
             cia_1: cia_1.clone(),
@@ -225,15 +225,15 @@ impl C64 {
             expansion_port: expansion_port.clone(),
             ram: ram.clone(),
             datassette,
-            joystick1,
-            joystick2,
+            joystick_1: joystick1,
+            joystick_2: joystick2,
             keyboard: keyboard.clone(),
             frame_buffer: frame_buffer.clone(),
             sound_buffer: sound_buffer.clone(),
             autostart: None,
             breakpoints: BreakpointManager::new(),
             clock,
-            frames: 0,
+            frame_count: 0,
             last_pc: 0,
         })
     }
@@ -254,19 +254,23 @@ impl C64 {
         &self.config
     }
 
-    pub fn get_cpu(&self) -> Rc<RefCell<Cpu>> {
-        self.cpu.clone()
+    pub fn get_cpu(&self) -> &Box<Cpu> {
+        &self.cpu
+    }
+
+    pub fn get_cpu_mut(&mut self) -> &mut Box<Cpu> {
+        &mut self.cpu
     }
 
     pub fn get_cycles(&self) -> u64 {
         self.clock.get()
     }
 
-    pub fn get_cia_1(&self) -> Rc<RefCell<Chip>> {
+    pub fn get_cia_1(&self) -> Rc<RefCell<dyn Chip>> {
         self.cia_1.clone()
     }
 
-    pub fn get_cia_2(&self) -> Rc<RefCell<Chip>> {
+    pub fn get_cia_2(&self) -> Rc<RefCell<dyn Chip>> {
         self.cia_2.clone()
     }
 
@@ -278,13 +282,15 @@ impl C64 {
         self.frame_buffer.clone()
     }
 
+    pub fn get_frame_count(&self) -> u32 { self.frame_count }
+
     pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
-        if let Some(ref joystick) = self.joystick1 {
+        if let Some(ref joystick) = self.joystick_1 {
             if joystick.borrow().get_index() == index {
                 return Some(joystick.clone());
             }
         }
-        if let Some(ref joystick) = self.joystick2 {
+        if let Some(ref joystick) = self.joystick_2 {
             if joystick.borrow().get_index() == index {
                 return Some(joystick.clone());
             }
@@ -293,18 +299,18 @@ impl C64 {
     }
 
     pub fn get_joystick1(&self) -> Option<Rc<RefCell<Joystick>>> {
-        self.joystick1.clone()
+        self.joystick_1.clone()
     }
 
     pub fn get_joystick2(&self) -> Option<Rc<RefCell<Joystick>>> {
-        self.joystick2.clone()
+        self.joystick_2.clone()
     }
 
     pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> {
         self.keyboard.clone()
     }
 
-    pub fn get_sid(&self) -> Rc<RefCell<Chip>> {
+    pub fn get_sid(&self) -> Rc<RefCell<dyn Chip>> {
         self.sid.clone()
     }
 
@@ -312,12 +318,12 @@ impl C64 {
         self.sound_buffer.clone()
     }
 
-    pub fn get_vic(&self) -> Rc<RefCell<Chip>> {
+    pub fn get_vic(&self) -> Rc<RefCell<dyn Chip>> {
         self.vic.clone()
     }
 
     pub fn is_cpu_jam(&self) -> bool {
-        self.last_pc == self.cpu.borrow().get_pc()
+        self.last_pc == self.cpu.get_pc()
     }
 
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
@@ -326,7 +332,8 @@ impl C64 {
 
     #[inline]
     pub fn check_breakpoints(&mut self) -> bool {
-        self.breakpoints.check(&self.cpu).is_some()
+        // FIXME self.breakpoints.check(&self.cpu).is_some()
+        false
     }
 
     pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
@@ -350,7 +357,7 @@ impl C64 {
             }
         }
         // Chipset
-        self.cpu.borrow_mut().reset();
+        self.cpu.reset();
         self.cia_1.borrow_mut().reset();
         self.cia_2.borrow_mut().reset();
         self.sid.borrow_mut().reset();
@@ -359,10 +366,10 @@ impl C64 {
         self.expansion_port.borrow_mut().reset();
         // Peripherals
         self.datassette.borrow_mut().reset();
-        if let Some(ref joystick) = self.joystick1 {
+        if let Some(ref joystick) = self.joystick_1 {
             joystick.borrow_mut().reset();
         }
-        if let Some(ref joystick) = self.joystick2 {
+        if let Some(ref joystick) = self.joystick_2 {
             joystick.borrow_mut().reset();
         }
         self.keyboard.borrow_mut().reset();
@@ -370,7 +377,7 @@ impl C64 {
         self.sound_buffer.lock().unwrap().reset();
         // Runtime State
         // self.clock.reset();
-        self.frames = 0;
+        self.frame_count = 0;
         self.last_pc = 0;
     }
 
@@ -400,7 +407,7 @@ impl C64 {
             self.sid.borrow_mut().process_vsync();
             self.cia_1.borrow_mut().process_vsync();
             self.cia_2.borrow_mut().process_vsync();
-            self.frames = self.frames.wrapping_add(1);
+            self.frame_count = self.frame_count.wrapping_add(1);
         }
         vsync
     }
@@ -423,16 +430,16 @@ impl C64 {
             self.sid.borrow_mut().process_vsync();
             self.cia_1.borrow_mut().process_vsync();
             self.cia_2.borrow_mut().process_vsync();
-            self.frames = self.frames.wrapping_add(1);
+            self.frame_count = self.frame_count.wrapping_add(1);
         }
     }
 
     #[inline]
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
-        self.last_pc = self.cpu.borrow().get_pc();
-        self.cpu.borrow_mut().step(&tick_fn);
+        self.last_pc = self.cpu.get_pc();
+        self.cpu.step(&tick_fn);
         if self.autostart.is_some() {
-            if self.cpu.borrow().get_pc() == BaseAddr::BootComplete.addr() {
+            if self.cpu.get_pc() == BaseAddr::BootComplete.addr() {
                 if let Some(mut autostart) = self.autostart.take() {
                     autostart.execute(self);
                 }
@@ -473,6 +480,6 @@ mod tests {
         let mut c64 = C64::new(config.clone(), factory).unwrap();
         c64.reset(false);
         let cpu = c64.get_cpu();
-        assert_eq!(0x94, cpu.borrow().read_debug(0xa000));
+        assert_eq!(0x94, cpu.read_debug(0xa000));
     }
 }

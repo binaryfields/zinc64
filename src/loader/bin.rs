@@ -35,14 +35,12 @@ struct BinImage {
 impl Image for BinImage {
     fn mount(&mut self, c64: &mut C64) {
         info!(target: "loader", "Mounting BIN image");
-        let cpu = c64.get_cpu();
-        cpu.borrow_mut().write_debug(0x0001, 0);
+        c64.get_cpu_mut().write_debug(0x0001, 0);
         c64.load(&self.data, self.offset);
-        cpu.borrow_mut().set_pc(self.offset);
+        c64.get_cpu_mut().set_pc(self.offset);
     }
 
-    #[allow(unused_variables)]
-    fn unmount(&mut self, c64: &mut C64) {}
+    fn unmount(&mut self, _c64: &mut C64) {}
 }
 
 pub struct BinLoader {
@@ -50,8 +48,8 @@ pub struct BinLoader {
 }
 
 impl BinLoader {
-    pub fn new(offset: u16) -> BinLoader {
-        BinLoader { offset }
+    pub fn new(offset: u16) -> Self {
+        Self { offset }
     }
 }
 

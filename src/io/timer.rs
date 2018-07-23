@@ -85,8 +85,8 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(mode: Mode, cnt_pin: Rc<RefCell<Pin>>) -> Timer {
-        Timer {
+    pub fn new(mode: Mode, cnt_pin: Rc<RefCell<Pin>>) -> Self {
+        Self {
             cnt_pin,
             mode,
             enabled: false,

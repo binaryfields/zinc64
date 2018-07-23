@@ -20,7 +20,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use core::{Addressable, MemoryController, Ram, Rom};
+use core::{Addressable, Mmu, Ram, Rom};
 use log::LogLevel;
 
 use super::{Bank, Configuration, MemoryMap};
@@ -39,8 +39,8 @@ pub struct Memory {
     // Addressable
     basic: Rc<RefCell<Rom>>,
     charset: Rc<RefCell<Rom>>,
-    expansion_port: Rc<RefCell<Addressable>>,
-    io: Box<Addressable>,
+    expansion_port: Rc<RefCell<dyn Addressable>>,
+    io: Box<dyn Addressable>,
     kernal: Rc<RefCell<Rom>>,
     ram: Rc<RefCell<Ram>>,
 }
@@ -61,13 +61,13 @@ impl BaseAddr {
 
 impl Memory {
     pub fn new(
-        expansion_port: Rc<RefCell<Addressable>>,
-        io: Box<Addressable>,
+        expansion_port: Rc<RefCell<dyn Addressable>>,
+        io: Box<dyn Addressable>,
         ram: Rc<RefCell<Ram>>,
         rom_basic: Rc<RefCell<Rom>>,
         rom_charset: Rc<RefCell<Rom>>,
         rom_kernal: Rc<RefCell<Rom>>,
-    ) -> Memory {
+    ) -> Self {
         let map = MemoryMap::new();
         let configuration = map.get(1);
         Memory {
@@ -83,7 +83,7 @@ impl Memory {
     }
 }
 
-impl MemoryController for Memory {
+impl Mmu for Memory {
     #[inline]
     fn switch_banks(&mut self, mode: u8) {
         if log_enabled!(LogLevel::Trace) {

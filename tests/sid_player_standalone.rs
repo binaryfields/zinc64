@@ -10,7 +10,7 @@ use zinc64::core::{
     Cpu,
     IoPort,
     IrqLine,
-    MemoryController,
+    Mmu,
     Pin,
     Ram,
     TickFn,
@@ -24,13 +24,13 @@ use zinc64::system::CircularBuffer;
 struct SimpleMemory {
     mode: u8,
     ram: Rc<RefCell<Ram>>,
-    sid: Rc<RefCell<Chip>>,
+    sid: Rc<RefCell<dyn Chip>>,
 }
 
 // SimpleMemory permanently maps device I/O into memory map.
 
 impl SimpleMemory {
-    pub fn new(ram: Rc<RefCell<Ram>>, sid: Rc<RefCell<Chip>>) -> Self {
+    pub fn new(ram: Rc<RefCell<Ram>>, sid: Rc<RefCell<dyn Chip>>) -> Self {
         SimpleMemory {
             mode: 0,
             ram,
@@ -39,7 +39,7 @@ impl SimpleMemory {
     }
 }
 
-impl MemoryController for SimpleMemory {
+impl Mmu for SimpleMemory {
     fn switch_banks(&mut self, mode: u8) {
         self.mode = mode;
     }

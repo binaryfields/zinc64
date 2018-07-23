@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use core::{Addressable, Chip, Clock, Cpu, ChipFactory, IoPort, IrqLine,
-           MemoryController, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
+           Mmu, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
 use cpu::Cpu6510;
 use device::ExpansionPort;
 use io::Cia;
@@ -51,7 +51,7 @@ impl ChipFactory for C64Factory {
 
     fn new_cia_1(
         &self,
-        cia_flag_line: Rc<RefCell<Pin>>,
+        cia_flag_pin: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
@@ -61,7 +61,7 @@ impl ChipFactory for C64Factory {
     ) -> Rc<RefCell<dyn Chip>> {
         Rc::new(RefCell::new(Cia::new(
             cia::Mode::Cia1,
-            cia_flag_line,
+            cia_flag_pin,
             cia_port_a,
             cia_port_b,
             irq_line,
@@ -73,7 +73,7 @@ impl ChipFactory for C64Factory {
 
     fn new_cia_2(
         &self,
-        cia_flag_line: Rc<RefCell<Pin>>,
+        cia_flag_pin: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
@@ -81,7 +81,7 @@ impl ChipFactory for C64Factory {
     ) -> Rc<RefCell<dyn Chip>> {
         Rc::new(RefCell::new(Cia::new(
             cia::Mode::Cia2,
-            cia_flag_line,
+            cia_flag_pin,
             cia_port_a,
             cia_port_b,
             irq_line,
@@ -147,7 +147,7 @@ impl ChipFactory for C64Factory {
         rom_kernal: Rc<RefCell<Rom>>,
         sid: Rc<RefCell<dyn Chip>>,
         vic: Rc<RefCell<dyn Chip>>,
-    ) -> Rc<RefCell<dyn MemoryController>> {
+    ) -> Rc<RefCell<dyn Mmu>> {
         let io = Box::new(Mmio::new(
             cia_1,
             cia_2,
@@ -183,8 +183,8 @@ impl ChipFactory for C64Factory {
         io_port: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
         nmi_line: Rc<RefCell<IrqLine>>,
-        mem: Rc<RefCell<dyn MemoryController>>,
-    ) -> Rc<RefCell<dyn Cpu>> {
-        Rc::new(RefCell::new(Cpu6510::new(ba_line, io_port, irq_line, nmi_line, mem)))
+        mem: Rc<RefCell<dyn Mmu>>,
+    ) -> Box<dyn Cpu> {
+        Box::new(Cpu6510::new(ba_line, io_port, irq_line, nmi_line, mem))
     }
 }

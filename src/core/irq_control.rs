@@ -25,8 +25,8 @@ pub struct IrqControl {
 }
 
 impl IrqControl {
-    pub fn new() -> IrqControl {
-        IrqControl { data: 0, mask: 0 }
+    pub fn new() -> Self {
+        Self { data: 0, mask: 0 }
     }
 
     #[inline]

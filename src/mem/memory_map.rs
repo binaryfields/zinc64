@@ -37,7 +37,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn new(config: [Bank; 7]) -> Configuration {
+    pub fn new(config: [Bank; 7]) -> Self {
         let mut banks = [Bank::Disabled; 0x10];
         for i in 0..0x10 {
             banks[i] = match i {
@@ -64,7 +64,7 @@ pub struct MemoryMap {
 }
 
 impl MemoryMap {
-    pub fn new() -> MemoryMap {
+    pub fn new() -> Self {
         let m31 = [
             Bank::Ram,
             Bank::Ram,

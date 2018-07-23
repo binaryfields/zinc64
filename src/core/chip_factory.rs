@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use core::{Addressable, Chip, Clock, Cpu, IoPort, IrqLine,
-           MemoryController, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
+           Mmu, Pin, Ram, Rom, SoundOutput, SystemModel, VicModel, VideoOutput};
 
 pub trait ChipFactory {
     // -- Chipset
@@ -84,7 +84,7 @@ pub trait ChipFactory {
         rom_kernal: Rc<RefCell<Rom>>,
         sid: Rc<RefCell<dyn Chip>>,
         vic: Rc<RefCell<dyn Chip>>,
-    ) -> Rc<RefCell<dyn MemoryController>>;
+    ) -> Rc<RefCell<dyn Mmu>>;
 
     fn new_ram(&self, capacity: usize) -> Rc<RefCell<Ram>>;
 
@@ -98,6 +98,6 @@ pub trait ChipFactory {
         io_port: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
         nmi_line: Rc<RefCell<IrqLine>>,
-        mem: Rc<RefCell<dyn MemoryController>>,
-    ) -> Rc<RefCell<dyn Cpu>>;
+        mem: Rc<RefCell<dyn Mmu>>,
+    ) -> Box<dyn Cpu>;
 }

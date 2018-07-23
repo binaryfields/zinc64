@@ -22,7 +22,7 @@ extern crate zinc64;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use zinc64::core::{Cpu, IoPort, IrqLine, MemoryController, Pin, Ram, TickFn};
+use zinc64::core::{Cpu, IoPort, IrqLine, Mmu, Pin, Ram, TickFn};
 use zinc64::cpu::Cpu6510;
 
 struct MockMemory {
@@ -35,7 +35,7 @@ impl MockMemory {
     }
 }
 
-impl MemoryController for MockMemory {
+impl Mmu for MockMemory {
     fn switch_banks(&mut self, _mode: u8) {}
 
     fn read(&self, address: u16) -> u8 {

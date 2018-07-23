@@ -61,8 +61,8 @@ impl Image for TapImage {
 pub struct TapLoader {}
 
 impl TapLoader {
-    pub fn new() -> TapLoader {
-        TapLoader {}
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn read_header(&self, rdr: &mut Read) -> io::Result<Header> {

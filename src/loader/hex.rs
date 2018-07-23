@@ -31,8 +31,8 @@ use loader::Loader;
 pub struct HexLoader {}
 
 impl HexLoader {
-    pub fn new() -> HexLoader {
-        HexLoader {}
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn map_hex(&self, hex: char) -> u8 {

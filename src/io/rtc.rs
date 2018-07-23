@@ -29,8 +29,8 @@ pub struct Rtc {
 }
 
 impl Rtc {
-    pub fn new() -> Rtc {
-        Rtc {
+    pub fn new() -> Self {
+        Self {
             enabled: true,
             hours: 0,
             minutes: 0,

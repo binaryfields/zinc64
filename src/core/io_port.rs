@@ -31,8 +31,8 @@ pub struct IoPort {
 }
 
 impl IoPort {
-    pub fn new(direction: u8, input: u8) -> IoPort {
-        IoPort {
+    pub fn new(direction: u8, input: u8) -> Self {
+        Self {
             direction,
             input,
             output: 0,

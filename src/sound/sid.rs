@@ -49,7 +49,7 @@ impl Sid {
         chip_model: SidModel,
         clock: Rc<Clock>,
         sound_buffer: Arc<Mutex<dyn SoundOutput>>,
-    ) -> Sid {
+    ) -> Self {
         info!(target: "sound", "Initializing SID");
         let resid_model = match chip_model {
             SidModel::Mos6581 => resid::ChipModel::Mos6581,

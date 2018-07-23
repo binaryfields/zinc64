@@ -74,8 +74,8 @@ impl Image for CrtImage {
 pub struct CrtLoader {}
 
 impl CrtLoader {
-    pub fn new() -> CrtLoader {
-        CrtLoader {}
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn build_cartridge(&self, header: Header) -> Cartridge {

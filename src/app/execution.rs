@@ -229,28 +229,28 @@ impl ExecutionEngine {
     fn reg_read(&mut self) -> Result<CommandResult, String> {
         let cpu = self.c64.get_cpu();
         let regs = command::RegData {
-            a: cpu.borrow().get_a(),
-            x: cpu.borrow().get_x(),
-            y: cpu.borrow().get_y(),
-            p: cpu.borrow().get_p(),
-            sp: cpu.borrow().get_sp(),
-            pc: cpu.borrow().get_pc(),
-            port_00: cpu.borrow().read_debug(0x00),
-            port_01: cpu.borrow().read_debug(0x01),
+            a: cpu.get_a(),
+            x: cpu.get_x(),
+            y: cpu.get_y(),
+            p: cpu.get_p(),
+            sp: cpu.get_sp(),
+            pc: cpu.get_pc(),
+            port_00: cpu.read_debug(0x00),
+            port_01: cpu.read_debug(0x01),
         };
         Ok(CommandResult::Registers(regs))
     }
 
     fn reg_write(&mut self, ops: &Vec<RegOp>) -> Result<CommandResult, String> {
-        let cpu = self.c64.get_cpu();
+        let cpu = self.c64.get_cpu_mut();
         for op in ops {
             match op {
-                &RegOp::SetA(value) => cpu.borrow_mut().set_a(value),
-                &RegOp::SetX(value) => cpu.borrow_mut().set_x(value),
-                &RegOp::SetY(value) => cpu.borrow_mut().set_y(value),
-                &RegOp::SetP(value) => cpu.borrow_mut().set_p(value),
-                &RegOp::SetSP(value) => cpu.borrow_mut().set_sp(value),
-                &RegOp::SetPC(value) => cpu.borrow_mut().set_pc(value),
+                &RegOp::SetA(value) => cpu.set_a(value),
+                &RegOp::SetX(value) => cpu.set_x(value),
+                &RegOp::SetY(value) => cpu.set_y(value),
+                &RegOp::SetP(value) => cpu.set_p(value),
+                &RegOp::SetSP(value) => cpu.set_sp(value),
+                &RegOp::SetPC(value) => cpu.set_pc(value),
             }
         }
         Ok(CommandResult::Unit)
@@ -269,7 +269,7 @@ impl ExecutionEngine {
         let mut buffer = Vec::new();
         let mut address = start;
         while address < end {
-            buffer.push(cpu.borrow().read_debug(address));
+            buffer.push(cpu.read_debug(address));
             address = address.wrapping_add(1);
         }
         Ok(CommandResult::Buffer(buffer))

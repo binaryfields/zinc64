@@ -29,12 +29,12 @@ pub struct Rom {
 }
 
 impl Rom {
-    pub fn new(capacity: usize, offset: u16, pattern: u8) -> Rom {
+    pub fn new(capacity: usize, offset: u16, pattern: u8) -> Self {
         let mut data = vec![0x00; capacity];
         for i in 0..data.len() {
             data[i] = pattern;
         }
-        Rom { data, offset }
+        Self { data, offset }
     }
 
     pub fn load(path: &Path, offset: u16) -> Result<Rom, io::Error> {
@@ -50,9 +50,8 @@ impl Rom {
         self.data[(address - self.offset) as usize]
     }
 
-    #[allow(unused_variables)]
     #[inline]
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, _address: u16, _value: u8) {
         panic!("writes to rom are not supported")
     }
 }

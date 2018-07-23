@@ -58,7 +58,6 @@ fn program_cia1tab() {
     let factory = Box::new(C64Factory::new(config.clone()));
     let mut c64 = C64::new(config.clone(), factory).unwrap();
     c64.reset(false);
-    let cpu = c64.get_cpu();
     let cia1_clone = c64.get_cia_1();
     let cia2_clone = c64.get_cia_2();
     let clock_clone = c64.get_clock();
@@ -81,10 +80,10 @@ fn program_cia1tab() {
         }
     });
     c64.load(&CIA1TAB_PRG.to_vec()[2..].to_vec(), 0x4000);
-    cpu.borrow_mut().set_pc(0x4000);
+    c64.get_cpu_mut().set_pc(0x4000);
     while test_cycle.get() < 13 {
         c64.step_internal(&tick_fn);
-        if cpu.borrow().get_pc() == 0x402d {
+        if c64.get_cpu().get_pc() == 0x402d {
             test_flag.set(true);
         }
     }
@@ -115,19 +114,18 @@ fn exec_keyboard_read() {
     c64.load(&code.to_vec(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.borrow_mut().set_row(1, !(1 << 5));
-    let cpu = c64.get_cpu();
-    cpu.borrow_mut().write_debug(0x0001, 0x06);
-    cpu.borrow_mut().set_pc(0xc000);
+    c64.get_cpu_mut().write_debug(0x0001, 0x06);
+    c64.get_cpu_mut().set_pc(0xc000);
     let mut branch_count = 0;
     loop {
         c64.step();
-        if cpu.borrow().get_pc() == 0xc018 {
+        if c64.get_cpu().get_pc() == 0xc018 {
             break;
         }
-        if cpu.borrow().get_pc() == 0xc015 {
+        if c64.get_cpu().get_pc() == 0xc015 {
             branch_count += 1;
             if branch_count > 1 {
-                panic!("trap at 0x{:x}", cpu.borrow_mut().get_pc());
+                panic!("trap at 0x{:x}", c64.get_cpu().get_pc());
             }
         }
     }

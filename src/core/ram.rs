@@ -22,9 +22,9 @@ pub struct Ram {
 }
 
 impl Ram {
-    pub fn new(capacity: usize) -> Ram {
+    pub fn new(capacity: usize) -> Self {
         info!(target: "mem", "Initializing RAM with capacity {}", capacity);
-        Ram {
+        Self {
             data: vec![0x00; capacity],
         }
     }

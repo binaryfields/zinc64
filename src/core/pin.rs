@@ -29,15 +29,15 @@ pub struct Pin {
 }
 
 impl Pin {
-    pub fn new_high() -> Pin {
-        Pin {
+    pub fn new_high() -> Self {
+        Self {
             state: State::High,
             last: State::High,
         }
     }
 
-    pub fn new_low() -> Pin {
-        Pin {
+    pub fn new_low() -> Self {
+        Self {
             state: State::Low,
             last: State::Low,
         }

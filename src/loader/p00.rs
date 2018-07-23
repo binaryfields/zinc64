@@ -55,15 +55,14 @@ impl Image for P00Image {
         c64.load(&self.data, self.offset);
     }
 
-    #[allow(unused_variables)]
-    fn unmount(&mut self, c64: &mut C64) {}
+    fn unmount(&mut self, _c64: &mut C64) {}
 }
 
 pub struct P00Loader {}
 
 impl P00Loader {
-    pub fn new() -> P00Loader {
-        P00Loader {}
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn read_header(&self, rdr: &mut Read) -> io::Result<Header> {

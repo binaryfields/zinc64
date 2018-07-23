@@ -127,16 +127,16 @@ pub struct Cia {
 impl Cia {
     pub fn new(
         mode: Mode,
-        cia_flag: Rc<RefCell<Pin>>,
+        cia_flag_pin: Rc<RefCell<Pin>>,
         cia_port_a: Rc<RefCell<IoPort>>,
         cia_port_b: Rc<RefCell<IoPort>>,
         irq_line: Rc<RefCell<IrqLine>>,
         joystick_1: Option<Rc<Cell<u8>>>,
         joystick_2: Option<Rc<Cell<u8>>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
-    ) -> Cia {
+    ) -> Self {
         let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
-        Cia {
+        Self {
             mode,
             irq_line,
             joystick_1,
@@ -150,7 +150,7 @@ impl Cia {
             tod_clock: Rtc::new(),
             tod_set_alarm: false,
             cnt_pin: cnt_pin.clone(),
-            flag_pin: cia_flag,
+            flag_pin: cia_flag_pin,
             port_a: cia_port_a,
             port_b: cia_port_b,
         }

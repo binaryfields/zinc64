@@ -40,15 +40,14 @@ impl Image for PrgImage {
         c64.load(&self.data, self.offset);
     }
 
-    #[allow(unused_variables)]
-    fn unmount(&mut self, c64: &mut C64) {}
+    fn unmount(&mut self, _c64: &mut C64) {}
 }
 
 pub struct PrgLoader {}
 
 impl PrgLoader {
-    pub fn new() -> PrgLoader {
-        PrgLoader {}
+    pub fn new() -> Self {
+        Self {}
     }
 }
 

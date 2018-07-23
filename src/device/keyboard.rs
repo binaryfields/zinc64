@@ -106,8 +106,8 @@ pub struct KeyEvent {
 }
 
 impl KeyEvent {
-    pub fn new(keycode: Key) -> KeyEvent {
-        KeyEvent {
+    pub fn new(keycode: Key) -> Self {
+        Self {
             keycode,
             modifier: None,
             disable_shift: false,
@@ -138,8 +138,8 @@ pub struct Keyboard {
 }
 
 impl Keyboard {
-    pub fn new(matrix: Rc<RefCell<[u8; 8]>>) -> Keyboard {
-        Keyboard {
+    pub fn new(matrix: Rc<RefCell<[u8; 8]>>) -> Self {
+        Self {
             matrix,
             queue: VecDeque::new(),
             disabled_shift: 0,

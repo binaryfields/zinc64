@@ -46,8 +46,8 @@ pub struct ExpansionPort {
 }
 
 impl ExpansionPort {
-    pub fn new(io_line: Rc<RefCell<IoPort>>) -> ExpansionPort {
-        ExpansionPort {
+    pub fn new(io_line: Rc<RefCell<IoPort>>) -> Self {
+        Self {
             cartridge: None,
             io_line,
         }
