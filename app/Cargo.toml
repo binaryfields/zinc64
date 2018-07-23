@@ -1,14 +1,11 @@
 [package]
-name = "zinc64"
+name = "zinc64-sdl"
 version = "0.5.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
-description = "Commodore 64 emulator toolkit with batteries included but swappable"
+description = "Commodore 64 emulator app"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"
-readme = "README.md"
-keywords = ["c64", "commodore", "emulator"]
-categories = ["emulators"]
-exclude = [ "bin/*", "doc/*", "res/*" ]
+publish = false
 
 [dependencies]
 bit_field = "0.9"
@@ -18,8 +15,9 @@ gl = "0.7"
 log = "0.3"
 resid-rs = "0.6"
 time = "0.1"
+zinc64 = { path = "..", version = "0.5.0" }
 
-[workspace]
-members = [
-    "app",
-]
+[dependencies.sdl2]
+version = "0.31"
+default-features = false
+features = ["unsafe_textures"]
