@@ -38,8 +38,8 @@ impl MuxUnit {
         let mut mb_collision = self.mb_collision;
         let mut mm_collision = self.mm_collision;
         let mut mm_count = 0u8;
-        for i in 0..8 {
-            if sprite_output[i].is_some() {
+        for (i, output) in sprite_output.iter().enumerate() {
+            if output.is_some() {
                 if fg_graphics {
                     mb_collision.set_bit(i, true);
                 }
@@ -47,11 +47,13 @@ impl MuxUnit {
                 mm_count += 1;
             }
         }
-        self.mb_interrupt = self.mb_collision == 0 && mb_collision != 0;
-        self.mb_collision |= mb_collision;
-        if mm_count >= 2 {
-            self.mm_interrupt = self.mm_collision == 0 && mm_collision != 0;
-            self.mm_collision |= mm_collision;
+        if mm_count != 0 {
+            self.mb_interrupt = self.mb_collision == 0 && mb_collision != 0;
+            self.mb_collision |= mb_collision;
+            if mm_count >= 2 {
+                self.mm_interrupt = self.mm_collision == 0 && mm_collision != 0;
+                self.mm_collision |= mm_collision;
+            }
         }
     }
 
@@ -60,21 +62,15 @@ impl MuxUnit {
     }
 
     pub fn feed_graphics(&mut self, gfx_output: (u8, bool)) {
-        if gfx_output.1 {
-            self.output_pixel(gfx_output.0, PRIO_FG_GRAPHICS);
-        } else {
-            self.output_pixel(gfx_output.0, PRIO_BG_GRAPHICS);
-        }
+        let priority = if gfx_output.1 { PRIO_FG_GRAPHICS } else { PRIO_BG_GRAPHICS };
+        self.output_pixel(gfx_output.0, priority);
     }
 
     pub fn feed_sprites(&mut self, sprite_output: &[Option<u8>; 8]) {
-        for i in 0..8 {
-            if let Some(output) = sprite_output[i] {
-                if !self.data_priority[i] {
-                    self.output_sprite_pixel(output, PRIO_FG_SPRITE);
-                } else {
-                    self.output_sprite_pixel(output, PRIO_BG_SPRITE);
-                }
+        for (i, sp_output) in sprite_output.iter().enumerate() {
+            if let Some(output) = sp_output {
+                let priority = if self.data_priority[i] { PRIO_BG_SPRITE } else { PRIO_FG_SPRITE };
+                self.output_sprite_pixel(*output, priority);
             }
         }
     }

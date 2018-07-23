@@ -58,11 +58,17 @@ impl FrameBuffer {
 }
 
 impl VideoOutput for FrameBuffer {
+    fn get_dimension(&self) -> (usize, usize) { self.dim }
+
     fn set_sync(&mut self, value: bool) {
         FrameBuffer::set_sync(self, value);
     }
 
-    fn write(&mut self, x: u16, y: u16, color: u8) {
+    fn write(&mut self, index: usize, color: u8) {
+        self.pixels[index] = self.palette[color as usize];
+    }
+
+    fn write_at(&mut self, x: u16, y: u16, color: u8) {
         FrameBuffer::write(self, x, y, color);
     }
 }

@@ -47,12 +47,12 @@ pub trait ChipFactory {
         &self,
         chip_model: VicModel,
         ba_line: Rc<RefCell<Pin>>,
-        cia_2_port_a: Rc<RefCell<IoPort>>,
         color_ram: Rc<RefCell<Ram>>,
         frame_buffer: Rc<RefCell<dyn VideoOutput>>,
         irq_line: Rc<RefCell<IrqLine>>,
         ram: Rc<RefCell<Ram>>,
         rom_charset: Rc<RefCell<Rom>>,
+        vic_base_address: Rc<Cell<u16>>,
     ) -> Rc<RefCell<dyn Chip>>;
 
     // -- Memory

@@ -94,26 +94,23 @@ impl GfxSequencer {
 
     pub fn clock(&mut self) {
         if !self.mc_cycle {
-            self.output = match self.config.mode {
-                Mode::Text => self.output_text(),
+            match self.config.mode {
+                Mode::Text => self.output = self.output_text(),
                 Mode::McText => {
                     self.mc_cycle = self.c_color.get_bit(3);
-                    self.output_text_mc()
+                    self.output = self.output_text_mc()
                 }
-                Mode::Bitmap => self.output_bitmap(),
+                Mode::Bitmap => self.output = self.output_bitmap(),
                 Mode::McBitmap => {
                     self.mc_cycle = true;
-                    self.output_bitmap_mc()
+                    self.output = self.output_bitmap_mc()
                 }
-                Mode::EcmText => self.output_text_ecm(),
-                Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => (0, false),
-                _ => panic!("unsupported graphics mode {}", self.config.mode.value()),
+                Mode::EcmText => self.output = self.output_text_ecm(),
+                Mode::InvalidText => panic!("unsupported graphics mode {}", self.config.mode.value()),
+                Mode::InvalidBitmap1 => self.output = (0, false),
+                Mode::InvalidBitmap2 => self.output = (0, false),
             };
-            self.data = if !self.mc_cycle {
-                self.data << 1
-            } else {
-                self.data << 2
-            }
+            self.data <<= if !self.mc_cycle { 1 } else { 2 };
         } else {
             self.mc_cycle = false;
         }

@@ -64,7 +64,7 @@ pub struct Vic {
     color_ram: Rc<RefCell<Ram>>,
     frame_buffer: Rc<RefCell<dyn VideoOutput>>,
     irq_line: Rc<RefCell<IrqLine>>,
-    mem: Rc<RefCell<VicMemory>>,
+    mem: VicMemory,
     // Functional Units
     border_unit: BorderUnit,
     gfx_seq: GfxSequencer,
@@ -90,8 +90,11 @@ pub struct Vic {
     // Runtime State
     display_on: bool,
     display_state: bool,
+    frame_buffer_width: usize,
     is_bad_line: bool,
+    sprite_dma: [bool; 8],
     sprite_ptrs: [u16; 8],
+    sprites_on: bool,
     vm_color_line: [u8; 40],
     vm_data_line: [u8; 40],
 }
@@ -103,10 +106,11 @@ impl Vic {
         color_ram: Rc<RefCell<Ram>>,
         irq_line: Rc<RefCell<IrqLine>>,
         frame_buffer: Rc<RefCell<dyn VideoOutput>>,
-        mem: Rc<RefCell<VicMemory>>,
+        mem: VicMemory,
     ) -> Vic {
         info!(target: "video", "Initializing VIC");
         let spec = Spec::new(chip_model);
+        let frame_buffer_width = frame_buffer.borrow().get_dimension().0;
         let sprites = [
             SpriteSequencer::new(),
             SpriteSequencer::new(),
@@ -126,7 +130,7 @@ impl Vic {
             irq_line,
             mem,
             // Functional Units
-            border_unit: BorderUnit::new(spec.clone()),
+            border_unit: BorderUnit::new(),
             gfx_seq: GfxSequencer::new(),
             interrupt_control: IrqControl::new(),
             mux_unit: MuxUnit::new(),
@@ -150,12 +154,118 @@ impl Vic {
             // Runtime State
             display_on: false,
             display_state: false,
+            frame_buffer_width,
             is_bad_line: false,
+            sprite_dma: [false; 8],
             sprite_ptrs: [0; 8],
+            sprites_on: false,
             vm_color_line: [0; 40],
             vm_data_line: [0; 40],
         };
         vic
+    }
+
+    fn draw(&mut self) {
+        let x_start = (self.raster_cycle << 3) - 12;
+        let x_scroll_start = x_start + self.x_scroll as u16;
+        let mut pixel_idx = self.raster_y as usize * self.frame_buffer_width + x_start as usize;
+        for x in x_start..x_start + 8 {
+            if !self.border_unit.is_enabled() {
+                if x == x_scroll_start {
+                    self.gfx_seq.load_data();
+                }
+                self.gfx_seq.clock();
+                self.mux_unit.feed_graphics(self.gfx_seq.output());
+            } else {
+                self.mux_unit.feed_border(self.border_unit.output());
+            }
+            if self.sprites_on {
+                for sprite in self.sprites.iter_mut() {
+                    sprite.clock(x);
+                }
+                let sprite_output = self.output_sprites();
+                self.mux_unit.compute_collisions(&sprite_output);
+                self.mux_unit.feed_sprites(&sprite_output);
+                if self.mux_unit.mb_interrupt {
+                    self.trigger_irq(1);
+                }
+                if self.mux_unit.mm_interrupt {
+                    self.trigger_irq(2);
+                }
+            }
+            let pixel = self.mux_unit.output();
+            self.frame_buffer
+                .borrow_mut()
+                .write(pixel_idx, pixel);
+            pixel_idx += 1;
+        }
+    }
+
+    fn draw_cycle_17_56(&mut self) {
+        let x_start = (self.raster_cycle << 3) - 12;
+        let x_scroll_start = x_start + self.x_scroll as u16;
+        let mut pixel_idx = self.raster_y as usize * self.frame_buffer_width + x_start as usize;
+        for x in x_start..x_start + 8 {
+            self.border_unit
+                .update_main_flop(x, self.raster_y, self.den);
+            if !self.border_unit.is_enabled() {
+                if x == x_scroll_start {
+                    self.gfx_seq.load_data();
+                }
+                self.gfx_seq.clock();
+                self.mux_unit.feed_graphics(self.gfx_seq.output());
+            } else {
+                self.mux_unit.feed_border(self.border_unit.output());
+            }
+            if self.sprites_on {
+                for sprite in self.sprites.iter_mut() {
+                    sprite.clock(x);
+                }
+                let sprite_output = self.output_sprites();
+                self.mux_unit.compute_collisions(&sprite_output);
+                self.mux_unit.feed_sprites(&sprite_output);
+                if self.mux_unit.mb_interrupt {
+                    self.trigger_irq(1);
+                }
+                if self.mux_unit.mm_interrupt {
+                    self.trigger_irq(2);
+                }
+            }
+            let pixel = self.mux_unit.output();
+            self.frame_buffer
+                .borrow_mut()
+                .write(pixel_idx, pixel);
+            pixel_idx += 1;
+        }
+    }
+
+    fn draw_border(&mut self) {
+        let x_start = (self.raster_cycle << 3) - 12;
+        let mut pixel_idx = self.raster_y as usize * self.frame_buffer_width + x_start as usize;
+        for x in x_start..x_start + 8 {
+            self.border_unit
+                .update_main_flop(x, self.raster_y, self.den);
+            self.mux_unit.feed_border(self.border_unit.output());
+            if self.sprites_on {
+                for sprite in self.sprites.iter_mut() {
+                    sprite.clock(x);
+                }
+                let sprite_output = self.output_sprites();
+                self.mux_unit.compute_collisions(&sprite_output);
+                self.mux_unit.feed_sprites(&sprite_output);
+                if self.mux_unit.mb_interrupt {
+                    self.trigger_irq(1);
+                }
+                if self.mux_unit.mm_interrupt {
+                    self.trigger_irq(2);
+                }
+            }
+            let pixel = self.mux_unit.output();
+            self.frame_buffer
+                .borrow_mut()
+                .write(pixel_idx, pixel);
+            pixel_idx += 1;
+        }
     }
 
     fn map_sprite_to_screen(&self, x: u16) -> u16 {
@@ -175,97 +285,6 @@ impl Vic {
                 }
             }
             _ => panic!("invalid sprite coords {}", x),
-        }
-    }
-
-    fn draw(&mut self) {
-        let x_start = (self.raster_cycle << 3) - 12;
-        let x_scroll_start = x_start + self.x_scroll as u16;
-        for x in x_start..x_start + 8 {
-            for sprite in self.sprites.iter_mut() {
-                sprite.clock(x);
-            }
-            if !self.border_unit.is_enabled() {
-                if x == x_scroll_start {
-                    self.gfx_seq.load_data();
-                }
-                self.gfx_seq.clock();
-                self.mux_unit.feed_graphics(self.gfx_seq.output());
-            } else {
-                self.mux_unit.feed_border(self.border_unit.output());
-            }
-            let sprite_output = self.output_sprites();
-            self.mux_unit.compute_collisions(&sprite_output);
-            self.mux_unit.feed_sprites(&sprite_output);
-            if self.mux_unit.mb_interrupt {
-                self.trigger_irq(1);
-            }
-            if self.mux_unit.mm_interrupt {
-                self.trigger_irq(2);
-            }
-            let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(x, self.raster_y, pixel);
-        }
-    }
-
-    fn draw_cycle_17_56(&mut self) {
-        let x_start = (self.raster_cycle << 3) - 12;
-        let x_scroll_start = x_start + self.x_scroll as u16;
-        for x in x_start..x_start + 8 {
-            self.border_unit
-                .update_main_flop(x, self.raster_y, self.den);
-            for sprite in self.sprites.iter_mut() {
-                sprite.clock(x);
-            }
-            if !self.border_unit.is_enabled() {
-                if x == x_scroll_start {
-                    self.gfx_seq.load_data();
-                }
-                self.gfx_seq.clock();
-                self.mux_unit.feed_graphics(self.gfx_seq.output());
-            } else {
-                self.mux_unit.feed_border(self.border_unit.output());
-            }
-            let sprite_output = self.output_sprites();
-            self.mux_unit.compute_collisions(&sprite_output);
-            self.mux_unit.feed_sprites(&sprite_output);
-            if self.mux_unit.mb_interrupt {
-                self.trigger_irq(1);
-            }
-            if self.mux_unit.mm_interrupt {
-                self.trigger_irq(2);
-            }
-            let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(x, self.raster_y, pixel);
-        }
-    }
-
-    fn draw_border(&mut self) {
-        let x_start = (self.raster_cycle << 3) - 12;
-        for x in x_start..x_start + 8 {
-            self.border_unit
-                .update_main_flop(x, self.raster_y, self.den);
-            for sprite in self.sprites.iter_mut() {
-                sprite.clock(x);
-            }
-            self.mux_unit.feed_border(self.border_unit.output());
-            let sprite_output = self.output_sprites();
-            self.mux_unit.compute_collisions(&sprite_output);
-            self.mux_unit.feed_sprites(&sprite_output);
-            if self.mux_unit.mb_interrupt {
-                self.trigger_irq(1);
-            }
-            if self.mux_unit.mm_interrupt {
-                self.trigger_irq(2);
-            }
-            let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(x, self.raster_y, pixel);
         }
     }
 
@@ -347,11 +366,12 @@ impl Vic {
            8 bits of RASTER. If this is the case, the display of the sprite is
            turned on.
         */
-        for sprite in self.sprites.iter_mut() {
+        for (i, sprite) in self.sprites.iter_mut().enumerate() {
             if sprite.config.y == (self.raster_y as u8) {
-                sprite.display = sprite.dma;
+                sprite.display = self.sprite_dma[i];
             }
         }
+        self.sprites_on = self.sprites.iter().any(|sp| sp.display);
     }
 
     fn update_sprite_dma_on(&mut self) {
@@ -367,8 +387,8 @@ impl Vic {
         for n in 0..8 {
             let sprite = &mut self.sprites[n];
             if sprite.config.enabled && sprite.config.y == (self.raster_y as u8) {
-                if !sprite.dma {
-                    sprite.dma = true;
+                if !self.sprite_dma[n] {
+                    self.sprite_dma[n] = true;
                     self.mc_base[n] = 0;
                     if sprite.config.expand_y {
                         sprite.expansion_flop = false;
@@ -390,9 +410,8 @@ impl Vic {
             if self.sprites[i].expansion_flop {
                 self.mc_base[i] += 1;
                 if self.mc_base[i] == 63 {
-                    let mut sprite = &mut self.sprites[i];
-                    sprite.dma = false;
-                    sprite.display = false;
+                    self.sprite_dma[i] = false;
+                    self.sprites[i].display = false;
                 }
             }
         }
@@ -416,7 +435,7 @@ impl Vic {
     fn c_access(&mut self) {
         if self.is_bad_line {
             let address = self.video_matrix | self.vc;
-            self.vm_data_line[self.vmli] = self.mem.borrow().read(address);
+            self.vm_data_line[self.vmli] = self.mem.read(address);
             self.vm_color_line[self.vmli] = self.color_ram.borrow().read(self.vc) & 0x0f;
             // DEFERRED vic: memory no access unless ba down for 3 cycles
         }
@@ -429,17 +448,17 @@ impl Vic {
                     let address = self.char_base
                         | ((self.vm_data_line[self.vmli] as u16) << 3)
                         | self.rc as u16;
-                    self.mem.borrow().read(address)
+                    self.mem.read(address)
                 }
                 Mode::EcmText => {
                     let address = self.char_base
                         | (((self.vm_data_line[self.vmli] & 0x3f) as u16) << 3)
                         | self.rc as u16;
-                    self.mem.borrow().read(address)
+                    self.mem.read(address)
                 }
                 Mode::Bitmap | Mode::McBitmap => {
                     let address = self.char_base & 0x2000 | (self.vc << 3) | self.rc as u16;
-                    self.mem.borrow().read(address)
+                    self.mem.read(address)
                 }
                 Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
                 _ => panic!(
@@ -457,14 +476,14 @@ impl Vic {
             self.vc += 1;
             self.vmli += 1;
         } else {
-            let g_data = self.mem.borrow().read(0x3fff);
+            let g_data = self.mem.read(0x3fff);
             self.gfx_seq.set_data(0, 0, g_data);
         }
     }
 
     fn p_access(&mut self, n: usize) {
         let address = self.video_matrix | 0x03f8 | n as u16;
-        self.sprite_ptrs[n] = (self.mem.borrow().read(address) as u16) << 6;
+        self.sprite_ptrs[n] = (self.mem.read(address) as u16) << 6;
     }
 
     fn s_access(&mut self, n: usize, byte: usize) {
@@ -479,7 +498,7 @@ impl Vic {
            by one after each s-access.
         */
         let address = self.sprite_ptrs[n] | (self.mc[n] as u16);
-        let data = self.mem.borrow().read(address);
+        let data = self.mem.read(address);
         self.sprites[n].set_data(byte, data);
         self.mc[n] += 1;
     }
@@ -504,10 +523,10 @@ impl Chip for Vic {
                 }
                 self.update_display_on();
                 self.update_bad_line();
-                let sprite_dma = self.sprites[3].dma | self.sprites[4].dma;
+                let sprite_dma = self.sprite_dma[3] | self.sprite_dma[4];
                 self.set_ba(sprite_dma);
                 self.p_access(3);
-                if self.sprites[3].dma {
+                if self.sprite_dma[3] {
                     self.s_access(3, 0);
                 }
             }
@@ -515,73 +534,73 @@ impl Chip for Vic {
                 if self.raster_y == self.raster_compare && self.raster_y == 0 {
                     self.trigger_irq(0);
                 }
-                let sprite_dma = self.sprites[3].dma | self.sprites[4].dma | self.sprites[5].dma;
+                let sprite_dma = self.sprite_dma[3] | self.sprite_dma[4] | self.sprite_dma[5];
                 self.set_ba(sprite_dma);
-                if self.sprites[3].dma {
+                if self.sprite_dma[3] {
                     self.s_access(3, 1);
                     self.s_access(3, 2);
                 }
             }
             3 => {
-                let sprite_dma = self.sprites[4].dma | self.sprites[5].dma;
+                let sprite_dma = self.sprite_dma[4] | self.sprite_dma[5];
                 self.set_ba(sprite_dma);
                 self.p_access(4);
-                if self.sprites[4].dma {
+                if self.sprite_dma[4] {
                     self.s_access(4, 0);
                 }
             }
             4 => {
-                let sprite_dma = self.sprites[4].dma | self.sprites[5].dma | self.sprites[6].dma;
+                let sprite_dma = self.sprite_dma[4] | self.sprite_dma[5] | self.sprite_dma[6];
                 self.set_ba(sprite_dma);
-                if self.sprites[4].dma {
+                if self.sprite_dma[4] {
                     self.s_access(4, 1);
                     self.s_access(4, 2);
                 }
             }
             5 => {
-                let sprite_dma = self.sprites[5].dma | self.sprites[6].dma;
+                let sprite_dma = self.sprite_dma[5] | self.sprite_dma[6];
                 self.set_ba(sprite_dma);
                 self.p_access(5);
-                if self.sprites[5].dma {
+                if self.sprite_dma[5] {
                     self.s_access(5, 0);
                 }
             }
             6 => {
-                let sprite_dma = self.sprites[5].dma | self.sprites[6].dma | self.sprites[7].dma;
+                let sprite_dma = self.sprite_dma[5] | self.sprite_dma[6] | self.sprite_dma[7];
                 self.set_ba(sprite_dma);
-                if self.sprites[5].dma {
+                if self.sprite_dma[5] {
                     self.s_access(5, 1);
                     self.s_access(5, 2);
                 }
             }
             7 => {
-                let sprite_dma = self.sprites[6].dma | self.sprites[7].dma;
+                let sprite_dma = self.sprite_dma[6] | self.sprite_dma[7];
                 self.set_ba(sprite_dma);
                 self.p_access(6);
-                if self.sprites[6].dma {
+                if self.sprite_dma[6] {
                     self.s_access(6, 0);
                 }
             }
             8 => {
-                let sprite_dma = self.sprites[6].dma | self.sprites[7].dma;
+                let sprite_dma = self.sprite_dma[6] | self.sprite_dma[7];
                 self.set_ba(sprite_dma);
-                if self.sprites[6].dma {
+                if self.sprite_dma[6] {
                     self.s_access(6, 1);
                     self.s_access(6, 2);
                 }
             }
             9 => {
-                let sprite_dma = self.sprites[7].dma;
+                let sprite_dma = self.sprite_dma[7];
                 self.set_ba(sprite_dma);
                 self.p_access(7);
-                if self.sprites[7].dma {
+                if self.sprite_dma[7] {
                     self.s_access(7, 0);
                 }
             }
             10 => {
-                let sprite_dma = self.sprites[7].dma;
+                let sprite_dma = self.sprite_dma[7];
                 self.set_ba(sprite_dma);
-                if self.sprites[7].dma {
+                if self.sprite_dma[7] {
                     self.s_access(7, 1);
                     self.s_access(7, 2);
                 }
@@ -659,19 +678,19 @@ impl Chip for Vic {
                 self.draw_cycle_17_56();
                 self.update_sprite_dma_on();
                 self.update_sprite_expansion_ff();
-                let sprite_dma = self.sprites[0].dma;
+                let sprite_dma = self.sprite_dma[0];
                 self.set_ba(sprite_dma);
                 self.g_access();
             }
             56 => {
                 self.draw_cycle_17_56();
                 self.update_sprite_dma_on();
-                let sprite_dma = self.sprites[0].dma;
+                let sprite_dma = self.sprite_dma[0];
                 self.set_ba(sprite_dma);
             }
             57 => {
                 self.draw_border();
-                let sprite_dma = self.sprites[0].dma | self.sprites[1].dma;
+                let sprite_dma = self.sprite_dma[0] | self.sprite_dma[1];
                 self.set_ba(sprite_dma);
             }
             58 => {
@@ -702,52 +721,52 @@ impl Chip for Vic {
                     self.mc[i] = self.mc_base[i];
                 }
                 self.update_sprite_display();
-                let sprite_dma = self.sprites[0].dma | self.sprites[1].dma;
+                let sprite_dma = self.sprite_dma[0] | self.sprite_dma[1];
                 self.set_ba(sprite_dma);
                 self.p_access(0);
-                if self.sprites[0].dma {
+                if self.sprite_dma[0] {
                     self.s_access(0, 0);
                 }
             }
             59 => {
                 self.draw_border();
-                let sprite_dma = self.sprites[0].dma | self.sprites[1].dma | self.sprites[2].dma;
+                let sprite_dma = self.sprite_dma[0] | self.sprite_dma[1] | self.sprite_dma[2];
                 self.set_ba(sprite_dma);
-                if self.sprites[0].dma {
+                if self.sprite_dma[0] {
                     self.s_access(0, 1);
                     self.s_access(0, 2);
                 }
             }
             60 => {
                 self.draw_border();
-                let sprite_dma = self.sprites[1].dma | self.sprites[2].dma;
+                let sprite_dma = self.sprite_dma[1] | self.sprite_dma[2];
                 self.set_ba(sprite_dma);
                 self.p_access(1);
-                if self.sprites[1].dma {
+                if self.sprite_dma[1] {
                     self.s_access(1, 0);
                 }
             }
             61 => {
                 self.draw_border();
-                let sprite_dma = self.sprites[1].dma | self.sprites[2].dma | self.sprites[3].dma;
+                let sprite_dma = self.sprite_dma[1] | self.sprite_dma[2] | self.sprite_dma[3];
                 self.set_ba(sprite_dma);
-                if self.sprites[1].dma {
+                if self.sprite_dma[1] {
                     self.s_access(1, 1);
                     self.s_access(1, 2);
                 }
             }
             62 => {
-                let sprite_dma = self.sprites[2].dma | self.sprites[3].dma;
+                let sprite_dma = self.sprite_dma[2] | self.sprite_dma[3];
                 self.set_ba(sprite_dma);
                 self.p_access(2);
-                if self.sprites[2].dma {
+                if self.sprite_dma[2] {
                     self.s_access(2, 0);
                 }
             }
             63 => {
-                let sprite_dma = self.sprites[2].dma | self.sprites[3].dma | self.sprites[4].dma;
+                let sprite_dma = self.sprite_dma[2] | self.sprite_dma[3] | self.sprite_dma[4];
                 self.set_ba(sprite_dma);
-                if self.sprites[2].dma {
+                if self.sprite_dma[2] {
                     self.s_access(2, 1);
                     self.s_access(2, 2);
                 }
@@ -821,13 +840,20 @@ impl Chip for Vic {
         // Runtime State
         self.display_on = false;
         self.display_state = false;
+        self.frame_buffer_width = self.frame_buffer.borrow().get_dimension().0;
         self.is_bad_line = false;
-        for i in 0..self.sprite_ptrs.len() {
-            self.sprite_ptrs[i] = 0;
+        self.sprites_on = false;
+        for dma in self.sprite_dma.iter_mut() {
+            *dma = false;
         }
-        for i in 0..self.vm_data_line.len() {
-            self.vm_color_line[i] = 0;
-            self.vm_data_line[i] = 0;
+        for ptr in self.sprite_ptrs.iter_mut() {
+            *ptr= 0;
+        }
+        for value in self.vm_color_line.iter_mut() {
+            *value = 0;
+        }
+        for value in self.vm_data_line.iter_mut() {
+            *value = 0;
         }
     }
 

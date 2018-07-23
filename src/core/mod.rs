@@ -71,6 +71,8 @@ pub trait SoundOutput {
 }
 
 pub trait VideoOutput {
+    fn get_dimension(&self) -> (usize, usize);
     fn set_sync(&mut self, value: bool);
-    fn write(&mut self, x: u16, y: u16, color: u8);
+    fn write(&mut self, index: usize, color: u8);
+    fn write_at(&mut self, x: u16, y: u16, color: u8);
 }

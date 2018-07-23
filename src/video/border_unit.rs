@@ -2,8 +2,6 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use super::spec::Spec;
-
 pub struct Config {
     pub border_color: u8,
     pub csel: bool,
@@ -27,39 +25,17 @@ impl Config {
 }
 
 pub struct BorderUnit {
-    spec: Spec,
     pub config: Config,
     main_flop: bool,
     vertical_flop: bool,
 }
 
 impl BorderUnit {
-    pub fn new(spec: Spec) -> Self {
+    pub fn new() -> Self {
         BorderUnit {
-            spec,
             config: Config::new(),
             main_flop: false,
             vertical_flop: false,
-        }
-    }
-
-    fn map_sprite_to_screen(&self, x: u16) -> u16 {
-        match self.spec.first_x_coord {
-            0x194 => {
-                match x {
-                    0x000...0x193 => x + 0x64, // 0x1f7 - 0x193
-                    0x194...0x1ff => x - 0x194,
-                    _ => panic!("invalid sprite coords {}", x),
-                }
-            }
-            0x19c => {
-                match x {
-                    0x000...0x19b => x + 0x64, // 0x1ff - 0x19b
-                    0x19c...0x1ff => x - 0x19c,
-                    _ => panic!("invalid sprite coords {}", x),
-                }
-            }
-            _ => panic!("invalid sprite coords {}", x),
         }
     }
 
@@ -103,21 +79,21 @@ impl BorderUnit {
            border flip flop is not set, the main flip flop is reset.
         */
         if self.config.csel {
-            if x == self.map_sprite_to_screen(0x18) {
+            if x == 0x7c {
                 self.update_vertical_flop(y, den);
                 if !self.vertical_flop {
                     self.main_flop = false;
                 }
-            } else if x == self.map_sprite_to_screen(0x158) {
+            } else if x == 0x1bc {
                 self.main_flop = true;
             }
         } else {
-            if x == self.map_sprite_to_screen(0x1f) {
+            if x == 0x83 {
                 self.update_vertical_flop(y, den);
                 if !self.vertical_flop {
                     self.main_flop = false;
                 }
-            } else if x == self.map_sprite_to_screen(0x14f) {
+            } else if x == 0x1b3 {
                 self.main_flop = true;
             }
         }

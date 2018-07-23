@@ -94,6 +94,7 @@ impl C64 {
         let exp_io_line = Rc::new(RefCell::new(IoPort::new(0xff, 0xff)));
         let irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
         let nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
+        let vic_base_address = Rc::new(Cell::new(0u16));
 
         // Memory
         let color_ram = factory.new_ram(config.model.color_ram);
@@ -123,12 +124,12 @@ impl C64 {
         let vic = factory.new_vic(
             config.model.vic_model,
             ba_line.clone(),
-            cia_2_port_a.clone(),
             color_ram.clone(),
             frame_buffer.clone(),
             irq_line.clone(),
             ram.clone(),
             rom_charset.clone(),
+            vic_base_address.clone(),
         );
 
         // Memory Controller and Processor
@@ -198,7 +199,13 @@ impl C64 {
                 let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
                 mem_clone_2.borrow_mut().switch_banks(mode);
             }));
-
+        let vic_cia_2_port_a_clone = vic_base_address.clone();
+        cia_2_port_a
+            .borrow_mut()
+            .set_observer(Box::new(move |value| {
+                let base_address = ((!value & 0x03) as u16) << 14;
+                vic_cia_2_port_a_clone.set(base_address);
+            }));
         Ok(C64 {
             config,
             cpu,

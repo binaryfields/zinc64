@@ -58,7 +58,6 @@ pub struct SpriteSequencer {
     data: u32,
     delay_cycles: u8,
     pub display: bool,
-    pub dma: bool,
     pub expansion_flop: bool,
     output: Option<u8>,
 }
@@ -73,7 +72,6 @@ impl SpriteSequencer {
             data: 0,
             delay_cycles: 0,
             display: false,
-            dma: false,
             expansion_flop: true,
             output: None,
         }
@@ -95,7 +93,6 @@ impl SpriteSequencer {
         }
     }
 
-    #[inline]
     pub fn clock(&mut self, x: u16) {
         if self.display {
             if self.delay_cycles == 0 {
@@ -106,16 +103,16 @@ impl SpriteSequencer {
                     match self.config.mode {
                         Mode::Standard => {
                             self.output = self.output_pixel();
-                            self.counter = self.counter << 1;
-                            self.data = self.data << 1;
+                            self.counter <<= 1;
+                            self.data <<= 1;
                             if self.config.expand_x {
                                 self.delay_cycles = 0b0001;
                             }
                         }
                         Mode::Multicolor => {
                             self.output = self.output_mc_pixel();
-                            self.counter = self.counter << 2;
-                            self.data = self.data << 2;
+                            self.counter <<= 2;
+                            self.data <<= 2;
                             self.delay_cycles = if self.config.expand_x { 0b0111 } else { 0b0001 }
                         }
                     }
@@ -123,12 +120,11 @@ impl SpriteSequencer {
                     self.output = None;
                 }
             } else {
-                self.delay_cycles = self.delay_cycles >> 1;
+                self.delay_cycles >>= 1;
             }
         }
     }
 
-    #[inline]
     pub fn output(&self) -> Option<u8> {
         self.output
     }
@@ -141,12 +137,10 @@ impl SpriteSequencer {
         self.data = 0;
         self.delay_cycles = 0;
         self.display = false;
-        self.dma = false;
         self.expansion_flop = true;
         self.output = None;
     }
 
-    #[inline]
     fn output_pixel(&self) -> Option<u8> {
         if self.data.get_bit(31) {
             Some(self.config.color)
@@ -155,7 +149,6 @@ impl SpriteSequencer {
         }
     }
 
-    #[inline]
     fn output_mc_pixel(&self) -> Option<u8> {
         match self.data >> 30 {
             0 => None,
