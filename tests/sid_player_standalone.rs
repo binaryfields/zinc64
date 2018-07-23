@@ -77,8 +77,8 @@ fn exec_sid_player() {
     let clock = Rc::new(Clock::new());
     let ba_line = Rc::new(RefCell::new(Pin::new_high()));
     let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-    let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-    let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
+    let irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
+    let nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
     let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(4096)));
 
     // Setup chipset
@@ -99,8 +99,8 @@ fn exec_sid_player() {
     let mut cpu = Cpu6510::new(
         ba_line,
         cpu_io_port,
-        cpu_irq,
-        cpu_nmi,
+        irq_line,
+        nmi_line,
         mem,
     );
 

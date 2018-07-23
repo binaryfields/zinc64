@@ -1,23 +1,7 @@
 # TODO
 
-- get rid off #[allow(unused_variables)]
-- blash
-- system/condition keep fmt together
-- migrate to euclid
-- integrate github ci
-- add linux and windows builds
-- publish to crates
-- upgrade license to gpl3
-
-- chipset: rewrite vic
+- fix warnings
+- ci: add linux and windows builds
 - device: add floppy support
 - app: add screenshot support
 - app: add ui/menus
-
-- s/irq/irq_line
-- s/nmi/nmi_line
-- s/cia1/cia_1
-- s/cia2/cia_2
-- s/flag/flag_line
-- s/cpu_irq/irq_line
-- reconcile use of flag (should be 1 instance)

@@ -1,5 +1,8 @@
 # Zinc64
 
+[![Build Status](https://travis-ci.org/digitalstreamio/zinc64.svg?branch=master)](https://travis-ci.org/digitalstreamio/zinc64)
+[![Crates.io](https://img.shields.io/crates/v/zinc64.svg?maxAge=2592000)](https://crates.io/crates/zinc64)
+
 ## Overview
 
 zinc64 is a Commodore 64 emulator toolkit "with batteries included but
@@ -34,8 +37,8 @@ that provides core emulator functionality.
 Here is an example how these components are used together:
 
         let config = Rc::new(Config::new(SystemModel::from("pal")));
-        let factory = Box::new(ChipFactory::new(config.clone()));
-        let mut c64 = C64::new(config.clone(), factory).unwrap();
+        let chip_factory = Box::new(C64Factory::new(config.clone()));
+        let mut c64 = C64::new(config.clone(), chip_factory).unwrap();
         c64.reset(false);
 
 ## Status
@@ -64,8 +67,8 @@ Here is an example how these components are used together:
 
 ## Roadmap
 
-- v0.5  - zinc64 ui
-- v0.6  - floppy support
+- v0.6  - zinc64 ui
+- v0.7  - floppy support
 
 ## Getting Started
 
@@ -84,15 +87,15 @@ Here is an example how these components are used together:
 3. Build the emulator.
 
         cd zinc64
-        cargo build --release
+        cargo build --release --all
 
 4. Run the emulator.
 
-        ./target/release/zinc64
+        ./target/release/zinc64-sdl
 
     or start a program
 
-    	./target/release/zinc64 --autostart path
+    	./target/release/zinc64-sdl --autostart path
 
 ### Windows Considerations
 
@@ -119,7 +122,7 @@ Here is an example how these components are used together:
 To start the debugger, run the emulator with '-d' or '--debug' option. Optionally, you can specify '--debugaddress'
 to bind to a specific address.
 
-        ./target/release/zinc64 --debug
+        ./target/release/zinc64-sdl --debug
 
 To connect to the debugger, telnet to the address and port used by the debugger.
 
@@ -138,7 +141,7 @@ or to get help on a specific command:
 
 Initial support for radare2 has been merged in version 0.3. To start the emulator with RAP server support, run
 
-        ./target/release/zinc64 --rap 127.0.0.1:9999
+        ./target/release/zinc64-sdl --rap 127.0.0.1:9999
 
 and connect with
 
@@ -148,7 +151,7 @@ and connect with
 
 I've included a number of examples from Kick Assembler that I've used to test various components of the emulator. They can be found in the bin folder of this repository and started with the emulator's autostart option.
 
-        ./target/release/zinc64 --autostart bin/SineAndGraphics.prg
+        ./target/release/zinc64-sdl --autostart bin/SineAndGraphics.prg
 
 | Program                  | Status  |
 |--------------------------|---------|
@@ -166,7 +169,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 
 The cpu validation was performed with the help of [Klaus2m5 functional tests](https://github.com/Klaus2m5/6502_65C02_functional_tests) for the 6502 processor 
 
-        ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
+        ./target/release/zinc64-sdl --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
 
 ## Keyboard Shortcuts
 
