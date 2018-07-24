@@ -3,4 +3,4 @@ sudo: false
 rust:
   - stable
 script:
-  - cargo test --all
+  - cargo test
