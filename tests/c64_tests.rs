@@ -50,7 +50,7 @@ fn program_cia1tab() {
     let test_flag_clone = test_flag.clone();
     let test_cycle = Rc::new(Cell::new(0));
     let test_cycle_clone = test_cycle.clone();
-    let tick_fn: TickFn = Box::new(move || {
+    let tick_fn: TickFn = Rc::new(move || {
         cia1_clone.borrow_mut().clock();
         cia2_clone.borrow_mut().clock();
         clock_clone.tick();
@@ -99,7 +99,7 @@ fn exec_keyboard_read() {
     c64.load(&code.to_vec(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.borrow_mut().set_row(1, !(1 << 5));
-    c64.get_cpu_mut().write_debug(0x0001, 0x06);
+    c64.get_cpu_mut().write(0x0001, 0x06);
     c64.get_cpu_mut().set_pc(0xc000);
     let mut branch_count = 0;
     loop {

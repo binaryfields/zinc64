@@ -1,8 +1,10 @@
 # TODO
 
+- system: fix breakpoint checking
 - app: fix warnings
 - input: fix joystick handling/default joystick
 - ci: add linux and windows builds
+
 - device: add floppy support
 - app: add screenshot support
 - app: add ui/menus

@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn decode_brk() {
-        let tick_fn: TickFn = Box::new(move || {});
+        let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
         let valid = match Instruction::decode(&mut cpu, 0x00, &tick_fn) {
             Instruction::BRK => true,
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn decode_lda_absolute() {
-        let tick_fn: TickFn = Box::new(move || {});
+        let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
         let valid = match Instruction::decode(&mut cpu, 0xad, &tick_fn) {
             Instruction::LDA(Operand::Absolute(_)) => true,

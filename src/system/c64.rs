@@ -63,6 +63,7 @@ pub struct C64 {
     clock: Rc<Clock>,
     frame_count: u32,
     last_pc: u16,
+    tick_fn: TickFn,
 }
 
 impl C64 {
@@ -206,6 +207,20 @@ impl C64 {
                 let base_address = ((!value & 0x03) as u16) << 14;
                 vic_cia_2_port_a_clone.set(base_address);
             }));
+        let tick_fn: TickFn = {
+            let cia_1_clone = cia_1.clone();
+            let cia_2_clone = cia_2.clone();
+            let clock_clone = clock.clone();
+            let datassette_clone = datassette.clone();
+            let vic_clone = vic.clone();
+            Rc::new(move || {
+                vic_clone.borrow_mut().clock();
+                cia_1_clone.borrow_mut().clock();
+                cia_2_clone.borrow_mut().clock();
+                datassette_clone.borrow_mut().clock();
+                clock_clone.tick();
+            })
+        };
         Ok(C64 {
             config,
             cpu,
@@ -227,6 +242,7 @@ impl C64 {
             clock,
             frame_count: 0,
             last_pc: 0,
+            tick_fn,
         })
     }
 
@@ -375,18 +391,7 @@ impl C64 {
     }
 
     pub fn run_frame(&mut self) -> bool {
-        let cia_1_clone = self.cia_1.clone();
-        let cia_2_clone = self.cia_2.clone();
-        let clock_clone = self.clock.clone();
-        let datassette_clone = self.datassette.clone();
-        let vic_clone = self.vic.clone();
-        let tick_fn: TickFn = Box::new(move || {
-            vic_clone.borrow_mut().clock();
-            cia_1_clone.borrow_mut().clock();
-            cia_2_clone.borrow_mut().clock();
-            datassette_clone.borrow_mut().clock();
-            clock_clone.tick();
-        });
+        let tick_fn = self.tick_fn.clone();
         let bp_present = self.breakpoints.is_bp_present();
         let mut vsync = false;
         while !vsync {
@@ -406,18 +411,7 @@ impl C64 {
     }
 
     pub fn step(&mut self) {
-        let cia_1_clone = self.cia_1.clone();
-        let cia_2_clone = self.cia_2.clone();
-        let clock_clone = self.clock.clone();
-        let datassette_clone = self.datassette.clone();
-        let vic_clone = self.vic.clone();
-        let tick_fn: TickFn = Box::new(move || {
-            vic_clone.borrow_mut().clock();
-            cia_1_clone.borrow_mut().clock();
-            cia_2_clone.borrow_mut().clock();
-            datassette_clone.borrow_mut().clock();
-            clock_clone.tick();
-        });
+        let tick_fn = self.tick_fn.clone();
         self.step_internal(&tick_fn);
         if self.frame_buffer.borrow().get_sync() {
             self.sid.borrow_mut().process_vsync();
@@ -472,6 +466,6 @@ mod tests {
         let mut c64 = C64::new(config.clone(), factory).unwrap();
         c64.reset(false);
         let cpu = c64.get_cpu();
-        assert_eq!(0x94, cpu.read_debug(0xa000));
+        assert_eq!(0x94, cpu.read(0xa000));
     }
 }

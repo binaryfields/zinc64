@@ -91,14 +91,6 @@ impl Cpu6510 {
         }
     }
 
-    fn set_flag(&mut self, flag: Flag, value: bool) {
-        if value {
-            self.p |= flag as u8;
-        } else {
-            self.p &= !(flag as u8);
-        }
-    }
-
     fn execute(&mut self, instr: &Instruction, tick_fn: &TickFn) {
         match *instr {
             //  Data Movement
@@ -477,18 +469,18 @@ impl Cpu6510 {
     }
 
     pub fn fetch_byte(&mut self, tick_fn: &TickFn) -> u8 {
-        let byte = self.read(self.pc, tick_fn);
+        let byte = self.read_internal(self.pc, tick_fn);
         self.pc = self.pc.wrapping_add(1);
         byte
     }
 
     pub fn fetch_word(&mut self, tick_fn: &TickFn) -> u16 {
-        let word = self.read_word(self.pc, tick_fn);
+        let word = self.read_internal_u16(self.pc, tick_fn);
         self.pc = self.pc.wrapping_add(2);
         word
     }
 
-    fn interrupt(&mut self, interrupt: Interrupt, tick_fn: &TickFn) -> u8 {
+    fn interrupt(&mut self, interrupt: Interrupt, tick_fn: &TickFn) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
         }
@@ -516,21 +508,28 @@ impl Cpu6510 {
             }
             Interrupt::Reset => {}
         }
-        self.pc = self.read_word(interrupt.vector(), tick_fn);
+        self.pc = self.read_internal_u16(interrupt.vector(), tick_fn);
         tick_fn();
-        7
     }
 
     fn pop(&mut self, tick_fn: &TickFn) -> u8 {
         self.sp = self.sp.wrapping_add(1);
         let addr = 0x0100 + self.sp as u16;
-        self.read(addr, tick_fn)
+        self.read_internal(addr, tick_fn)
     }
 
     fn push(&mut self, value: u8, tick_fn: &TickFn) {
         let addr = 0x0100 + self.sp as u16;
         self.sp = self.sp.wrapping_sub(1);
-        self.write(addr, value, tick_fn);
+        self.write_internal(addr, value, tick_fn);
+    }
+
+    fn set_flag(&mut self, flag: Flag, value: bool) {
+        if value {
+            self.p |= flag as u8;
+        } else {
+            self.p &= !(flag as u8);
+        }
     }
 
     fn test_flag(&self, flag: Flag) -> bool {
@@ -544,7 +543,7 @@ impl Cpu6510 {
 
     // -- Memory Ops
 
-    pub fn read(&self, address: u16, tick_fn: &TickFn) -> u8 {
+    pub fn read_internal(&self, address: u16, tick_fn: &TickFn) -> u8 {
         let value = match address {
             0x0000 => self.io_port.borrow().get_direction(),
             0x0001 => self.io_port.borrow().get_value(),
@@ -554,13 +553,13 @@ impl Cpu6510 {
         value
     }
 
-    pub fn read_word(&self, address: u16, tick_fn: &TickFn) -> u16 {
-        let low = self.read(address, tick_fn);
-        let high = self.read(address + 1, tick_fn);
+    pub fn read_internal_u16(&self, address: u16, tick_fn: &TickFn) -> u16 {
+        let low = self.read_internal(address, tick_fn);
+        let high = self.read_internal(address + 1, tick_fn);
         ((high as u16) << 8) | low as u16
     }
 
-    pub fn write(&mut self, address: u16, value: u8, tick_fn: &TickFn) {
+    pub fn write_internal(&mut self, address: u16, value: u8, tick_fn: &TickFn) {
         match address {
             0x0000 => self.io_port.borrow_mut().set_direction(value),
             0x0001 => self.io_port.borrow_mut().set_value(value),
@@ -630,9 +629,9 @@ impl Cpu for Cpu6510 {
         self.io_port.borrow_mut().set_value(0xff);
         self.irq_line.borrow_mut().reset();
         self.nmi_line.borrow_mut().reset();
-        let tick_fn: TickFn = Box::new(move || {});
-        self.write(0x0000, 0b_0010_1111, &tick_fn);
-        self.write(0x0001, 0b_0001_1111, &tick_fn);
+        self.write(0x0000, 0b_0010_1111);
+        self.write(0x0001, 0b_0001_1111);
+        let tick_fn: TickFn = Rc::new(move || {});
         self.interrupt(Interrupt::Reset, &tick_fn);
     }
 
@@ -655,20 +654,16 @@ impl Cpu for Cpu6510 {
         self.execute(&instr, tick_fn);
     }
 
-    // I/O
+    // -- I/O
 
-    fn read_debug(&self, address: u16) -> u8 {
-        let tick_fn: TickFn = Box::new(move || {});
-        self.read(address, &tick_fn)
+    fn read(&self, address: u16) -> u8 {
+        let noop_fn: TickFn = Rc::new(move || {});
+        self.read_internal(address, &noop_fn)
     }
 
-    fn write_debug(&mut self, address: u16, value: u8) {
-        match address {
-            0x0000 => self.io_port.borrow_mut().set_direction(value),
-            0x0001 => self.io_port.borrow_mut().set_value(value),
-            _ => {}
-        }
-        self.mem.borrow_mut().write(address, value);
+    fn write(&mut self, address: u16, value: u8) {
+        let noop_fn: TickFn = Rc::new(move || {});
+        self.write_internal(address, value, &noop_fn);
     }
 }
 
@@ -759,7 +754,7 @@ mod tests {
 
     #[test]
     fn adc_80_16() {
-        let tick_fn: TickFn = Box::new(move || {});
+        let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
         cpu.a = 80;
         cpu.set_flag(Flag::Carry, false);
@@ -772,7 +767,7 @@ mod tests {
 
     #[test]
     fn inc_with_overflow() {
-        let tick_fn: TickFn = Box::new(move || {});
+        let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
         cpu.a = 0xff;
         cpu.execute(&Instruction::INC(Operand::Accumulator), &tick_fn);

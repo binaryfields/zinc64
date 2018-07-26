@@ -220,8 +220,8 @@ impl ExecutionEngine {
             p: cpu.get_p(),
             sp: cpu.get_sp(),
             pc: cpu.get_pc(),
-            port_00: cpu.read_debug(0x00),
-            port_01: cpu.read_debug(0x01),
+            port_00: cpu.read(0x00),
+            port_01: cpu.read(0x01),
         };
         Ok(CommandResult::Registers(regs))
     }
@@ -254,7 +254,7 @@ impl ExecutionEngine {
         let mut buffer = Vec::new();
         let mut address = start;
         while address < end {
-            buffer.push(cpu.read_debug(address));
+            buffer.push(cpu.read(address));
             address = address.wrapping_add(1);
         }
         Ok(CommandResult::Buffer(buffer))

@@ -7,7 +7,6 @@ extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate resid;
-extern crate time;
 
 pub mod core;
 pub mod cpu;

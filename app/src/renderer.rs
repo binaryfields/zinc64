@@ -40,7 +40,11 @@ impl Renderer {
             builder.resizable();
         }
         let window = builder.build().unwrap();
-        let canvas = window.into_canvas().build().unwrap();
+        let canvas = window.into_canvas()
+            .accelerated()
+            .present_vsync()
+            .build()
+            .unwrap();
         let creator = canvas.texture_creator();
         let texture = creator
             .create_texture_streaming(

@@ -110,7 +110,7 @@ fn exec_sid_player() {
 
     // Run it
     let clock_clone = clock.clone();
-    let tick_fn: TickFn = Box::new(move || {
+    let tick_fn: TickFn = Rc::new(move || {
         clock_clone.tick();
     });
 

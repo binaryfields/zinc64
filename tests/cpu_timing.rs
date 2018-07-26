@@ -310,12 +310,12 @@ fn opcode_timing() {
         if cycles > 0 {
             let clock = Rc::new(Cell::new(0u8));
             let clock_clone = clock.clone();
-            let tick_fn: TickFn = Box::new(move || {
+            let tick_fn: TickFn = Rc::new(move || {
                 clock_clone.set(clock_clone.get().wrapping_add(1));
             });
-            cpu.write_debug(0x1000, opcode as u8);
-            cpu.write_debug(0x1001, 0x00);
-            cpu.write_debug(0x1002, 0x10);
+            cpu.write(0x1000, opcode as u8);
+            cpu.write(0x1001, 0x00);
+            cpu.write(0x1002, 0x10);
             cpu.set_pc(0x1000);
             cpu.step(&tick_fn);
             assert_eq!(cycles, clock.get(), "opcode {:02x} timing failed", opcode as u8);

@@ -1,6 +1,6 @@
 [package]
 name = "zinc64-sdl"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 description = "Commodore 64 emulator app"
 license = "GPL-3.0+"
@@ -14,7 +14,7 @@ getopts = "0.2"
 gl = "0.7"
 log = "0.3"
 time = "0.1"
-zinc64 = { path = "..", version = "0.5.0" }
+zinc64 = { path = "..", version = "0.5.3" }
 
 [dependencies.sdl2]
 version = "0.31"

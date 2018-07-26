@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+use std::rc::Rc;
+
 mod chip_factory;
 mod clock;
 mod io_port;
@@ -37,7 +39,7 @@ pub trait Chip {
     fn write(&mut self, reg: u8, value: u8);
 }
 
-pub type TickFn = Box<Fn()>;
+pub type TickFn = Rc<Fn()>;
 
 pub trait Cpu {
     fn get_a(&self) -> u8;
@@ -55,8 +57,8 @@ pub trait Cpu {
     fn reset(&mut self);
     fn step(&mut self, tick_fn: &TickFn);
     // I/O
-    fn read_debug(&self, address: u16) -> u8;
-    fn write_debug(&mut self, address: u16, value: u8);
+    fn read(&self, address: u16) -> u8;
+    fn write(&mut self, address: u16, value: u8);
 }
 
 pub trait Mmu {
