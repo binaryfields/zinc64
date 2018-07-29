@@ -1,5 +1,6 @@
 # TODO
 
+- core: irq_control to irq
 - system: fix breakpoint checking
 - app: fix warnings
 - input: fix joystick handling/default joystick

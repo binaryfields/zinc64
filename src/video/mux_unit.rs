@@ -10,8 +10,24 @@ const PRIO_FG_GRAPHICS: u8 = 2;
 const PRIO_BG_SPRITE: u8 = 3;
 const PRIO_BG_GRAPHICS: u8 = 4;
 
-pub struct MuxUnit {
+pub struct Config {
     pub data_priority: [bool; 8],
+}
+
+impl Config {
+    pub fn new() -> Self {
+        Self {
+            data_priority: [false; 8],
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.data_priority = [false; 8];
+    }
+}
+
+pub struct MuxUnit {
+    pub config: Config,
     pub mb_collision: u8,
     pub mb_interrupt: bool,
     pub mm_collision: u8,
@@ -23,7 +39,7 @@ pub struct MuxUnit {
 impl MuxUnit {
     pub fn new() -> Self {
         MuxUnit {
-            data_priority: [false; 8],
+            config: Config::new(),
             mb_collision: 0,
             mb_interrupt: false,
             mm_collision: 0,
@@ -69,7 +85,7 @@ impl MuxUnit {
     pub fn feed_sprites(&mut self, sprite_output: &[Option<u8>; 8]) {
         for (i, sp_output) in sprite_output.iter().enumerate() {
             if let Some(output) = sp_output {
-                let priority = if self.data_priority[i] { PRIO_BG_SPRITE } else { PRIO_FG_SPRITE };
+                let priority = if self.config.data_priority[i] { PRIO_BG_SPRITE } else { PRIO_FG_SPRITE };
                 self.output_sprite_pixel(*output, priority);
             }
         }
@@ -80,7 +96,7 @@ impl MuxUnit {
     }
 
     pub fn reset(&mut self) {
-        self.data_priority = [false; 8];
+        self.config.reset();
         self.mb_collision = 0;
         self.mb_interrupt = false;
         self.mm_collision = 0;

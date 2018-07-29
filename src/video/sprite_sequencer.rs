@@ -11,11 +11,11 @@ pub enum Mode {
 }
 
 pub struct Config {
+    pub mode: Mode,
     pub color: u8,
     pub enabled: bool,
     pub expand_x: bool,
     pub expand_y: bool,
-    pub mode: Mode,
     pub multicolor: [u8; 2],
     pub x: u16,
     pub x_screen: u16,
@@ -25,11 +25,11 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Config {
+            mode: Mode::Standard,
             color: 0,
             enabled: false,
             expand_x: false,
             expand_y: false,
-            mode: Mode::Standard,
             multicolor: [0; 2],
             x: 0,
             x_screen: 0,
@@ -38,11 +38,11 @@ impl Config {
     }
 
     pub fn reset(&mut self) {
+        self.mode = Mode::Standard;
         self.color = 0;
         self.enabled = false;
         self.expand_x = false;
         self.expand_y = false;
-        self.mode = Mode::Standard;
         self.multicolor = [0; 2];
         self.x = 0;
         self.x_screen = 0;
