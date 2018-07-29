@@ -135,7 +135,7 @@ pub struct Vic {
     // Functional Units
     border_unit: BorderUnit,
     gfx_seq: GfxSequencer,
-    interrupt_control: IrqControl,
+    irq_control: IrqControl,
     mux_unit: MuxUnit,
     raster_unit: RasterUnit,
     sprite_units: [SpriteSequencer; 8],
@@ -186,7 +186,7 @@ impl Vic {
             // Functional Units
             border_unit: BorderUnit::new(),
             gfx_seq: GfxSequencer::new(),
-            interrupt_control: IrqControl::new(),
+            irq_control: IrqControl::new(),
             mux_unit: MuxUnit::new(),
             raster_unit: RasterUnit::new(),
             sprite_units: sprites,
@@ -349,12 +349,12 @@ impl Vic {
     }
 
     fn trigger_irq(&mut self, source: usize) {
-        self.interrupt_control.set_event(source);
-        if self.interrupt_control.is_triggered() {
+        self.irq_control.set_event(source);
+        if self.irq_control.is_triggered() {
             if log_enabled!(LogLevel::Trace) {
                 trace!(target: "vic::reg", "Irq data = {:02x}, mask = {:02x}, source: {}",
-                       self.interrupt_control.get_data(),
-                       self.interrupt_control.get_mask(),
+                       self.irq_control.get_data(),
+                       self.irq_control.get_mask(),
                        source
                 );
             }
@@ -855,7 +855,7 @@ impl Chip for Vic {
         // Functional Units
         self.border_unit.reset();
         self.gfx_seq.reset();
-        self.interrupt_control.reset();
+        self.irq_control.reset();
         self.mux_unit.reset();
         self.raster_unit.reset();
         for sprite_unit in self.sprite_units.iter_mut() {
@@ -943,9 +943,9 @@ impl Chip for Vic {
                 vm | cb | 0x01
             }
             // Reg::IRR
-            0x19 => self.interrupt_control.get_data() | 0x70,
+            0x19 => self.irq_control.get_data() | 0x70,
             // Reg::IMR
-            0x1a => self.interrupt_control.get_mask() | 0xf0,
+            0x1a => self.irq_control.get_mask() | 0xf0,
             // Reg::MDP
             0x1b => {
                 let mut result = 0;
@@ -1078,17 +1078,17 @@ impl Chip for Vic {
             }
             // Reg::IRR
             0x19 => {
-                self.interrupt_control.clear_events(value & 0x0f);
+                self.irq_control.clear_events(value & 0x0f);
                 self.irq_line
                     .borrow_mut()
                     .set_low(IrqSource::Vic.value(), false);
             }
             // Reg::IMR
             0x1a => {
-                self.interrupt_control.set_mask(value & 0x0f);
+                self.irq_control.set_mask(value & 0x0f);
                 self.irq_line.borrow_mut().set_low(
                     IrqSource::Vic.value(),
-                    self.interrupt_control.is_triggered(),
+                    self.irq_control.is_triggered(),
                 );
             }
             // Reg::MDP
