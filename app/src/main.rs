@@ -74,8 +74,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
         init_logging(&matches)?;
         info!("Starting {}", NAME);
         let config = Rc::new(Cli::parse_system_config(&matches)?);
-        let factory = Box::new(C64Factory::new(config.clone()));
-        let mut c64 = C64::new(config.clone(), factory).unwrap();
+        let chip_factory = Box::new(C64Factory::new(config.clone()));
+        let mut c64 = C64::new(config.clone(), chip_factory).unwrap();
         c64.reset(true);
         Cli::set_c64_options(&mut c64, &matches)?;
         if matches.opt_present("console") {

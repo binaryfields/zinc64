@@ -4,7 +4,6 @@
 
 use std::sync::mpsc::Sender;
 
-#[allow(dead_code)]
 pub enum Command {
     Attach(Sender<CommandResult>),
     Detach,
@@ -35,7 +34,6 @@ pub enum Command {
     SysStopwatch(bool),
 }
 
-#[allow(dead_code)]
 pub enum CommandResult {
     Await,
     Buffer(Vec<u8>),

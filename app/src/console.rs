@@ -9,8 +9,8 @@ pub struct ConsoleApp {
 }
 
 impl ConsoleApp {
-    pub fn new(c64: C64) -> ConsoleApp {
-        ConsoleApp { c64 }
+    pub fn new(c64: C64) -> Self {
+        Self{ c64 }
     }
 
     pub fn run(&mut self) {
@@ -21,8 +21,7 @@ impl ConsoleApp {
                 rt.borrow_mut().set_sync(false);
             }
             if self.c64.is_cpu_jam() {
-                let cpu = self.c64.get_cpu();
-                warn!(target: "main", "CPU JAM detected at 0x{:x}", cpu.get_pc());
+                warn!(target: "main", "CPU JAM detected at 0x{:x}", self.c64.get_cpu().get_pc());
                 break;
             }
         }

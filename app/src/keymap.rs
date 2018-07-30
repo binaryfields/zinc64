@@ -79,7 +79,7 @@ impl KeyMap {
             Keycode::X => Some(KeyEvent::new(Key::X)),
             Keycode::Y => Some(KeyEvent::new(Key::Y)),
             Keycode::Z => Some(KeyEvent::new(Key::Z)),
-            //
+            // Symbols
             Keycode::Asterisk => Some(KeyEvent::new(Key::Asterisk)),
             Keycode::At => Some(KeyEvent::new(Key::At)),
             Keycode::Backslash
@@ -118,7 +118,7 @@ impl KeyMap {
             Keycode::Semicolon => Some(KeyEvent::new(Key::Semicolon)),
             Keycode::Slash => Some(KeyEvent::new(Key::Slash)),
             Keycode::Space => Some(KeyEvent::new(Key::Space)),
-            //
+            // Control
             Keycode::Down => Some(KeyEvent::new(Key::CrsrDown)),
             Keycode::Home => Some(KeyEvent::new(Key::Home)),
             Keycode::LCtrl => Some(KeyEvent::new(Key::Ctrl)),
