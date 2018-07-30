@@ -27,7 +27,7 @@ impl VicMemory {
     }
 
     pub fn read(&self, address: u16) -> u8 {
-        let full_address =  self.base_address.get() | address;
+        let full_address = self.base_address.get() | address;
         let zone = full_address >> 12;
         match zone {
             0x01 => self.charset.borrow().read(full_address - 0x1000),

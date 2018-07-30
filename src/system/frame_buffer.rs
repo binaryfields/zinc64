@@ -58,7 +58,9 @@ impl FrameBuffer {
 }
 
 impl VideoOutput for FrameBuffer {
-    fn get_dimension(&self) -> (usize, usize) { self.dim }
+    fn get_dimension(&self) -> (usize, usize) {
+        self.dim
+    }
 
     fn set_sync(&mut self, value: bool) {
         FrameBuffer::set_sync(self, value);

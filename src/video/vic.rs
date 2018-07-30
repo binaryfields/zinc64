@@ -94,7 +94,7 @@ impl RasterUnit {
             sprites_on: false,
         }
     }
-    
+
     pub fn reset(&mut self) {
         self.display_on = false;
         self.display_state = false;
@@ -120,7 +120,7 @@ impl RasterUnit {
             *dma = false;
         }
         for ptr in self.sprite_ptrs.iter_mut() {
-            *ptr= 0;
+            *ptr = 0;
         }
         self.sprites_on = false;
     }
@@ -237,9 +237,7 @@ impl Vic {
                 }
             }
             let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(pixel_idx, pixel);
+            self.frame_buffer.borrow_mut().write(pixel_idx, pixel);
             pixel_idx += 1;
         }
     }
@@ -249,8 +247,7 @@ impl Vic {
         let x_scroll_start = x_start + self.x_scroll as u16;
         let mut pixel_idx = self.y as usize * self.frame_buffer_width + x_start as usize;
         for x in x_start..x_start + 8 {
-            self.border_unit
-                .update_main_flop(x, self.y, self.den);
+            self.border_unit.update_main_flop(x, self.y, self.den);
             if !self.border_unit.is_enabled() {
                 if x == x_scroll_start {
                     self.gfx_seq.load_data();
@@ -275,9 +272,7 @@ impl Vic {
                 }
             }
             let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(pixel_idx, pixel);
+            self.frame_buffer.borrow_mut().write(pixel_idx, pixel);
             pixel_idx += 1;
         }
     }
@@ -286,8 +281,7 @@ impl Vic {
         let x_start = (self.cycle << 3) - 12;
         let mut pixel_idx = self.y as usize * self.frame_buffer_width + x_start as usize;
         for x in x_start..x_start + 8 {
-            self.border_unit
-                .update_main_flop(x, self.y, self.den);
+            self.border_unit.update_main_flop(x, self.y, self.den);
             self.mux_unit.feed_border(self.border_unit.output());
             if self.raster_unit.sprites_on {
                 for sprite in self.sprite_units.iter_mut() {
@@ -304,9 +298,7 @@ impl Vic {
                 }
             }
             let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(pixel_idx, pixel);
+            self.frame_buffer.borrow_mut().write(pixel_idx, pixel);
             pixel_idx += 1;
         }
     }
@@ -479,7 +471,8 @@ impl Vic {
         if self.raster_unit.is_bad_line {
             let address = self.video_matrix | self.raster_unit.vc;
             self.raster_unit.vm_data_line[self.raster_unit.vmli] = self.mem.read(address);
-            self.raster_unit.vm_color_line[self.raster_unit.vmli] = self.color_ram.borrow().read(self.raster_unit.vc) & 0x0f;
+            self.raster_unit.vm_color_line[self.raster_unit.vmli] =
+                self.color_ram.borrow().read(self.raster_unit.vc) & 0x0f;
             // DEFERRED vic: memory no access unless ba down for 3 cycles
         }
     }
@@ -495,12 +488,14 @@ impl Vic {
                 }
                 Mode::EcmText => {
                     let address = self.char_base
-                        | (((self.raster_unit.vm_data_line[self.raster_unit.vmli] & 0x3f) as u16) << 3)
-                        | self.raster_unit.rc as u16;
+                        | (((self.raster_unit.vm_data_line[self.raster_unit.vmli] & 0x3f) as u16)
+                            << 3) | self.raster_unit.rc as u16;
                     self.mem.read(address)
                 }
                 Mode::Bitmap | Mode::McBitmap => {
-                    let address = self.char_base & 0x2000 | (self.raster_unit.vc << 3) | self.raster_unit.rc as u16;
+                    let address = self.char_base & 0x2000
+                        | (self.raster_unit.vc << 3)
+                        | self.raster_unit.rc as u16;
                     self.mem.read(address)
                 }
                 Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
@@ -577,7 +572,9 @@ impl Chip for Vic {
                 if self.y == self.raster_compare && self.y == 0 {
                     self.trigger_irq(0);
                 }
-                let sprite_dma = self.raster_unit.sprite_dma[3] | self.raster_unit.sprite_dma[4] | self.raster_unit.sprite_dma[5];
+                let sprite_dma = self.raster_unit.sprite_dma[3]
+                    | self.raster_unit.sprite_dma[4]
+                    | self.raster_unit.sprite_dma[5];
                 self.set_ba(sprite_dma);
                 if self.raster_unit.sprite_dma[3] {
                     self.s_access(3, 1);
@@ -593,7 +590,9 @@ impl Chip for Vic {
                 }
             }
             4 => {
-                let sprite_dma = self.raster_unit.sprite_dma[4] | self.raster_unit.sprite_dma[5] | self.raster_unit.sprite_dma[6];
+                let sprite_dma = self.raster_unit.sprite_dma[4]
+                    | self.raster_unit.sprite_dma[5]
+                    | self.raster_unit.sprite_dma[6];
                 self.set_ba(sprite_dma);
                 if self.raster_unit.sprite_dma[4] {
                     self.s_access(4, 1);
@@ -609,7 +608,9 @@ impl Chip for Vic {
                 }
             }
             6 => {
-                let sprite_dma = self.raster_unit.sprite_dma[5] | self.raster_unit.sprite_dma[6] | self.raster_unit.sprite_dma[7];
+                let sprite_dma = self.raster_unit.sprite_dma[5]
+                    | self.raster_unit.sprite_dma[6]
+                    | self.raster_unit.sprite_dma[7];
                 self.set_ba(sprite_dma);
                 if self.raster_unit.sprite_dma[5] {
                     self.s_access(5, 1);
@@ -773,7 +774,9 @@ impl Chip for Vic {
             }
             59 => {
                 self.draw_border();
-                let sprite_dma = self.raster_unit.sprite_dma[0] | self.raster_unit.sprite_dma[1] | self.raster_unit.sprite_dma[2];
+                let sprite_dma = self.raster_unit.sprite_dma[0]
+                    | self.raster_unit.sprite_dma[1]
+                    | self.raster_unit.sprite_dma[2];
                 self.set_ba(sprite_dma);
                 if self.raster_unit.sprite_dma[0] {
                     self.s_access(0, 1);
@@ -791,7 +794,9 @@ impl Chip for Vic {
             }
             61 => {
                 self.draw_border();
-                let sprite_dma = self.raster_unit.sprite_dma[1] | self.raster_unit.sprite_dma[2] | self.raster_unit.sprite_dma[3];
+                let sprite_dma = self.raster_unit.sprite_dma[1]
+                    | self.raster_unit.sprite_dma[2]
+                    | self.raster_unit.sprite_dma[3];
                 self.set_ba(sprite_dma);
                 if self.raster_unit.sprite_dma[1] {
                     self.s_access(1, 1);
@@ -807,14 +812,15 @@ impl Chip for Vic {
                 }
             }
             63 => {
-                let sprite_dma = self.raster_unit.sprite_dma[2] | self.raster_unit.sprite_dma[3] | self.raster_unit.sprite_dma[4];
+                let sprite_dma = self.raster_unit.sprite_dma[2]
+                    | self.raster_unit.sprite_dma[3]
+                    | self.raster_unit.sprite_dma[4];
                 self.set_ba(sprite_dma);
                 if self.raster_unit.sprite_dma[2] {
                     self.s_access(2, 1);
                     self.s_access(2, 2);
                 }
-                self.border_unit
-                    .update_vertical_flop(self.y, self.den);
+                self.border_unit.update_vertical_flop(self.y, self.den);
             }
             64 => {}
             65 => {}
@@ -958,7 +964,10 @@ impl Chip for Vic {
             0x1c => {
                 let mut result = 0;
                 for i in 0..8 {
-                    result.set_bit(i, self.sprite_units[i].config.mode == SpriteMode::Multicolor);
+                    result.set_bit(
+                        i,
+                        self.sprite_units[i].config.mode == SpriteMode::Multicolor,
+                    );
                 }
                 result
             }
@@ -1006,7 +1015,8 @@ impl Chip for Vic {
             // Reg::M0X - Reg::M7X
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
                 let n = (reg >> 1) as usize;
-                self.sprite_units[n].config.x = (self.sprite_units[n].config.x & 0xff00) | (value as u16);
+                self.sprite_units[n].config.x =
+                    (self.sprite_units[n].config.x & 0xff00) | (value as u16);
                 self.sprite_units[n].config.x_screen =
                     self.map_sprite_to_screen(self.sprite_units[n].config.x);
             }
@@ -1086,10 +1096,9 @@ impl Chip for Vic {
             // Reg::IMR
             0x1a => {
                 self.irq_control.set_mask(value & 0x0f);
-                self.irq_line.borrow_mut().set_low(
-                    IrqSource::Vic.value(),
-                    self.irq_control.is_triggered(),
-                );
+                self.irq_line
+                    .borrow_mut()
+                    .set_low(IrqSource::Vic.value(), self.irq_control.is_triggered());
             }
             // Reg::MDP
             0x1b => for i in 0..8 as usize {

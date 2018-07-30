@@ -106,7 +106,9 @@ impl GfxSequencer {
                     self.output = self.output_bitmap_mc()
                 }
                 Mode::EcmText => self.output = self.output_text_ecm(),
-                Mode::InvalidText => panic!("unsupported graphics mode {}", self.config.mode.value()),
+                Mode::InvalidText => {
+                    panic!("unsupported graphics mode {}", self.config.mode.value())
+                }
                 Mode::InvalidBitmap1 => self.output = (0, false),
                 Mode::InvalidBitmap2 => self.output = (0, false),
             };

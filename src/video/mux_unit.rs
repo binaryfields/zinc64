@@ -78,14 +78,22 @@ impl MuxUnit {
     }
 
     pub fn feed_graphics(&mut self, gfx_output: (u8, bool)) {
-        let priority = if gfx_output.1 { PRIO_FG_GRAPHICS } else { PRIO_BG_GRAPHICS };
+        let priority = if gfx_output.1 {
+            PRIO_FG_GRAPHICS
+        } else {
+            PRIO_BG_GRAPHICS
+        };
         self.output_pixel(gfx_output.0, priority);
     }
 
     pub fn feed_sprites(&mut self, sprite_output: &[Option<u8>; 8]) {
         for (i, sp_output) in sprite_output.iter().enumerate() {
             if let Some(output) = sp_output {
-                let priority = if self.config.data_priority[i] { PRIO_BG_SPRITE } else { PRIO_FG_SPRITE };
+                let priority = if self.config.data_priority[i] {
+                    PRIO_BG_SPRITE
+                } else {
+                    PRIO_FG_SPRITE
+                };
                 self.output_sprite_pixel(*output, priority);
             }
         }

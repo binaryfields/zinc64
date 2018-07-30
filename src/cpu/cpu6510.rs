@@ -475,7 +475,8 @@ impl Cpu6510 {
             }
             // Undocumented
             Instruction::AXS(ref op) => {
-                let result = ((self.regs.a & self.regs.x) as u16).wrapping_sub(op.get(self, tick_fn) as u16);
+                let result =
+                    ((self.regs.a & self.regs.x) as u16).wrapping_sub(op.get(self, tick_fn) as u16);
                 self.set_flag(Flag::Carry, result < 0x100);
                 self.update_nz((result & 0xff) as u8);
                 self.regs.x = (result & 0xff) as u8;
