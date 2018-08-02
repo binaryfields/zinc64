@@ -22,7 +22,8 @@ pub struct Cli;
 impl Cli {
     pub fn parse_args(args: &Vec<String>) -> Result<getopts::Matches, String> {
         let opts = Cli::build_options();
-        let matches = opts.parse(&args[1..])
+        let matches = opts
+            .parse(&args[1..])
             .map_err(|f| format!("Invalid options\n{}", f))?;
         Ok(matches)
     }

@@ -111,9 +111,7 @@ impl App {
             let command_tx_clone = command_tx.clone();
             thread::spawn(move || {
                 let debugger = Debugger::new(command_tx_clone);
-                debugger
-                    .start(address)
-                    .expect("Failed to start debugger");
+                debugger.start(address).expect("Failed to start debugger");
             });
         }
         if let Some(address) = options.rap_address {
@@ -121,9 +119,7 @@ impl App {
             let command_tx_clone = command_tx.clone();
             thread::spawn(move || {
                 let rap_server = RapServer::new(command_tx_clone);
-                rap_server
-                    .start(address)
-                    .expect("Failed to start debugger");
+                rap_server.start(address).expect("Failed to start debugger");
             });
         }
         let app = App {
@@ -155,7 +151,9 @@ impl App {
                     } else {
                         match self.execution_engine.halt() {
                             Ok(_) => (),
-                            Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
+                            Err(error) => {
+                                error!(target: "app", "Failed to execute halt: {}", error)
+                            }
                         };
                     }
                 }
@@ -204,9 +202,7 @@ impl App {
             }
             {
                 let fb = frame_buffer.borrow();
-                self.renderer
-                    .render(&fb)
-                    .expect("Failed to render frame");
+                self.renderer.render(&fb).expect("Failed to render frame");
             }
             frame_buffer.borrow_mut().set_sync(false);
         }
@@ -225,7 +221,8 @@ impl App {
     }
 
     fn sync_frame(&mut self) {
-        let refresh_rate = self.execution_engine
+        let refresh_rate = self
+            .execution_engine
             .get_c64()
             .get_config()
             .model
@@ -321,75 +318,75 @@ impl App {
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        match self.execution_engine.halt() {
-                            Ok(_) => (),
-                            Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
-                        };
-                    }
+                {
+                    match self.execution_engine.halt() {
+                        Ok(_) => (),
+                        Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
+                    };
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::M),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.toggle_mute();
-                    }
+                {
+                    self.toggle_mute();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::P),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.toggle_pause();
-                    }
+                {
+                    self.toggle_pause();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::Q),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.set_state(State::Stopped);
-                    }
+                {
+                    self.set_state(State::Stopped);
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::W),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.toggle_warp();
-                    }
+                {
+                    self.toggle_warp();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::F9),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.reset();
-                    }
+                {
+                    self.reset();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::F1),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LCTRLMOD) =>
-                    {
-                        self.toggle_datassette_play();
-                    }
+                {
+                    self.toggle_datassette_play();
+                }
                 Event::KeyDown {
                     keycode: Some(Keycode::Return),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                    {
-                        self.renderer.toggle_fullscreen();
-                    }
+                {
+                    self.renderer.toggle_fullscreen();
+                }
                 _ => {
                     self.io.handle_event(&event);
                 }
@@ -398,12 +395,13 @@ impl App {
         let keyboard = self.execution_engine.get_c64().get_keyboard();
         if keyboard.borrow().has_events()
             && self.execution_engine.get_c64().get_cycles() >= self.next_keyboard_event
-            {
-                keyboard.borrow_mut().drain_event();
-                self.next_keyboard_event = self.execution_engine
-                    .get_c64()
-                    .get_cycles()
-                    .wrapping_add(20000);
-            }
+        {
+            keyboard.borrow_mut().drain_event();
+            self.next_keyboard_event = self
+                .execution_engine
+                .get_c64()
+                .get_cycles()
+                .wrapping_add(20000);
+        }
     }
 }

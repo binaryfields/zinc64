@@ -106,11 +106,13 @@ impl Io {
                 keymod,
                 ..
             } => {
-                let is_virtual_1 = self.joystick1
+                let is_virtual_1 = self
+                    .joystick1
                     .as_ref()
                     .map(|joystick| joystick.borrow().is_virtual())
                     .unwrap_or(false);
-                let is_virtual_2 = self.joystick2
+                let is_virtual_2 = self
+                    .joystick2
                     .as_ref()
                     .map(|joystick| joystick.borrow().is_virtual())
                     .unwrap_or(false);
@@ -134,11 +136,13 @@ impl Io {
                 keymod,
                 ..
             } => {
-                let is_virtual_1 = self.joystick1
+                let is_virtual_1 = self
+                    .joystick1
                     .as_ref()
                     .map(|joystick| joystick.borrow().is_virtual())
                     .unwrap_or(false);
-                let is_virtual_2 = self.joystick2
+                let is_virtual_2 = self
+                    .joystick2
                     .as_ref()
                     .map(|joystick| joystick.borrow().is_virtual())
                     .unwrap_or(false);
