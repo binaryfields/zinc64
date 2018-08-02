@@ -1,7 +1,6 @@
 # TODO
 
 - system: fix breakpoint checking
-- app: fix warnings
 - input: fix joystick handling/default joystick
 - ci: add linux and windows builds
 

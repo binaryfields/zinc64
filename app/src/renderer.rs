@@ -40,7 +40,8 @@ impl Renderer {
             builder.resizable();
         }
         let window = builder.build().unwrap();
-        let canvas = window.into_canvas()
+        let canvas = window
+            .into_canvas()
             .accelerated()
             .present_vsync()
             .build()

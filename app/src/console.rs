@@ -10,7 +10,7 @@ pub struct ConsoleApp {
 
 impl ConsoleApp {
     pub fn new(c64: C64) -> Self {
-        Self{ c64 }
+        Self { c64 }
     }
 
     pub fn run(&mut self) {

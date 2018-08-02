@@ -69,32 +69,31 @@ impl ExecutionEngine {
 
     fn execute_internal(&mut self, command: &Command) -> Result<CommandResult, String> {
         match *command {
-            Command::Attach(ref debugger) => self.attach(debugger),
-            Command::Detach => self.detach(),
+            Command::Attach(ref debugger) => Ok(self.attach(debugger)),
+            Command::Detach => Ok(self.detach()),
             // Breakpoint
-            Command::BpClear => self.bp_clear(),
+            Command::BpClear => Ok(self.bp_clear()),
             Command::BpCondition(index, ref expr, radix) => self.bp_condition(index, expr, radix),
             Command::BpDisable(index) => self.bp_enable(index, false),
-            Command::BpDisableAll => self.bp_enable_all(false),
+            Command::BpDisableAll => Ok(self.bp_enable_all(false)),
             Command::BpEnable(index) => self.bp_enable(index, true),
-            Command::BpEnableAll => self.bp_enable_all(true),
+            Command::BpEnableAll => Ok(self.bp_enable_all(true)),
             Command::BpIgnore(index, count) => self.bp_ignore(index, count),
-            Command::BpList => self.bp_list(),
+            Command::BpList => Ok(self.bp_list()),
             Command::BpRemove(index) => self.bp_remove(index),
-            Command::BpSet(address, autodelete) => self.bp_set(address, autodelete),
+            Command::BpSet(address, autodelete) => Ok(self.bp_set(address, autodelete)),
             // Debugger
-            Command::Continue => self.continue_(),
-            Command::RegRead => self.reg_read(),
-            Command::RegWrite(ref ops) => self.reg_write(ops),
-            Command::Step => self.step(),
+            Command::Continue => Ok(self.continue_()),
+            Command::RegRead => Ok(self.reg_read()),
+            Command::RegWrite(ref ops) => Ok(self.reg_write(ops)),
+            Command::Step => Ok(self.step()),
             // Memory
-            Command::MemRead(start, end) => self.mem_read(start, end),
-            Command::MemWrite(address, ref data) => self.mem_write(address, data),
+            Command::MemRead(start, end) => Ok(self.mem_read(start, end)),
+            Command::MemWrite(address, ref data) => Ok(self.mem_write(address, data)),
             // System
-            Command::SysIo(_address) => self.sys_screen(),
-            Command::SysQuit => self.sys_quit(),
-            Command::SysReset(hard) => self.sys_reset(hard),
-            Command::SysScreen => self.sys_screen(),
+            Command::SysQuit => Ok(self.sys_quit()),
+            Command::SysReset(hard) => Ok(self.sys_reset(hard)),
+            Command::SysScreen => Ok(self.sys_screen()),
             Command::SysStopwatch(reset) => self.sys_stopwatch(reset),
         }
     }
@@ -111,24 +110,24 @@ impl ExecutionEngine {
 
     // -- Commands
 
-    fn attach(&mut self, debugger: &Sender<CommandResult>) -> Result<CommandResult, String> {
+    fn attach(&mut self, debugger: &Sender<CommandResult>) -> CommandResult {
         self.debugger = Some(debugger.clone());
         self.state = State::Halted;
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
-    fn detach(&mut self) -> Result<CommandResult, String> {
+    fn detach(&mut self) -> CommandResult {
         self.debugger = None;
         self.state = State::Running;
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
     // -- Breakpoint
 
-    fn bp_clear(&mut self) -> Result<CommandResult, String> {
+    fn bp_clear(&mut self) -> CommandResult {
         let bpm = self.c64.get_bpm_mut();
         bpm.clear();
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
     fn bp_condition(
@@ -157,10 +156,10 @@ impl ExecutionEngine {
         Ok(CommandResult::Unit)
     }
 
-    fn bp_enable_all(&mut self, enabled: bool) -> Result<CommandResult, String> {
+    fn bp_enable_all(&mut self, enabled: bool) -> CommandResult {
         let bpm = self.c64.get_bpm_mut();
         bpm.enable_all(enabled);
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
     fn bp_ignore(&mut self, index: u16, count: u16) -> Result<CommandResult, String> {
@@ -169,7 +168,7 @@ impl ExecutionEngine {
         Ok(CommandResult::Unit)
     }
 
-    fn bp_list(&self) -> Result<CommandResult, String> {
+    fn bp_list(&self) -> CommandResult {
         let bpm = self.c64.get_bpm();
         let mut buffer = String::new();
         for bp in bpm.list() {
@@ -188,7 +187,7 @@ impl ExecutionEngine {
         if buffer.is_empty() {
             buffer.push_str("No breakpoints are set\n");
         }
-        Ok(CommandResult::Text(buffer))
+        CommandResult::Text(buffer)
     }
 
     fn bp_remove(&mut self, index: u16) -> Result<CommandResult, String> {
@@ -197,21 +196,21 @@ impl ExecutionEngine {
         Ok(CommandResult::Unit)
     }
 
-    fn bp_set(&mut self, address: u16, autodelete: bool) -> Result<CommandResult, String> {
+    fn bp_set(&mut self, address: u16, autodelete: bool) -> CommandResult {
         let bpm = self.c64.get_bpm_mut();
         let index = bpm.set(address, autodelete);
         let buffer = format!("Bp {}: ${:04x}\n", index, address);
-        Ok(CommandResult::Text(buffer))
+        CommandResult::Text(buffer)
     }
 
     // Debugger
 
-    fn continue_(&mut self) -> Result<CommandResult, String> {
+    fn continue_(&mut self) -> CommandResult {
         self.state = State::Running;
-        Ok(CommandResult::Await)
+        CommandResult::Await
     }
 
-    fn reg_read(&mut self) -> Result<CommandResult, String> {
+    fn reg_read(&mut self) -> CommandResult {
         let cpu = self.c64.get_cpu();
         let regs = command::RegData {
             a: cpu.get_a(),
@@ -223,10 +222,10 @@ impl ExecutionEngine {
             port_00: cpu.read(0x00),
             port_01: cpu.read(0x01),
         };
-        Ok(CommandResult::Registers(regs))
+        CommandResult::Registers(regs)
     }
 
-    fn reg_write(&mut self, ops: &Vec<RegOp>) -> Result<CommandResult, String> {
+    fn reg_write(&mut self, ops: &Vec<RegOp>) -> CommandResult {
         let cpu = self.c64.get_cpu_mut();
         for op in ops {
             match op {
@@ -238,18 +237,18 @@ impl ExecutionEngine {
                 &RegOp::SetPC(value) => cpu.set_pc(value),
             }
         }
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
-    fn step(&mut self) -> Result<CommandResult, String> {
+    fn step(&mut self) -> CommandResult {
         self.c64.step();
         let bp_hit = if self.c64.check_breakpoints() { 1 } else { 0 };
-        Ok(CommandResult::Number(bp_hit))
+        CommandResult::Number(bp_hit)
     }
 
     // -- Memory
 
-    fn mem_read(&self, start: u16, end: u16) -> Result<CommandResult, String> {
+    fn mem_read(&self, start: u16, end: u16) -> CommandResult {
         let cpu = self.c64.get_cpu();
         let mut buffer = Vec::new();
         let mut address = start;
@@ -257,33 +256,33 @@ impl ExecutionEngine {
             buffer.push(cpu.read(address));
             address = address.wrapping_add(1);
         }
-        Ok(CommandResult::Buffer(buffer))
+        CommandResult::Buffer(buffer)
     }
 
-    fn mem_write(&mut self, address: u16, data: &Vec<u8>) -> Result<CommandResult, String> {
+    fn mem_write(&mut self, address: u16, data: &Vec<u8>) -> CommandResult {
         self.c64.load(data, address);
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
     // -- System
 
-    fn sys_quit(&mut self) -> Result<CommandResult, String> {
+    fn sys_quit(&mut self) -> CommandResult {
         self.state = State::Stopped;
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
-    fn sys_reset(&mut self, hard: bool) -> Result<CommandResult, String> {
+    fn sys_reset(&mut self, hard: bool) -> CommandResult {
         self.c64.reset(hard);
-        Ok(CommandResult::Unit)
+        CommandResult::Unit
     }
 
-    fn sys_screen(&self) -> Result<CommandResult, String> {
+    fn sys_screen(&self) -> CommandResult {
         let cia2 = self.c64.get_cia_2();
         let vic = self.c64.get_vic();
         let cia2_port_a = cia2.borrow_mut().read(0x00);
         let vm = (((vic.borrow_mut().read(0x18) & 0xf0) >> 4) as u16) << 10;
         let vm_base = ((!cia2_port_a & 0x03) as u16) << 14 | vm;
-        Ok(CommandResult::Number(vm_base))
+        CommandResult::Number(vm_base)
     }
 
     fn sys_stopwatch(&mut self, reset: bool) -> Result<CommandResult, String> {

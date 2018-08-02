@@ -74,7 +74,7 @@ impl App {
         let sdl_context = sdl2::init()?;
         // Initialize video
         let sdl_video = sdl_context.video()?;
-        info!(target: "ui", "Opening app window {}x{}", options.window_size.0, options.window_size.1);
+        info!(target: "app", "Opening app window {}x{}", options.window_size.0, options.window_size.1);
         let renderer = Renderer::new(
             &sdl_video,
             options.window_size,
@@ -107,19 +107,23 @@ impl App {
             let address = options
                 .dbg_address
                 .unwrap_or(SocketAddr::from(([127, 0, 0, 1], 9999)));
-            info!(target: "ui", "Starting debugger at {}", address);
+            info!(target: "app", "Starting debugger at {}", address);
             let command_tx_clone = command_tx.clone();
             thread::spawn(move || {
                 let debugger = Debugger::new(command_tx_clone);
-                debugger.start(address);
+                debugger
+                    .start(address)
+                    .expect("Failed to start debugger");
             });
         }
         if let Some(address) = options.rap_address {
-            info!(target: "ui", "Starting rap server at {}", address);
+            info!(target: "app", "Starting rap server at {}", address);
             let command_tx_clone = command_tx.clone();
             thread::spawn(move || {
                 let rap_server = RapServer::new(command_tx_clone);
-                rap_server.start(address);
+                rap_server
+                    .start(address)
+                    .expect("Failed to start debugger");
             });
         }
         let app = App {
@@ -137,7 +141,7 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<(), String> {
-        info!(target: "ui", "Running main loop");
+        info!(target: "app", "Running main loop");
         let mut events = self.sdl_context.event_pump().unwrap();
         'running: loop {
             match self.execution_engine.get_state() {
@@ -149,7 +153,10 @@ impl App {
                     if vsync {
                         self.process_vsync();
                     } else {
-                        self.execution_engine.halt();
+                        match self.execution_engine.halt() {
+                            Ok(_) => (),
+                            Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
+                        };
                     }
                 }
                 State::Paused => {
@@ -162,7 +169,7 @@ impl App {
                     thread::sleep(Duration::from_millis(20));
                 }
                 State::Stopped => {
-                    info!(target: "ui", "State {:?}", self.execution_engine.get_state());
+                    info!(target: "app", "State {:?}", self.execution_engine.get_state());
                     break 'running;
                 }
             }
@@ -172,21 +179,52 @@ impl App {
         Ok(())
     }
 
+    #[allow(dead_code)]
+    fn handle_cpu_jam(&mut self) -> bool {
+        match self.options.jam_action {
+            JamAction::Continue => true,
+            JamAction::Quit => {
+                warn!(target: "app", "CPU JAM detected at 0x{:x}", self.execution_engine.get_c64().get_cpu().get_pc());
+                self.set_state(State::Stopped);
+                false
+            }
+            JamAction::Reset => {
+                warn!(target: "app", "CPU JAM detected at 0x{:x}", self.execution_engine.get_c64().get_cpu().get_pc());
+                self.reset();
+                false
+            }
+        }
+    }
+
     fn process_vsync(&mut self) {
-        let rt = self.execution_engine.get_c64().get_frame_buffer();
-        if rt.borrow().get_sync() {
+        let frame_buffer = self.execution_engine.get_c64().get_frame_buffer();
+        if frame_buffer.borrow().get_sync() {
             if !self.options.warp_mode {
                 self.sync_frame();
             }
             {
-                let frame_buffer = rt.borrow();
-                self.renderer.render(&frame_buffer);
+                let fb = frame_buffer.borrow();
+                self.renderer
+                    .render(&fb)
+                    .expect("Failed to render frame");
             }
-            rt.borrow_mut().set_sync(false);
+            frame_buffer.borrow_mut().set_sync(false);
         }
     }
 
-    pub fn sync_frame(&mut self) {
+    fn reset(&mut self) {
+        self.execution_engine.get_c64_mut().reset(false);
+        self.next_keyboard_event = 0;
+    }
+
+    fn set_state(&mut self, new_state: State) {
+        if self.execution_engine.get_state() != new_state {
+            self.execution_engine.set_state(new_state);
+            self.update_audio_state();
+        }
+    }
+
+    fn sync_frame(&mut self) {
         let refresh_rate = self.execution_engine
             .get_c64()
             .get_config()
@@ -204,35 +242,6 @@ impl App {
             thread::sleep(Duration::new(0, wait_ns));
         }
         self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
-    }
-
-    #[allow(dead_code)]
-    fn handle_cpu_jam(&mut self) -> bool {
-        match self.options.jam_action {
-            JamAction::Continue => true,
-            JamAction::Quit => {
-                warn!(target: "ui", "CPU JAM detected at 0x{:x}", self.execution_engine.get_c64().get_cpu().get_pc());
-                self.set_state(State::Stopped);
-                false
-            }
-            JamAction::Reset => {
-                warn!(target: "ui", "CPU JAM detected at 0x{:x}", self.execution_engine.get_c64().get_cpu().get_pc());
-                self.reset();
-                false
-            }
-        }
-    }
-
-    fn reset(&mut self) {
-        self.execution_engine.execute(&Command::SysReset(false)); // FIXME
-        self.next_keyboard_event = 0;
-    }
-
-    fn set_state(&mut self, new_state: State) {
-        if self.execution_engine.get_state() != new_state {
-            self.execution_engine.set_state(new_state);
-            self.update_audio_state();
-        }
     }
 
     fn toggle_datassette_play(&mut self) {
@@ -273,23 +282,25 @@ impl App {
 
     // -- Event Handling
 
+    fn handle_command(&mut self, command: &Command) {
+        match self.execution_engine.execute(&command) {
+            Ok(_) => (),
+            Err(error) => warn!(target: "app", "Failed to execute command: {}", error),
+        };
+    }
+
     fn handle_commands(&mut self, debugging: bool) {
         if !debugging {
             match self.command_rx.try_recv() {
-                Ok(command) => self.execution_engine.execute(&command),
-                _ => Ok(()),
+                Ok(command) => self.handle_command(&command),
+                _ => (),
             };
         } else {
-            let mut done = false;
-            while !done {
+            loop {
                 match self.command_rx.recv_timeout(Duration::from_millis(1)) {
-                    Ok(command) => {
-                        self.execution_engine.execute(&command);
-                    }
-                    _ => {
-                        done = true;
-                    }
-                }
+                    Ok(command) => self.handle_command(&command),
+                    _ => break,
+                };
             }
         }
     }
@@ -310,72 +321,75 @@ impl App {
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.execution_engine.halt();
-                }
+                    {
+                        match self.execution_engine.halt() {
+                            Ok(_) => (),
+                            Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
+                        };
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::M),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.toggle_mute();
-                }
+                    {
+                        self.toggle_mute();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::P),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.toggle_pause();
-                }
+                    {
+                        self.toggle_pause();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::Q),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.set_state(State::Stopped);
-                }
+                    {
+                        self.set_state(State::Stopped);
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::W),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.toggle_warp();
-                }
+                    {
+                        self.toggle_warp();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::F9),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.reset();
-                }
+                    {
+                        self.reset();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::F1),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LCTRLMOD) =>
-                {
-                    self.toggle_datassette_play();
-                }
+                    {
+                        self.toggle_datassette_play();
+                    }
                 Event::KeyDown {
                     keycode: Some(Keycode::Return),
                     keymod,
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) =>
-                {
-                    self.renderer.toggle_fullscreen();
-                }
+                    {
+                        self.renderer.toggle_fullscreen();
+                    }
                 _ => {
                     self.io.handle_event(&event);
                 }
@@ -384,12 +398,12 @@ impl App {
         let keyboard = self.execution_engine.get_c64().get_keyboard();
         if keyboard.borrow().has_events()
             && self.execution_engine.get_c64().get_cycles() >= self.next_keyboard_event
-        {
-            keyboard.borrow_mut().drain_event();
-            self.next_keyboard_event = self.execution_engine
-                .get_c64()
-                .get_cycles()
-                .wrapping_add(20000);
-        }
+            {
+                keyboard.borrow_mut().drain_event();
+                self.next_keyboard_event = self.execution_engine
+                    .get_c64()
+                    .get_cycles()
+                    .wrapping_add(20000);
+            }
     }
 }

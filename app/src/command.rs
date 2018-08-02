@@ -27,7 +27,6 @@ pub enum Command {
     MemRead(u16, u16),
     MemWrite(u16, Vec<u8>),
     // System
-    SysIo(u16),
     SysQuit,
     SysReset(bool),
     SysScreen,
