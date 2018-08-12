@@ -50,7 +50,7 @@ pub enum Key {
     X,
     Y,
     Z,
-    //
+    // Symbols
     Asterisk,
     At,
     Backspace,
@@ -66,7 +66,7 @@ pub enum Key {
     Semicolon,
     Slash,
     Space,
-    //
+    // Control
     CrsrDown,
     Ctrl,
     Home,

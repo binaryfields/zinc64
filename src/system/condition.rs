@@ -2,7 +2,6 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
 use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -86,7 +85,7 @@ impl Condition {
         parser.parse(expr)
     }
 
-    pub fn eval(&self, cpu: &RefCell<Cpu>) -> bool {
+    pub fn eval(&self, cpu: &Box<dyn Cpu>) -> bool {
         match self.op {
             Operator::Equal => self.eval_reg(&self.reg, cpu) == self.eval_val(&self.val, cpu),
             Operator::NotEqual => self.eval_reg(&self.reg, cpu) != self.eval_val(&self.val, cpu),
@@ -99,18 +98,18 @@ impl Condition {
         }
     }
 
-    fn eval_reg(&self, reg: &Reg, cpu: &RefCell<Cpu>) -> u16 {
+    fn eval_reg(&self, reg: &Reg, cpu: &Box<dyn Cpu>) -> u16 {
         match reg {
-            &Reg::A => cpu.borrow().get_a() as u16,
-            &Reg::X => cpu.borrow().get_x() as u16,
-            &Reg::Y => cpu.borrow().get_y() as u16,
-            &Reg::P => cpu.borrow().get_p() as u16,
-            &Reg::SP => cpu.borrow().get_sp() as u16,
-            &Reg::PC => cpu.borrow().get_pc(),
+            &Reg::A => cpu.get_a() as u16,
+            &Reg::X => cpu.get_x() as u16,
+            &Reg::Y => cpu.get_y() as u16,
+            &Reg::P => cpu.get_p() as u16,
+            &Reg::SP => cpu.get_sp() as u16,
+            &Reg::PC => cpu.get_pc(),
         }
     }
 
-    fn eval_val(&self, val: &Value, cpu: &RefCell<Cpu>) -> u16 {
+    fn eval_val(&self, val: &Value, cpu: &Box<dyn Cpu>) -> u16 {
         match val {
             &Value::Constant(value) => value,
             &Value::Register(ref reg) => self.eval_reg(reg, cpu),

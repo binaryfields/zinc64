@@ -341,8 +341,7 @@ impl C64 {
     }
 
     pub fn check_breakpoints(&mut self) -> bool {
-        // FIXME self.breakpoints.check(&self.cpu).is_some()
-        false
+        self.breakpoints.check(&self.cpu).is_some()
     }
 
     pub fn load(&mut self, data: &Vec<u8>, offset: u16) {

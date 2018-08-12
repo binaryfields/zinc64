@@ -131,6 +131,8 @@ impl Cli {
         }
         if let Some(joydev) = matches.opt_str("joydev2") {
             config.joystick.joystick_2 = device::joystick::Mode::from(&joydev);
+        } else {
+            config.joystick.joystick_2 = device::joystick::Mode::Numpad;
         }
         Ok(())
     }

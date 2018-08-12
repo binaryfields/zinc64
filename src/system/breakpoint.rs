@@ -2,7 +2,6 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
 use std::slice::Iter;
 
 use core::Cpu;
@@ -31,11 +30,11 @@ impl BreakpointManager {
         }
     }
 
-    pub fn check(&mut self, cpu: &RefCell<Cpu>) -> Option<usize> {
+    pub fn check(&mut self, cpu: &Box<dyn Cpu>) -> Option<usize> {
         if self.breakpoints.is_empty() {
             None
         } else {
-            let pc = cpu.borrow().get_pc();
+            let pc = cpu.get_pc();
             let bp_pos = self.breakpoints.iter_mut().position(|bp| {
                 if bp.address == pc && bp.enabled {
                     if bp.ignore == 0 {

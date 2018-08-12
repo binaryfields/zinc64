@@ -3,6 +3,7 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use sdl2;
@@ -23,6 +24,8 @@ pub struct Io {
     sdl_joystick1: Option<joystick::Joystick>,
     #[allow(dead_code)]
     sdl_joystick2: Option<joystick::Joystick>,
+    pressed_joy_keys: HashSet<Keycode>,
+    pressed_joy_buttons: Vec<Button>,
 }
 
 impl Io {
@@ -56,11 +59,13 @@ impl Io {
             joystick2,
             sdl_joystick1,
             sdl_joystick2,
+            pressed_joy_keys: HashSet::new(),
+            pressed_joy_buttons: Vec::new(),
         };
         Ok(io)
     }
 
-    pub fn handle_event(&self, event: &Event) {
+    pub fn handle_event(&mut self, event: &Event) {
         match *event {
             Event::KeyDown {
                 keycode: Some(key),
@@ -99,34 +104,51 @@ impl Io {
         None
     }
 
-    fn handle_joystick_event(&self, event: &Event) {
+    fn handle_joystick_button_down(&mut self, button: Button) {
+        self.pressed_joy_buttons.push(button);
+        if let Some(ref mut joystick) = self.joystick1 {
+            if joystick.borrow().is_virtual() {
+                joystick.borrow_mut().on_key_down(button);
+            }
+        }
+        if let Some(ref mut joystick) = self.joystick2 {
+            if joystick.borrow().is_virtual() {
+                joystick.borrow_mut().on_key_down(button);
+            }
+        }
+    }
+
+    fn handle_joystick_button_up(&mut self, button: Button) {
+        if let Some(index) = self.pressed_joy_buttons.iter().position(|b| *b == button) {
+            self.pressed_joy_buttons.remove(index);
+        }
+        if !self.pressed_joy_buttons.contains(&button) {
+            if let Some(ref mut joystick) = self.joystick1 {
+                if joystick.borrow().is_virtual() {
+                    joystick.borrow_mut().on_key_up(button);
+                }
+            }
+            if let Some(ref mut joystick) = self.joystick2 {
+                if joystick.borrow().is_virtual() {
+                    joystick.borrow_mut().on_key_up(button);
+                }
+            }
+        }
+    }
+
+    fn handle_joystick_event(&mut self, event: &Event) {
         match *event {
             Event::KeyDown {
                 keycode: Some(key),
                 keymod,
                 ..
             } => {
-                let is_virtual_1 = self
-                    .joystick1
-                    .as_ref()
-                    .map(|joystick| joystick.borrow().is_virtual())
-                    .unwrap_or(false);
-                let is_virtual_2 = self
-                    .joystick2
-                    .as_ref()
-                    .map(|joystick| joystick.borrow().is_virtual())
-                    .unwrap_or(false);
-                if is_virtual_1 || is_virtual_2 {
-                    if let Some(joy_button) = self.map_joystick_key(key, keymod) {
-                        if is_virtual_1 {
-                            if let Some(ref joystick) = self.joystick1 {
-                                joystick.borrow_mut().on_key_down(joy_button);
-                            }
-                        }
-                        if is_virtual_2 {
-                            if let Some(ref joystick) = self.joystick2 {
-                                joystick.borrow_mut().on_key_down(joy_button);
-                            }
+                if let Some(buttons) = self.map_joystick_key(key, keymod) {
+                    if !self.pressed_joy_keys.contains(&key) {
+                        self.pressed_joy_keys.insert(key);
+                        self.handle_joystick_button_down(buttons.0);
+                        if let Some(button1) = buttons.1 {
+                            self.handle_joystick_button_down(button1);
                         }
                     }
                 }
@@ -136,28 +158,11 @@ impl Io {
                 keymod,
                 ..
             } => {
-                let is_virtual_1 = self
-                    .joystick1
-                    .as_ref()
-                    .map(|joystick| joystick.borrow().is_virtual())
-                    .unwrap_or(false);
-                let is_virtual_2 = self
-                    .joystick2
-                    .as_ref()
-                    .map(|joystick| joystick.borrow().is_virtual())
-                    .unwrap_or(false);
-                if is_virtual_1 || is_virtual_2 {
-                    if let Some(joy_button) = self.map_joystick_key(key, keymod) {
-                        if is_virtual_1 {
-                            if let Some(ref joystick) = self.joystick1 {
-                                joystick.borrow_mut().on_key_up(joy_button);
-                            }
-                        }
-                        if is_virtual_2 {
-                            if let Some(ref joystick) = self.joystick2 {
-                                joystick.borrow_mut().on_key_up(joy_button);
-                            }
-                        }
+                if let Some(buttons) = self.map_joystick_key(key, keymod) {
+                    self.pressed_joy_keys.remove(&key);
+                    self.handle_joystick_button_up(buttons.0);
+                    if let Some(button1) = buttons.1 {
+                        self.handle_joystick_button_up(button1);
                     }
                 }
             }
@@ -189,13 +194,18 @@ impl Io {
         }
     }
 
-    fn map_joystick_key(&self, keycode: Keycode, _keymod: Mod) -> Option<Button> {
+    fn map_joystick_key(&self, keycode: Keycode, _keymod: Mod) -> Option<(Button, Option<Button>)> {
         match keycode {
-            Keycode::Kp2 => Some(Button::Down),
-            Keycode::Kp4 => Some(Button::Left),
-            Keycode::Kp6 => Some(Button::Right),
-            Keycode::Kp8 => Some(Button::Up),
-            Keycode::KpEnter => Some(Button::Fire),
+            Keycode::Kp0 => Some((Button::Fire, None)),
+            Keycode::Kp1 => Some((Button::Down, Some(Button::Left))),
+            Keycode::Kp2 => Some((Button::Down, None)),
+            Keycode::Kp3 => Some((Button::Down, Some(Button::Right))),
+            Keycode::Kp4 => Some((Button::Left, None)),
+            Keycode::Kp6 => Some((Button::Right, None)),
+            Keycode::Kp7 => Some((Button::Up, Some(Button::Left))),
+            Keycode::Kp8 => Some((Button::Up, None)),
+            Keycode::Kp9 => Some((Button::Up, Some(Button::Right))),
+            Keycode::KpEnter => Some((Button::Fire, None)),
             _ => None,
         }
     }

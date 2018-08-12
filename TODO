@@ -1,9 +1,7 @@
 # TODO
 
-- system: fix breakpoint checking
-- input: fix joystick handling/default joystick
+- app: rename to zinc64-sdl and publish
 - ci: add linux and windows builds
-
 - device: add floppy support
 - app: add screenshot support
 - app: add ui/menus
