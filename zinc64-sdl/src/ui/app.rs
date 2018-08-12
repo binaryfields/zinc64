@@ -17,42 +17,11 @@ use sdl2::{EventPump, Sdl};
 use time;
 use zinc64::system::C64;
 
-use super::audio::AppAudio;
-use super::command::Command;
-use super::debugger::Debugger;
-use super::execution::{ExecutionEngine, State};
-use super::io::Io;
-use super::rap_server::RapServer;
-use super::renderer::Renderer;
-
-pub enum JamAction {
-    Continue,
-    Quit,
-    Reset,
-}
-
-impl JamAction {
-    pub fn from(action: &str) -> JamAction {
-        match action {
-            "continue" => JamAction::Continue,
-            "quit" => JamAction::Quit,
-            "reset" => JamAction::Reset,
-            _ => panic!("invalid jam action {}", action),
-        }
-    }
-}
-
-pub struct Options {
-    pub fullscreen: bool,
-    pub window_size: (u32, u32),
-    pub speed: u8,
-    pub warp_mode: bool,
-    // Debug
-    pub debug: bool,
-    pub dbg_address: Option<SocketAddr>,
-    pub jam_action: JamAction,
-    pub rap_address: Option<SocketAddr>,
-}
+use config::{JamAction, Options};
+use debug::{Command, Debugger, RapServer};
+use debug::{ExecutionEngine, State};
+use input::Io;
+use output::{AppAudio, Renderer};
 
 pub struct App {
     // Dependencies

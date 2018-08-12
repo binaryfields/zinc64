@@ -1,6 +1,5 @@
 # TODO
 
-- app: rename to zinc64-sdl and publish
 - ci: add linux and windows builds
 - device: add floppy support
 - app: add screenshot support

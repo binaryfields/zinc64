@@ -5,7 +5,6 @@ authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 description = "Commodore 64 emulator app"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"
-publish = false
 
 [dependencies]
 bit_field = "0.9"

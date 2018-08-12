@@ -12,7 +12,7 @@ use zinc64::device;
 use zinc64::loader::{BinLoader, Loader, Loaders};
 use zinc64::system::{C64, Config};
 
-use super::app;
+use super::{JamAction, Options};
 
 static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -28,7 +28,7 @@ impl Cli {
         Ok(matches)
     }
 
-    pub fn parse_app_options(matches: &getopts::Matches) -> Result<app::Options, String> {
+    pub fn parse_app_options(matches: &getopts::Matches) -> Result<Options, String> {
         let width = matches
             .opt_str("width")
             .map(|s| s.parse::<u32>().unwrap())
@@ -37,7 +37,7 @@ impl Cli {
             .opt_str("height")
             .map(|s| s.parse::<u32>().unwrap())
             .unwrap_or(600);
-        let options = app::Options {
+        let options = Options {
             fullscreen: matches.opt_present("fullscreen"),
             window_size: (width, height),
             speed: matches
@@ -52,8 +52,8 @@ impl Cli {
             }),
             jam_action: matches
                 .opt_str("jamaction")
-                .map(|s| app::JamAction::from(&s))
-                .unwrap_or(app::JamAction::Continue),
+                .map(|s| JamAction::from(&s))
+                .unwrap_or(JamAction::Continue),
             rap_address: matches.opt_str("rap").map(|s| {
                 let addr: SocketAddr = s.parse().unwrap();
                 addr

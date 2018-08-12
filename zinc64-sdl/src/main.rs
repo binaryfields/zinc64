@@ -11,20 +11,13 @@ extern crate sdl2;
 extern crate time;
 extern crate zinc64;
 
-mod app;
-mod audio;
-mod charset;
-mod cli;
-mod command;
+mod config;
 mod console;
-mod debugger;
-mod disassembler;
-mod execution;
-mod io;
-mod keymap;
-mod logger;
-mod rap_server;
-mod renderer;
+mod debug;
+mod input;
+mod output;
+mod ui;
+mod util;
 
 use std::env;
 use std::process;
@@ -32,10 +25,10 @@ use std::rc::Rc;
 
 use zinc64::system::{C64, C64Factory};
 
-use self::app::App;
-use self::cli::Cli;
+use self::config::Cli;
 use self::console::ConsoleApp;
-use self::logger::Logger;
+use self::ui::App;
+use self::util::Logger;
 
 static NAME: &'static str = "zinc64";
 

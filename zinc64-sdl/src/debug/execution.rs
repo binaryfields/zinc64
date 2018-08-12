@@ -8,7 +8,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use zinc64::system::C64;
 
 use super::command;
-use super::command::{Command, CommandResult, RegOp};
+use super::{Command, CommandResult, RegOp};
 
 // DEFERRED debugger: impl io
 

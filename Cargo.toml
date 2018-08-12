@@ -20,5 +20,5 @@ resid-rs = "0.7"
 
 [workspace]
 members = [
-    "app",
+    "zinc64-sdl",
 ]
