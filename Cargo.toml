@@ -1,6 +1,6 @@
 [package]
 name = "zinc64"
-version = "0.5.3"
+version = "0.6.0-pre"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 description = "Commodore 64 emulator toolkit with batteries included but swappable"
 license = "GPL-3.0+"
@@ -20,5 +20,6 @@ resid-rs = "0.7"
 
 [workspace]
 members = [
+    "zinc64-debug",
     "zinc64-sdl",
 ]

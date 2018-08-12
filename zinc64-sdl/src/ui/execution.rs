@@ -6,9 +6,7 @@ use std::sync::mpsc::Sender;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use zinc64::system::C64;
-
-use super::command;
-use super::{Command, CommandResult, RegOp};
+use zinc64_debug::{Command, CommandResult, RegOp, RegData};
 
 // DEFERRED debugger: impl io
 
@@ -212,7 +210,7 @@ impl ExecutionEngine {
 
     fn reg_read(&mut self) -> CommandResult {
         let cpu = self.c64.get_cpu();
-        let regs = command::RegData {
+        let regs = RegData {
             a: cpu.get_a(),
             x: cpu.get_x(),
             y: cpu.get_y(),

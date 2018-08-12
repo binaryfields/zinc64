@@ -131,6 +131,7 @@ impl Chip for Sid {
 
 #[cfg(test)]
 mod tests {
+    /*
     use super::*;
 
     #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -146,7 +147,6 @@ mod tests {
         19, 63, 250,
     ];
 
-    /*
     fn setup_sid(clock: Rc<Clock>) -> Sid {
         let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(8192)));
         let mut sid = Sid::new(SidModel::Mos6581, clock, sound_buffer);

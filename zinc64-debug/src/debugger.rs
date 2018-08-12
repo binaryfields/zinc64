@@ -14,7 +14,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use zinc64::cpu::Instruction;
 
 use super::charset;
-use super::command::{Command, CommandResult, RegData, RegOp};
+use super::{Command, CommandResult, RegData, RegOp};
 use super::disassembler::Disassembler;
 
 // SPEC: Vice -> Alt-H -> help -> [Enter]

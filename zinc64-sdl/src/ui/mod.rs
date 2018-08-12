@@ -3,5 +3,6 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 mod app;
+mod execution;
 
 pub use self::app::App;

@@ -10,10 +10,10 @@ extern crate log;
 extern crate sdl2;
 extern crate time;
 extern crate zinc64;
+extern crate zinc64_debug;
 
 mod config;
 mod console;
-mod debug;
 mod input;
 mod output;
 mod ui;

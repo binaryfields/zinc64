@@ -16,12 +16,13 @@ use sdl2::keyboard::Keycode;
 use sdl2::{EventPump, Sdl};
 use time;
 use zinc64::system::C64;
+use zinc64_debug::{Command, Debugger, RapServer};
 
 use config::{JamAction, Options};
-use debug::{Command, Debugger, RapServer};
-use debug::{ExecutionEngine, State};
-use input::Io;
+use input::Input;
 use output::{AppAudio, Renderer};
+
+use super::execution::{ExecutionEngine, State};
 
 pub struct App {
     // Dependencies
@@ -30,7 +31,7 @@ pub struct App {
     audio_device: AudioDevice<AppAudio>,
     command_rx: mpsc::Receiver<Command>,
     execution_engine: ExecutionEngine,
-    io: Io,
+    input: Input,
     renderer: Renderer,
     sdl_context: Sdl,
     // Runtime State
@@ -64,7 +65,7 @@ impl App {
         audio_device.lock().set_volume(100);
         // Initialize I/O
         let sdl_joystick = sdl_context.joystick()?;
-        let io = Io::new(
+        let io = Input::new(
             &sdl_joystick,
             c64.get_keyboard(),
             c64.get_joystick1(),
@@ -96,7 +97,7 @@ impl App {
             audio_device,
             command_rx,
             execution_engine: ExecutionEngine::new(c64),
-            io,
+            input: io,
             renderer,
             sdl_context,
             next_frame_ns: 0,
@@ -357,7 +358,7 @@ impl App {
                     self.renderer.toggle_fullscreen();
                 }
                 _ => {
-                    self.io.handle_event(&event);
+                    self.input.handle_event(&event);
                 }
             }
         }

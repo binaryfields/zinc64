@@ -14,7 +14,7 @@ use std::u8;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use super::command::{Command, CommandResult};
+use super::{Command, CommandResult};
 
 // SPEC: https://github.com/radare/radare2/blob/master/doc/rap
 // SPEC: https://github.com/radare/radare2/blob/master/libr/io/p/io_rap.c
