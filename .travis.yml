@@ -1,6 +1,59 @@
+## Environment
+
 language: rust
-sudo: false
-rust:
-  - stable
+rust: stable
+sudo: required
+dist: trusty
+services: docker
+env:
+  global:
+    - CRATE_NAME=zinc64
+
+## Jobs
+
+matrix:
+  include:
+    # Linux
+    - env: TARGET=x86_64-unknown-linux-gnu
+    # OSX
+    # - env: TARGET=x86_64-apple-darwin
+    #   os: osx
+
+## Lifecycle
+
+install:
+  - source ~/.cargo/env || true
+  # cargo install cross
+  # docker build -t dsio/$CRATE_NAME-$TARGET:latest ci/docker/$TARGET
+
 script:
-  - cargo test
+  - cross test --target $TARGET --all
+
+before_cache:
+  - chmod -R a+r $HOME/.cargo
+
+before_deploy:
+  - test -f Cargo.lock || cargo generate-lockfile
+  - cross build -p zinc64-sdl --target $TARGET --release
+  - sh ci/before_deploy.sh
+
+deploy:
+  provider: releases
+  api_key:
+    secure: tAvz4RUNCIjaIROvZINbyIdpqtSo2c99kwc5MH7SDMpeKhDW+90ZO0ObKj3ipiK/cIYROD5gWto/aDOogbcinAjH/Qd1khLBVm8e9q3LWTtrqljr94DxOW6RnyrVRD+DI1QPAqdFZiNPPP0w++LPYm9guqL1Ju8w1NAH45C/Z9eEDmE3kFCe+rKenOBuM3SrNJMsimApPkSuDM8iky76YunaJLXuHw3W9EbV84NF+Wq3aU2wlWkCSikqsVeQ5/Jeoxs6Cwna+UpUMmhOqnioXzpWWXWg/qBJAJla/D9zAd4jQtrZnOGTz3n/Unolc+jJPXIRpR9KAgErpbBhhLm9WwQpSnt8Ory1Gg6T0Sxg/RH/Si5s7Pc+dz1/HqEeWEALtL9GlkU75WaFhlF1z2qOR8MxJrYkDa9a5k30tvwMKxrrhvHfk0ie4IyVTDmYG6zQcsZKrRphvUw8N7AJmBuNm/TKqb8z1lUEXK7oAaLyyXTmdUwPsCSOZ+FEvKzhHWnFF8HB7rYlbNuIEms+RbnijpTXyTgTjCdTEKDYKfE6XuNQfCQoBzlcqU5QrTYPHpLjzdodWrInLBEI5HglVG7TcQ12Lah8CxXogCcPSkN7hknSSA9ba1bZtC4C/Fof+WPFI+ONMQONQ3FBomraJwgRmSBOKCxXWn3Jd07Z8GDLy88=
+  file_glob: true
+  file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.*
+  skip_cleanup: true
+  on:
+    condition: $TRAVIS_RUST_VERSION = stable
+    tags: true
+
+## Extras
+
+cache: cargo
+
+branches:
+  only:
+    # release tags
+    - /^\d+\.\d+\.\d+.*$/
+    - master

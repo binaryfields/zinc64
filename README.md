@@ -67,8 +67,8 @@ Here is an example how these components are used together:
 
 ## Roadmap
 
-- v0.6  - zinc64 ui
-- v0.7  - floppy support
+- v0.7  - zinc64 ui
+- v0.8  - floppy support
 
 ## Getting Started
 
@@ -109,7 +109,7 @@ Here is an example how these components are used together:
 
 	to 
 
-		C:\Users\{Your Username}\.multirust\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\stable-x86_64-pc-windows-msvc\lib
+		C:\Users\{Your Username}\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib
 
 4. Copy SDL2.dll from
 

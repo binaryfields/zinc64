@@ -1,0 +1,62 @@
+## Environment
+
+environment:
+  global:
+    RUST_VERSION: stable
+    CRATE_NAME: zinc64
+    SDL_VERSION: 2.0.7
+  matrix:
+    - TARGET: x86_64-pc-windows-msvc
+
+## Lifecycle
+
+install:
+  - ps: >-
+      If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw64\bin'
+      } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw32\bin'
+      }
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs/
+  - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
+  - curl -sSf -o SDL2-devel.zip https://www.libsdl.org/release/SDL2-devel-%SDL_VERSION%-VC.zip
+  - 7z x -y SDL2-devel.zip
+  - copy SDL2-%SDL_VERSION%\lib\x64\* C:\Users\appveyor\.rustup\toolchains\%RUST_VERSION%-%TARGET%\lib\rustlib\%TARGET%\lib\
+  - copy SDL2-%SDL_VERSION%\lib\x64\SDL2.dll
+
+test_script:
+  - if [%APPVEYOR_REPO_TAG%]==[false] (
+      cargo test --target %TARGET% --all
+    )
+
+before_deploy:
+  - cargo build -p zinc64-sdl --target %TARGET% --release
+  - ps: ci\before_deploy.ps1
+
+deploy:
+  provider: GitHub
+  artifact: /.*\.zip/
+  auth_token:
+    secure: ZXHogOrnLMpvZUOkxFEDcchPLb/stbac9DTcil6qvp24dvY8tbW01v5zPGrjD1t+
+  description: ''
+  on:
+    RUST_VERSION: stable
+    appveyor_repo_tag: true
+
+## Extras
+
+cache:
+  - C:\Users\appveyor\.cargo\registry
+  - target
+
+branches:
+  only:
+    # Release tags
+    - /^\d+\.\d+\.\d+.*$/
+    - master
+
+# Building is done in the test phase, so we disable Appveyor's build phase.
+build: false
