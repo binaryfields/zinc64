@@ -19,13 +19,13 @@ fn setup_cia() -> Cia {
     let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
     let mut cia = Cia::new(
         Mode::Cia1,
-        cia_flag,
+        None,
+        None,
+        Some(keyboard_matrix),
         cia_port_a,
         cia_port_b,
+        cia_flag,
         cpu_irq,
-        None,
-        None,
-        keyboard_matrix,
     );
     cia.reset();
     cia

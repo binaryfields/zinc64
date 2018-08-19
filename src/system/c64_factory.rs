@@ -9,8 +9,8 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use core::{
-    Addressable, Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SoundOutput,
-    SystemModel, VicModel, VideoOutput,
+    Addressable, Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SidModel,
+    SoundOutput, VicModel, VideoOutput,
 };
 use cpu::Cpu6510;
 use device::ExpansionPort;
@@ -38,53 +38,52 @@ impl ChipFactory for C64Factory {
 
     fn new_cia_1(
         &self,
-        cia_flag_pin: Rc<RefCell<Pin>>,
-        cia_port_a: Rc<RefCell<IoPort>>,
-        cia_port_b: Rc<RefCell<IoPort>>,
-        irq_line: Rc<RefCell<IrqLine>>,
         joystick_1: Rc<Cell<u8>>,
         joystick_2: Rc<Cell<u8>>,
         keyboard_matrix: Rc<RefCell<[u8; 8]>>,
+        port_a: Rc<RefCell<IoPort>>,
+        port_b: Rc<RefCell<IoPort>>,
+        flag_pin: Rc<RefCell<Pin>>,
+        irq_line: Rc<RefCell<IrqLine>>,
     ) -> Rc<RefCell<dyn Chip>> {
         Rc::new(RefCell::new(Cia::new(
             cia::Mode::Cia1,
-            cia_flag_pin,
-            cia_port_a,
-            cia_port_b,
-            irq_line,
             Some(joystick_1),
             Some(joystick_2),
-            keyboard_matrix,
+            Some(keyboard_matrix),
+            port_a,
+            port_b,
+            flag_pin,
+            irq_line,
         )))
     }
 
     fn new_cia_2(
         &self,
-        cia_flag_pin: Rc<RefCell<Pin>>,
-        cia_port_a: Rc<RefCell<IoPort>>,
-        cia_port_b: Rc<RefCell<IoPort>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-        keyboard_matrix: Rc<RefCell<[u8; 8]>>,
+        port_a: Rc<RefCell<IoPort>>,
+        port_b: Rc<RefCell<IoPort>>,
+        flag_pin: Rc<RefCell<Pin>>,
+        nmi_line: Rc<RefCell<IrqLine>>,
     ) -> Rc<RefCell<dyn Chip>> {
         Rc::new(RefCell::new(Cia::new(
             cia::Mode::Cia2,
-            cia_flag_pin,
-            cia_port_a,
-            cia_port_b,
-            irq_line,
             None,
             None,
-            keyboard_matrix,
+            None,
+            port_a,
+            port_b,
+            flag_pin,
+            nmi_line,
         )))
     }
 
     fn new_sid(
         &self,
-        system_model: &SystemModel,
-        clock: Rc<Clock>,
+        chip_model: SidModel,
+        system_clock: Rc<Clock>,
         sound_buffer: Arc<Mutex<dyn SoundOutput>>,
     ) -> Rc<RefCell<dyn Chip>> {
-        let mut sid = Sid::new(system_model.sid_model, clock, sound_buffer);
+        let mut sid = Sid::new(chip_model, system_clock, sound_buffer);
         sid.set_sampling_parameters(
             SamplingMethod::ResampleFast,
             self.config.model.cpu_freq,
@@ -97,22 +96,22 @@ impl ChipFactory for C64Factory {
     fn new_vic(
         &self,
         chip_model: VicModel,
-        ba_line: Rc<RefCell<Pin>>,
         color_ram: Rc<RefCell<Ram>>,
-        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
-        irq_line: Rc<RefCell<IrqLine>>,
         ram: Rc<RefCell<Ram>>,
         rom_charset: Rc<RefCell<Rom>>,
         vic_base_address: Rc<Cell<u16>>,
+        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+        ba_line: Rc<RefCell<Pin>>,
+        irq_line: Rc<RefCell<IrqLine>>,
     ) -> Rc<RefCell<dyn Chip>> {
         let vic_mem = VicMemory::new(vic_base_address, rom_charset, ram);
         Rc::new(RefCell::new(Vic::new(
             chip_model,
-            ba_line,
             color_ram,
-            irq_line,
-            frame_buffer,
             vic_mem,
+            frame_buffer,
+            ba_line,
+            irq_line,
         )))
     }
 
@@ -166,12 +165,12 @@ impl ChipFactory for C64Factory {
 
     fn new_cpu(
         &self,
-        ba_line: Rc<RefCell<Pin>>,
+        mem: Rc<RefCell<dyn Mmu>>,
         io_port: Rc<RefCell<IoPort>>,
+        ba_line: Rc<RefCell<Pin>>,
         irq_line: Rc<RefCell<IrqLine>>,
         nmi_line: Rc<RefCell<IrqLine>>,
-        mem: Rc<RefCell<dyn Mmu>>,
     ) -> Box<dyn Cpu> {
-        Box::new(Cpu6510::new(ba_line, io_port, irq_line, nmi_line, mem))
+        Box::new(Cpu6510::new(mem, io_port, ba_line, irq_line, nmi_line))
     }
 }

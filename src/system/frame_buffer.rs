@@ -69,8 +69,4 @@ impl VideoOutput for FrameBuffer {
     fn write(&mut self, index: usize, color: u8) {
         self.pixels[index] = self.palette[color as usize];
     }
-
-    fn write_at(&mut self, x: u16, y: u16, color: u8) {
-        FrameBuffer::write(self, x, y, color);
-    }
 }

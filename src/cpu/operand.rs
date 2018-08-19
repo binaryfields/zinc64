@@ -167,7 +167,7 @@ mod tests {
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
         let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
-        Cpu6510::new(ba_line, cpu_io_port, cpu_irq, cpu_nmi, mem)
+        Cpu6510::new(mem, cpu_io_port, ba_line, cpu_irq, cpu_nmi)
     }
 
     #[test]

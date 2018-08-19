@@ -21,7 +21,7 @@ pub enum SamplingMethod {
 
 pub struct Sid {
     // Dependencies
-    clock: Rc<Clock>,
+    system_clock: Rc<Clock>,
     sound_buffer: Arc<Mutex<dyn SoundOutput>>,
     // Functional Units
     resid: resid::Sid,
@@ -32,7 +32,7 @@ pub struct Sid {
 impl Sid {
     pub fn new(
         chip_model: SidModel,
-        clock: Rc<Clock>,
+        system_clock: Rc<Clock>,
         sound_buffer: Arc<Mutex<dyn SoundOutput>>,
     ) -> Self {
         info!(target: "sound", "Initializing SID");
@@ -42,7 +42,7 @@ impl Sid {
         };
         let resid = resid::Sid::new(resid_model);
         Sid {
-            clock,
+            system_clock,
             sound_buffer,
             resid,
             cycles: 0,
@@ -70,8 +70,8 @@ impl Sid {
     }
 
     fn sync(&mut self) {
-        if self.cycles != self.clock.get() {
-            let delta = (self.clock.get() - self.cycles) as u32;
+        if self.cycles != self.system_clock.get() {
+            let delta = (self.system_clock.get() - self.cycles) as u32;
             self.clock_delta(delta);
         }
     }
@@ -110,7 +110,7 @@ impl Chip for Sid {
 
     fn reset(&mut self) {
         self.resid.reset();
-        self.cycles = self.clock.get();
+        self.cycles = self.system_clock.get();
     }
 
     // I/O

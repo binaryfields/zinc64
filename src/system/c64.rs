@@ -106,31 +106,30 @@ impl C64 {
 
         // Chipset
         let cia_1 = factory.new_cia_1(
-            cia_1_flag_pin.clone(),
-            cia_1_port_a.clone(),
-            cia_1_port_b.clone(),
-            irq_line.clone(),
             joystick_1_state.clone(),
             joystick_2_state.clone(),
             keyboard_matrix.clone(),
+            cia_1_port_a.clone(),
+            cia_1_port_b.clone(),
+            cia_1_flag_pin.clone(),
+            irq_line.clone(),
         );
         let cia_2 = factory.new_cia_2(
-            cia_2_flag_pin.clone(),
             cia_2_port_a.clone(),
             cia_2_port_b.clone(),
+            cia_2_flag_pin.clone(),
             nmi_line.clone(),
-            keyboard_matrix.clone(),
         );
-        let sid = factory.new_sid(&config.model, clock.clone(), sound_buffer.clone());
+        let sid = factory.new_sid(config.model.sid_model, clock.clone(), sound_buffer.clone());
         let vic = factory.new_vic(
             config.model.vic_model,
-            ba_line.clone(),
             color_ram.clone(),
-            frame_buffer.clone(),
-            irq_line.clone(),
             ram.clone(),
             rom_charset.clone(),
             vic_base_address.clone(),
+            frame_buffer.clone(),
+            ba_line.clone(),
+            irq_line.clone(),
         );
 
         // Memory Controller and Processor
@@ -148,11 +147,11 @@ impl C64 {
             vic.clone(),
         );
         let cpu = factory.new_cpu(
-            ba_line.clone(),
+            mem.clone(),
             cpu_io_port.clone(),
+            ba_line.clone(),
             irq_line.clone(),
             nmi_line.clone(),
-            mem.clone(),
         );
 
         // Peripherals
@@ -200,12 +199,12 @@ impl C64 {
                 let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
                 mem_clone_2.borrow_mut().switch_banks(mode);
             }));
-        let vic_cia_2_port_a_clone = vic_base_address.clone();
+        let vic_base_address_clone = vic_base_address.clone();
         cia_2_port_a
             .borrow_mut()
             .set_observer(Box::new(move |value| {
                 let base_address = ((!value & 0x03) as u16) << 14;
-                vic_cia_2_port_a_clone.set(base_address);
+                vic_base_address_clone.set(base_address);
             }));
         let tick_fn: TickFn = {
             let cia_1_clone = cia_1.clone();
@@ -224,14 +223,14 @@ impl C64 {
         Ok(C64 {
             config,
             cpu,
-            sid: sid.clone(),
-            vic: vic.clone(),
             cia_1: cia_1.clone(),
             cia_2: cia_2.clone(),
+            sid: sid.clone(),
+            vic: vic.clone(),
             color_ram: color_ram.clone(),
-            expansion_port: expansion_port.clone(),
             ram: ram.clone(),
             datassette,
+            expansion_port: expansion_port.clone(),
             joystick_1: joystick1,
             joystick_2: joystick2,
             keyboard: keyboard.clone(),

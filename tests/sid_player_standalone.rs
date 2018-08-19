@@ -97,11 +97,11 @@ fn exec_sid_player() {
         SimpleMemory::new(ram.clone(), sid.clone())
     ));
     let mut cpu = Cpu6510::new(
-        ba_line,
+        mem,
         cpu_io_port,
+        ba_line,
         irq_line,
         nmi_line,
-        mem,
     );
 
     // Load program

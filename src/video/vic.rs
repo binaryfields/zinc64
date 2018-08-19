@@ -130,7 +130,6 @@ pub struct Vic {
     // Dependencies
     spec: Spec,
     color_ram: Rc<RefCell<Ram>>,
-    frame_buffer: Rc<RefCell<dyn VideoOutput>>,
     mem: VicMemory,
     // Functional Units
     border_unit: BorderUnit,
@@ -153,16 +152,17 @@ pub struct Vic {
     // I/O
     ba_line: Rc<RefCell<Pin>>,
     irq_line: Rc<RefCell<IrqLine>>,
+    frame_buffer: Rc<RefCell<dyn VideoOutput>>,
 }
 
 impl Vic {
     pub fn new(
         chip_model: VicModel,
-        ba_line: Rc<RefCell<Pin>>,
         color_ram: Rc<RefCell<Ram>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
         mem: VicMemory,
+        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+        ba_line: Rc<RefCell<Pin>>,
+        irq_line: Rc<RefCell<IrqLine>>,
     ) -> Vic {
         info!(target: "video", "Initializing VIC");
         let spec = Spec::new(chip_model);
@@ -181,7 +181,6 @@ impl Vic {
             // Dependencies
             spec,
             color_ram,
-            frame_buffer,
             mem,
             // Functional Units
             border_unit: BorderUnit::new(),
@@ -202,6 +201,7 @@ impl Vic {
             cycle: 1,
             y: 0,
             // I/O
+            frame_buffer,
             ba_line,
             irq_line,
         };

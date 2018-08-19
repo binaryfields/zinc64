@@ -87,10 +87,9 @@ impl Reg {
 pub struct Cia {
     // Dependencies
     mode: Mode,
-    irq_line: Rc<RefCell<IrqLine>>,
     joystick_1: Option<Rc<Cell<u8>>>,
     joystick_2: Option<Rc<Cell<u8>>>,
-    keyboard_matrix: Rc<RefCell<[u8; 8]>>,
+    keyboard_matrix: Option<Rc<RefCell<[u8; 8]>>>,
     // Functional Units
     irq_control: IrqControl,
     irq_delay: CycleCounter,
@@ -102,6 +101,7 @@ pub struct Cia {
     // I/O
     cnt_pin: Rc<RefCell<Pin>>,
     flag_pin: Rc<RefCell<Pin>>,
+    irq_line: Rc<RefCell<IrqLine>>,
     port_a: Rc<RefCell<IoPort>>,
     port_b: Rc<RefCell<IoPort>>,
 }
@@ -109,18 +109,17 @@ pub struct Cia {
 impl Cia {
     pub fn new(
         mode: Mode,
-        cia_flag_pin: Rc<RefCell<Pin>>,
-        cia_port_a: Rc<RefCell<IoPort>>,
-        cia_port_b: Rc<RefCell<IoPort>>,
-        irq_line: Rc<RefCell<IrqLine>>,
         joystick_1: Option<Rc<Cell<u8>>>,
         joystick_2: Option<Rc<Cell<u8>>>,
-        keyboard_matrix: Rc<RefCell<[u8; 8]>>,
+        keyboard_matrix: Option<Rc<RefCell<[u8; 8]>>>,
+        port_a: Rc<RefCell<IoPort>>,
+        port_b: Rc<RefCell<IoPort>>,
+        flag_pin: Rc<RefCell<Pin>>,
+        irq_line: Rc<RefCell<IrqLine>>,
     ) -> Self {
         let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
         Self {
             mode,
-            irq_line,
             joystick_1,
             joystick_2,
             keyboard_matrix,
@@ -132,9 +131,10 @@ impl Cia {
             tod_clock: Rtc::new(),
             tod_set_alarm: false,
             cnt_pin: cnt_pin.clone(),
-            flag_pin: cia_flag_pin,
-            port_a: cia_port_a,
-            port_b: cia_port_b,
+            flag_pin,
+            irq_line,
+            port_a,
+            port_b,
         }
     }
 
@@ -187,13 +187,17 @@ impl Cia {
     }
 
     fn scan_keyboard(&self, columns: u8) -> u8 {
-        let mut result = 0;
-        for i in 0..8 as usize {
-            if columns.get_bit(i) {
-                result |= self.keyboard_matrix.borrow()[i];
+        if let Some(ref keyboard_matrix) = self.keyboard_matrix {
+            let mut result = 0;
+            for i in 0..8 as usize {
+                if columns.get_bit(i) {
+                    result |= keyboard_matrix.borrow()[i];
+                }
             }
+            result
+        } else {
+            0
         }
-        result
     }
 }
 
@@ -447,13 +451,13 @@ mod tests {
         let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
         let mut cia = Cia::new(
             Mode::Cia1,
-            cia_flag,
+            None,
+            None,
+            Some(keyboard_matrix),
             cia_port_a,
             cia_port_b,
+            cia_flag,
             cpu_irq,
-            None,
-            None,
-            keyboard_matrix,
         );
         cia.reset();
         cia
@@ -467,13 +471,13 @@ mod tests {
         let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
         let mut cia = Cia::new(
             Mode::Cia1,
-            cia_flag,
+            None,
+            None,
+            Some(keyboard_matrix),
             cia_port_a,
             cia_port_b,
+            cia_flag,
             cpu_irq,
-            None,
-            None,
-            keyboard_matrix,
         );
         cia.reset();
         cia
