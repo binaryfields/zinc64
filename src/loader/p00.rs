@@ -91,7 +91,8 @@ impl Loader for P00Loader {
         info!(target: "loader", "Loading P00 {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
-        let header = self.read_header(&mut reader)
+        let header = self
+            .read_header(&mut reader)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid P00 header"))?;
         self.validate_header(&header)?;
         let offset = reader.read_u16::<LittleEndian>()?;

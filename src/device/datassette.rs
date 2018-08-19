@@ -121,7 +121,8 @@ impl Datassette {
 
     pub fn is_playing(&self) -> bool {
         // Cassette motor control (0=motor spins)
-        let motor_on = !self.cpu_io_port
+        let motor_on = !self
+            .cpu_io_port
             .borrow()
             .get_value()
             .get_bit(ControlPort::CassetteMotor.value());

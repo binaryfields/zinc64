@@ -89,10 +89,12 @@ impl Cartridge {
     }
 
     fn switch_bank(&mut self, bank_number: u8) {
-        let bank_lo = self.banks
+        let bank_lo = self
+            .banks
             .iter()
             .find(|&bank| bank.bank_number == bank_number && bank.offset < 0xa000);
-        let bank_hi = self.banks
+        let bank_hi = self
+            .banks
             .iter()
             .find(|&bank| bank.bank_number == bank_number && bank.offset >= 0xa000);
         match bank_lo {

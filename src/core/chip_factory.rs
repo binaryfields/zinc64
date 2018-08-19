@@ -25,7 +25,6 @@ use core::{
 /// with each component of the system.
 ///
 pub trait ChipFactory {
-
     // -- Processor
 
     /// Constructs CPU.

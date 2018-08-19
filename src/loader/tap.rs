@@ -93,7 +93,8 @@ impl Loader for TapLoader {
         info!(target: "loader", "Loading TAP {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut rdr = BufReader::new(file);
-        let header = self.read_header(&mut rdr)
+        let header = self
+            .read_header(&mut rdr)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid tape header"))?;
         info!(target: "loader", "Found tape, version {}, size {}", header.version, header.size);
         self.validate_header(&header)?;

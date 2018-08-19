@@ -173,7 +173,8 @@ impl Loader for CrtLoader {
         info!(target: "loader", "Loading CRT {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut rdr = BufReader::new(file);
-        let header = self.read_header(&mut rdr)
+        let header = self
+            .read_header(&mut rdr)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge header"))?;
         info!(target: "loader", "Found cartridge {}, version {}.{}, type {}",
               str::from_utf8(&header.name).unwrap_or(""),
@@ -184,14 +185,16 @@ impl Loader for CrtLoader {
         rdr.consume((header.header_length - 0x40) as usize);
         let mut cartridge = self.build_cartridge(header);
         loop {
-            let chip_header_opt = self.read_chip_header(&mut rdr)
+            let chip_header_opt = self
+                .read_chip_header(&mut rdr)
                 .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge chip header"))?;
             match chip_header_opt {
                 Some(chip_header) => {
                     info!(target: "loader", "Found chip {}, offset 0x{:x}, size {}",
                           chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
                     self.validate_chip_header(&chip_header)?;
-                    let chip_data = self.read_data(&mut rdr, (chip_header.length - 0x10) as usize)
+                    let chip_data = self
+                        .read_data(&mut rdr, (chip_header.length - 0x10) as usize)
                         .map_err(|_| {
                             Error::new(
                                 ErrorKind::InvalidData,

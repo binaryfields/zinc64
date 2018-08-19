@@ -83,7 +83,8 @@ impl Mmu for Memory {
         match self.configuration.get(zone as u8) {
             Bank::Ram => self.ram.borrow().read(address),
             Bank::Basic => self.basic.borrow().read(address),
-            Bank::Charset => self.charset
+            Bank::Charset => self
+                .charset
                 .borrow()
                 .read(address - BaseAddr::Charset.addr()),
             Bank::Kernal => self.kernal.borrow().read(address),

@@ -54,10 +54,12 @@ impl Addressable for Mmio {
             0xd000...0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
             0xd400...0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
             0xd800...0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
-            0xdc00...0xdcff => self.cia_1
+            0xdc00...0xdcff => self
+                .cia_1
                 .borrow_mut()
                 .write((address & 0x000f) as u8, value),
-            0xdd00...0xddff => self.cia_2
+            0xdd00...0xddff => self
+                .cia_2
                 .borrow_mut()
                 .write((address & 0x000f) as u8, value),
             0xde00...0xdfff => self.expansion_port.borrow_mut().write(address, value),
