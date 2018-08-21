@@ -9,8 +9,8 @@ use std::result::Result;
 use getopts;
 use zinc64::core::SystemModel;
 use zinc64::device;
-use zinc64::loader::{BinLoader, Loader, Loaders};
 use zinc64::system::{C64, Config};
+use zinc64_loader::{BinLoader, Loader, Loaders};
 
 use super::{JamAction, Options};
 

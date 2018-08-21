@@ -10,8 +10,9 @@ use std::path::Path;
 use std::rc::Rc;
 use std::result::Result;
 
-use c64::C64;
-use loader::Loader;
+use zinc64::c64::C64;
+
+use super::Loader;
 
 pub struct HexLoader {}
 

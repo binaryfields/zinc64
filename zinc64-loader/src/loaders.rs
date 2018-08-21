@@ -4,11 +4,11 @@
 
 use std::path::Path;
 
-use loader::crt;
-use loader::p00;
-use loader::prg;
-use loader::tap;
-use loader::Loader;
+use crt;
+use p00;
+use prg;
+use tap;
+use Loader;
 
 pub struct Loaders;
 

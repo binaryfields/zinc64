@@ -11,6 +11,7 @@ extern crate sdl2;
 extern crate time;
 extern crate zinc64;
 extern crate zinc64_debug;
+extern crate zinc64_loader;
 
 mod config;
 mod console;

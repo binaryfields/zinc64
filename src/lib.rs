@@ -12,7 +12,6 @@ pub mod core;
 pub mod cpu;
 pub mod device;
 pub mod io;
-pub mod loader;
 pub mod mem;
 pub mod sound;
 pub mod system;

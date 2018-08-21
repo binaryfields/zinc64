@@ -8,7 +8,7 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::result::Result;
 
-use system::{AutostartMethod, C64, Image};
+use zinc64::system::{AutostartMethod, C64, Image};
 
 use super::Loader;
 

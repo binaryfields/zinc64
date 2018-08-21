@@ -21,5 +21,6 @@ resid-rs = "0.7"
 [workspace]
 members = [
     "zinc64-debug",
+    "zinc64-loader",
     "zinc64-sdl",
 ]
