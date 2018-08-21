@@ -29,9 +29,9 @@ history.
 
 ### Extensibility
 
-The emulator components may be swapped out by providing custom core::Factory trait
-implementation. The default implementation of the core::Factory trait is done through
-system::ChipFactory. The chip factory object is passed into system::C64 component
+The emulator components may be swapped out by providing custom core::ChipFactory trait
+implementation. The default implementation of the core::ChipFactory trait is done through
+system::C64Factory. The chip factory object is passed into system::C64 component
 that provides core emulator functionality.
 
 Here is an example how these components are used together:
@@ -39,7 +39,31 @@ Here is an example how these components are used together:
         let config = Rc::new(Config::new(SystemModel::from("pal")));
         let chip_factory = Box::new(C64Factory::new(config.clone()));
         let mut c64 = C64::new(config.clone(), chip_factory).unwrap();
-        c64.reset(false);
+        c64.reset(true);
+
+The four core traits used to model system operation are Chip, Cpu, Mmu and Addressable.
+A Chip trait represents a system component that is driven by clock signal.
+
+        pub trait Chip {
+            /// The core method of the chip, emulates one clock cycle of the chip.
+            fn clock(&mut self);
+            /// Process delta cycles at once.
+            fn clock_delta(&mut self, delta: u32);
+            /// Handle vsync event.
+            fn process_vsync(&mut self);
+            /// Handle reset signal.
+            fn reset(&mut self);
+            // I/O
+            /// Read value from the specified register.
+            fn read(&mut self, reg: u8) -> u8;
+            /// Write value to the specified register.
+            fn write(&mut self, reg: u8, value: u8);
+        }
+
+Since all system components with the exception of Cpu and Mmu implement Chip trait,
+interactions between chips and other components are limited to and handled through
+shared I/O lines/pins that are provided to chip constructors. This allows implementation
+of chips to be decoupled from each other.
 
 ## Status
 
