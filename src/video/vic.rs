@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bit_field::BitField;
@@ -153,6 +153,7 @@ pub struct Vic {
     ba_line: Rc<RefCell<Pin>>,
     irq_line: Rc<RefCell<IrqLine>>,
     frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+    vsync_flag: Rc<Cell<bool>>,
 }
 
 impl Vic {
@@ -161,6 +162,7 @@ impl Vic {
         color_ram: Rc<RefCell<Ram>>,
         mem: VicMemory,
         frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+        vsync_flag: Rc<Cell<bool>>,
         ba_line: Rc<RefCell<Pin>>,
         irq_line: Rc<RefCell<IrqLine>>,
     ) -> Vic {
@@ -204,6 +206,7 @@ impl Vic {
             frame_buffer,
             ba_line,
             irq_line,
+            vsync_flag,
         };
         vic
     }
@@ -843,8 +846,7 @@ impl Chip for Vic {
                    and is irrelevant.
                 */
                 self.raster_unit.vc_base = 0;
-                let mut rt = self.frame_buffer.borrow_mut();
-                rt.set_sync(true);
+                self.vsync_flag.set(true);
             }
         }
     }

@@ -34,6 +34,17 @@ impl C64Factory {
 }
 
 impl ChipFactory for C64Factory {
+    fn new_cpu(
+        &self,
+        mem: Rc<RefCell<dyn Mmu>>,
+        io_port: Rc<RefCell<IoPort>>,
+        ba_line: Rc<RefCell<Pin>>,
+        irq_line: Rc<RefCell<IrqLine>>,
+        nmi_line: Rc<RefCell<IrqLine>>,
+    ) -> Box<dyn Cpu> {
+        Box::new(Cpu6510::new(mem, io_port, ba_line, irq_line, nmi_line))
+    }
+
     // -- Chipset
 
     fn new_cia_1(
@@ -101,6 +112,7 @@ impl ChipFactory for C64Factory {
         rom_charset: Rc<RefCell<Rom>>,
         vic_base_address: Rc<Cell<u16>>,
         frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+        vsync_flag: Rc<Cell<bool>>,
         ba_line: Rc<RefCell<Pin>>,
         irq_line: Rc<RefCell<IrqLine>>,
     ) -> Rc<RefCell<dyn Chip>> {
@@ -110,6 +122,7 @@ impl ChipFactory for C64Factory {
             color_ram,
             vic_mem,
             frame_buffer,
+            vsync_flag,
             ba_line,
             irq_line,
         )))
@@ -159,18 +172,5 @@ impl ChipFactory for C64Factory {
     fn new_rom(&self, path: &Path, offset: u16) -> Result<Rc<RefCell<Rom>>, io::Error> {
         let rom = Rom::load(path, offset)?;
         Ok(Rc::new(RefCell::new(rom)))
-    }
-
-    // -- Processor
-
-    fn new_cpu(
-        &self,
-        mem: Rc<RefCell<dyn Mmu>>,
-        io_port: Rc<RefCell<IoPort>>,
-        ba_line: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-        nmi_line: Rc<RefCell<IrqLine>>,
-    ) -> Box<dyn Cpu> {
-        Box::new(Cpu6510::new(mem, io_port, ba_line, irq_line, nmi_line))
     }
 }

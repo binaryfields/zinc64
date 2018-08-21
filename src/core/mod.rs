@@ -98,9 +98,8 @@ pub trait SoundOutput {
 
 /// Video output used by VIC chip.
 pub trait VideoOutput {
-    /// Get frame buffer width and height..
+    /// Get frame buffer width and height.
     fn get_dimension(&self) -> (usize, usize);
-    fn set_sync(&mut self, value: bool);
     /// Write pixel color to the specified location. Index is computed from raster x, y coordinates:
     /// index = y * pitch + x.
     fn write(&mut self, index: usize, color: u8);

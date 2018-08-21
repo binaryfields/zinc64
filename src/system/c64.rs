@@ -64,6 +64,7 @@ pub struct C64 {
     frame_count: u32,
     last_pc: u16,
     tick_fn: TickFn,
+    vsync_flag: Rc<Cell<bool>>,
 }
 
 impl C64 {
@@ -82,6 +83,7 @@ impl C64 {
         let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(
             config.sound.buffer_size << 2,
         )));
+        let vsync_flag = Rc::new(Cell::new(false));
 
         // I/O Lines
         let ba_line = Rc::new(RefCell::new(Pin::new_high()));
@@ -128,6 +130,7 @@ impl C64 {
             rom_charset.clone(),
             vic_base_address.clone(),
             frame_buffer.clone(),
+            vsync_flag.clone(),
             ba_line.clone(),
             irq_line.clone(),
         );
@@ -242,6 +245,7 @@ impl C64 {
             frame_count: 0,
             last_pc: 0,
             tick_fn,
+            vsync_flag,
         })
     }
 
@@ -331,6 +335,8 @@ impl C64 {
         self.vic.clone()
     }
 
+    pub fn get_vsync(&self) -> bool { self.vsync_flag.get() }
+
     pub fn is_cpu_jam(&self) -> bool {
         self.last_pc == self.cpu.get_pc()
     }
@@ -338,6 +344,8 @@ impl C64 {
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
         self.autostart = autostart;
     }
+
+    pub fn reset_vsync(&self) { self.vsync_flag.set(false) }
 
     pub fn check_breakpoints(&mut self) -> bool {
         self.breakpoints.check(&self.cpu).is_some()
@@ -386,32 +394,31 @@ impl C64 {
         // self.clock.reset();
         self.frame_count = 0;
         self.last_pc = 0;
+        self.vsync_flag.set(false);
     }
 
     pub fn run_frame(&mut self) -> bool {
         let tick_fn = self.tick_fn.clone();
         let bp_present = self.breakpoints.is_bp_present();
-        let mut vsync = false;
-        while !vsync {
+        while !self.vsync_flag.get() {
             self.step_internal(&tick_fn);
             if bp_present && self.check_breakpoints() {
                 break;
             }
-            vsync = self.frame_buffer.borrow().get_sync();
         }
-        if vsync {
+        if self.vsync_flag.get() {
             self.sid.borrow_mut().process_vsync();
             self.cia_1.borrow_mut().process_vsync();
             self.cia_2.borrow_mut().process_vsync();
             self.frame_count = self.frame_count.wrapping_add(1);
         }
-        vsync
+        self.vsync_flag.get()
     }
 
     pub fn step(&mut self) {
         let tick_fn = self.tick_fn.clone();
         self.step_internal(&tick_fn);
-        if self.frame_buffer.borrow().get_sync() {
+        if self.vsync_flag.get() {
             self.sid.borrow_mut().process_vsync();
             self.cia_1.borrow_mut().process_vsync();
             self.cia_2.borrow_mut().process_vsync();

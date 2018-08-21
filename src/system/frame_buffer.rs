@@ -11,7 +11,6 @@ pub struct FrameBuffer {
     dim: (usize, usize),
     palette: [u32; 16],
     pixels: Vec<u32>,
-    sync: bool,
 }
 
 impl FrameBuffer {
@@ -20,7 +19,6 @@ impl FrameBuffer {
             dim: (width as usize, height as usize),
             palette,
             pixels: vec![0; (width * height) as usize],
-            sync: false,
         }
     }
 
@@ -32,19 +30,10 @@ impl FrameBuffer {
         unsafe { mem::transmute::<&[u32], &[u8]>(self.pixels.as_ref()) }
     }
 
-    pub fn get_sync(&self) -> bool {
-        self.sync
-    }
-
-    pub fn set_sync(&mut self, value: bool) {
-        self.sync = value;
-    }
-
     pub fn reset(&mut self) {
         for i in 0..self.pixels.len() {
             self.pixels[i] = 0x00;
         }
-        self.sync = false;
     }
 
     pub fn write(&mut self, x: u16, y: u16, color: u8) {
@@ -60,10 +49,6 @@ impl FrameBuffer {
 impl VideoOutput for FrameBuffer {
     fn get_dimension(&self) -> (usize, usize) {
         self.dim
-    }
-
-    fn set_sync(&mut self, value: bool) {
-        FrameBuffer::set_sync(self, value);
     }
 
     fn write(&mut self, index: usize, color: u8) {

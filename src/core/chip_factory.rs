@@ -25,7 +25,6 @@ use core::{
 /// with each component of the system.
 ///
 pub trait ChipFactory {
-    // -- Processor
 
     /// Constructs CPU.
     ///
@@ -119,8 +118,8 @@ pub trait ChipFactory {
     /// the memory base address is provided through `vic_base_address`. This is an optimization
     /// as `vic_base_address` will be updated only when CIA 2 port A changes.
     ///
-    /// VIC output is written to provided frame buffer. VIC should also set sync flag
-    /// on frame buffer when v-sync condition exists.
+    /// VIC output is written to provided frame buffer. VIC should also set vsync flag
+    /// when v-sync condition exists.
     ///
     /// # Dependencies
     /// `chip_model` - choose either 6567 or 6569
@@ -130,6 +129,7 @@ pub trait ChipFactory {
     /// `vic_base_address` - memory base address as defined by CIA 2 port A bits 0 and 1
     /// # I/O
     /// `frame_buffer` - pixel color information is written here
+    /// `vsync_flag` - set when vsync condition is reached
     /// # Signals
     /// `ba_line` - ba output
     /// `irq_line` - interrupt request output
@@ -141,6 +141,7 @@ pub trait ChipFactory {
         rom_charset: Rc<RefCell<Rom>>,
         vic_base_address: Rc<Cell<u16>>,
         frame_buffer: Rc<RefCell<dyn VideoOutput>>,
+        vsync_flag: Rc<Cell<bool>>,
         ba_line: Rc<RefCell<Pin>>,
         irq_line: Rc<RefCell<IrqLine>>,
     ) -> Rc<RefCell<dyn Chip>>;

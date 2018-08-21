@@ -165,16 +165,13 @@ impl App {
     }
 
     fn process_vsync(&mut self) {
-        let frame_buffer = self.execution_engine.get_c64().get_frame_buffer();
-        if frame_buffer.borrow().get_sync() {
+        if self.execution_engine.get_c64().get_vsync() {
             if !self.options.warp_mode {
                 self.sync_frame();
             }
-            {
-                let fb = frame_buffer.borrow();
-                self.renderer.render(&fb).expect("Failed to render frame");
-            }
-            frame_buffer.borrow_mut().set_sync(false);
+            let frame_buffer = self.execution_engine.get_c64().get_frame_buffer();
+            self.renderer.render(&frame_buffer.borrow()).expect("Failed to render frame");
+            self.execution_engine.get_c64().reset_vsync();
         }
     }
 
