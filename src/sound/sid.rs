@@ -26,6 +26,7 @@ pub struct Sid {
     // Functional Units
     resid: resid::Sid,
     // Runtime State
+    buffer: [i16; 8192],
     cycles: u64,
 }
 
@@ -45,6 +46,7 @@ impl Sid {
             system_clock,
             sound_buffer,
             resid,
+            buffer: [0i16; 8192],
             cycles: 0,
         }
     }
@@ -83,25 +85,19 @@ impl Chip for Sid {
         self.cycles = self.cycles.wrapping_add(1);
     }
 
-    fn clock_delta(&mut self, cycles: u32) {
-        if cycles > 0 {
-            let mut buffer = [0i16; 8192]; // TODO sound: magic value
-            let buffer_length = buffer.len();
-            let mut samples = 0;
-            let mut delta = cycles;
+    fn clock_delta(&mut self, delta: u32) {
+        if delta > 0 {
+            let mut delta = delta;
             while delta > 0 {
-                let (read, next_delta) =
-                    self.resid
-                        .sample(delta, &mut buffer[samples..], buffer_length - samples, 1);
-                samples += read as usize;
+                let (samples, next_delta) = self.resid.sample(delta, &mut self.buffer[..], 1);
+                let mut output = self.sound_buffer.lock().unwrap();
+                for i in 0..samples {
+                    output.write(self.buffer[i]);
+                }
                 delta = next_delta;
             }
-            let mut output = self.sound_buffer.lock().unwrap();
-            for i in 0..samples {
-                output.write(buffer[i]);
-            }
-            self.cycles = self.cycles.wrapping_add(cycles as u64);
         }
+        self.cycles = self.cycles.wrapping_add(delta as u64);
     }
 
     fn process_vsync(&mut self) {

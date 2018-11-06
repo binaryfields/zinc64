@@ -41,7 +41,7 @@ Here is an example how these components are used together:
         let mut c64 = C64::new(config.clone(), chip_factory).unwrap();
         c64.reset(true);
 
-The four core traits used to model system operation are Chip, Cpu, Mmu and Addressable.
+Four core traits used to model system operation are Chip, Cpu, Mmu and Addressable.
 A Chip trait represents a system component that is driven by clock signal.
 
         pub trait Chip {

@@ -14,14 +14,14 @@ use core::{
 };
 
 /// ChipFactory serves as the foundation of an extensible emulator architecture and
-/// provides an interface to construct each chip/component with the system.
-/// It allows for each components to be swapped out and replaced by different implementation.
-/// To accomplish that, special considerations were made to model interactions between chips
+/// provides an interface to construct each chip/component within the system.
+/// It allows for each component to be swapped out and replaced by different implementation.
+/// To accomplish this, special considerations were made to model interactions between chips
 /// without coupling them together. All interactions are managed through separate I/O state
 /// provided as input to each of the chip constructors (`IrqLine`, `Pin`).
 ///
-/// The four core traits used to model system operation are `Chip`, `Cpu`, `Mmu` and `Addressable`.
-/// The consumer of chip factory (usually emulator) will use these four traits to interact
+/// Four core traits used to model system operation are `Chip`, `Cpu`, `Mmu` and `Addressable`.
+/// The consumer of chip factory (usually an emulator) will use these four traits to interact
 /// with each component of the system.
 ///
 pub trait ChipFactory {
