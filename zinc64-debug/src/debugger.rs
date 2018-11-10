@@ -16,8 +16,8 @@ use byteorder::{BigEndian, ReadBytesExt};
 use zinc64::cpu::Instruction;
 
 use super::charset;
-use super::{Command, CommandResult, RegData, RegOp};
 use super::disassembler::Disassembler;
+use super::{Command, CommandResult, RegData, RegOp};
 
 // SPEC: Vice -> Alt-H -> help -> [Enter]
 
@@ -445,7 +445,7 @@ impl Connection {
     fn cmd_hunt(&mut self, start: u16, end: u16, search: &[u8]) -> io::Result<String> {
         let data = self.read_mem(start, end)?;
         let mut buffer = String::new();
-        for (i, value)  in data.iter().enumerate() {
+        for (i, value) in data.iter().enumerate() {
             let mut found = true;
             for item in search {
                 if *value != *item {
@@ -676,7 +676,8 @@ impl Connection {
                 } else {
                     "c"
                 }
-            ).as_str(),
+            )
+            .as_str(),
         );
         buffer
     }
@@ -729,7 +730,8 @@ impl Connection {
                 } else {
                     "0"
                 }
-            ).as_str(),
+            )
+            .as_str(),
         );
         buffer
     }

@@ -24,7 +24,7 @@ use std::env;
 use std::process;
 use std::rc::Rc;
 
-use zinc64::system::{C64, C64Factory};
+use zinc64::system::{C64Factory, C64};
 
 use self::config::Cli;
 use self::console::ConsoleApp;
@@ -45,7 +45,9 @@ fn main() {
 }
 
 fn init_logging(matches: &getopts::Matches) -> Result<(), String> {
-    let loglevel = matches.opt_str("loglevel").unwrap_or_else(|| "info".to_string());
+    let loglevel = matches
+        .opt_str("loglevel")
+        .unwrap_or_else(|| "info".to_string());
     let mut logger = Logger::build(&loglevel)?;
     for target_level in matches.opt_strs("log") {
         if let Some(equals) = target_level.find('=') {

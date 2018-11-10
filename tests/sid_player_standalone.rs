@@ -8,21 +8,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use zinc64::core::{
-    Chip,
-    Clock,
-    Cpu,
-    IoPort,
-    IrqLine,
-    Mmu,
-    Pin,
-    Ram,
-    TickFn,
-    SystemModel,
-};
+use zinc64::core::{Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, SystemModel, TickFn};
 use zinc64::cpu::Cpu6510;
-use zinc64::sound::Sid;
 use zinc64::sound::sid;
+use zinc64::sound::Sid;
 use zinc64::system::CircularBuffer;
 
 struct SimpleMemory {
@@ -35,11 +24,7 @@ struct SimpleMemory {
 
 impl SimpleMemory {
     pub fn new(ram: Rc<RefCell<Ram>>, sid: Rc<RefCell<dyn Chip>>) -> Self {
-        SimpleMemory {
-            mode: 0,
-            ram,
-            sid,
-        }
+        SimpleMemory { mode: 0, ram, sid }
     }
 }
 
@@ -50,14 +35,14 @@ impl Mmu for SimpleMemory {
 
     fn read(&self, address: u16) -> u8 {
         match address {
-            0xd400 ... 0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
+            0xd400...0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
             _ => self.ram.borrow().read(address),
         }
     }
 
     fn write(&mut self, address: u16, value: u8) {
         match address {
-            0xd400 ... 0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
+            0xd400...0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
             _ => self.ram.borrow_mut().write(address, value),
         }
     }
@@ -66,8 +51,8 @@ impl Mmu for SimpleMemory {
 // NOTE this should be actual player code
 
 static CODE: [u8; 24] = [
-    0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d,
-    0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
+    0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d, 0x00,
+    0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
 ];
 static CODE_OFFSET: u16 = 0x1000;
 
@@ -82,27 +67,19 @@ fn exec_sid_player() {
     let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(4096)));
 
     // Setup chipset
-    let sid = Rc::new(RefCell::new(
-        Sid::new(model.sid_model, clock.clone(), sound_buffer.clone())
-    ));
+    let sid = Rc::new(RefCell::new(Sid::new(
+        model.sid_model,
+        clock.clone(),
+        sound_buffer.clone(),
+    )));
     sid.borrow_mut().set_sampling_parameters(
         sid::SamplingMethod::ResampleFast,
         model.cpu_freq,
         44100,
     );
-    let ram = Rc::new(RefCell::new(
-        Ram::new(model.memory_size)
-    ));
-    let mem = Rc::new(RefCell::new(
-        SimpleMemory::new(ram.clone(), sid.clone())
-    ));
-    let mut cpu = Cpu6510::new(
-        mem,
-        cpu_io_port,
-        ba_line,
-        irq_line,
-        nmi_line,
-    );
+    let ram = Rc::new(RefCell::new(Ram::new(model.memory_size)));
+    let mem = Rc::new(RefCell::new(SimpleMemory::new(ram.clone(), sid.clone())));
+    let mut cpu = Cpu6510::new(mem, cpu_io_port, ba_line, irq_line, nmi_line);
 
     // Load program
     ram.borrow_mut().load(&CODE.to_vec(), CODE_OFFSET);

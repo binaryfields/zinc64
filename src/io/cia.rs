@@ -406,17 +406,17 @@ impl Chip for Cia {
             Reg::SDR => {}
             Reg::ICR => {
                 /*
-                The MASK register provides convenient control of
-                individual mask bits. When writing to the MASK register,
-                if bit 7 (SET/CLEAR) of the data written is a ZERO,
-                any mask bit written with a one will be cleared, while
-                those mask bits written with a zero will be unaffected. If
-                bit 7 of the data written is a ONE, any mask bit written
-                with a one will be set, while those mask bits written with
-                a zero will be unaffected. In order for an interrupt flag to
-                set IR and generate an Interrupt Request, the corresponding
-                MASK bit must be set.
-s                */
+                                The MASK register provides convenient control of
+                                individual mask bits. When writing to the MASK register,
+                                if bit 7 (SET/CLEAR) of the data written is a ZERO,
+                                any mask bit written with a one will be cleared, while
+                                those mask bits written with a zero will be unaffected. If
+                                bit 7 of the data written is a ONE, any mask bit written
+                                with a one will be set, while those mask bits written with
+                                a zero will be unaffected. In order for an interrupt flag to
+                                set IR and generate an Interrupt Request, the corresponding
+                                MASK bit must be set.
+                s                */
                 self.irq_control.update_mask(value);
                 if self.irq_control.is_triggered() {
                     self.irq_delay.feed(IntDelay::Interrupt0 as u16);
@@ -662,10 +662,10 @@ mod tests {
 
     /*
     Program CIA1TAB - TA, TB, PB67 and ICR in cascaded mode
-
+    
     Both latches are set to 2. TA counts system clocks, TB counts TA underflows (cascaded).
     PB6 is high for one cycle when TA underflows, PB7 is toggled when TB underflows. IMR is $02.
-
+    
     TA  01 02 02 01 02 02 01 02 02 01 02 02
     TB  02 02 02 01 01 01 00 00 02 02 02 02
     PB  80 C0 80 80 C0 80 80 C0 00 00 40 00

@@ -172,7 +172,9 @@ impl App {
                 self.sync_frame();
             }
             let frame_buffer = self.execution_engine.get_c64().get_frame_buffer();
-            self.renderer.render(&frame_buffer.borrow()).expect("Failed to render frame");
+            self.renderer
+                .render(&frame_buffer.borrow())
+                .expect("Failed to render frame");
             self.execution_engine.get_c64().reset_vsync();
         }
     }
@@ -282,8 +284,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     match self.execution_engine.halt() {
                         Ok(_) => (),
                         Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
@@ -294,8 +295,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_mute();
                 }
                 Event::KeyDown {
@@ -303,8 +303,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_pause();
                 }
                 Event::KeyDown {
@@ -312,8 +311,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     self.set_state(State::Stopped);
                 }
                 Event::KeyDown {
@@ -321,8 +319,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     self.toggle_warp();
                 }
                 Event::KeyDown {
@@ -330,8 +327,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     self.reset();
                 }
                 Event::KeyDown {
@@ -339,8 +335,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LCTRLMOD) =>
-                {
+                } if keymod.contains(keyboard::LCTRLMOD) => {
                     self.toggle_datassette_play();
                 }
                 Event::KeyDown {
@@ -348,8 +343,7 @@ impl App {
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) =>
-                {
+                } if keymod.contains(keyboard::LALTMOD) => {
                     self.renderer.toggle_fullscreen();
                 }
                 _ => {

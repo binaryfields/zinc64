@@ -318,7 +318,12 @@ fn opcode_timing() {
             cpu.write(0x1002, 0x10);
             cpu.set_pc(0x1000);
             cpu.step(&tick_fn);
-            assert_eq!(cycles, clock.get(), "opcode {:02x} timing failed", opcode as u8);
+            assert_eq!(
+                cycles,
+                clock.get(),
+                "opcode {:02x} timing failed",
+                opcode as u8
+            );
         }
     }
 }

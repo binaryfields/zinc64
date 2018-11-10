@@ -10,7 +10,7 @@ use std::result::Result;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use zinc64::system::autostart;
-use zinc64::system::{Autostart, AutostartMethod, C64, Image};
+use zinc64::system::{Autostart, AutostartMethod, Image, C64};
 
 use super::Loader;
 

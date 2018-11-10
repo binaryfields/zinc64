@@ -32,7 +32,6 @@ impl Default for BreakpointManager {
 }
 
 impl BreakpointManager {
-
     pub fn check(&mut self, cpu: &dyn Cpu) -> Option<usize> {
         if self.breakpoints.is_empty() {
             None

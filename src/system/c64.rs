@@ -106,7 +106,8 @@ impl C64 {
         let ram = factory.new_ram(config.model.memory_size);
         let rom_basic = factory.new_rom(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?;
         let rom_charset = factory.new_rom(Path::new("res/rom/characters.rom"), 0)?;
-        let rom_kernal = factory.new_rom(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?;
+        let rom_kernal =
+            factory.new_rom(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?;
 
         // Chipset
         let cia_1 = factory.new_cia_1(
@@ -337,7 +338,9 @@ impl C64 {
         self.vic.clone()
     }
 
-    pub fn get_vsync(&self) -> bool { self.vsync_flag.get() }
+    pub fn get_vsync(&self) -> bool {
+        self.vsync_flag.get()
+    }
 
     pub fn is_cpu_jam(&self) -> bool {
         self.last_pc == self.cpu.get_pc()
@@ -347,7 +350,9 @@ impl C64 {
         self.autostart = autostart;
     }
 
-    pub fn reset_vsync(&self) { self.vsync_flag.set(false) }
+    pub fn reset_vsync(&self) {
+        self.vsync_flag.set(false)
+    }
 
     pub fn check_breakpoints(&mut self) -> bool {
         self.breakpoints.check(&*self.cpu).is_some()
@@ -431,8 +436,7 @@ impl C64 {
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.get_pc();
         self.cpu.step(&tick_fn);
-        if self.autostart.is_some()
-            && self.cpu.get_pc() == BaseAddr::BootComplete.addr() {
+        if self.autostart.is_some() && self.cpu.get_pc() == BaseAddr::BootComplete.addr() {
             if let Some(mut autostart) = self.autostart.take() {
                 autostart.execute(self);
             }

@@ -34,7 +34,8 @@ impl Logger {
         log::set_logger(|max_log_level| {
             max_log_level.set(logger.get_level().to_log_level_filter());
             Box::new(logger)
-        }).map_err(|_| "cannot initialize logging".to_string())
+        })
+        .map_err(|_| "cannot initialize logging".to_string())
     }
 
     pub fn add_target(&mut self, target: String, level: &str) -> Result<(), String> {

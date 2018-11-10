@@ -428,7 +428,8 @@ impl Vic {
             let sprite = &mut self.sprite_units[n];
             if sprite.config.enabled
                 && sprite.config.y == (self.y as u8)
-                && !self.raster_unit.sprite_dma[n] {
+                && !self.raster_unit.sprite_dma[n]
+            {
                 self.raster_unit.sprite_dma[n] = true;
                 self.raster_unit.mc_base[n] = 0;
                 if sprite.config.expand_y {
@@ -494,7 +495,8 @@ impl Vic {
                 Mode::EcmText => {
                     let address = self.char_base
                         | (((self.raster_unit.vm_data_line[self.raster_unit.vmli] & 0x3f) as u16)
-                            << 3) | self.raster_unit.rc as u16;
+                            << 3)
+                        | self.raster_unit.rc as u16;
                     self.mem.read(address)
                 }
                 Mode::Bitmap | Mode::McBitmap => {
@@ -1028,11 +1030,13 @@ impl Chip for Vic {
                 self.sprite_units[n].config.y = value;
             }
             // Reg::MX8
-            0x10 => for i in 0..8 as usize {
-                self.sprite_units[i].config.x.set_bit(8, value.get_bit(i));
-                self.sprite_units[i].config.x_screen =
-                    self.map_sprite_to_screen(self.sprite_units[i].config.x);
-            },
+            0x10 => {
+                for i in 0..8 as usize {
+                    self.sprite_units[i].config.x.set_bit(8, value.get_bit(i));
+                    self.sprite_units[i].config.x_screen =
+                        self.map_sprite_to_screen(self.sprite_units[i].config.x);
+                }
+            }
             // Reg::CR1
             0x11 => {
                 self.raster_compare.set_bit(8, value.get_bit(7));
@@ -1062,9 +1066,11 @@ impl Chip for Vic {
             // Reg::LPY
             0x14 => {}
             // Reg::ME
-            0x15 => for i in 0..8 as usize {
-                self.sprite_units[i].config.enabled = value.get_bit(i);
-            },
+            0x15 => {
+                for i in 0..8 as usize {
+                    self.sprite_units[i].config.enabled = value.get_bit(i);
+                }
+            }
             // Reg::CR2
             0x16 => {
                 let mut mode = self.gfx_seq.config.mode.value();
@@ -1074,15 +1080,17 @@ impl Chip for Vic {
                 self.x_scroll = value & 0x07;
             }
             // Reg::MYE
-            0x17 => for i in 0..8 as usize {
-                self.sprite_units[i].config.expand_y = value.get_bit(i);
-                /*
-                Section: 3.8. Sprites
-                1. The expansion flip flip is set as long as the bit in MxYE in register
-                   $d017 corresponding to the sprite is cleared.
-                */
-                self.sprite_units[i].expansion_flop = !self.sprite_units[i].config.expand_y;
-            },
+            0x17 => {
+                for i in 0..8 as usize {
+                    self.sprite_units[i].config.expand_y = value.get_bit(i);
+                    /*
+                    Section: 3.8. Sprites
+                    1. The expansion flip flip is set as long as the bit in MxYE in register
+                       $d017 corresponding to the sprite is cleared.
+                    */
+                    self.sprite_units[i].expansion_flop = !self.sprite_units[i].config.expand_y;
+                }
+            }
             // Reg::MEMPTR
             0x18 => {
                 self.video_matrix = (((value & 0xf0) >> 4) as u16) << 10;
@@ -1103,21 +1111,27 @@ impl Chip for Vic {
                     .set_low(IrqSource::Vic.value(), self.irq_control.is_triggered());
             }
             // Reg::MDP
-            0x1b => for i in 0..8 as usize {
-                self.mux_unit.config.data_priority[i] = value.get_bit(i);
-            },
+            0x1b => {
+                for i in 0..8 as usize {
+                    self.mux_unit.config.data_priority[i] = value.get_bit(i);
+                }
+            }
             // Reg::MMC
-            0x1c => for i in 0..8 as usize {
-                self.sprite_units[i].config.mode = if !value.get_bit(i) {
-                    SpriteMode::Standard
-                } else {
-                    SpriteMode::Multicolor
-                };
-            },
+            0x1c => {
+                for i in 0..8 as usize {
+                    self.sprite_units[i].config.mode = if !value.get_bit(i) {
+                        SpriteMode::Standard
+                    } else {
+                        SpriteMode::Multicolor
+                    };
+                }
+            }
             // Reg::MXE
-            0x1d => for i in 0..8 as usize {
-                self.sprite_units[i].config.expand_x = value.get_bit(i);
-            },
+            0x1d => {
+                for i in 0..8 as usize {
+                    self.sprite_units[i].config.expand_x = value.get_bit(i);
+                }
+            }
             // Reg::MM
             0x1e => {}
             // Reg::MD
@@ -1127,9 +1141,11 @@ impl Chip for Vic {
             // Reg::B0C - Reg::B3C
             0x21...0x24 => self.gfx_seq.config.bg_color[reg as usize - 0x21] = value & 0x0f,
             // Reg::MM0  - Reg::MM1
-            0x25...0x26 => for i in 0..8 as usize {
-                self.sprite_units[i].config.multicolor[reg as usize - 0x25] = value & 0x0f;
-            },
+            0x25...0x26 => {
+                for i in 0..8 as usize {
+                    self.sprite_units[i].config.multicolor[reg as usize - 0x25] = value & 0x0f;
+                }
+            }
             // Reg::M0C - Reg::M7C
             0x27...0x2e => self.sprite_units[reg as usize - 0x27].config.color = value & 0x0f,
             _ => {}

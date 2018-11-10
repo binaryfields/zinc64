@@ -242,7 +242,6 @@ impl Default for MemoryMap {
 }
 
 impl MemoryMap {
-
     pub fn get(&self, mode: u8) -> Configuration {
         match mode {
             1...31 => self.modes[(mode - 1) as usize],

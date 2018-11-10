@@ -148,11 +148,13 @@ impl Timer {
             self.delay.feed(Delay::Load0 as u16);
         }
         let input_mode = match self.mode {
-            Mode::TimerA => if value.get_bit(5) {
-                1
-            } else {
-                0
-            },
+            Mode::TimerA => {
+                if value.get_bit(5) {
+                    1
+                } else {
+                    0
+                }
+            }
             Mode::TimerB => (value & 0x60) >> 5,
         };
         self.input_mode = match input_mode {

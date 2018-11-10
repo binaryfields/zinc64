@@ -9,7 +9,7 @@ use std::result::Result;
 use getopts;
 use zinc64::core::SystemModel;
 use zinc64::device;
-use zinc64::system::{C64, Config};
+use zinc64::system::{Config, C64};
 use zinc64_loader::{BinLoader, Loader, Loaders};
 
 use super::{JamAction, Options};
@@ -63,7 +63,11 @@ impl Cli {
     }
 
     pub fn parse_system_config(matches: &getopts::Matches) -> Result<Config, String> {
-        let model = SystemModel::from(&matches.opt_str("model").unwrap_or_else(|| String::from("pal")));
+        let model = SystemModel::from(
+            &matches
+                .opt_str("model")
+                .unwrap_or_else(|| String::from("pal")),
+        );
         let mut config = Config::new(model);
         Cli::parse_device_config(&mut config, matches)?;
         Cli::parse_sound_config(&mut config, matches)?;
@@ -108,16 +112,41 @@ impl Cli {
             // Sound
             .optflag("", "nosound", "disable sound playback")
             .optflag("", "nosidfilters", "disable SID filters")
-            .optopt("", "soundbufsize", "set sound buffer size in samples", "4096")
+            .optopt(
+                "",
+                "soundbufsize",
+                "set sound buffer size in samples",
+                "4096",
+            )
             .optopt("", "soundrate", "set sound sample rate in Hz", "44100")
             // Debug
             .optmulti("", "bp", "set breakpoint at this address", "address")
             .optflag("d", "debug", "start debugger")
-            .optopt("", "debugaddress", "start debugger bound to the specified address", "127.0.0.1:9999")
-            .optopt("", "jamaction", "set cpu jam handling", "[continue|quit|reset]")
-            .optopt("", "rap", "start rap server bound to the specified address", "127.0.0.1:9999")
+            .optopt(
+                "",
+                "debugaddress",
+                "start debugger bound to the specified address",
+                "127.0.0.1:9999",
+            )
+            .optopt(
+                "",
+                "jamaction",
+                "set cpu jam handling",
+                "[continue|quit|reset]",
+            )
+            .optopt(
+                "",
+                "rap",
+                "start rap server bound to the specified address",
+                "127.0.0.1:9999",
+            )
             // Logging
-            .optopt("", "loglevel", "set log level", "[error|warn|info|debug|trace]")
+            .optopt(
+                "",
+                "loglevel",
+                "set log level",
+                "[error|warn|info|debug|trace]",
+            )
             .optmulti("", "log", "set log level for a target", "target=level")
             // Help
             .optflag("h", "help", "display this help")

@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use zinc64::core::{SystemModel, TickFn};
 use zinc64::io::cia;
-use zinc64::system::{C64, C64Factory, Config};
+use zinc64::system::{C64Factory, Config, C64};
 
 /*
 Program CIA1TAB - TA, TB, PB67 and ICR in cascaded mode
@@ -25,16 +25,12 @@ ICR 00 01 01 01 01 01 01 01 03 83 83 83
 
 static CIA1TAB_PRG: &'static [u8] = include_bytes!("data/cia1tab.prg");
 
-static CIA1TAB_TA: [u8; 12] = [
-    01, 02, 02, 01, 02, 02, 01, 02, 02, 01, 02, 02
-];
+static CIA1TAB_TA: [u8; 12] = [01, 02, 02, 01, 02, 02, 01, 02, 02, 01, 02, 02];
 
-static CIA1TAB_TB: [u8; 12] = [
-    02, 02, 02, 01, 01, 01, 00, 00, 02, 02, 02, 02
-];
+static CIA1TAB_TB: [u8; 12] = [02, 02, 02, 01, 01, 01, 00, 00, 02, 02, 02, 02];
 
 static CIA1TAB_PB: [u8; 12] = [
-    0x80, 0xC0, 0x80, 0x80, 0xC0, 0x80, 0x80, 0xC0, 0x00, 0x00, 0x40, 0x00
+    0x80, 0xC0, 0x80, 0x80, 0xC0, 0x80, 0x80, 0xC0, 0x00, 0x00, 0x40, 0x00,
 ];
 
 #[test]
@@ -57,9 +53,18 @@ fn program_cia1tab() {
         if test_flag_clone.get() {
             if test_cycle_clone.get() >= 1 && test_cycle_clone.get() < 13 {
                 let i = test_cycle_clone.get() - 1;
-                assert_eq!(cia1_clone.borrow_mut().read(cia::Reg::TALO.addr()), CIA1TAB_TA[i]);
-                assert_eq!(cia1_clone.borrow_mut().read(cia::Reg::TBLO.addr()), CIA1TAB_TB[i]);
-                assert_eq!(cia1_clone.borrow_mut().read(cia::Reg::PRB.addr()), CIA1TAB_PB[i]);
+                assert_eq!(
+                    cia1_clone.borrow_mut().read(cia::Reg::TALO.addr()),
+                    CIA1TAB_TA[i]
+                );
+                assert_eq!(
+                    cia1_clone.borrow_mut().read(cia::Reg::TBLO.addr()),
+                    CIA1TAB_TB[i]
+                );
+                assert_eq!(
+                    cia1_clone.borrow_mut().read(cia::Reg::PRB.addr()),
+                    CIA1TAB_PB[i]
+                );
             }
             test_cycle_clone.set(test_cycle_clone.get() + 1);
         }
@@ -90,8 +95,8 @@ fn exec_keyboard_read() {
     .c017  58         cli
     */
     let code = [
-        0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d,
-        0x00, 0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
+        0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d, 0x00,
+        0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
     ];
     let config = Rc::new(Config::new(SystemModel::from("pal")));
     let factory = Box::new(C64Factory::new(config.clone()));

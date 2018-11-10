@@ -27,7 +27,6 @@ use core::{
 /// with each component of the system.
 ///
 pub trait ChipFactory {
-
     /// Constructs CPU.
     ///
     /// The three least significant bits in the port register correspond to the three

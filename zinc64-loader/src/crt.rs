@@ -14,7 +14,7 @@ use std::str;
 use byteorder::{BigEndian, ReadBytesExt};
 use zinc64::device::{Cartridge, Chip, ChipType, HwType};
 use zinc64::system::autostart;
-use zinc64::system::{C64, Image};
+use zinc64::system::{Image, C64};
 
 use super::Loader;
 

@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use zinc64::system::C64;
-use zinc64_debug::{Command, CommandResult, RegOp, RegData};
+use zinc64_debug::{Command, CommandResult, RegData, RegOp};
 
 // DEFERRED debugger: impl io
 
@@ -181,7 +181,8 @@ impl ExecutionEngine {
                         .as_ref()
                         .map_or(String::new(), |cond| format!(" if {}", cond)),
                     if bp.enabled { "" } else { " disabled" },
-                ).as_str(),
+                )
+                .as_str(),
             );
         }
         if buffer.is_empty() {

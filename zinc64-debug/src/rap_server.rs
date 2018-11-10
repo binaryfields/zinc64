@@ -160,7 +160,8 @@ impl Connection {
             Err(error) => Ok(error),
         }?;
         info!(target: "rap", "Cmd result len {}", result.len());
-        self.writer.write_u8(RapOp::Cmd as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u8(RapOp::Cmd as u8 | RapOp::Reply as u8)?;
         self.writer
             .write_u32::<BigEndian>((result.len() + 1) as u32)?;
         if !result.is_empty() {

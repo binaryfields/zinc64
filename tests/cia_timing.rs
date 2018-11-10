@@ -8,8 +8,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use zinc64::core::{Chip, IoPort, IrqLine, Pin};
-use zinc64::io::Cia;
 use zinc64::io::cia::{Mode, Reg};
+use zinc64::io::Cia;
 
 fn setup_cia() -> Cia {
     let cia_flag = Rc::new(RefCell::new(Pin::new_low()));
@@ -215,4 +215,3 @@ fn cia1_tb123_01_00() {
     assert_eq!(0x05, cia.read(Reg::TBLO.addr()));
     cia.clock();
 }
-
