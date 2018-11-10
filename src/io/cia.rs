@@ -19,7 +19,7 @@ use super::timer::Timer;
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
 
 enum IntDelay {
-    Interrupt0 = 1 << 0,
+    Interrupt0 = 1,
     Interrupt1 = 1 << 1,
 }
 
@@ -30,8 +30,8 @@ pub enum Mode {
 }
 
 impl Mode {
-    pub fn irq_source(&self) -> usize {
-        *self as usize
+    pub fn irq_source(self) -> usize {
+        self as usize
     }
 }
 
@@ -79,8 +79,8 @@ impl Reg {
     }
 
     #[allow(dead_code)]
-    pub fn addr(&self) -> u8 {
-        *self as u8
+    pub fn addr(self) -> u8 {
+        self as u8
     }
 }
 
@@ -107,6 +107,7 @@ pub struct Cia {
 }
 
 impl Cia {
+    #![cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
         mode: Mode,
         joystick_1: Option<Rc<Cell<u8>>>,
@@ -123,7 +124,7 @@ impl Cia {
             joystick_1,
             joystick_2,
             keyboard_matrix,
-            irq_control: IrqControl::new(),
+            irq_control: IrqControl::default(),
             irq_delay: CycleCounter::new(0xffff),
             timer_a: Timer::new(timer::Mode::TimerA, cnt_pin.clone()),
             timer_b: Timer::new(timer::Mode::TimerB, cnt_pin.clone()),
@@ -202,6 +203,7 @@ impl Cia {
 }
 
 impl Chip for Cia {
+    #![cfg_attr(feature = "cargo-clippy", allow(clippy::useless_let_if_seq))]
     fn clock(&mut self) {
         // Process timers
         self.timer_a.feed_source(false);

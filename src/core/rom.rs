@@ -16,8 +16,8 @@ pub struct Rom {
 impl Rom {
     pub fn new(capacity: usize, offset: u16, pattern: u8) -> Self {
         let mut data = vec![0x00; capacity];
-        for i in 0..data.len() {
-            data[i] = pattern;
+        for byte in &mut data {
+            *byte = pattern;
         }
         Self { data, offset }
     }

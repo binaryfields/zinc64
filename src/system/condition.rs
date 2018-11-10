@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -19,13 +21,13 @@ enum Operator {
 
 impl fmt::Display for Operator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Operator::Equal => write!(f, "=="),
-            &Operator::NotEqual => write!(f, "!="),
-            &Operator::Greater => write!(f, ">"),
-            &Operator::GreaterEqual => write!(f, ">="),
-            &Operator::Less => write!(f, "<"),
-            &Operator::LessEqual => write!(f, "<="),
+        match *self {
+            Operator::Equal => write!(f, "=="),
+            Operator::NotEqual => write!(f, "!="),
+            Operator::Greater => write!(f, ">"),
+            Operator::GreaterEqual => write!(f, ">="),
+            Operator::Less => write!(f, "<"),
+            Operator::LessEqual => write!(f, "<="),
         }
     }
 }
@@ -41,13 +43,13 @@ enum Reg {
 
 impl fmt::Display for Reg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Reg::A => write!(f, "A"),
-            &Reg::X => write!(f, "X"),
-            &Reg::Y => write!(f, "Y"),
-            &Reg::P => write!(f, "P"),
-            &Reg::SP => write!(f, "SP"),
-            &Reg::PC => write!(f, "PC"),
+        match *self {
+            Reg::A => write!(f, "A"),
+            Reg::X => write!(f, "X"),
+            Reg::Y => write!(f, "Y"),
+            Reg::P => write!(f, "P"),
+            Reg::SP => write!(f, "SP"),
+            Reg::PC => write!(f, "PC"),
         }
     }
 }
@@ -59,10 +61,10 @@ enum Value {
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Value::Constant(val) if val <= 0xff => write!(f, "{:02x}", val),
-            &Value::Constant(val) => write!(f, "{:04x}", val),
-            &Value::Register(ref reg) => write!(f, "{}", reg),
+        match *self {
+            Value::Constant(val) if val <= 0xff => write!(f, "{:02x}", val),
+            Value::Constant(val) => write!(f, "{:04x}", val),
+            Value::Register(ref reg) => write!(f, "{}", reg),
         }
     }
 }
@@ -85,7 +87,7 @@ impl Condition {
         parser.parse(expr)
     }
 
-    pub fn eval(&self, cpu: &Box<dyn Cpu>) -> bool {
+    pub fn eval(&self, cpu: &dyn Cpu) -> bool {
         match self.op {
             Operator::Equal => self.eval_reg(&self.reg, cpu) == self.eval_val(&self.val, cpu),
             Operator::NotEqual => self.eval_reg(&self.reg, cpu) != self.eval_val(&self.val, cpu),
@@ -98,21 +100,21 @@ impl Condition {
         }
     }
 
-    fn eval_reg(&self, reg: &Reg, cpu: &Box<dyn Cpu>) -> u16 {
-        match reg {
-            &Reg::A => cpu.get_a() as u16,
-            &Reg::X => cpu.get_x() as u16,
-            &Reg::Y => cpu.get_y() as u16,
-            &Reg::P => cpu.get_p() as u16,
-            &Reg::SP => cpu.get_sp() as u16,
-            &Reg::PC => cpu.get_pc(),
+    fn eval_reg(&self, reg: &Reg, cpu: &dyn Cpu) -> u16 {
+        match *reg {
+            Reg::A => cpu.get_a() as u16,
+            Reg::X => cpu.get_x() as u16,
+            Reg::Y => cpu.get_y() as u16,
+            Reg::P => cpu.get_p() as u16,
+            Reg::SP => cpu.get_sp() as u16,
+            Reg::PC => cpu.get_pc(),
         }
     }
 
-    fn eval_val(&self, val: &Value, cpu: &Box<dyn Cpu>) -> u16 {
-        match val {
-            &Value::Constant(value) => value,
-            &Value::Register(ref reg) => self.eval_reg(reg, cpu),
+    fn eval_val(&self, val: &Value, cpu: &dyn Cpu) -> u16 {
+        match *val {
+            Value::Constant(value) => value,
+            Value::Register(ref reg) => self.eval_reg(reg, cpu),
         }
     }
 }
@@ -175,7 +177,7 @@ impl Parser {
     fn parse_val(&self, val: &str) -> Result<Value, String> {
         match self.parse_reg(val) {
             Ok(reg) => Ok(Value::Register(reg)),
-            Err(_) => self.parse_num(val).map(|v| Value::Constant(v)),
+            Err(_) => self.parse_num(val).map(Value::Constant),
         }
     }
 }
@@ -206,7 +208,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             c if c.is_alphanumeric() => Some(Token::Atom(consume_while(&mut self.iter, |c| {
                 c.is_alphanumeric()
             }))),
-            c if is_symbol(c) => Some(Token::Op(consume_while(&mut self.iter, |c| is_symbol(c)))),
+            c if is_symbol(c) => Some(Token::Op(consume_while(&mut self.iter, is_symbol))),
             c if c.is_whitespace() => self.next(),
             '⊥' => None,
             _ => self.next(),
@@ -230,9 +232,8 @@ where
 }
 
 fn is_symbol(c: char) -> bool {
-    let result = match c {
+    match c {
         '<' | '=' | '>' | '!' => true,
         _ => false,
-    };
-    result
+    }
 }

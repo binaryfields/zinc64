@@ -74,7 +74,7 @@ static CODE_OFFSET: u16 = 0x1000;
 #[test]
 fn exec_sid_player() {
     let model = SystemModel::c64_pal();
-    let clock = Rc::new(Clock::new());
+    let clock = Rc::new(Clock::default());
     let ba_line = Rc::new(RefCell::new(Pin::new_high()));
     let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
     let irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));

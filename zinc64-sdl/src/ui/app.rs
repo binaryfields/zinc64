@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::net::SocketAddr;
 use std::result::Result;
 use std::sync::mpsc;
@@ -40,12 +42,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(c64: C64, options: Options) -> Result<App, String> {
+    pub fn build(c64: C64, options: Options) -> Result<App, String> {
         let sdl_context = sdl2::init()?;
         // Initialize video
         let sdl_video = sdl_context.video()?;
         info!(target: "app", "Opening app window {}x{}", options.window_size.0, options.window_size.1);
-        let renderer = Renderer::new(
+        let renderer = Renderer::build(
             &sdl_video,
             options.window_size,
             c64.get_config().model.frame_buffer_size,
@@ -65,7 +67,7 @@ impl App {
         audio_device.lock().set_volume(100);
         // Initialize I/O
         let sdl_joystick = sdl_context.joystick()?;
-        let io = Input::new(
+        let io = Input::build(
             &sdl_joystick,
             c64.get_keyboard(),
             c64.get_joystick1(),
@@ -76,7 +78,7 @@ impl App {
         if options.debug {
             let address = options
                 .dbg_address
-                .unwrap_or(SocketAddr::from(([127, 0, 0, 1], 9999)));
+                .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 9999)));
             info!(target: "app", "Starting debugger at {}", address);
             let command_tx_clone = command_tx.clone();
             thread::spawn(move || {
@@ -255,16 +257,12 @@ impl App {
 
     fn handle_commands(&mut self, debugging: bool) {
         if !debugging {
-            match self.command_rx.try_recv() {
-                Ok(command) => self.handle_command(&command),
-                _ => (),
-            };
+            if let Ok(command) = self.command_rx.try_recv() {
+                self.handle_command(&command);
+            }
         } else {
-            loop {
-                match self.command_rx.recv_timeout(Duration::from_millis(1)) {
-                    Ok(command) => self.handle_command(&command),
-                    _ => break,
-                };
+            while let Ok(command) = self.command_rx.recv_timeout(Duration::from_millis(1)) {
+                self.handle_command(&command);
             }
         }
     }

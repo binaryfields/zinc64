@@ -39,8 +39,8 @@ enum BaseAddr {
 }
 
 impl BaseAddr {
-    pub fn addr(&self) -> u16 {
-        *self as u16
+    pub fn addr(self) -> u16 {
+        self as u16
     }
 }
 
@@ -53,7 +53,7 @@ impl Memory {
         rom_charset: Rc<RefCell<Rom>>,
         rom_kernal: Rc<RefCell<Rom>>,
     ) -> Self {
-        let map = MemoryMap::new();
+        let map = MemoryMap::default();
         let configuration = map.get(1);
         Memory {
             map,

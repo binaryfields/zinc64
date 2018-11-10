@@ -4,17 +4,12 @@
 
 use std::cell::Cell;
 
+#[derive(Default)]
 pub struct Clock {
     counter: Cell<u64>,
 }
 
 impl Clock {
-    pub fn new() -> Self {
-        Self {
-            counter: Cell::new(0),
-        }
-    }
-
     pub fn elapsed(&self, prev: u64) -> u64 {
         self.counter.get() - prev
     }

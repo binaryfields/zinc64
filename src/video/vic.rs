@@ -2,6 +2,9 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cyclomatic_complexity))]
+
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -52,8 +55,8 @@ pub enum IrqSource {
 }
 
 impl IrqSource {
-    pub fn value(&self) -> usize {
-        *self as usize
+    pub fn value(self) -> usize {
+        self as usize
     }
 }
 
@@ -179,7 +182,7 @@ impl Vic {
             SpriteSequencer::new(),
             SpriteSequencer::new(),
         ];
-        let vic = Vic {
+        Vic {
             // Dependencies
             spec,
             color_ram,
@@ -187,7 +190,7 @@ impl Vic {
             // Functional Units
             border_unit: BorderUnit::new(),
             gfx_seq: GfxSequencer::new(),
-            irq_control: IrqControl::new(),
+            irq_control: IrqControl::default(),
             mux_unit: MuxUnit::new(),
             raster_unit: RasterUnit::new(),
             sprite_units: sprites,
@@ -207,8 +210,7 @@ impl Vic {
             ba_line,
             irq_line,
             vsync_flag,
-        };
-        vic
+        }
     }
 
     fn draw(&mut self) {
@@ -424,13 +426,13 @@ impl Vic {
         */
         for n in 0..8 {
             let sprite = &mut self.sprite_units[n];
-            if sprite.config.enabled && sprite.config.y == (self.y as u8) {
-                if !self.raster_unit.sprite_dma[n] {
-                    self.raster_unit.sprite_dma[n] = true;
-                    self.raster_unit.mc_base[n] = 0;
-                    if sprite.config.expand_y {
-                        sprite.expansion_flop = false;
-                    }
+            if sprite.config.enabled
+                && sprite.config.y == (self.y as u8)
+                && !self.raster_unit.sprite_dma[n] {
+                self.raster_unit.sprite_dma[n] = true;
+                self.raster_unit.mc_base[n] = 0;
+                if sprite.config.expand_y {
+                    sprite.expansion_flop = false;
                 }
             }
         }
@@ -764,9 +766,7 @@ impl Chip for Vic {
                 4. In the first phase of cycle 58, the MC of every sprite is loaded from
                    its belonging MCBASE (MCBASE->MC) ...
                 */
-                for i in 0..8 {
-                    self.raster_unit.mc[i] = self.raster_unit.mc_base[i];
-                }
+                self.raster_unit.mc[..8].clone_from_slice(&self.raster_unit.mc_base[..8]);
                 self.update_sprite_display();
                 let sprite_dma = self.raster_unit.sprite_dma[0] | self.raster_unit.sprite_dma[1];
                 self.set_ba(sprite_dma);

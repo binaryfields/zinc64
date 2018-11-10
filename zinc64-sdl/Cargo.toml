@@ -1,6 +1,6 @@
 [package]
 name = "zinc64-sdl"
-version = "0.6.1-pre"
+version = "0.7.0-pre"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 description = "Commodore 64 emulator app"
 license = "GPL-3.0+"
@@ -15,9 +15,9 @@ byteorder = "1.2"
 getopts = "0.2"
 log = "0.3"
 time = "0.1"
-zinc64 = { path = "..", version = "0.6.1-pre" }
-zinc64-debug = { path = "../zinc64-debug", version = "0.6.1-pre" }
-zinc64-loader = { path = "../zinc64-loader", version = "0.6.1-pre" }
+zinc64 = { path = "..", version = "0.7.0-pre" }
+zinc64-debug = { path = "../zinc64-debug", version = "0.7.0-pre" }
+zinc64-loader = { path = "../zinc64-loader", version = "0.7.0-pre" }
 
 [dependencies.sdl2]
 version = "0.31"

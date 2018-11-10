@@ -19,8 +19,8 @@ pub enum Button {
 }
 
 impl Button {
-    pub fn bit(&self) -> usize {
-        *self as usize
+    pub fn bit(self) -> usize {
+        self as usize
     }
 }
 
@@ -43,8 +43,8 @@ impl Mode {
         }
     }
 
-    pub fn index(&self) -> u8 {
-        *self as u8
+    pub fn index(self) -> u8 {
+        self as u8
     }
 }
 

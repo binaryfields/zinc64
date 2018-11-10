@@ -34,8 +34,8 @@ enum ControlPort {
 }
 
 impl ControlPort {
-    pub fn value(&self) -> usize {
-        *self as usize
+    pub fn value(self) -> usize {
+        self as usize
     }
 }
 

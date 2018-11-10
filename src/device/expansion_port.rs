@@ -19,8 +19,8 @@ enum IoLine {
 }
 
 impl IoLine {
-    pub fn value(&self) -> usize {
-        *self as usize
+    pub fn value(self) -> usize {
+        self as usize
     }
 }
 

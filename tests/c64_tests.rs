@@ -41,7 +41,7 @@ static CIA1TAB_PB: [u8; 12] = [
 fn program_cia1tab() {
     let config = Rc::new(Config::new(SystemModel::from("pal")));
     let factory = Box::new(C64Factory::new(config.clone()));
-    let mut c64 = C64::new(config.clone(), factory).unwrap();
+    let mut c64 = C64::build(config.clone(), &*factory).unwrap();
     c64.reset(false);
     let cia1_clone = c64.get_cia_1();
     let cia2_clone = c64.get_cia_2();
@@ -95,7 +95,7 @@ fn exec_keyboard_read() {
     ];
     let config = Rc::new(Config::new(SystemModel::from("pal")));
     let factory = Box::new(C64Factory::new(config.clone()));
-    let mut c64 = C64::new(config.clone(), factory).unwrap();
+    let mut c64 = C64::build(config.clone(), &*factory).unwrap();
     c64.load(&code.to_vec(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.borrow_mut().set_row(1, !(1 << 5));

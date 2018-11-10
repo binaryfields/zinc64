@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Read};
@@ -63,7 +65,7 @@ impl CrtLoader {
         Self {}
     }
 
-    fn build_cartridge(&self, header: Header) -> Cartridge {
+    fn build_cartridge(&self, header: &Header) -> Cartridge {
         Cartridge {
             version: header.version,
             hw_type: HwType::from(header.hw_type as u8),
@@ -75,7 +77,7 @@ impl CrtLoader {
         }
     }
 
-    fn build_chip(&self, header: ChipHeader, data: Vec<u8>) -> Chip {
+    fn build_chip(&self, header: &ChipHeader, data: Vec<u8>) -> Chip {
         Chip {
             chip_type: ChipType::from(header.chip_type),
             bank_number: header.bank_number as u8,
@@ -183,7 +185,7 @@ impl Loader for CrtLoader {
               header.hw_type);
         self.validate_header(&header)?;
         rdr.consume((header.header_length - 0x40) as usize);
-        let mut cartridge = self.build_cartridge(header);
+        let mut cartridge = self.build_cartridge(&header);
         loop {
             let chip_header_opt = self
                 .read_chip_header(&mut rdr)
@@ -201,7 +203,7 @@ impl Loader for CrtLoader {
                                 format!("invalid cartridge chip {} data", chip_header.bank_number),
                             )
                         })?;
-                    let chip = self.build_chip(chip_header, chip_data);
+                    let chip = self.build_chip(&chip_header, chip_data);
                     cartridge.add(chip);
                 }
                 None => {

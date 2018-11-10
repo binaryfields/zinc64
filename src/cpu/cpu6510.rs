@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
@@ -22,7 +24,7 @@ use super::instruction::Instruction;
 //   are also handled here.
 
 enum Flag {
-    Carry = 1 << 0,
+    Carry = 1,
     Zero = 1 << 1,
     IntDisable = 1 << 2,
     Decimal = 1 << 3,
@@ -34,7 +36,7 @@ enum Flag {
 
 #[derive(Debug)]
 enum Interrupt {
-    Break = 1 << 0,
+    Break = 1,
     Irq = 1 << 1,
     Nmi = 1 << 2,
     Reset = 1 << 3,
@@ -434,7 +436,7 @@ impl Cpu6510 {
                 self.set_flag(Flag::Zero, value & a == 0);
             }
             Instruction::BRK => {
-                self.interrupt(Interrupt::Break, tick_fn);
+                self.interrupt(&Interrupt::Break, tick_fn);
             }
             Instruction::CLC => {
                 self.set_flag(Flag::Carry, false);
@@ -502,7 +504,7 @@ impl Cpu6510 {
         word
     }
 
-    fn interrupt(&mut self, interrupt: Interrupt, tick_fn: &TickFn) {
+    fn interrupt(&mut self, interrupt: &Interrupt, tick_fn: &TickFn) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::int", "Interrupt {:?}", interrupt);
         }
@@ -649,7 +651,7 @@ impl Cpu for Cpu6510 {
         self.write(0x0000, 0b_0010_1111);
         self.write(0x0001, 0b_0001_1111);
         let tick_fn: TickFn = Rc::new(move || {});
-        self.interrupt(Interrupt::Reset, &tick_fn);
+        self.interrupt(&Interrupt::Reset, &tick_fn);
     }
 
     fn step(&mut self, tick_fn: &TickFn) {
@@ -657,9 +659,9 @@ impl Cpu for Cpu6510 {
             tick_fn();
         }
         if self.nmi_line.borrow().is_low() {
-            self.interrupt(Interrupt::Nmi, tick_fn);
+            self.interrupt(&Interrupt::Nmi, tick_fn);
         } else if self.irq_line.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
-            self.interrupt(Interrupt::Irq, tick_fn);
+            self.interrupt(&Interrupt::Irq, tick_fn);
         }
         let pc = self.regs.pc;
         let opcode = self.fetch_byte(tick_fn);

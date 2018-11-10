@@ -4,6 +4,8 @@
 
 // Spec: http://unusedino.de/ec64/technical/misc/vic656x/colors/
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::unreadable_literal))]
+
 pub struct Palette;
 
 impl Palette {

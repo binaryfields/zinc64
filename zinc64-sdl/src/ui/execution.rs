@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::sync::mpsc::Sender;
 
 use byteorder::{BigEndian, WriteBytesExt};
@@ -100,7 +102,7 @@ impl ExecutionEngine {
         if let Some(ref debugger) = self.debugger {
             debugger
                 .send(result)
-                .map_err(|_| format!("Failed to send result"))
+                .map_err(|_| "Failed to send result".to_string())
         } else {
             Ok(())
         }
@@ -131,7 +133,7 @@ impl ExecutionEngine {
     fn bp_condition(
         &mut self,
         index: u16,
-        expr: &String,
+        expr: &str,
         radix: u32,
     ) -> Result<CommandResult, String> {
         let bpm = self.c64.get_bpm_mut();
@@ -143,7 +145,7 @@ impl ExecutionEngine {
             bp.condition
                 .as_ref()
                 .map(|cond| format!("{}", cond))
-                .unwrap_or("".to_string())
+                .unwrap_or_else(|| "".to_string())
         );
         Ok(CommandResult::Text(buffer))
     }
@@ -223,16 +225,16 @@ impl ExecutionEngine {
         CommandResult::Registers(regs)
     }
 
-    fn reg_write(&mut self, ops: &Vec<RegOp>) -> CommandResult {
+    fn reg_write(&mut self, ops: &[RegOp]) -> CommandResult {
         let cpu = self.c64.get_cpu_mut();
         for op in ops {
-            match op {
-                &RegOp::SetA(value) => cpu.set_a(value),
-                &RegOp::SetX(value) => cpu.set_x(value),
-                &RegOp::SetY(value) => cpu.set_y(value),
-                &RegOp::SetP(value) => cpu.set_p(value),
-                &RegOp::SetSP(value) => cpu.set_sp(value),
-                &RegOp::SetPC(value) => cpu.set_pc(value),
+            match *op {
+                RegOp::SetA(value) => cpu.set_a(value),
+                RegOp::SetX(value) => cpu.set_x(value),
+                RegOp::SetY(value) => cpu.set_y(value),
+                RegOp::SetP(value) => cpu.set_p(value),
+                RegOp::SetSP(value) => cpu.set_sp(value),
+                RegOp::SetPC(value) => cpu.set_pc(value),
             }
         }
         CommandResult::Unit
@@ -257,7 +259,7 @@ impl ExecutionEngine {
         CommandResult::Buffer(buffer)
     }
 
-    fn mem_write(&mut self, address: u16, data: &Vec<u8>) -> CommandResult {
+    fn mem_write(&mut self, address: u16, data: &[u8]) -> CommandResult {
         self.c64.load(data, address);
         CommandResult::Unit
     }

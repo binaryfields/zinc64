@@ -23,7 +23,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(
+    pub fn build(
         sdl_video: &sdl2::VideoSubsystem,
         window_size: (u32, u32),
         screen_size: (u32, u32),
@@ -73,15 +73,10 @@ impl Renderer {
 
     pub fn render(&mut self, frame_buffer: &FrameBuffer) -> Result<(), String> {
         self.texture
-            .update(
-                None,
-                frame_buffer.get_pixel_data(),
-                frame_buffer.get_pitch(),
-            )
+            .update(None, frame_buffer.get_pixel_data(), frame_buffer.get_pitch())
             .map_err(|_| "failed to update texture")?;
         self.canvas.clear();
-        self.canvas
-            .copy(&self.texture, Some(self.viewport_rect.clone()), None)?;
+        self.canvas.copy(&self.texture, Some(self.viewport_rect), None)?;
         self.canvas.present();
         self.frame = self.frame.wrapping_add(1);
         self.last_frame_ts = time::precise_time_ns();

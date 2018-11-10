@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,7 +15,7 @@ use super::cycle_counter::CycleCounter;
 // SPEC: A Software Model of the CIA6526 by Wolfgang Lorenz
 
 enum Delay {
-    Count0 = 1 << 0,
+    Count0 = 1,
     Count1 = 1 << 1,
     Count2 = 1 << 2,
     Count3 = 1 << 3,

@@ -20,7 +20,7 @@ static VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub struct Cli;
 
 impl Cli {
-    pub fn parse_args(args: &Vec<String>) -> Result<getopts::Matches, String> {
+    pub fn parse_args(args: &[String]) -> Result<getopts::Matches, String> {
         let opts = Cli::build_options();
         let matches = opts
             .parse(&args[1..])
@@ -63,7 +63,7 @@ impl Cli {
     }
 
     pub fn parse_system_config(matches: &getopts::Matches) -> Result<Config, String> {
-        let model = SystemModel::from(&matches.opt_str("model").unwrap_or(String::from("pal")));
+        let model = SystemModel::from(&matches.opt_str("model").unwrap_or_else(|| String::from("pal")));
         let mut config = Config::new(model);
         Cli::parse_device_config(&mut config, matches)?;
         Cli::parse_sound_config(&mut config, matches)?;
@@ -159,8 +159,8 @@ impl Cli {
                 let mut autostart = loader.autostart(path).map_err(|err| format!("{}", err))?;
                 autostart.execute(c64);
             }
-            None => match matches.opt_str("binary") {
-                Some(binary_path) => {
+            None => {
+                if let Some(binary_path) = matches.opt_str("binary") {
                     let offset = matches
                         .opt_str("offset")
                         .map(|s| s.parse::<u16>().unwrap())
@@ -170,8 +170,7 @@ impl Cli {
                     let mut image = loader.load(path).map_err(|err| format!("{}", err))?;
                     image.mount(c64);
                 }
-                None => {}
-            },
+            }
         }
         Ok(())
     }

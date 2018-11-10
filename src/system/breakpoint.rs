@@ -22,15 +22,18 @@ pub struct BreakpointManager {
     bp_index: u16,
 }
 
-impl BreakpointManager {
-    pub fn new() -> Self {
+impl Default for BreakpointManager {
+    fn default() -> Self {
         Self {
             breakpoints: Vec::new(),
             bp_index: 1,
         }
     }
+}
 
-    pub fn check(&mut self, cpu: &Box<dyn Cpu>) -> Option<usize> {
+impl BreakpointManager {
+
+    pub fn check(&mut self, cpu: &dyn Cpu) -> Option<usize> {
         if self.breakpoints.is_empty() {
             None
         } else {
@@ -74,7 +77,7 @@ impl BreakpointManager {
     }
 
     pub fn is_bp_present(&self) -> bool {
-        self.breakpoints.iter().position(|bp| bp.enabled).is_some()
+        self.breakpoints.iter().any(|bp| bp.enabled)
     }
 
     pub fn ignore(&mut self, index: u16, count: u16) -> Result<(), String> {
@@ -119,12 +122,12 @@ impl BreakpointManager {
     pub fn set_condition(
         &mut self,
         index: u16,
-        expr: &String,
+        expr: &str,
         radix: Option<u32>,
     ) -> Result<(), String> {
         match self.find_mut(index) {
             Some(bp) => {
-                let condition = Condition::parse(expr.as_str(), radix)?;
+                let condition = Condition::parse(expr, radix)?;
                 bp.condition = Some(condition);
                 Ok(())
             }

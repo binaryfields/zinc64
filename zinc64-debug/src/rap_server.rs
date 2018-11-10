@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::ffi::CStr;
 use std::io;
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
@@ -22,7 +24,7 @@ use super::{Command, CommandResult};
 
 const RAP_RMT_MAX: u32 = 4096;
 
-const REG_PROFILE: &'static str = "
+const REG_PROFILE: &str = "
 =PC	pc
 =SP	sp
 gpr	a	.8	0	0
@@ -39,6 +41,7 @@ gpr	sp	.8	4	0
 gpr	pc	.16	5	0
 ";
 
+#[derive(Clone, Copy)]
 enum RapCmd {
     Registers,
     RegisterProfile,
@@ -81,17 +84,14 @@ impl RapServer {
     pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
         let listener = TcpListener::bind(addr)?;
         for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let mut conn = Connection::new(self.command_tx.clone(), stream).unwrap();
-                    match conn.handle() {
-                        Ok(_) => info!(target: "debugger", "Connection closed"),
-                        Err(error) => {
-                            error!(target: "debugger", "Connection failed, error - {}", error)
-                        }
+            if let Ok(stream) = stream {
+                let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
+                match conn.handle() {
+                    Ok(_) => info!(target: "debugger", "Connection closed"),
+                    Err(error) => {
+                        error!(target: "debugger", "Connection failed, error - {}", error)
                     }
                 }
-                Err(_) => {}
             }
         }
         Ok(())
@@ -112,7 +112,7 @@ struct Connection {
 }
 
 impl Connection {
-    pub fn new(command_tx: Sender<Command>, stream: TcpStream) -> io::Result<Self> {
+    pub fn build(command_tx: Sender<Command>, stream: &TcpStream) -> io::Result<Self> {
         let reader = BufReader::new(stream.try_clone()?);
         let writer = BufWriter::new(stream.try_clone()?);
         let (response_tx, response_rx) = mpsc::channel::<CommandResult>();
@@ -163,8 +163,8 @@ impl Connection {
         self.writer.write_u8(RapOp::Cmd as u8 | RapOp::Reply as u8)?;
         self.writer
             .write_u32::<BigEndian>((result.len() + 1) as u32)?;
-        if result.len() > 0 {
-            self.writer.write_all(&mut result.as_bytes())?;
+        if !result.is_empty() {
+            self.writer.write_all(&result.as_bytes())?;
             self.writer.write_u8(0)?;
         }
         self.writer.flush()
@@ -172,9 +172,9 @@ impl Connection {
 
     fn handle_close(&mut self) -> io::Result<()> {
         let _fd = self.reader.read_u32::<BigEndian>()?;
-        let _result = match self.execute_emu(Command::Detach)? {
+        match self.execute_emu(Command::Detach)? {
             CommandResult::Unit => Ok(()),
-            result => Err(self.invalid_response(result)),
+            result => Err(self.invalid_response(&result)),
         }?;
         self.running = false;
         self.writer
@@ -189,9 +189,9 @@ impl Connection {
         let mut data = vec![0; len as usize];
         self.reader.read_exact(&mut data)?;
         let tx = self.response_tx.clone();
-        let _result = match self.execute_emu(Command::Attach(tx))? {
+        match self.execute_emu(Command::Attach(tx))? {
             CommandResult::Unit => Ok(()),
-            result => Err(self.invalid_response(result)),
+            result => Err(self.invalid_response(&result)),
         }?;
         self.writer
             .write_u8(RapOp::Open as u8 | RapOp::Reply as u8)?;
@@ -208,14 +208,14 @@ impl Connection {
         let start = self.offset;
         let end = self.offset.wrapping_add(len as u16);
         let command = Command::MemRead(start, end);
-        let mut data = match self.execute_emu(command)? {
+        let data = match self.execute_emu(command)? {
             CommandResult::Buffer(data) => Ok(data),
-            result => Err(self.invalid_response(result)),
+            result => Err(self.invalid_response(&result)),
         }?;
         self.writer
             .write_u8(RapOp::Read as u8 | RapOp::Reply as u8)?;
         self.writer.write_u32::<BigEndian>(data.len() as u32)?;
-        self.writer.write_all(&mut data)?;
+        self.writer.write_all(&data)?;
         self.writer.flush()
     }
 
@@ -244,9 +244,9 @@ impl Connection {
         let mut data = vec![0; len as usize];
         self.reader.read_exact(&mut data)?;
         let command = Command::MemWrite(self.offset, data);
-        let _result = match self.execute_emu(command)? {
+        match self.execute_emu(command)? {
             CommandResult::Unit => Ok(()),
-            result => Err(self.invalid_response(result)),
+            result => Err(self.invalid_response(&result)),
         }?;
         self.writer
             .write_u8(RapOp::Write as u8 | RapOp::Reply as u8)?;
@@ -254,7 +254,7 @@ impl Connection {
         self.writer.flush()
     }
 
-    fn invalid_response(&self, _result: CommandResult) -> Error {
+    fn invalid_response(&self, _result: &CommandResult) -> Error {
         Error::new(ErrorKind::Other, "Invalid debugger result")
     }
 
@@ -272,7 +272,7 @@ impl Connection {
                 buffer.push_str(format!("pc = 0x{:04x}\n", regs.pc).as_str());
                 Ok(buffer)
             }
-            other => Err(self.invalid_response(other)),
+            other => Err(self.invalid_response(&other)),
         }
     }
 
@@ -308,7 +308,7 @@ impl CommandParser {
         Self { radix: 16 }
     }
 
-    pub fn parse(&self, input: &String) -> Result<RapCmd, String> {
+    pub fn parse(&self, input: &str) -> Result<RapCmd, String> {
         let mut tokens = input.split_whitespace();
         if let Some(command) = tokens.next() {
             match command.to_lowercase().as_str() {

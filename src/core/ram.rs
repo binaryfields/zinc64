@@ -20,7 +20,7 @@ impl Ram {
         }
     }
 
-    pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
+    pub fn load(&mut self, data: &[u8], offset: u16) {
         let mut address = offset;
         for byte in data {
             self.write(address, *byte);

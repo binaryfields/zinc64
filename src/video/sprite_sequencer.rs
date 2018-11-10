@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use bit_field::BitField;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -97,7 +99,7 @@ impl SpriteSequencer {
         if self.display {
             if self.delay_cycles == 0 {
                 if x == self.config.x_screen && self.counter == 0 {
-                    self.counter = 0xffffff00;
+                    self.counter = 0xffff_ff00;
                 }
                 if x >= self.config.x_screen && self.counter != 0 {
                     match self.config.mode {

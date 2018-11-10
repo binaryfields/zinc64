@@ -141,9 +141,10 @@ impl Keyboard {
 
     pub fn drain_event(&mut self) {
         if let Some((key_event, pressed)) = self.queue.pop_front() {
-            match pressed {
-                true => self.on_key_down(key_event),
-                false => self.on_key_up(key_event),
+            if pressed {
+                self.on_key_down(key_event)
+            } else {
+                self.on_key_up(key_event)
             }
         }
     }

@@ -4,22 +4,19 @@
 
 use bit_field::BitField;
 
+#[derive(Default)]
 pub struct IrqControl {
     data: u8,
     mask: u8,
 }
 
 impl IrqControl {
-    pub fn new() -> Self {
-        Self { data: 0, mask: 0 }
-    }
-
     pub fn clear(&mut self) {
         self.data = 0;
     }
 
     pub fn clear_events(&mut self, events: u8) {
-        self.data = self.data & (!events);
+        self.data &= !events;
     }
 
     pub fn get_data(&self) -> u8 {

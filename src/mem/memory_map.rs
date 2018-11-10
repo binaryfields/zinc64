@@ -24,8 +24,8 @@ pub struct Configuration {
 impl Configuration {
     pub fn new(config: [Bank; 7]) -> Self {
         let mut banks = [Bank::Disabled; 0x10];
-        for i in 0..0x10 {
-            banks[i] = match i {
+        for (i, bank) in banks.iter_mut().enumerate().take(0x10) {
+            *bank = match i {
                 0x00 => config[0],
                 0x01...0x07 => config[1],
                 0x08...0x09 => config[2],
@@ -48,8 +48,8 @@ pub struct MemoryMap {
     modes: [Configuration; 31],
 }
 
-impl MemoryMap {
-    pub fn new() -> Self {
+impl Default for MemoryMap {
+    fn default() -> Self {
         let m31 = [
             Bank::Ram,
             Bank::Ram,
@@ -239,6 +239,9 @@ impl MemoryMap {
             ],
         }
     }
+}
+
+impl MemoryMap {
 
     pub fn get(&self, mode: u8) -> Configuration {
         match mode {

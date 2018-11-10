@@ -57,6 +57,7 @@ pub enum CommandResult {
     Unit,
 }
 
+#[derive(Clone, Copy)]
 pub struct RegData {
     pub a: u8,
     pub x: u8,

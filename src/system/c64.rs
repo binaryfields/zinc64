@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::cell::{Cell, RefCell};
 use std::io;
 use std::path::Path;
@@ -30,8 +32,8 @@ enum BaseAddr {
 }
 
 impl BaseAddr {
-    pub fn addr(&self) -> u16 {
-        *self as u16
+    pub fn addr(self) -> u16 {
+        self as u16
     }
 }
 
@@ -68,10 +70,10 @@ pub struct C64 {
 }
 
 impl C64 {
-    pub fn new(config: Rc<Config>, factory: Box<dyn ChipFactory>) -> Result<C64, io::Error> {
+    pub fn build(config: Rc<Config>, factory: &dyn ChipFactory) -> Result<C64, io::Error> {
         info!(target: "c64", "Initializing system");
         // Buffers
-        let clock = Rc::new(Clock::new());
+        let clock = Rc::new(Clock::default());
         let frame_buffer = Rc::new(RefCell::new(FrameBuffer::new(
             config.model.frame_buffer_size.0,
             config.model.frame_buffer_size.1,
@@ -240,7 +242,7 @@ impl C64 {
             frame_buffer: frame_buffer.clone(),
             sound_buffer: sound_buffer.clone(),
             autostart: None,
-            breakpoints: BreakpointManager::new(),
+            breakpoints: BreakpointManager::default(),
             clock,
             frame_count: 0,
             last_pc: 0,
@@ -265,12 +267,12 @@ impl C64 {
         &self.config
     }
 
-    pub fn get_cpu(&self) -> &Box<Cpu> {
-        &self.cpu
+    pub fn get_cpu(&self) -> &Cpu {
+        &*self.cpu
     }
 
-    pub fn get_cpu_mut(&mut self) -> &mut Box<Cpu> {
-        &mut self.cpu
+    pub fn get_cpu_mut(&mut self) -> &mut Cpu {
+        &mut *self.cpu
     }
 
     pub fn get_cycles(&self) -> u64 {
@@ -348,10 +350,10 @@ impl C64 {
     pub fn reset_vsync(&self) { self.vsync_flag.set(false) }
 
     pub fn check_breakpoints(&mut self) -> bool {
-        self.breakpoints.check(&self.cpu).is_some()
+        self.breakpoints.check(&*self.cpu).is_some()
     }
 
-    pub fn load(&mut self, data: &Vec<u8>, offset: u16) {
+    pub fn load(&mut self, data: &[u8], offset: u16) {
         let mut mem = self.ram.borrow_mut();
         let mut address = offset;
         for byte in data {
@@ -429,11 +431,10 @@ impl C64 {
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.get_pc();
         self.cpu.step(&tick_fn);
-        if self.autostart.is_some() {
-            if self.cpu.get_pc() == BaseAddr::BootComplete.addr() {
-                if let Some(mut autostart) = self.autostart.take() {
-                    autostart.execute(self);
-                }
+        if self.autostart.is_some()
+            && self.cpu.get_pc() == BaseAddr::BootComplete.addr() {
+            if let Some(mut autostart) = self.autostart.take() {
+                autostart.execute(self);
             }
         }
     }
@@ -468,7 +469,7 @@ mod tests {
     fn verify_mem_layout() {
         let config = Rc::new(Config::new(SystemModel::from("pal")));
         let factory = Box::new(C64Factory::new(config.clone()));
-        let mut c64 = C64::new(config.clone(), factory).unwrap();
+        let mut c64 = C64::build(config.clone(), &*factory).unwrap();
         c64.reset(false);
         let cpu = c64.get_cpu();
         assert_eq!(0x94, cpu.read(0xa000));

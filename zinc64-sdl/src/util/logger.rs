@@ -18,7 +18,7 @@ pub struct Logger {
 }
 
 impl Logger {
-    pub fn new(level: &str) -> Result<Logger, String> {
+    pub fn build(level: &str) -> Result<Logger, String> {
         let loglevel =
             LogLevel::from_str(&level).map_err(|_| format!("invalid log level {}", level))?;
         let mut logger = Logger {
@@ -37,8 +37,8 @@ impl Logger {
         }).map_err(|_| "cannot initialize logging".to_string())
     }
 
-    pub fn add_target(&mut self, target: String, level: String) -> Result<(), String> {
-        let loglevel = LogLevel::from_str(&level)
+    pub fn add_target(&mut self, target: String, level: &str) -> Result<(), String> {
+        let loglevel = LogLevel::from_str(level)
             .map_err(|_| format!("invalid log level {} for target {}", level, &target))?;
         self.targets.insert(target, loglevel);
         Ok(())
@@ -48,6 +48,7 @@ impl Logger {
         self.level
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::explicit_counter_loop))]
     pub fn load_config(&mut self, path: &Path) -> Result<(), String> {
         let file = File::open(path)
             .map_err(|_| format!("failed to open file {}", path.to_str().unwrap()))?;
@@ -59,7 +60,7 @@ impl Logger {
             let line = l.unwrap();
             if let Some(equals) = line.find('=') {
                 let (target, level) = line.split_at(equals);
-                self.add_target(target.to_string(), level[1..].to_string())?;
+                self.add_target(target.to_string(), &level[1..])?;
             } else {
                 return Err(format!("invalid logger config line {}", line_num));
             }

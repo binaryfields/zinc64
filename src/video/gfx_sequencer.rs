@@ -39,8 +39,8 @@ impl Mode {
         }
     }
 
-    pub fn value(&self) -> u8 {
-        *self as u8
+    pub fn value(self) -> u8 {
+        self as u8
     }
 }
 

@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+
 use std::io;
 use std::io::{BufRead, BufReader, BufWriter, Cursor, Error, ErrorKind, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -74,17 +76,14 @@ impl Debugger {
     pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
         let listener = TcpListener::bind(addr)?;
         for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let mut conn = Connection::new(self.command_tx.clone(), stream).unwrap();
-                    match conn.handle() {
-                        Ok(_) => info!(target: "debugger", "Connection closed"),
-                        Err(error) => {
-                            error!(target: "debugger", "Connection failed, error - {}", error)
-                        }
+            if let Ok(stream) = stream {
+                let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
+                match conn.handle() {
+                    Ok(_) => info!(target: "debugger", "Connection closed"),
+                    Err(error) => {
+                        error!(target: "debugger", "Connection failed, error - {}", error)
                     }
                 }
-                Err(_) => {}
             }
         }
         Ok(())
@@ -106,7 +105,7 @@ struct Connection {
 }
 
 impl Connection {
-    pub fn new(command_tx: mpsc::Sender<Command>, stream: TcpStream) -> io::Result<Self> {
+    pub fn build(command_tx: mpsc::Sender<Command>, stream: &TcpStream) -> io::Result<Self> {
         let reader = BufReader::new(stream.try_clone()?);
         let writer = BufWriter::new(stream.try_clone()?);
         let (response_tx, response_rx) = mpsc::channel::<CommandResult>();
@@ -159,8 +158,8 @@ impl Connection {
             // Memory
             Cmd::Compare(start, end, target) => self.cmd_compare(start, end, target),
             Cmd::Disassemble(start, end) => self.cmd_disassemble(start, end),
-            Cmd::Fill(start, end, data) => self.cmd_fill(start, end, data),
-            Cmd::Hunt(start, end, data) => self.cmd_hunt(start, end, data),
+            Cmd::Fill(start, end, data) => self.cmd_fill(start, end, &data),
+            Cmd::Hunt(start, end, data) => self.cmd_hunt(start, end, &data),
             Cmd::Memory(start, end) => self.cmd_memory(start, end),
             Cmd::MemChar(address) => self.cmd_memchar(address),
             Cmd::Move(start, end, target) => self.cmd_move(start, end, target),
@@ -179,7 +178,7 @@ impl Connection {
         self.writer.write_all(output.as_bytes())
     }
 
-    fn handle_request(&mut self, input: &String) -> io::Result<()> {
+    fn handle_request(&mut self, input: &str) -> io::Result<()> {
         match self.command_parser.parse(input) {
             Ok(command) => self.handle_command(command),
             Err(error) => self.writer.write_all(format!("{}\n", error).as_bytes()),
@@ -222,7 +221,7 @@ impl Connection {
             self.execute_unit_cmd(Command::BpDisable(index))
         } else {
             self.execute_unit_cmd(Command::BpDisableAll)?;
-            Ok(format!("Set all breakpoints to state: disabled\n"))
+            Ok("Set all breakpoints to state: disabled\n".to_string())
         }
     }
 
@@ -231,7 +230,7 @@ impl Connection {
             self.execute_unit_cmd(Command::BpRemove(index))
         } else {
             self.execute_unit_cmd(Command::BpClear)?;
-            Ok(format!("Deleted all breakpoints\n"))
+            Ok("Deleted all breakpoints\n".to_string())
         }
     }
 
@@ -240,7 +239,7 @@ impl Connection {
             self.execute_unit_cmd(Command::BpEnable(index))
         } else {
             self.execute_unit_cmd(Command::BpEnableAll)?;
-            Ok(format!("Set all breakpoints to state: enabled\n"))
+            Ok("Set all breakpoints to state: enabled\n".to_string())
         }
     }
 
@@ -311,7 +310,7 @@ impl Connection {
         }
         let mut buffer = String::new();
         if bp_hit > 0 {
-            buffer.push_str(format!("Stopped on breakpoint\n").as_str());
+            buffer.push_str("Stopped on breakpoint\n");
         }
         let regs = self.read_regs()?;
         let mem = self.read_mem(regs.pc, regs.pc.wrapping_add(10))?;
@@ -351,7 +350,7 @@ impl Connection {
         }
         let mut buffer = String::new();
         if bp_hit > 0 {
-            buffer.push_str(format!("Stopped on breakpoint\n").as_str());
+            buffer.push_str("Stopped on breakpoint\n");
         }
         let regs = self.read_regs()?;
         let mem = self.read_mem(regs.pc, regs.pc.wrapping_add(10))?;
@@ -374,7 +373,7 @@ impl Connection {
         }
         let mut buffer = String::new();
         if bp_hit > 0 {
-            buffer.push_str(format!("Stopped on breakpoint\n").as_str());
+            buffer.push_str("Stopped on breakpoint\n");
         }
         let regs = self.read_regs()?;
         let mem = self.read_mem(regs.pc, regs.pc.wrapping_add(10))?;
@@ -412,7 +411,7 @@ impl Connection {
     }
 
     fn cmd_disassemble(&mut self, start: Option<u16>, end: Option<u16>) -> io::Result<String> {
-        let start = start.unwrap_or(self.regs.as_ref().map(|r| r.pc).unwrap_or(0));
+        let start = start.unwrap_or_else(|| self.regs.as_ref().map(|r| r.pc).unwrap_or(0));
         let end = end.unwrap_or(start + 96);
         let data = self.read_mem(start, end + 10)?;
         let dis = Disassembler::new(data, start);
@@ -434,23 +433,22 @@ impl Connection {
         Ok(buffer)
     }
 
-    fn cmd_fill(&mut self, start: u16, end: u16, data: Vec<u8>) -> io::Result<String> {
+    fn cmd_fill(&mut self, start: u16, end: u16, data: &[u8]) -> io::Result<String> {
         let mut address = start;
         while address < end {
-            self.execute_unit_cmd(Command::MemWrite(address, data.clone()))?;
+            self.execute_unit_cmd(Command::MemWrite(address, data.to_vec()))?;
             address = address.wrapping_add(data.len() as u16);
         }
         Ok(String::new())
     }
 
-    fn cmd_hunt(&mut self, start: u16, end: u16, search: Vec<u8>) -> io::Result<String> {
+    fn cmd_hunt(&mut self, start: u16, end: u16, search: &[u8]) -> io::Result<String> {
         let data = self.read_mem(start, end)?;
         let mut buffer = String::new();
-        for i in 0..data.len() {
+        for (i, value)  in data.iter().enumerate() {
             let mut found = true;
-            let value = data[i];
-            for j in 0..search.len() {
-                if value != search[j] {
+            for item in search {
+                if *value != *item {
                     found = false;
                     break;
                 }
@@ -463,7 +461,7 @@ impl Connection {
     }
 
     fn cmd_memory(&mut self, start: Option<u16>, end: Option<u16>) -> io::Result<String> {
-        let start = start.unwrap_or(self.regs.as_ref().map(|r| r.pc).unwrap_or(0));
+        let start = start.unwrap_or_else(|| self.regs.as_ref().map(|r| r.pc).unwrap_or(0));
         let data = self.read_mem(start, end.unwrap_or(start + 96))?;
         let mut buffer = String::new();
         let mut address = start;
@@ -489,7 +487,7 @@ impl Connection {
     }
 
     fn cmd_memchar(&mut self, address: Option<u16>) -> io::Result<String> {
-        let address = address.unwrap_or(self.regs.as_ref().map(|r| r.pc).unwrap_or(0));
+        let address = address.unwrap_or_else(|| self.regs.as_ref().map(|r| r.pc).unwrap_or(0));
         let data = self.read_mem(address, address.wrapping_add(8))?;
         let mut buffer = String::new();
         for value in data {
@@ -510,7 +508,7 @@ impl Connection {
     }
 
     fn cmd_petscii(&mut self, start: u16, end: Option<u16>) -> io::Result<String> {
-        let data = self.read_mem(start, end.unwrap_or(start.wrapping_add(400)))?;
+        let data = self.read_mem(start, end.unwrap_or_else(|| start.wrapping_add(400)))?;
         let mut buffer = String::new();
         let mut counter = 0;
         for value in data {
@@ -754,7 +752,7 @@ impl CommandParser {
         self.radix = radix;
     }
 
-    pub fn parse(&self, input: &String) -> Result<Cmd, String> {
+    pub fn parse(&self, input: &str) -> Result<Cmd, String> {
         let mut tokens = input.split_whitespace();
         if let Some(command) = tokens.next() {
             match command.to_lowercase().as_str() {
@@ -816,7 +814,7 @@ impl CommandParser {
         if let Some(expr) = expr {
             Ok(Cmd::BpCondition(index, expr.to_string()))
         } else {
-            Err(format!("Missing expression"))
+            Err("Missing expression".to_string())
         }
     }
 
@@ -872,7 +870,7 @@ impl CommandParser {
         let mut ops = Vec::new();
         while let Some(op) = self.parse_reg_op(tokens)? {
             ops.push(op);
-            if self.parse_reg_sep(tokens)? == false {
+            if !self.parse_reg_sep(tokens)? {
                 break;
             }
         }
@@ -948,7 +946,7 @@ impl CommandParser {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let mut data: Vec<u8> = Vec::new();
-        while let Some(token) = tokens.next() {
+        for token in tokens {
             if token.contains(',') {
                 for value in token.split(',') {
                     data.push(self.parse_byte(value)?);
@@ -957,10 +955,10 @@ impl CommandParser {
                 data.push(self.parse_byte(token)?)
             }
         }
-        if data.len() >= 1 {
+        if !data.is_empty() {
             Ok(Cmd::Fill(start, end, data))
         } else {
-            Err(format!("Missing data"))
+            Err("Missing data".to_string())
         }
     }
 
@@ -968,7 +966,7 @@ impl CommandParser {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let mut data: Vec<u8> = Vec::new();
-        while let Some(token) = tokens.next() {
+        for token in tokens {
             if token.contains(',') {
                 for value in token.split(',') {
                     data.push(self.parse_byte(value)?);
@@ -977,10 +975,10 @@ impl CommandParser {
                 data.push(self.parse_byte(token)?)
             }
         }
-        if data.len() >= 1 {
+        if !data.is_empty() {
             Ok(Cmd::Hunt(start, end, data))
         } else {
-            Err(format!("Missing data"))
+            Err("Missing data".to_string())
         }
     }
 
@@ -1211,7 +1209,7 @@ impl CommandHelp {
 }
 
 enum CpuFlag {
-    Carry = 1 << 0,
+    Carry = 1,
     Zero = 1 << 1,
     IntDisable = 1 << 2,
     Decimal = 1 << 3,
