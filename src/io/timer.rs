@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::Pin;
+use crate::core::Pin;
 
 use super::cycle_counter::CycleCounter;
 

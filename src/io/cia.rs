@@ -6,7 +6,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Chip, IoPort, IrqControl, IrqLine, Pin};
+use crate::core::{Chip, IoPort, IrqControl, IrqLine, Pin};
 use log::LogLevel;
 
 use super::cycle_counter::CycleCounter;

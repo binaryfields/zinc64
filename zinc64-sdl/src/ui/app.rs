@@ -20,9 +20,9 @@ use time;
 use zinc64::system::C64;
 use zinc64_debug::{Command, Debugger, RapServer};
 
-use config::{JamAction, Options};
-use input::Input;
-use output::{AppAudio, Renderer};
+use crate::config::{JamAction, Options};
+use crate::input::Input;
+use crate::output::{AppAudio, Renderer};
 
 use super::execution::{ExecutionEngine, State};
 

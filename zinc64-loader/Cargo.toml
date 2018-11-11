@@ -2,6 +2,7 @@
 name = "zinc64-loader"
 version = "0.7.0-pre"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
+edition = "2018"
 description = "Commodore 64 emulator loader support"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"

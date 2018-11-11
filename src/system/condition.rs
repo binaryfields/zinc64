@@ -8,7 +8,7 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
-use core::Cpu;
+use crate::core::Cpu;
 
 enum Operator {
     Equal,

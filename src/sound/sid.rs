@@ -7,7 +7,7 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{Chip, Clock, SidModel, SoundOutput};
+use crate::core::{Chip, Clock, SidModel, SoundOutput};
 use log::LogLevel;
 use resid;
 

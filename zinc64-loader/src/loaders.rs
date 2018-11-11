@@ -4,11 +4,11 @@
 
 use std::path::Path;
 
-use crt;
-use p00;
-use prg;
-use tap;
-use Loader;
+use crate::crt;
+use crate::p00;
+use crate::prg;
+use crate::tap;
+use crate::Loader;
 
 pub struct Loaders;
 

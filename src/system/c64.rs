@@ -11,9 +11,9 @@ use std::rc::Rc;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
-use core::{Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Pin, Ram, TickFn};
-use device::joystick;
-use device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
+use crate::core::{Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Pin, Ram, TickFn};
+use crate::device::joystick;
+use crate::device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 
 use super::breakpoint::BreakpointManager;
 use super::{Autostart, CircularBuffer, Config, FrameBuffer, Palette};
@@ -467,7 +467,7 @@ impl C64 {
 mod tests {
     use super::super::C64Factory;
     use super::*;
-    use core::SystemModel;
+    use crate::core::SystemModel;
 
     #[test]
     fn verify_mem_layout() {

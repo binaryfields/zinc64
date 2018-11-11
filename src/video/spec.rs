@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use core::VicModel;
+use crate::core::VicModel;
 
 #[derive(Clone, Copy)]
 pub struct Spec {

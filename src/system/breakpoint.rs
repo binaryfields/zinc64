@@ -4,7 +4,7 @@
 
 use std::slice::Iter;
 
-use core::Cpu;
+use crate::core::Cpu;
 
 use super::Condition;
 

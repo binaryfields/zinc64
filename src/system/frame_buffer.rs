@@ -4,7 +4,7 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::transmute_ptr_to_ptr))]
 
-use core::VideoOutput;
+use crate::core::VideoOutput;
 use std::mem;
 
 const PIXEL_BYTES: usize = 4;

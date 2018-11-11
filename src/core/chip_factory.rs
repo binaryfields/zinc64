@@ -10,7 +10,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{
+use crate::core::{
     Addressable, Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SidModel, SoundOutput,
     VicModel, VideoOutput,
 };

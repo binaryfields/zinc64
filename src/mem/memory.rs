@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use core::{Addressable, Mmu, Ram, Rom};
+use crate::core::{Addressable, Mmu, Ram, Rom};
 use log::LogLevel;
 
 use super::{Bank, Configuration, MemoryMap};
@@ -113,7 +113,7 @@ impl Mmu for Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::{Ram, Rom};
+    use crate::core::{Ram, Rom};
 
     impl Addressable for Ram {
         fn read(&self, address: u16) -> u8 {

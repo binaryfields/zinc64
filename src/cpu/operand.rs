@@ -6,7 +6,7 @@
 
 use std::fmt;
 
-use core::{Cpu, TickFn};
+use crate::core::{Cpu, TickFn};
 
 use super::Cpu6510;
 
@@ -137,7 +137,7 @@ impl fmt::Display for Operand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::{IoPort, IrqLine, Mmu, Pin, Ram};
+    use crate::core::{IoPort, IrqLine, Mmu, Pin, Ram};
     use std::cell::RefCell;
     use std::rc::Rc;
 

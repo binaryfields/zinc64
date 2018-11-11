@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use core::{Addressable, Chip, Ram};
+use crate::core::{Addressable, Chip, Ram};
 
 pub struct Mmio {
     cia_1: Rc<RefCell<dyn Chip>>,

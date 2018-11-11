@@ -2,6 +2,7 @@
 name = "zinc64"
 version = "0.7.0-pre"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
+edition = "2018"
 description = "Commodore 64 emulator toolkit with batteries included but swappable"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"

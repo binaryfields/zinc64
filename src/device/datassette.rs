@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{IoPort, Pin};
+use crate::core::{IoPort, Pin};
 
 use super::Tape;
 

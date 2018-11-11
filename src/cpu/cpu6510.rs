@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use core::{Cpu, IoPort, IrqLine, Mmu, Pin, TickFn};
+use crate::core::{Cpu, IoPort, IrqLine, Mmu, Pin, TickFn};
 use log::LogLevel;
 
 use super::instruction::Instruction;
@@ -738,7 +738,7 @@ impl fmt::Display for Cpu6510 {
 mod tests {
     use super::super::operand::Operand;
     use super::*;
-    use core::Ram;
+    use crate::core::Ram;
 
     struct MockMemory {
         ram: Ram,

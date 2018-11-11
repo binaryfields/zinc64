@@ -9,7 +9,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Chip, IrqControl, IrqLine, Pin, Ram, VicModel, VideoOutput};
+use crate::core::{Chip, IrqControl, IrqLine, Pin, Ram, VicModel, VideoOutput};
 use log::LogLevel;
 
 use super::border_unit::BorderUnit;

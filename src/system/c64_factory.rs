@@ -8,18 +8,18 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use core::{
+use crate::core::{
     Addressable, Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SidModel,
     SoundOutput, VicModel, VideoOutput,
 };
-use cpu::Cpu6510;
-use device::ExpansionPort;
-use io::cia;
-use io::Cia;
-use mem::{Memory, Mmio};
-use sound::sid::SamplingMethod;
-use sound::Sid;
-use video::{Vic, VicMemory};
+use crate::cpu::Cpu6510;
+use crate::device::ExpansionPort;
+use crate::io::cia;
+use crate::io::Cia;
+use crate::mem::{Memory, Mmio};
+use crate::sound::sid::SamplingMethod;
+use crate::sound::Sid;
+use crate::video::{Vic, VicMemory};
 
 use super::Config;
 

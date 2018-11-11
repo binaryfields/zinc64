@@ -4,7 +4,7 @@
 
 use std::iter::Iterator;
 
-use core::Addressable;
+use crate::core::Addressable;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 

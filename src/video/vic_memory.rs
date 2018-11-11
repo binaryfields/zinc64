@@ -5,7 +5,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use core::{Ram, Rom};
+use crate::core::{Ram, Rom};
 
 pub struct VicMemory {
     base_address: Rc<Cell<u16>>,

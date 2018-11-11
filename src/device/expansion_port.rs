@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
-use core::{Addressable, IoPort};
+use crate::core::{Addressable, IoPort};
 
 use super::cartridge::Cartridge;
 
