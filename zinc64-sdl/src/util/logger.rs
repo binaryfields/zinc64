@@ -71,7 +71,7 @@ impl Logger {
 }
 
 impl log::Log for Logger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
+    fn enabled(&self, metadata: &LogMetadata<'_>) -> bool {
         if let Some(target_level) = self.targets.get(metadata.target()) {
             metadata.level() <= (*target_level)
         } else {
@@ -79,7 +79,7 @@ impl log::Log for Logger {
         }
     }
 
-    fn log(&self, record: &LogRecord) {
+    fn log(&self, record: &LogRecord<'_>) {
         if self.enabled(record.metadata()) {
             println!(
                 "{} [{}] - {}",

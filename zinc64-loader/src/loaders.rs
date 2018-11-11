@@ -13,7 +13,7 @@ use crate::Loader;
 pub struct Loaders;
 
 impl Loaders {
-    pub fn from_ext(ext: Option<&str>) -> Box<Loader> {
+    pub fn from_ext(ext: Option<&str>) -> Box<dyn Loader> {
         match ext {
             Some("crt") => Box::new(crt::CrtLoader::new()),
             //Some("hex") => Box::new(hex::HexLoader::new()),
@@ -25,7 +25,7 @@ impl Loaders {
         }
     }
 
-    pub fn from_path(path: &Path) -> Box<Loader> {
+    pub fn from_path(path: &Path) -> Box<dyn Loader> {
         let ext = path.extension().map(|s| s.to_str().unwrap_or(""));
         Loaders::from_ext(ext)
     }

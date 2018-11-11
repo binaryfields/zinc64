@@ -50,7 +50,7 @@ impl P00Loader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut Read) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
         let mut signature = [0u8; 7];
         let mut filename = [0u8; 16];
         let header = Header {
@@ -87,7 +87,7 @@ impl Loader for P00Loader {
         Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
         info!(target: "loader", "Loading P00 {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);

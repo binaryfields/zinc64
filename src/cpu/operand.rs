@@ -116,7 +116,7 @@ impl Operand {
 }
 
 impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Operand::Accumulator => write!(f, "acc"),
             Operand::Immediate(value) => write!(f, "#{:02x}", value),

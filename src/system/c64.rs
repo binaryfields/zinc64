@@ -268,11 +268,11 @@ impl C64 {
         &self.config
     }
 
-    pub fn get_cpu(&self) -> &Cpu {
+    pub fn get_cpu(&self) -> &dyn Cpu {
         &*self.cpu
     }
 
-    pub fn get_cpu_mut(&mut self) -> &mut Cpu {
+    pub fn get_cpu_mut(&mut self) -> &mut dyn Cpu {
         &mut *self.cpu
     }
 
@@ -449,7 +449,7 @@ impl C64 {
         self.expansion_port.borrow_mut().attach(cartridge);
     }
 
-    pub fn attach_tape(&mut self, tape: Box<Tape>) {
+    pub fn attach_tape(&mut self, tape: Box<dyn Tape>) {
         self.datassette.borrow_mut().attach(tape);
     }
 

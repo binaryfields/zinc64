@@ -2,16 +2,16 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-extern crate bit_field;
-extern crate byteorder;
-extern crate getopts;
+
+
+use getopts;
 #[macro_use]
 extern crate log;
-extern crate sdl2;
-extern crate time;
-extern crate zinc64;
-extern crate zinc64_debug;
-extern crate zinc64_loader;
+
+
+
+
+
 
 mod config;
 mod console;

@@ -89,7 +89,7 @@ impl BreakpointManager {
         }
     }
 
-    pub fn list(&self) -> Iter<Breakpoint> {
+    pub fn list(&self) -> Iter<'_, Breakpoint> {
         self.breakpoints.iter()
     }
 

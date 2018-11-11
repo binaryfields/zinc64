@@ -4,7 +4,7 @@
 
 use bit_field::BitField;
 
-pub type Observer = Box<Fn(u8)>;
+pub type Observer = Box<dyn Fn(u8)>;
 
 // direction - (where 1 is an output, and 0 is an input).
 

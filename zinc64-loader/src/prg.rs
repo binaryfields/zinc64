@@ -43,7 +43,7 @@ impl Loader for PrgLoader {
         Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
         info!(target: "loader", "Loading PRG {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);

@@ -20,7 +20,7 @@ enum Operator {
 }
 
 impl fmt::Display for Operator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Operator::Equal => write!(f, "=="),
             Operator::NotEqual => write!(f, "!="),
@@ -42,7 +42,7 @@ enum Reg {
 }
 
 impl fmt::Display for Reg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Reg::A => write!(f, "A"),
             Reg::X => write!(f, "X"),
@@ -60,7 +60,7 @@ enum Value {
 }
 
 impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Value::Constant(val) if val <= 0xff => write!(f, "{:02x}", val),
             Value::Constant(val) => write!(f, "{:04x}", val),
@@ -76,7 +76,7 @@ pub struct Condition {
 }
 
 impl fmt::Display for Condition {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {} {}", self.reg, self.op, self.val)
     }
 }
@@ -216,7 +216,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
-fn consume_while<F>(iter: &mut Peekable<Chars>, predicate: F) -> String
+fn consume_while<F>(iter: &mut Peekable<Chars<'_>>, predicate: F) -> String
 where
     F: Fn(char) -> bool,
 {

@@ -31,7 +31,7 @@ struct Header {
 }
 
 struct TapImage {
-    tape: Option<Box<Tape>>,
+    tape: Option<Box<dyn Tape>>,
 }
 
 impl Image for TapImage {
@@ -52,7 +52,7 @@ impl TapLoader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut Read) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
         let mut signature = [0u8; 12];
         let mut reserved = [0u8; 3];
         let header = Header {
@@ -91,7 +91,7 @@ impl Loader for TapLoader {
         Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
         info!(target: "loader", "Loading TAP {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut rdr = BufReader::new(file);

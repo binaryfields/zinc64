@@ -87,7 +87,7 @@ impl CrtLoader {
         }
     }
 
-    fn read_chip_header(&self, rdr: &mut Read) -> io::Result<Option<ChipHeader>> {
+    fn read_chip_header(&self, rdr: &mut dyn Read) -> io::Result<Option<ChipHeader>> {
         let mut signature = [0u8; 4];
         match rdr.read(&mut signature)? {
             0 => Ok(None),
@@ -109,13 +109,13 @@ impl CrtLoader {
         }
     }
 
-    fn read_data(&self, rdr: &mut Read, length: usize) -> io::Result<Vec<u8>> {
+    fn read_data(&self, rdr: &mut dyn Read, length: usize) -> io::Result<Vec<u8>> {
         let mut data = vec![0; length];
         rdr.read_exact(&mut data)?;
         Ok(data)
     }
 
-    fn read_header(&self, rdr: &mut Read) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
         let mut signature = [0u8; 16];
         let mut reserved = [0u8; 6];
         let mut name = [0u8; 32];
@@ -171,7 +171,7 @@ impl Loader for CrtLoader {
         Ok(autostart::AutostartMethod::WithImage(image))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
         info!(target: "loader", "Loading CRT {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut rdr = BufReader::new(file);

@@ -370,7 +370,7 @@ impl Chip for Cia {
                 self.timer_b.set_latch_hi(value);
             }
             Reg::TODTS => {
-                let mut tod = if !self.tod_set_alarm {
+                let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
                     &mut self.tod_alarm
@@ -378,7 +378,7 @@ impl Chip for Cia {
                 tod.set_tenth(from_bcd(value & 0x0f));
             }
             Reg::TODSEC => {
-                let mut tod = if !self.tod_set_alarm {
+                let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
                     &mut self.tod_alarm
@@ -386,7 +386,7 @@ impl Chip for Cia {
                 tod.set_seconds(from_bcd(value & 0x7f));
             }
             Reg::TODMIN => {
-                let mut tod = if !self.tod_set_alarm {
+                let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
                     &mut self.tod_alarm
@@ -394,7 +394,7 @@ impl Chip for Cia {
                 tod.set_minutes(from_bcd(value & 0x7f));
             }
             Reg::TODHR => {
-                let mut tod = if !self.tod_set_alarm {
+                let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
                     &mut self.tod_alarm

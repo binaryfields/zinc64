@@ -2,11 +2,11 @@
 // Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-extern crate bit_field;
-extern crate byteorder;
+
+
 #[macro_use]
 extern crate log;
-extern crate zinc64;
+
 
 mod bin;
 mod crt;
@@ -25,5 +25,5 @@ pub use self::loaders::Loaders;
 
 pub trait Loader {
     fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error>;
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error>;
+    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error>;
 }

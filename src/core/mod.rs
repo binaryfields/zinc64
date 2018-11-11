@@ -51,7 +51,7 @@ pub trait Chip {
 
 /// A tick represents a callback invoked by the cpu for each clock cycle
 /// during instruction execution.
-pub type TickFn = Rc<Fn()>;
+pub type TickFn = Rc<dyn Fn()>;
 
 /// CPU is responsible for decoding and executing instructions.
 pub trait Cpu {

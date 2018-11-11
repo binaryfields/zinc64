@@ -322,19 +322,19 @@ impl CommandParser {
         }
     }
 
-    fn parse_registers(&self, tokens: &mut Iterator<Item = &str>) -> Result<RapCmd, String> {
+    fn parse_registers(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<RapCmd, String> {
         self.ensure_eos(tokens)?;
         Ok(RapCmd::Registers)
     }
 
-    fn parse_register_profile(&self, tokens: &mut Iterator<Item = &str>) -> Result<RapCmd, String> {
+    fn parse_register_profile(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<RapCmd, String> {
         self.ensure_eos(tokens)?;
         Ok(RapCmd::RegisterProfile)
     }
 
     // Helpers
 
-    fn ensure_eos(&self, tokens: &mut Iterator<Item = &str>) -> Result<(), String> {
+    fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
         match tokens.next() {
             Some(token) => Err(format!("Invalid token {}", token)),
             None => Ok(()),

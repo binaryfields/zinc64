@@ -15,11 +15,11 @@ pub enum Mode {
 
 pub struct Autostart {
     mode: Mode,
-    image: Box<Image>,
+    image: Box<dyn Image>,
 }
 
 impl Autostart {
-    pub fn new(mode: Mode, image: Box<Image>) -> Autostart {
+    pub fn new(mode: Mode, image: Box<dyn Image>) -> Autostart {
         Autostart { mode, image }
     }
 
@@ -38,8 +38,8 @@ impl Autostart {
 }
 
 pub enum AutostartMethod {
-    WithImage(Box<Image>),
-    WithBinImage(Box<Image>),
+    WithImage(Box<dyn Image>),
+    WithBinImage(Box<dyn Image>),
     WithAutostart(Option<Autostart>),
 }
 

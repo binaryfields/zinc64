@@ -799,7 +799,7 @@ impl CommandParser {
 
     // -- Breakpoint
 
-    fn parse_break(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_break(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         match address {
@@ -808,7 +808,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_condition(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_condition(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num(tokens.next())?;
         self.ensure_keyword("if", tokens)?;
         let expr = tokens.next();
@@ -820,32 +820,32 @@ impl CommandParser {
         }
     }
 
-    fn parse_delete(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_delete(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpDelete(index))
     }
 
-    fn parse_disable(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_disable(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpDisable(index))
     }
 
-    fn parse_enable(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_enable(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpEnable(index))
     }
 
-    fn parse_ignore(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_ignore(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num(tokens.next())?;
         let count = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpIgnore(index, count.unwrap_or(1)))
     }
 
-    fn parse_until(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_until(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         match address {
@@ -856,19 +856,19 @@ impl CommandParser {
 
     // -- Debugger
 
-    fn parse_goto(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_goto(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Goto(address))
     }
 
-    fn parse_next(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_next(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let count = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Next(count.unwrap_or(1)))
     }
 
-    fn parse_registers(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_registers(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let mut ops = Vec::new();
         while let Some(op) = self.parse_reg_op(tokens)? {
             ops.push(op);
@@ -883,7 +883,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_reg_op(&self, tokens: &mut Iterator<Item = &str>) -> Result<Option<RegOp>, String> {
+    fn parse_reg_op(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Option<RegOp>, String> {
         if let (Some(name), Some(op), Some(value)) = (tokens.next(), tokens.next(), tokens.next()) {
             match op.trim() {
                 "=" => {
@@ -905,7 +905,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_reg_sep(&self, tokens: &mut Iterator<Item = &str>) -> Result<bool, String> {
+    fn parse_reg_sep(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<bool, String> {
         if let Some(sep) = tokens.next() {
             match sep.trim() {
                 "," => Ok(true),
@@ -916,12 +916,12 @@ impl CommandParser {
         }
     }
 
-    fn parse_return(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_return(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Return)
     }
 
-    fn parse_step(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_step(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let count = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Step(count.unwrap_or(1)))
@@ -929,7 +929,7 @@ impl CommandParser {
 
     // -- Memory
 
-    fn parse_compare(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_compare(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let target = self.parse_num(tokens.next())?;
@@ -937,14 +937,14 @@ impl CommandParser {
         Ok(Cmd::Compare(start, end, target))
     }
 
-    fn parse_disassemble(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_disassemble(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num_maybe(tokens.next())?;
         let end = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Disassemble(start, end))
     }
 
-    fn parse_fill(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_fill(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let mut data: Vec<u8> = Vec::new();
@@ -964,7 +964,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_hunt(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_hunt(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let mut data: Vec<u8> = Vec::new();
@@ -984,20 +984,20 @@ impl CommandParser {
         }
     }
 
-    fn parse_memory(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_memory(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num_maybe(tokens.next())?;
         let end = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Memory(start, end))
     }
 
-    fn parse_mem_char(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_mem_char(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::MemChar(address))
     }
 
-    fn parse_move(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_move(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num(tokens.next())?;
         let target = self.parse_num(tokens.next())?;
@@ -1005,7 +1005,7 @@ impl CommandParser {
         Ok(Cmd::Move(start, end, target))
     }
 
-    fn parse_petscii(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_petscii(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
         let end = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
@@ -1014,18 +1014,18 @@ impl CommandParser {
 
     // -- System
 
-    fn parse_reset(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_reset(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let mode = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Reset(mode.unwrap_or(0) == 1))
     }
 
-    fn parse_screen(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_screen(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Screen)
     }
 
-    fn parse_stopwatch(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_stopwatch(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let reset = if let Some(token) = tokens.next() {
             token == "reset"
         } else {
@@ -1036,23 +1036,23 @@ impl CommandParser {
 
     // -- Monitor
 
-    fn parse_help(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_help(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let command = tokens.next().map(|s| s.to_string());
         self.ensure_eos(tokens)?;
         Ok(Cmd::Help(command))
     }
 
-    fn parse_exit(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_exit(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Exit)
     }
 
-    fn parse_quit(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_quit(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         self.ensure_eos(tokens)?;
         Ok(Cmd::Quit)
     }
 
-    fn parse_radix(&self, tokens: &mut Iterator<Item = &str>) -> Result<Cmd, String> {
+    fn parse_radix(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let radix = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Radix(radix))
@@ -1060,7 +1060,7 @@ impl CommandParser {
 
     // -- Helpers
 
-    fn ensure_eos(&self, tokens: &mut Iterator<Item = &str>) -> Result<(), String> {
+    fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
         match tokens.next() {
             Some(token) => Err(format!("Unexpected token {}", token)),
             None => Ok(()),
@@ -1070,7 +1070,7 @@ impl CommandParser {
     fn ensure_keyword(
         &self,
         keyword: &str,
-        tokens: &mut Iterator<Item = &str>,
+        tokens: &mut dyn Iterator<Item = &str>,
     ) -> Result<(), String> {
         match tokens.next() {
             Some(token) if token.to_string().to_lowercase() == keyword => Ok(()),

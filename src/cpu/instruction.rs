@@ -409,7 +409,7 @@ impl Instruction {
 }
 
 impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             // Data Movement
             Instruction::LDA(ref operand) => write!(f, "lda {}", operand),

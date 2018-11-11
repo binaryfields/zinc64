@@ -44,7 +44,7 @@ impl Loader for BinLoader {
         Ok(AutostartMethod::WithBinImage(image))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<Image>, io::Error> {
+    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
         info!(target: "loader", "Loading BIN {}", path.to_str().unwrap());
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);

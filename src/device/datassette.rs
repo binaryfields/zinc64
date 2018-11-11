@@ -73,7 +73,7 @@ pub struct Datassette {
     cpu_io_port: Rc<RefCell<IoPort>>,
     // Runtime State
     playing: bool,
-    tape: Option<Box<Tape>>,
+    tape: Option<Box<dyn Tape>>,
     current_pulse: Pulse,
 }
 
@@ -88,7 +88,7 @@ impl Datassette {
         }
     }
 
-    pub fn attach(&mut self, tape: Box<Tape>) {
+    pub fn attach(&mut self, tape: Box<dyn Tape>) {
         self.tape = Some(tape);
     }
 
