@@ -15,7 +15,7 @@ exclude = [ "bin/*", "doc/*", "res/*" ]
 bit_field = "0.9"
 byteorder = "1.2"
 log = "0.3"
-resid-rs = { path = "../resid-rs", version="0.8" }
+resid-rs = { git = "https://github.com/digitalstreamio/resid-rs" }
 
 [profile.release]
 

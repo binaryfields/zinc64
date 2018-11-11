@@ -1,7 +1,7 @@
 ## Environment
 
 language: rust
-rust: stable
+rust: beta
 sudo: required
 dist: trusty
 services: docker
@@ -23,7 +23,7 @@ matrix:
 
 install:
   - source ~/.cargo/env || true
-  # cargo install cross
+  - cargo install cross || true
   # docker build -t dsio/$CRATE_NAME-$TARGET:latest ci/docker/$TARGET
 
 script:
