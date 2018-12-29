@@ -1,5 +1,5 @@
 // This file is part of zinc64.
-// Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
+// Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
@@ -131,7 +131,7 @@ impl Chip for Sid {
 mod tests {
     /*
     use super::*;
-    
+
     #[cfg_attr(rustfmt, rustfmt_skip)]
     static SID_DATA: [u16; 51] = [
         25, 177, 250, 28, 214, 250,
@@ -144,14 +144,14 @@ mod tests {
         25, 177, 250, 24, 63, 125,
         19, 63, 250,
     ];
-    
+
     fn setup_sid(clock: Rc<Clock>) -> Sid {
         let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(8192)));
         let mut sid = Sid::new(SidModel::Mos6581, clock, sound_buffer);
         sid.reset();
         sid
     }
-    
+
     #[test]
     fn test_sid_output() {
         let clock = Rc::new(Clock::new());

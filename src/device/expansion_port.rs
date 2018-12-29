@@ -1,12 +1,12 @@
 // This file is part of zinc64.
-// Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
+// Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bit_field::BitField;
 use crate::core::{Addressable, IoPort};
+use bit_field::BitField;
 
 use super::cartridge::Cartridge;
 

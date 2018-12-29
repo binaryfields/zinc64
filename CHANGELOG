@@ -115,3 +115,7 @@
 ### Week 17 - 20180811
 
 - ci and deployment for linux/windows
+
+### Week 18 - 20181111
+
+- migration to rust 2018

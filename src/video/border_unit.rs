@@ -1,5 +1,5 @@
 // This file is part of zinc64.
-// Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
+// Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::collapsible_if))]
@@ -60,7 +60,7 @@ impl BorderUnit {
      ------+------------+-----------
      Left  |  31 ($1f)  |  24 ($18)
      Right | 335 ($14f) | 344 ($158)
-    
+
             |   RSEL=0  |  RSEL=1
      -------+-----------+----------
      Top    |  55 ($37) |  51 ($33)

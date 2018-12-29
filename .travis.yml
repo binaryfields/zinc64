@@ -1,7 +1,7 @@
 ## Environment
 
 language: rust
-rust: beta
+rust: stable
 sudo: required
 dist: trusty
 services: docker

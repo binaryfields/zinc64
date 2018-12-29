@@ -32,6 +32,8 @@ test_script:
       cargo test --target %TARGET% --all
     )
 
+build: false
+
 before_deploy:
   - cargo build -p zinc64-sdl --target %TARGET% --release
   - ps: ci\before_deploy.ps1
@@ -58,5 +60,3 @@ branches:
     - /^\d+\.\d+\.\d+.*$/
     - master
 
-# Building is done in the test phase, so we disable Appveyor's build phase.
-build: false

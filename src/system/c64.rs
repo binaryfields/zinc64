@@ -1,5 +1,5 @@
 // This file is part of zinc64.
-// Copyright (c) 2016-2018 Sebastian Jastrzebski. All rights reserved.
+// Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
@@ -86,6 +86,7 @@ impl C64 {
             config.sound.buffer_size << 2,
         )));
         let vsync_flag = Rc::new(Cell::new(false));
+        let vic_base_address = Rc::new(Cell::new(0u16));
 
         // I/O Lines
         let ba_line = Rc::new(RefCell::new(Pin::new_high()));
@@ -99,7 +100,6 @@ impl C64 {
         let exp_io_line = Rc::new(RefCell::new(IoPort::new(0xff, 0xff)));
         let irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
         let nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
-        let vic_base_address = Rc::new(Cell::new(0u16));
 
         // Memory
         let color_ram = factory.new_ram(config.model.color_ram);
@@ -433,6 +433,7 @@ impl C64 {
         }
     }
 
+    #[inline]
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
         self.last_pc = self.cpu.get_pc();
         self.cpu.step(&tick_fn);
