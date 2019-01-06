@@ -1,5 +1,6 @@
 # TODO
 
+- test nostd build
 - update ci
 - update readme
 - device: add mouse support

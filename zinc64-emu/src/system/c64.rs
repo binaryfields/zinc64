@@ -458,9 +458,9 @@ mod tests {
     use super::*;
     use zinc64_core::SystemModel;
 
-    static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
-    static RES_CHARSET_ROM: &[u8] = include_bytes!("../../res/rom/characters.rom");
-    static RES_KERNAL_ROM: &[u8] = include_bytes!("../../res/rom/kernal.rom");
+    static RES_BASIC_ROM: &[u8] = include_bytes!("../../../res/rom/basic.rom");
+    static RES_CHARSET_ROM: &[u8] = include_bytes!("../../../res/rom/characters.rom");
+    static RES_KERNAL_ROM: &[u8] = include_bytes!("../../../res/rom/kernal.rom");
 
     #[test]
     fn verify_mem_layout() {

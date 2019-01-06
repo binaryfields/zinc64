@@ -33,4 +33,5 @@ members = [
     "zinc64-emu",
     "zinc64-debug",
     "zinc64-loader",
+    "zinc64-raspi",
 ]
