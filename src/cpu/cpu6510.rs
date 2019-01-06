@@ -4,12 +4,9 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::cell::RefCell;
-use std::fmt;
-use std::rc::Rc;
-
-use crate::core::{Cpu, IoPort, IrqLine, Mmu, Pin, TickFn};
+use core::fmt;
 use log::LogLevel;
+use zinc64_core::{make_noop, Cpu, IoPort, IrqLine, Mmu, Pin, Shared, TickFn};
 
 use super::instruction::Instruction;
 
@@ -86,23 +83,23 @@ impl Registers {
 
 pub struct Cpu6510 {
     // Dependencies
-    mem: Rc<RefCell<dyn Mmu>>,
+    mem: Shared<dyn Mmu>,
     // Runtime State
     regs: Registers,
     // I/O
-    ba_line: Rc<RefCell<Pin>>,
-    io_port: Rc<RefCell<IoPort>>,
-    irq_line: Rc<RefCell<IrqLine>>,
-    nmi_line: Rc<RefCell<IrqLine>>,
+    ba_line: Shared<Pin>,
+    io_port: Shared<IoPort>,
+    irq_line: Shared<IrqLine>,
+    nmi_line: Shared<IrqLine>,
 }
 
 impl Cpu6510 {
     pub fn new(
-        mem: Rc<RefCell<dyn Mmu>>,
-        io_port: Rc<RefCell<IoPort>>,
-        ba_line: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-        nmi_line: Rc<RefCell<IrqLine>>,
+        mem: Shared<dyn Mmu>,
+        io_port: Shared<IoPort>,
+        ba_line: Shared<Pin>,
+        irq_line: Shared<IrqLine>,
+        nmi_line: Shared<IrqLine>,
     ) -> Self {
         Self {
             mem,
@@ -650,8 +647,7 @@ impl Cpu for Cpu6510 {
         self.nmi_line.borrow_mut().reset();
         self.write(0x0000, 0b_0010_1111);
         self.write(0x0001, 0b_0001_1111);
-        let tick_fn: TickFn = Rc::new(move || {});
-        self.interrupt(&Interrupt::Reset, &tick_fn);
+        self.interrupt(&Interrupt::Reset, &make_noop());
     }
 
     fn step(&mut self, tick_fn: &TickFn) {
@@ -676,13 +672,11 @@ impl Cpu for Cpu6510 {
     // -- I/O
 
     fn read(&self, address: u16) -> u8 {
-        let noop_fn: TickFn = Rc::new(move || {});
-        self.read_internal(address, &noop_fn)
+        self.read_internal(address, &make_noop())
     }
 
     fn write(&mut self, address: u16, value: u8) {
-        let noop_fn: TickFn = Rc::new(move || {});
-        self.write_internal(address, value, &noop_fn);
+        self.write_internal(address, value, &make_noop());
     }
 }
 
@@ -738,7 +732,7 @@ impl fmt::Display for Cpu6510 {
 mod tests {
     use super::super::operand::Operand;
     use super::*;
-    use crate::core::Ram;
+    use zinc64_core::{new_shared, Ram};
 
     struct MockMemory {
         ram: Ram,
@@ -763,21 +757,20 @@ mod tests {
     }
 
     fn setup_cpu() -> Cpu6510 {
-        let ba_line = Rc::new(RefCell::new(Pin::new_high()));
-        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
-        let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
+        let ba_line = new_shared(Pin::new_high());
+        let cpu_io_port = new_shared(IoPort::new(0x00, 0xff));
+        let cpu_irq = new_shared(IrqLine::new("irq"));
+        let cpu_nmi = new_shared(IrqLine::new("nmi"));
+        let mem = new_shared(MockMemory::new(Ram::new(0x10000)));
         Cpu6510::new(mem, cpu_io_port, ba_line, cpu_irq, cpu_nmi)
     }
 
     #[test]
     fn adc_80_16() {
-        let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
         cpu.set_a(80);
         cpu.set_flag(Flag::Carry, false);
-        cpu.execute(&Instruction::ADC(Operand::Immediate(16)), &tick_fn);
+        cpu.execute(&Instruction::ADC(Operand::Immediate(16)), &make_noop());
         assert_eq!(96, cpu.get_a());
         assert_eq!(false, cpu.test_flag(Flag::Carry));
         assert_eq!(false, cpu.test_flag(Flag::Negative));
@@ -786,10 +779,9 @@ mod tests {
 
     #[test]
     fn inc_with_overflow() {
-        let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
         cpu.set_a(0xff);
-        cpu.execute(&Instruction::INC(Operand::Accumulator), &tick_fn);
+        cpu.execute(&Instruction::INC(Operand::Accumulator), &make_noop());
         assert_eq!(0x00, cpu.get_a());
         assert_eq!(false, cpu.test_flag(Flag::Negative));
         assert_eq!(true, cpu.test_flag(Flag::Zero));

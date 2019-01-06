@@ -4,11 +4,12 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
-use zinc64::system::CircularBuffer;
+
+use super::SoundBuffer;
 
 // TODO app: audio warp handling
 
@@ -17,7 +18,7 @@ const SCALER_SHIFT: usize = 12;
 const VOLUME_MAX: u8 = 100;
 
 pub struct AppAudio {
-    buffer: Arc<Mutex<CircularBuffer>>,
+    buffer: Arc<SoundBuffer>,
     mute: bool,
     scaler: i32,
     volume: u8,
@@ -29,7 +30,7 @@ impl AppAudio {
         sample_rate: i32,
         channels: u8,
         buffer_size: u16,
-        buffer: Arc<Mutex<CircularBuffer>>,
+        buffer: Arc<SoundBuffer>,
     ) -> Result<AudioDevice<AppAudio>, String> {
         let audio_spec = AudioSpecDesired {
             freq: Some(sample_rate),
@@ -63,15 +64,10 @@ impl AudioCallback for AppAudio {
     type Channel = i16;
 
     fn callback(&mut self, out: &mut [i16]) {
-        let mut input = self.buffer.lock().unwrap();
-        if input.len() < out.len() {
-            debug!(target: "app", "audio callback underflow {}/{}", out.len(), input.len());
-        }
-        for x in out.iter_mut() {
-            let sample = input.pop();
-            if !self.mute {
-                *x = ((sample as i32 * self.scaler) >> SCALER_SHIFT) as i16;
-            } else {
+        if !self.mute {
+            self.buffer.copy(out, self.scaler, SCALER_SHIFT);
+        } else {
+            for x in out.iter_mut() {
                 *x = 0;
             }
         }

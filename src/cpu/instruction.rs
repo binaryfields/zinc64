@@ -2,9 +2,8 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::fmt;
-
-use crate::core::{Cpu, TickFn};
+use core::fmt;
+use zinc64_core::{Cpu, TickFn};
 
 use super::operand::Operand;
 use super::Cpu6510;
@@ -483,9 +482,7 @@ impl fmt::Display for Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{IoPort, IrqLine, Mmu, Pin, Ram};
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use zinc64_core::{make_noop, new_shared, IoPort, IrqLine, Mmu, Pin, Ram};
 
     struct MockMemory {
         ram: Ram,
@@ -510,19 +507,19 @@ mod tests {
     }
 
     fn setup_cpu() -> Cpu6510 {
-        let ba_line = Rc::new(RefCell::new(Pin::new_high()));
-        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
-        let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
+        let ba_line = new_shared(Pin::new_high());
+        let cpu_io_port = new_shared(IoPort::new(0x00, 0xff));
+        let cpu_irq = new_shared(IrqLine::new("irq"));
+        let cpu_nmi = new_shared(IrqLine::new("nmi"));
+        let mem = new_shared(MockMemory::new(Ram::new(0x10000)));
         Cpu6510::new(mem, cpu_io_port, ba_line, cpu_irq, cpu_nmi)
     }
 
     #[test]
     fn decode_brk() {
-        let tick_fn: TickFn = Rc::new(move || {});
+        //let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
-        let valid = match Instruction::decode(&mut cpu, 0x00, &tick_fn) {
+        let valid = match Instruction::decode(&mut cpu, 0x00, &make_noop()) {
             Instruction::BRK => true,
             _ => false,
         };
@@ -531,9 +528,9 @@ mod tests {
 
     #[test]
     fn decode_lda_absolute() {
-        let tick_fn: TickFn = Rc::new(move || {});
+        //let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
-        let valid = match Instruction::decode(&mut cpu, 0xad, &tick_fn) {
+        let valid = match Instruction::decode(&mut cpu, 0xad, &make_noop()) {
             Instruction::LDA(Operand::Absolute(_)) => true,
             _ => false,
         };

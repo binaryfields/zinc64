@@ -2,12 +2,9 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-
-use crate::core::{Chip, IoPort, IrqControl, IrqLine, Pin};
 use bit_field::BitField;
 use log::LogLevel;
+use zinc64_core::{new_shared, Chip, IoPort, IrqControl, IrqLine, Pin, Shared, SharedCell};
 
 use super::cycle_counter::CycleCounter;
 use super::rtc::Rtc;
@@ -87,9 +84,9 @@ impl Reg {
 pub struct Cia {
     // Dependencies
     mode: Mode,
-    joystick_1: Option<Rc<Cell<u8>>>,
-    joystick_2: Option<Rc<Cell<u8>>>,
-    keyboard_matrix: Option<Rc<RefCell<[u8; 8]>>>,
+    joystick_1: Option<SharedCell<u8>>,
+    joystick_2: Option<SharedCell<u8>>,
+    keyboard_matrix: Option<Shared<[u8; 8]>>,
     // Functional Units
     irq_control: IrqControl,
     irq_delay: CycleCounter,
@@ -99,26 +96,26 @@ pub struct Cia {
     tod_clock: Rtc,
     tod_set_alarm: bool,
     // I/O
-    cnt_pin: Rc<RefCell<Pin>>,
-    flag_pin: Rc<RefCell<Pin>>,
-    irq_line: Rc<RefCell<IrqLine>>,
-    port_a: Rc<RefCell<IoPort>>,
-    port_b: Rc<RefCell<IoPort>>,
+    cnt_pin: Shared<Pin>,
+    flag_pin: Shared<Pin>,
+    irq_line: Shared<IrqLine>,
+    port_a: Shared<IoPort>,
+    port_b: Shared<IoPort>,
 }
 
 impl Cia {
     #![cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
         mode: Mode,
-        joystick_1: Option<Rc<Cell<u8>>>,
-        joystick_2: Option<Rc<Cell<u8>>>,
-        keyboard_matrix: Option<Rc<RefCell<[u8; 8]>>>,
-        port_a: Rc<RefCell<IoPort>>,
-        port_b: Rc<RefCell<IoPort>>,
-        flag_pin: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
+        joystick_1: Option<SharedCell<u8>>,
+        joystick_2: Option<SharedCell<u8>>,
+        keyboard_matrix: Option<Shared<[u8; 8]>>,
+        port_a: Shared<IoPort>,
+        port_b: Shared<IoPort>,
+        flag_pin: Shared<Pin>,
+        irq_line: Shared<IrqLine>,
     ) -> Self {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         Self {
             mode,
             joystick_1,
@@ -179,7 +176,7 @@ impl Cia {
         result
     }
 
-    fn scan_joystick(&self, joystick: &Option<Rc<Cell<u8>>>) -> u8 {
+    fn scan_joystick(&self, joystick: &Option<SharedCell<u8>>) -> u8 {
         if let Some(ref state) = *joystick {
             !state.get()
         } else {
@@ -444,13 +441,14 @@ fn to_bcd(num: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zinc64_core::new_shared;
 
     fn setup_cia() -> Cia {
-        let cia_flag = Rc::new(RefCell::new(Pin::new_low()));
-        let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
+        let cia_flag = new_shared(Pin::new_low());
+        let cia_port_a = new_shared(IoPort::new(0x00, 0xff));
+        let cia_port_b = new_shared(IoPort::new(0x00, 0xff));
+        let cpu_irq = new_shared(IrqLine::new("irq"));
+        let keyboard_matrix = new_shared([0xff; 8]);
         let mut cia = Cia::new(
             Mode::Cia1,
             None,
@@ -466,11 +464,11 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn setup_cia_with_keyboard(keyboard_matrix: Rc<RefCell<[u8; 8]>>) -> Cia {
-        let cia_flag = Rc::new(RefCell::new(Pin::new_low()));
-        let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
+    fn setup_cia_with_keyboard(keyboard_matrix: Shared<[u8; 8]>) -> Cia {
+        let cia_flag = new_shared(Pin::new_low());
+        let cia_port_a = new_shared(IoPort::new(0x00, 0xff));
+        let cia_port_b = new_shared(IoPort::new(0x00, 0xff));
+        let cpu_irq = new_shared(IrqLine::new("irq"));
         let mut cia = Cia::new(
             Mode::Cia1,
             None,

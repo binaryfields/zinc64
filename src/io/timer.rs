@@ -4,11 +4,8 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::core::Pin;
 use bit_field::BitField;
+use zinc64_core::{Pin, Shared};
 
 use super::cycle_counter::CycleCounter;
 
@@ -55,7 +52,7 @@ enum RunMode {
 
 pub struct Timer {
     // Dependencies
-    cnt_pin: Rc<RefCell<Pin>>,
+    cnt_pin: Shared<Pin>,
     // Configuration
     mode: Mode,
     enabled: bool,
@@ -72,7 +69,7 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(mode: Mode, cnt_pin: Rc<RefCell<Pin>>) -> Self {
+    pub fn new(mode: Mode, cnt_pin: Shared<Pin>) -> Self {
         Self {
             cnt_pin,
             mode,
@@ -310,10 +307,11 @@ impl Timer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zinc64_core::new_shared;
 
     #[test]
     fn set_config() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0b_0010_1001);
         assert_eq!(true, timer.enabled);
@@ -323,7 +321,7 @@ mod tests {
 
     #[test]
     fn set_and_get_config() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0b_0010_1001);
         assert_eq!(0b_0010_1001, timer.get_config());
@@ -331,7 +329,7 @@ mod tests {
 
     #[test]
     fn count_delay_2c() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
@@ -349,7 +347,7 @@ mod tests {
 
     #[test]
     fn load_delay_1c() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
@@ -362,7 +360,7 @@ mod tests {
 
     #[test]
     fn pb_output_pulse() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
@@ -393,7 +391,7 @@ mod tests {
 
     #[test]
     fn reload_delay_0c() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
@@ -412,7 +410,7 @@ mod tests {
 
     #[test]
     fn reload_count_delay_1c() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
@@ -431,7 +429,7 @@ mod tests {
 
     #[test]
     fn reload_scenario() {
-        let cnt_pin = Rc::new(RefCell::new(Pin::new_high()));
+        let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);

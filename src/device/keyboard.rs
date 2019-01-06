@@ -2,11 +2,10 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::rc::Rc;
-
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
 use bit_field::BitField;
+use zinc64_core::Shared;
 
 // SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
 
@@ -117,16 +116,16 @@ impl KeyEvent {
 }
 
 pub struct Keyboard {
-    matrix: Rc<RefCell<[u8; 8]>>,
-    queue: VecDeque<(KeyEvent, bool)>,
+    matrix: Shared<[u8; 8]>,
+    queue: Vec<(KeyEvent, bool)>,
     disabled_shift: u8,
 }
 
 impl Keyboard {
-    pub fn new(matrix: Rc<RefCell<[u8; 8]>>) -> Self {
+    pub fn new(matrix: Shared<[u8; 8]>) -> Self {
         Self {
             matrix,
-            queue: VecDeque::new(),
+            queue: Vec::new(),
             disabled_shift: 0,
         }
     }
@@ -140,7 +139,8 @@ impl Keyboard {
     }
 
     pub fn drain_event(&mut self) {
-        if let Some((key_event, pressed)) = self.queue.pop_front() {
+        if !self.queue.is_empty() {
+            let (key_event, pressed) = self.queue.remove(0);
             if pressed {
                 self.on_key_down(key_event)
             } else {
@@ -152,8 +152,8 @@ impl Keyboard {
     pub fn enqueue(&mut self, str: &str) {
         for c in str.to_string().chars() {
             let key_event = self.map_char(c);
-            self.queue.push_back((key_event, true));
-            self.queue.push_back((key_event, false));
+            self.queue.push((key_event, true));
+            self.queue.push((key_event, false));
         }
     }
 
@@ -363,10 +363,11 @@ impl Keyboard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zinc64_core::new_shared;
 
     #[test]
     fn enqueue_key_event() {
-        let matrix = Rc::new(RefCell::new([0; 8]));
+        let matrix = new_shared([0; 8]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         assert_eq!(false, keyboard.has_events());
@@ -376,7 +377,7 @@ mod tests {
 
     #[test]
     fn drain_key_event() {
-        let matrix = Rc::new(RefCell::new([0; 8]));
+        let matrix = new_shared([0; 8]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");
@@ -388,7 +389,7 @@ mod tests {
 
     #[test]
     fn emulate_key_press() {
-        let matrix = Rc::new(RefCell::new([0; 8]));
+        let matrix = new_shared([0; 8]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");

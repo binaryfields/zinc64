@@ -7,6 +7,7 @@
 use std::net::SocketAddr;
 use std::result::Result;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -18,11 +19,12 @@ use sdl2::keyboard::Keycode;
 use sdl2::{EventPump, Sdl};
 use time;
 use zinc64::system::C64;
+use zinc64_core::Shared;
 use zinc64_debug::{Command, Debugger, RapServer};
 
 use crate::config::{JamAction, Options};
 use crate::input::Input;
-use crate::output::{AppAudio, Renderer};
+use crate::output::{AppAudio, FrameBuffer, Renderer, SoundBuffer};
 
 use super::execution::{ExecutionEngine, State};
 
@@ -37,12 +39,18 @@ pub struct App {
     renderer: Renderer,
     sdl_context: Sdl,
     // Runtime State
+    frame_buffer: Shared<FrameBuffer>,
     next_frame_ns: u64,
     next_keyboard_event: u64,
 }
 
 impl App {
-    pub fn build(c64: C64, options: Options) -> Result<App, String> {
+    pub fn build(
+        c64: C64,
+        frame_buffer: Shared<FrameBuffer>,
+        sound_buffer: Arc<SoundBuffer>,
+        options: Options,
+    ) -> Result<App, String> {
         let sdl_context = sdl2::init()?;
         // Initialize video
         let sdl_video = sdl_context.video()?;
@@ -62,7 +70,7 @@ impl App {
             c64.get_config().sound.sample_rate as i32,
             1,
             c64.get_config().sound.buffer_size as u16,
-            c64.get_sound_buffer(),
+            sound_buffer.clone(),
         )?;
         audio_device.lock().set_volume(100);
         // Initialize I/O
@@ -102,6 +110,7 @@ impl App {
             input: io,
             renderer,
             sdl_context,
+            frame_buffer,
             next_frame_ns: 0,
             next_keyboard_event: 0,
         };
@@ -171,9 +180,8 @@ impl App {
             if !self.options.warp_mode {
                 self.sync_frame();
             }
-            let frame_buffer = self.execution_engine.get_c64().get_frame_buffer();
             self.renderer
-                .render(&frame_buffer.borrow())
+                .render(&self.frame_buffer.borrow())
                 .expect("Failed to render frame");
             self.execution_engine.get_c64().reset_vsync();
         }

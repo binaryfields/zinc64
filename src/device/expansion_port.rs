@@ -2,11 +2,8 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::core::{Addressable, IoPort};
 use bit_field::BitField;
+use zinc64_core::{Addressable, IoPort, Shared};
 
 use super::cartridge::Cartridge;
 
@@ -27,11 +24,11 @@ impl IoLine {
 pub struct ExpansionPort {
     cartridge: Option<Cartridge>,
     // I/O
-    io_line: Rc<RefCell<IoPort>>,
+    io_line: Shared<IoPort>,
 }
 
 impl ExpansionPort {
-    pub fn new(io_line: Rc<RefCell<IoPort>>) -> Self {
+    pub fn new(io_line: Shared<IoPort>) -> Self {
         Self {
             cartridge: None,
             io_line,

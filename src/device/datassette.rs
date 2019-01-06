@@ -2,11 +2,10 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::core::{IoPort, Pin};
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
 use bit_field::BitField;
+use zinc64_core::{IoPort, Pin, Shared};
 
 use super::Tape;
 
@@ -69,8 +68,8 @@ impl Pulse {
 
 pub struct Datassette {
     // Dependencies
-    cia_flag_pin: Rc<RefCell<Pin>>,
-    cpu_io_port: Rc<RefCell<IoPort>>,
+    cia_flag_pin: Shared<Pin>,
+    cpu_io_port: Shared<IoPort>,
     // Runtime State
     playing: bool,
     tape: Option<Box<dyn Tape>>,
@@ -78,7 +77,7 @@ pub struct Datassette {
 }
 
 impl Datassette {
-    pub fn new(cia_flag_pin: Rc<RefCell<Pin>>, cpu_io_port: Rc<RefCell<IoPort>>) -> Self {
+    pub fn new(cia_flag_pin: Shared<Pin>, cpu_io_port: Shared<IoPort>) -> Self {
         Self {
             cia_flag_pin,
             cpu_io_port,

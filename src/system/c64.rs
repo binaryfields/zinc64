@@ -4,19 +4,22 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::cell::{Cell, RefCell};
-use std::io;
-use std::path::Path;
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::rc::Rc;
+#[cfg(not(feature = "std"))]
+use alloc::sync::Arc;
+#[cfg(feature = "std")]
 use std::rc::Rc;
-use std::result::Result;
-use std::sync::{Arc, Mutex};
-
-use crate::core::{Chip, ChipFactory, Clock, Cpu, IoPort, IrqLine, Pin, Ram, TickFn};
-use crate::device::joystick;
-use crate::device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
+#[cfg(feature = "std")]
+use std::sync::Arc;
+use zinc64_core::*;
 
 use super::breakpoint::BreakpointManager;
-use super::{Autostart, CircularBuffer, Config, FrameBuffer, Palette};
+use super::{Autostart, Config};
+use crate::device::joystick;
+use crate::device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -42,22 +45,22 @@ pub struct C64 {
     config: Rc<Config>,
     // Chipset
     cpu: Box<dyn Cpu>,
-    cia_1: Rc<RefCell<dyn Chip>>,
-    cia_2: Rc<RefCell<dyn Chip>>,
-    sid: Rc<RefCell<dyn Chip>>,
-    vic: Rc<RefCell<dyn Chip>>,
+    cia_1: Shared<dyn Chip>,
+    cia_2: Shared<dyn Chip>,
+    sid: Shared<dyn Chip>,
+    vic: Shared<dyn Chip>,
     // Memory
-    color_ram: Rc<RefCell<Ram>>,
-    ram: Rc<RefCell<Ram>>,
+    color_ram: Shared<Ram>,
+    ram: Shared<Ram>,
     // Peripherals
-    datassette: Rc<RefCell<Datassette>>,
-    expansion_port: Rc<RefCell<ExpansionPort>>,
-    joystick_1: Option<Rc<RefCell<Joystick>>>,
-    joystick_2: Option<Rc<RefCell<Joystick>>>,
-    keyboard: Rc<RefCell<Keyboard>>,
+    datassette: Shared<Datassette>,
+    expansion_port: Shared<ExpansionPort>,
+    joystick_1: Option<Shared<Joystick>>,
+    joystick_2: Option<Shared<Joystick>>,
+    keyboard: Shared<Keyboard>,
     // Buffers
-    frame_buffer: Rc<RefCell<FrameBuffer>>,
-    sound_buffer: Arc<Mutex<CircularBuffer>>,
+    frame_buffer: Shared<VideoOutput>,
+    sound_buffer: Arc<SoundOutput>,
     // Configuration
     autostart: Option<Autostart>,
     breakpoints: BreakpointManager,
@@ -66,48 +69,44 @@ pub struct C64 {
     frame_count: u32,
     last_pc: u16,
     tick_fn: TickFn,
-    vsync_flag: Rc<Cell<bool>>,
+    vsync_flag: SharedCell<bool>,
 }
 
 impl C64 {
-    pub fn build(config: Rc<Config>, factory: &dyn ChipFactory) -> Result<C64, io::Error> {
+    pub fn build(
+        config: Rc<Config>,
+        factory: &dyn ChipFactory,
+        frame_buffer: Shared<VideoOutput>,
+        sound_buffer: Arc<SoundOutput>,
+    ) -> C64 {
         info!(target: "c64", "Initializing system");
         // Buffers
         let clock = Rc::new(Clock::default());
-        let frame_buffer = Rc::new(RefCell::new(FrameBuffer::new(
-            config.model.frame_buffer_size.0,
-            config.model.frame_buffer_size.1,
-            Palette::default(),
-        )));
-        let joystick_1_state = Rc::new(Cell::new(0u8));
-        let joystick_2_state = Rc::new(Cell::new(0u8));
-        let keyboard_matrix = Rc::new(RefCell::new([0; 8]));
-        let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(
-            config.sound.buffer_size << 2,
-        )));
-        let vsync_flag = Rc::new(Cell::new(false));
-        let vic_base_address = Rc::new(Cell::new(0u16));
+        let joystick_1_state = new_shared_cell(0u8);
+        let joystick_2_state = new_shared_cell(0u8);
+        let keyboard_matrix = new_shared([0; 8]);
+        let vsync_flag = new_shared_cell(false);
+        let vic_base_address = new_shared_cell(0u16);
 
         // I/O Lines
-        let ba_line = Rc::new(RefCell::new(Pin::new_high()));
-        let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_1_flag_pin = Rc::new(RefCell::new(Pin::new_low()));
-        let cia_1_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_1_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_2_flag_pin = Rc::new(RefCell::new(Pin::new_low()));
-        let cia_2_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let cia_2_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-        let exp_io_line = Rc::new(RefCell::new(IoPort::new(0xff, 0xff)));
-        let irq_line = Rc::new(RefCell::new(IrqLine::new("irq")));
-        let nmi_line = Rc::new(RefCell::new(IrqLine::new("nmi")));
+        let ba_line = new_shared(Pin::new_high());
+        let cpu_io_port = new_shared(IoPort::new(0x00, 0xff));
+        let cia_1_flag_pin = new_shared(Pin::new_low());
+        let cia_1_port_a = new_shared(IoPort::new(0x00, 0xff));
+        let cia_1_port_b = new_shared(IoPort::new(0x00, 0xff));
+        let cia_2_flag_pin = new_shared(Pin::new_low());
+        let cia_2_port_a = new_shared(IoPort::new(0x00, 0xff));
+        let cia_2_port_b = new_shared(IoPort::new(0x00, 0xff));
+        let exp_io_line = new_shared(IoPort::new(0xff, 0xff));
+        let irq_line = new_shared(IrqLine::new("irq"));
+        let nmi_line = new_shared(IrqLine::new("nmi"));
 
         // Memory
         let color_ram = factory.new_ram(config.model.color_ram);
         let ram = factory.new_ram(config.model.memory_size);
-        let rom_basic = factory.new_rom(Path::new("res/rom/basic.rom"), BaseAddr::Basic.addr())?;
-        let rom_charset = factory.new_rom(Path::new("res/rom/characters.rom"), 0)?;
-        let rom_kernal =
-            factory.new_rom(Path::new("res/rom/kernal.rom"), BaseAddr::Kernal.addr())?;
+        let rom_basic = factory.new_rom(config.roms.basic.as_slice(), BaseAddr::Basic.addr());
+        let rom_charset = factory.new_rom(config.roms.charset.as_slice(), 0);
+        let rom_kernal = factory.new_rom(config.roms.kernal.as_slice(), BaseAddr::Kernal.addr());
 
         // Chipset
         let cia_1 = factory.new_cia_1(
@@ -139,7 +138,7 @@ impl C64 {
         );
 
         // Memory Controller and Processor
-        let expansion_port = Rc::new(RefCell::new(ExpansionPort::new(exp_io_line.clone())));
+        let expansion_port = new_shared(ExpansionPort::new(exp_io_line.clone()));
         let mem = factory.new_memory(
             cia_1.clone(),
             cia_2.clone(),
@@ -161,29 +160,26 @@ impl C64 {
         );
 
         // Peripherals
-        let datassette = Rc::new(RefCell::new(Datassette::new(
-            cia_1_flag_pin.clone(),
-            cpu_io_port.clone(),
-        )));
+        let datassette = new_shared(Datassette::new(cia_1_flag_pin.clone(), cpu_io_port.clone()));
         let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(Joystick::new(
+            Some(new_shared(Joystick::new(
                 config.joystick.joystick_1,
                 config.joystick.axis_motion_threshold,
                 joystick_1_state.clone(),
-            ))))
+            )))
         } else {
             None
         };
         let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
-            Some(Rc::new(RefCell::new(Joystick::new(
+            Some(new_shared(Joystick::new(
                 config.joystick.joystick_2,
                 config.joystick.axis_motion_threshold,
                 joystick_2_state.clone(),
-            ))))
+            )))
         } else {
             None
         };
-        let keyboard = Rc::new(RefCell::new(Keyboard::new(keyboard_matrix.clone())));
+        let keyboard = new_shared(Keyboard::new(keyboard_matrix.clone()));
 
         // Observers
         let exp_io_line_clone_1 = exp_io_line.clone();
@@ -226,7 +222,7 @@ impl C64 {
                 clock_clone.tick();
             })
         };
-        Ok(C64 {
+        C64 {
             config,
             cpu,
             cia_1: cia_1.clone(),
@@ -249,7 +245,7 @@ impl C64 {
             last_pc: 0,
             tick_fn,
             vsync_flag,
-        })
+        }
     }
 
     pub fn get_bpm(&self) -> &BreakpointManager {
@@ -280,27 +276,23 @@ impl C64 {
         self.clock.get()
     }
 
-    pub fn get_cia_1(&self) -> Rc<RefCell<dyn Chip>> {
+    pub fn get_cia_1(&self) -> Shared<dyn Chip> {
         self.cia_1.clone()
     }
 
-    pub fn get_cia_2(&self) -> Rc<RefCell<dyn Chip>> {
+    pub fn get_cia_2(&self) -> Shared<dyn Chip> {
         self.cia_2.clone()
     }
 
-    pub fn get_datasette(&self) -> Rc<RefCell<Datassette>> {
+    pub fn get_datasette(&self) -> Shared<Datassette> {
         self.datassette.clone()
-    }
-
-    pub fn get_frame_buffer(&self) -> Rc<RefCell<FrameBuffer>> {
-        self.frame_buffer.clone()
     }
 
     pub fn get_frame_count(&self) -> u32 {
         self.frame_count
     }
 
-    pub fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
+    pub fn get_joystick(&self, index: u8) -> Option<Shared<Joystick>> {
         if let Some(ref joystick) = self.joystick_1 {
             if joystick.borrow().get_index() == index {
                 return Some(joystick.clone());
@@ -314,27 +306,23 @@ impl C64 {
         None
     }
 
-    pub fn get_joystick1(&self) -> Option<Rc<RefCell<Joystick>>> {
+    pub fn get_joystick1(&self) -> Option<Shared<Joystick>> {
         self.joystick_1.clone()
     }
 
-    pub fn get_joystick2(&self) -> Option<Rc<RefCell<Joystick>>> {
+    pub fn get_joystick2(&self) -> Option<Shared<Joystick>> {
         self.joystick_2.clone()
     }
 
-    pub fn get_keyboard(&self) -> Rc<RefCell<Keyboard>> {
+    pub fn get_keyboard(&self) -> Shared<Keyboard> {
         self.keyboard.clone()
     }
 
-    pub fn get_sid(&self) -> Rc<RefCell<dyn Chip>> {
+    pub fn get_sid(&self) -> Shared<dyn Chip> {
         self.sid.clone()
     }
 
-    pub fn get_sound_buffer(&self) -> Arc<Mutex<CircularBuffer>> {
-        self.sound_buffer.clone()
-    }
-
-    pub fn get_vic(&self) -> Rc<RefCell<dyn Chip>> {
+    pub fn get_vic(&self) -> Shared<dyn Chip> {
         self.vic.clone()
     }
 
@@ -396,7 +384,7 @@ impl C64 {
         }
         self.keyboard.borrow_mut().reset();
         self.frame_buffer.borrow_mut().reset();
-        self.sound_buffer.lock().unwrap().reset();
+        self.sound_buffer.reset();
         // Runtime State
         // self.clock.reset();
         self.frame_count = 0;
@@ -468,15 +456,41 @@ impl C64 {
 mod tests {
     use super::super::C64Factory;
     use super::*;
-    use crate::core::SystemModel;
+    use zinc64_core::SystemModel;
+
+    static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
+    static RES_CHARSET_ROM: &[u8] = include_bytes!("../../res/rom/characters.rom");
+    static RES_KERNAL_ROM: &[u8] = include_bytes!("../../res/rom/kernal.rom");
 
     #[test]
     fn verify_mem_layout() {
-        let config = Rc::new(Config::new(SystemModel::from("pal")));
+        let config = Rc::new(Config::new_with_roms(
+            SystemModel::from("pal"),
+            RES_BASIC_ROM,
+            RES_CHARSET_ROM,
+            RES_KERNAL_ROM,
+        ));
         let factory = Box::new(C64Factory::new(config.clone()));
-        let mut c64 = C64::build(config.clone(), &*factory).unwrap();
+        let video_output = new_shared(NullVideo {});
+        let sound_output = Arc::new(NullSound {});
+        let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
         c64.reset(false);
         let cpu = c64.get_cpu();
         assert_eq!(0x94, cpu.read(0xa000));
+    }
+
+    struct NullSound;
+    impl SoundOutput for NullSound {
+        fn reset(&self) {}
+        fn write(&self, _samples: &[i16]) {}
+    }
+
+    struct NullVideo;
+    impl VideoOutput for NullVideo {
+        fn get_dimension(&self) -> (usize, usize) {
+            (0, 0)
+        }
+        fn reset(&mut self) {}
+        fn write(&mut self, _index: usize, _color: u8) {}
     }
 }

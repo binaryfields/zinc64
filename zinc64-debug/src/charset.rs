@@ -147,7 +147,6 @@ pub fn pet_to_ascii(code: u8) -> u8 {
         223 => 0,   // ▧
         // Block 7, Common Graphics (Alternate)
         224...255 => 0,
-        _ => 0,
     }
 }
 

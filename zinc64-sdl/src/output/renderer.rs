@@ -10,7 +10,8 @@ use sdl2::rect::Rect;
 use sdl2::render;
 use sdl2::video;
 use time;
-use zinc64::system::FrameBuffer;
+
+use super::FrameBuffer;
 
 pub struct Renderer {
     canvas: render::WindowCanvas,

@@ -2,14 +2,17 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+use std::fs;
+use std::io;
+use std::io::Read;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::result::Result;
 
 use getopts;
-use zinc64::core::SystemModel;
 use zinc64::device;
 use zinc64::system::{Config, C64};
+use zinc64_core::SystemModel;
 use zinc64_loader::{BinLoader, Loader, Loaders};
 
 use super::{JamAction, Options};
@@ -70,6 +73,7 @@ impl Cli {
         );
         let mut config = Config::new(model);
         Cli::parse_device_config(&mut config, matches)?;
+        Cli::parse_rom_config(&mut config, matches)?;
         Cli::parse_sound_config(&mut config, matches)?;
         Ok(config)
     }
@@ -163,6 +167,23 @@ impl Cli {
         } else {
             config.joystick.joystick_2 = device::joystick::Mode::Numpad;
         }
+        Ok(())
+    }
+
+    fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
+        let mut data = Vec::new();
+        let mut file = fs::File::open(path)?;
+        file.read_to_end(&mut data)?;
+        Ok(data)
+    }
+
+    fn parse_rom_config(config: &mut Config, _matches: &getopts::Matches) -> Result<(), String> {
+        config.roms.basic = Cli::load_file(Path::new("res/rom/basic.rom"))
+            .map_err(|_| format!("Invalid rom: basic"))?;
+        config.roms.charset = Cli::load_file(Path::new("res/rom/characters.rom"))
+            .map_err(|_| format!("Invalid rom: charset"))?;
+        config.roms.kernal = Cli::load_file(Path::new("res/rom/kernal.rom"))
+            .map_err(|_| format!("Invalid rom: kernal"))?;
         Ok(())
     }
 

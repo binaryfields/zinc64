@@ -2,28 +2,25 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::core::{Addressable, Chip, Ram};
+use zinc64_core::{Addressable, Chip, Ram, Shared};
 
 pub struct Mmio {
-    cia_1: Rc<RefCell<dyn Chip>>,
-    cia_2: Rc<RefCell<dyn Chip>>,
-    color_ram: Rc<RefCell<Ram>>,
-    expansion_port: Rc<RefCell<dyn Addressable>>,
-    sid: Rc<RefCell<dyn Chip>>,
-    vic: Rc<RefCell<dyn Chip>>,
+    cia_1: Shared<dyn Chip>,
+    cia_2: Shared<dyn Chip>,
+    color_ram: Shared<Ram>,
+    expansion_port: Shared<dyn Addressable>,
+    sid: Shared<dyn Chip>,
+    vic: Shared<dyn Chip>,
 }
 
 impl Mmio {
     pub fn new(
-        cia_1: Rc<RefCell<dyn Chip>>,
-        cia_2: Rc<RefCell<dyn Chip>>,
-        color_ram: Rc<RefCell<Ram>>,
-        expansion_port: Rc<RefCell<dyn Addressable>>,
-        sid: Rc<RefCell<dyn Chip>>,
-        vic: Rc<RefCell<dyn Chip>>,
+        cia_1: Shared<dyn Chip>,
+        cia_2: Shared<dyn Chip>,
+        color_ram: Shared<Ram>,
+        expansion_port: Shared<dyn Addressable>,
+        sid: Shared<dyn Chip>,
+        vic: Shared<dyn Chip>,
     ) -> Self {
         Self {
             cia_1,

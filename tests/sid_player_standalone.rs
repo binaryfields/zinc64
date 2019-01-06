@@ -2,11 +2,13 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+/*
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use zinc64::core::{Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, SystemModel, TickFn};
+use zinc64::util::{Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Shared, SystemModel, TickFn};
 use zinc64::cpu::Cpu6510;
 use zinc64::sound::sid;
 use zinc64::sound::Sid;
@@ -14,14 +16,14 @@ use zinc64::system::CircularBuffer;
 
 struct SimpleMemory {
     mode: u8,
-    ram: Rc<RefCell<Ram>>,
-    sid: Rc<RefCell<dyn Chip>>,
+    ram: Shared<Ram>,
+    sid: Shared<dyn Chip>,
 }
 
 // SimpleMemory permanently maps device I/O into memory map.
 
 impl SimpleMemory {
-    pub fn new(ram: Rc<RefCell<Ram>>, sid: Rc<RefCell<dyn Chip>>) -> Self {
+    pub fn new(ram: Shared<Ram>, sid: Shared<dyn Chip>) -> Self {
         SimpleMemory { mode: 0, ram, sid }
     }
 }
@@ -106,3 +108,4 @@ fn exec_sid_player() {
         frames -= 1;
     }
 }
+*/

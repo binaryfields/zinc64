@@ -4,10 +4,11 @@
 
 use std::cell::Cell;
 use std::rc::Rc;
+use std::sync::Arc;
 
-use zinc64::core::{SystemModel, TickFn};
 use zinc64::io::cia;
 use zinc64::system::{C64Factory, Config, C64};
+use zinc64_core::{new_shared, SoundOutput, SystemModel, TickFn, VideoOutput};
 
 /*
 Program CIA1TAB - TA, TB, PB67 and ICR in cascaded mode
@@ -21,7 +22,7 @@ PB  80 C0 80 80 C0 80 80 C0 00 00 40 00
 ICR 00 01 01 01 01 01 01 01 03 83 83 83
 */
 
-static CIA1TAB_PRG: &'static [u8] = include_bytes!("data/cia1tab.prg");
+static CIA1TAB_PRG: &[u8] = include_bytes!("data/cia1tab.prg");
 
 static CIA1TAB_TA: [u8; 12] = [01, 02, 02, 01, 02, 02, 01, 02, 02, 01, 02, 02];
 
@@ -31,11 +32,28 @@ static CIA1TAB_PB: [u8; 12] = [
     0x80, 0xC0, 0x80, 0x80, 0xC0, 0x80, 0x80, 0xC0, 0x00, 0x00, 0x40, 0x00,
 ];
 
+struct NullSound;
+impl SoundOutput for NullSound {
+    fn reset(&self) {}
+    fn write(&self, _samples: &[i16]) {}
+}
+
+struct NullVideo;
+impl VideoOutput for NullVideo {
+    fn get_dimension(&self) -> (usize, usize) {
+        (0, 0)
+    }
+    fn reset(&mut self) {}
+    fn write(&mut self, _index: usize, _color: u8) {}
+}
+
 #[test]
 fn program_cia1tab() {
     let config = Rc::new(Config::new(SystemModel::from("pal")));
     let factory = Box::new(C64Factory::new(config.clone()));
-    let mut c64 = C64::build(config.clone(), &*factory).unwrap();
+    let video_output = new_shared(NullVideo {});
+    let sound_output = Arc::new(NullSound {});
+    let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
     c64.reset(false);
     let cia1_clone = c64.get_cia_1();
     let cia2_clone = c64.get_cia_2();
@@ -98,7 +116,9 @@ fn exec_keyboard_read() {
     ];
     let config = Rc::new(Config::new(SystemModel::from("pal")));
     let factory = Box::new(C64Factory::new(config.clone()));
-    let mut c64 = C64::build(config.clone(), &*factory).unwrap();
+    let video_output = new_shared(NullVideo {});
+    let sound_output = Arc::new(NullSound {});
+    let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
     c64.load(&code.to_vec(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.borrow_mut().set_row(1, !(1 << 5));

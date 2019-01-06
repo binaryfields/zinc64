@@ -6,9 +6,7 @@
 
 mod keymap;
 
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
 
 use sdl2;
 use sdl2::event::Event;
@@ -16,14 +14,15 @@ use sdl2::joystick;
 use sdl2::keyboard::{Keycode, Mod};
 use zinc64::device::joystick::Button;
 use zinc64::device::{Joystick, Keyboard};
+use zinc64_core::Shared;
 
 use self::keymap::KeyMap;
 
 pub struct Input {
     //event_pump: EventPump,
-    keyboard: Rc<RefCell<Keyboard>>,
-    joystick1: Option<Rc<RefCell<Joystick>>>,
-    joystick2: Option<Rc<RefCell<Joystick>>>,
+    keyboard: Shared<Keyboard>,
+    joystick1: Option<Shared<Joystick>>,
+    joystick2: Option<Shared<Joystick>>,
     #[allow(dead_code)]
     sdl_joystick1: Option<joystick::Joystick>,
     #[allow(dead_code)]
@@ -35,9 +34,9 @@ pub struct Input {
 impl Input {
     pub fn build(
         sdl_joystick: &sdl2::JoystickSubsystem,
-        keyboard: Rc<RefCell<Keyboard>>,
-        joystick1: Option<Rc<RefCell<Joystick>>>,
-        joystick2: Option<Rc<RefCell<Joystick>>>,
+        keyboard: Shared<Keyboard>,
+        joystick1: Option<Shared<Joystick>>,
+        joystick2: Option<Shared<Joystick>>,
     ) -> Result<Input, String> {
         sdl_joystick.set_event_state(true);
         let sdl_joystick1 = joystick1.as_ref().and_then(|joystick| {
@@ -94,7 +93,7 @@ impl Input {
         self.handle_joystick_event(event);
     }
 
-    fn get_joystick(&self, index: u8) -> Option<Rc<RefCell<Joystick>>> {
+    fn get_joystick(&self, index: u8) -> Option<Shared<Joystick>> {
         if let Some(ref joystick) = self.joystick1 {
             if joystick.borrow().get_index() == index {
                 return Some(joystick.clone());

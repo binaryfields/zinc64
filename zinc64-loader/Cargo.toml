@@ -1,6 +1,6 @@
 [package]
 name = "zinc64-loader"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 edition = "2018"
 description = "Commodore 64 emulator loader support"
@@ -11,7 +11,6 @@ keywords = ["c64", "commodore", "emulator"]
 categories = ["emulators"]
 
 [dependencies]
-bit_field = "0.9"
 byteorder = "1.2"
 log = "0.3"
-zinc64 = { path = "..", version = "0.7.0" }
+zinc64 = { path = ".." }

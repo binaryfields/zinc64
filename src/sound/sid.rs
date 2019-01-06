@@ -4,12 +4,18 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
+#[cfg(not(feature = "std"))]
+use alloc::rc::Rc;
+#[cfg(not(feature = "std"))]
+use alloc::sync::Arc;
+#[cfg(feature = "std")]
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
-use crate::core::{Chip, Clock, SidModel, SoundOutput};
 use log::LogLevel;
 use resid;
+use zinc64_core::{Chip, Clock, SidModel, SoundOutput};
 
 // TODO sound: add sid output sample rate test cases
 
@@ -24,7 +30,7 @@ pub enum SamplingMethod {
 pub struct Sid {
     // Dependencies
     system_clock: Rc<Clock>,
-    sound_buffer: Arc<Mutex<dyn SoundOutput>>,
+    sound_buffer: Arc<dyn SoundOutput>,
     // Functional Units
     resid: resid::Sid,
     // Runtime State
@@ -36,7 +42,7 @@ impl Sid {
     pub fn new(
         chip_model: SidModel,
         system_clock: Rc<Clock>,
-        sound_buffer: Arc<Mutex<dyn SoundOutput>>,
+        sound_buffer: Arc<dyn SoundOutput>,
     ) -> Self {
         info!(target: "sound", "Initializing SID");
         let resid_model = match chip_model {
@@ -92,10 +98,7 @@ impl Chip for Sid {
             let mut delta = delta;
             while delta > 0 {
                 let (samples, next_delta) = self.resid.sample(delta, &mut self.buffer[..], 1);
-                let mut output = self.sound_buffer.lock().unwrap();
-                for i in 0..samples {
-                    output.write(self.buffer[i]);
-                }
+                self.sound_buffer.write(&self.buffer[0..samples]);
                 delta = next_delta;
             }
         }

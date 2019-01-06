@@ -5,12 +5,9 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cyclomatic_complexity))]
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-
-use crate::core::{Chip, IrqControl, IrqLine, Pin, Ram, VicModel, VideoOutput};
 use bit_field::BitField;
 use log::LogLevel;
+use zinc64_core::*;
 
 use super::border_unit::BorderUnit;
 use super::gfx_sequencer::{GfxSequencer, Mode};
@@ -132,7 +129,7 @@ impl RasterUnit {
 pub struct Vic {
     // Dependencies
     spec: Spec,
-    color_ram: Rc<RefCell<Ram>>,
+    color_ram: Shared<Ram>,
     mem: VicMemory,
     // Functional Units
     border_unit: BorderUnit,
@@ -153,21 +150,21 @@ pub struct Vic {
     cycle: u16,
     y: u16,
     // I/O
-    ba_line: Rc<RefCell<Pin>>,
-    irq_line: Rc<RefCell<IrqLine>>,
-    frame_buffer: Rc<RefCell<dyn VideoOutput>>,
-    vsync_flag: Rc<Cell<bool>>,
+    ba_line: Shared<Pin>,
+    irq_line: Shared<IrqLine>,
+    frame_buffer: Shared<dyn VideoOutput>,
+    vsync_flag: SharedCell<bool>,
 }
 
 impl Vic {
     pub fn new(
         chip_model: VicModel,
-        color_ram: Rc<RefCell<Ram>>,
+        color_ram: Shared<Ram>,
         mem: VicMemory,
-        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
-        vsync_flag: Rc<Cell<bool>>,
-        ba_line: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
+        frame_buffer: Shared<dyn VideoOutput>,
+        vsync_flag: SharedCell<bool>,
+        ba_line: Shared<Pin>,
+        irq_line: Shared<IrqLine>,
     ) -> Vic {
         info!(target: "video", "Initializing VIC");
         let spec = Spec::new(chip_model);

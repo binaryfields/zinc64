@@ -2,13 +2,17 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::vec;
+
 pub struct Ram {
     data: Vec<u8>,
 }
 
 impl Ram {
     pub fn new(capacity: usize) -> Self {
-        info!(target: "mem", "Initializing RAM with capacity {}", capacity);
         Self {
             data: vec![0x00; capacity],
         }

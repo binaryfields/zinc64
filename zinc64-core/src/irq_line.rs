@@ -3,9 +3,10 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use bit_field::BitField;
-use log::LogLevel;
+// use log::LogLevel;
 
 pub struct IrqLine {
+    #[allow(unused)]
     kind: &'static str,
     signal: u8,
 }
@@ -24,14 +25,14 @@ impl IrqLine {
     }
 
     pub fn set_low(&mut self, source: usize, value: bool) {
-        if log_enabled!(LogLevel::Trace) {
+        /* if log_enabled!(LogLevel::Trace) {
             trace!(
                 target: "cpu::int", "{}.{:?} {}",
                 self.kind,
                 source,
                 if value { "set " } else { "cleared " }
             );
-        }
+        } */
         self.signal.set_bit(source, value);
     }
 }

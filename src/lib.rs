@@ -2,10 +2,17 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
+
+#[cfg(feature = "std")]
+extern crate core;
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc;
 #[macro_use]
 extern crate log;
 
-pub mod core;
 pub mod cpu;
 pub mod device;
 pub mod io;

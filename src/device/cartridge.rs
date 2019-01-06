@@ -2,9 +2,10 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::iter::Iterator;
-
-use crate::core::Addressable;
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+use core::iter::Iterator;
+use zinc64_core::Addressable;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 

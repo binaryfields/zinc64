@@ -2,10 +2,8 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::Cell;
-use std::rc::Rc;
-
 use bit_field::BitField;
+use zinc64_core::SharedCell;
 
 // DEFERRED device: joystick test cases
 
@@ -53,11 +51,11 @@ pub struct Joystick {
     mode: Mode,
     threshold: i16,
     // State
-    state: Rc<Cell<u8>>,
+    state: SharedCell<u8>,
 }
 
 impl Joystick {
-    pub fn new(mode: Mode, threshold: i16, state: Rc<Cell<u8>>) -> Self {
+    pub fn new(mode: Mode, threshold: i16, state: SharedCell<u8>) -> Self {
         Self {
             mode,
             threshold,

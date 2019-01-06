@@ -2,23 +2,16 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-
-use crate::core::{Ram, Rom};
+use zinc64_core::{Ram, Rom, Shared, SharedCell};
 
 pub struct VicMemory {
-    base_address: Rc<Cell<u16>>,
-    charset: Rc<RefCell<Rom>>,
-    ram: Rc<RefCell<Ram>>,
+    base_address: SharedCell<u16>,
+    charset: Shared<Rom>,
+    ram: Shared<Ram>,
 }
 
 impl VicMemory {
-    pub fn new(
-        base_address: Rc<Cell<u16>>,
-        charset: Rc<RefCell<Rom>>,
-        ram: Rc<RefCell<Ram>>,
-    ) -> VicMemory {
+    pub fn new(base_address: SharedCell<u16>, charset: Shared<Rom>, ram: Shared<Ram>) -> VicMemory {
         VicMemory {
             base_address,
             charset,

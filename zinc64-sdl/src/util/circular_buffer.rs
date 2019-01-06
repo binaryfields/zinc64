@@ -2,20 +2,18 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use crate::core::SoundOutput;
-
-pub struct CircularBuffer {
-    buffer: Vec<i16>,
+pub struct CircularBuffer<T: Copy + Default> {
+    buffer: Vec<T>,
     capacity: usize,
     count: usize,
     head: usize,
     tail: usize,
 }
 
-impl CircularBuffer {
-    pub fn new(capacity: usize) -> CircularBuffer {
+impl<T: Copy + Default> CircularBuffer<T> {
+    pub fn new(capacity: usize) -> CircularBuffer<T> {
         CircularBuffer {
-            buffer: vec![0; capacity],
+            buffer: vec![T::default(); capacity],
             capacity,
             count: 0,
             head: 0,
@@ -23,17 +21,13 @@ impl CircularBuffer {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.count == 0
-    }
-
     pub fn len(&self) -> usize {
         self.count
     }
 
-    pub fn pop(&mut self) -> i16 {
+    pub fn pop(&mut self) -> T {
         if self.count == 0 {
-            0
+            T::default()
         } else {
             let value = self.buffer[self.head];
             self.count -= 1;
@@ -45,7 +39,7 @@ impl CircularBuffer {
         }
     }
 
-    pub fn push(&mut self, value: i16) -> bool {
+    pub fn push(&mut self, value: T) -> bool {
         if self.count == self.capacity {
             false
         } else {
@@ -60,18 +54,12 @@ impl CircularBuffer {
     }
 
     pub fn reset(&mut self) {
-        for i in 0..self.buffer.len() {
-            self.buffer[i] = 0;
+        for value in self.buffer.iter_mut() {
+            *value = T::default();
         }
         self.count = 0;
         self.head = 0;
         self.tail = 0;
-    }
-}
-
-impl SoundOutput for CircularBuffer {
-    fn write(&mut self, value: i16) {
-        self.push(value);
     }
 }
 

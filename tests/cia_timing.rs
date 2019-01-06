@@ -5,9 +5,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use zinc64::core::{Chip, IoPort, IrqLine, Pin};
 use zinc64::io::cia::{Mode, Reg};
 use zinc64::io::Cia;
+use zinc64_core::{Chip, IoPort, IrqLine, Pin};
 
 fn setup_cia() -> Cia {
     let cia_flag = Rc::new(RefCell::new(Pin::new_low()));

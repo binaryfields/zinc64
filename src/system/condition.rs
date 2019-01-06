@@ -4,11 +4,12 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::fmt;
-use std::iter::Peekable;
-use std::str::Chars;
-
-use crate::core::Cpu;
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+use core::fmt;
+use core::iter::Peekable;
+use core::str::Chars;
+use zinc64_core::Cpu;
 
 enum Operator {
     Equal,

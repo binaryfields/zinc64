@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cmp::PartialEq;
+use core::cmp::PartialEq;
 
 pub struct Rtc {
     enabled: bool,

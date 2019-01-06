@@ -16,15 +16,18 @@ mod util;
 use std::env;
 use std::process;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use zinc64::system::{C64Factory, C64};
+use zinc64_core::new_shared;
 
-use self::config::Cli;
-use self::console::ConsoleApp;
-use self::ui::App;
-use self::util::Logger;
+use crate::config::Cli;
+use crate::console::ConsoleApp;
+use crate::output::{FrameBuffer, Palette, SoundBuffer};
+use crate::ui::App;
+use crate::util::Logger;
 
-static NAME: &'static str = "zinc64";
+static NAME: &str = "zinc64";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -65,7 +68,18 @@ fn run(args: &[String]) -> Result<(), String> {
         info!("Starting {}", NAME);
         let config = Rc::new(Cli::parse_system_config(&matches)?);
         let chip_factory = Box::new(C64Factory::new(config.clone()));
-        let mut c64 = C64::build(config.clone(), &*chip_factory).unwrap();
+        let frame_buffer = new_shared(FrameBuffer::new(
+            config.model.frame_buffer_size.0,
+            config.model.frame_buffer_size.1,
+            Palette::default(),
+        ));
+        let sound_buffer = Arc::new(SoundBuffer::new(config.sound.buffer_size << 2));
+        let mut c64 = C64::build(
+            config.clone(),
+            &*chip_factory,
+            frame_buffer.clone(),
+            sound_buffer.clone(),
+        );
         c64.reset(true);
         Cli::set_c64_options(&mut c64, &matches)?;
         if matches.opt_present("console") {
@@ -73,7 +87,7 @@ fn run(args: &[String]) -> Result<(), String> {
             app.run();
         } else {
             let options = Cli::parse_app_options(&matches)?;
-            let mut app = App::build(c64, options)?;
+            let mut app = App::build(c64, frame_buffer.clone(), sound_buffer.clone(), options)?;
             app.run()?;
         }
     }

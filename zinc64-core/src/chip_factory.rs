@@ -4,16 +4,18 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
 
-use std::cell::{Cell, RefCell};
-use std::io;
-use std::path::Path;
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::rc::Rc;
+#[cfg(not(feature = "std"))]
+use alloc::sync::Arc;
+#[cfg(feature = "std")]
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+#[cfg(feature = "std")]
+use std::sync::Arc;
 
-use crate::core::{
-    Addressable, Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Rom, SidModel, SoundOutput,
-    VicModel, VideoOutput,
-};
+use crate::*;
 
 /// ChipFactory serves as the foundation of an extensible emulator architecture and
 /// provides an interface to construct each chip/component within the system.
@@ -42,11 +44,11 @@ pub trait ChipFactory {
     /// `nmi_line` - non-maskable interrupt request input
     fn new_cpu(
         &self,
-        mem: Rc<RefCell<dyn Mmu>>,
-        io_port: Rc<RefCell<IoPort>>,
-        ba_line: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-        nmi_line: Rc<RefCell<IrqLine>>,
+        mem: Shared<dyn Mmu>,
+        io_port: Shared<IoPort>,
+        ba_line: Shared<Pin>,
+        irq_line: Shared<IrqLine>,
+        nmi_line: Shared<IrqLine>,
     ) -> Box<dyn Cpu>;
 
     // -- Chipset
@@ -68,14 +70,14 @@ pub trait ChipFactory {
     /// `irq_line` - interrupt request output
     fn new_cia_1(
         &self,
-        joystick_1: Rc<Cell<u8>>,
-        joystick_2: Rc<Cell<u8>>,
-        keyboard_matrix: Rc<RefCell<[u8; 8]>>,
-        port_a: Rc<RefCell<IoPort>>,
-        port_b: Rc<RefCell<IoPort>>,
-        flag_pin: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-    ) -> Rc<RefCell<dyn Chip>>;
+        joystick_1: SharedCell<u8>,
+        joystick_2: SharedCell<u8>,
+        keyboard_matrix: Shared<[u8; 8]>,
+        port_a: Shared<IoPort>,
+        port_b: Shared<IoPort>,
+        flag_pin: Shared<Pin>,
+        irq_line: Shared<IrqLine>,
+    ) -> Shared<dyn Chip>;
 
     /// Constructs CIA 2 chip.
     ///
@@ -87,11 +89,11 @@ pub trait ChipFactory {
     /// `nmi_line` - interrupt request output
     fn new_cia_2(
         &self,
-        port_a: Rc<RefCell<IoPort>>,
-        port_b: Rc<RefCell<IoPort>>,
-        flag_pin: Rc<RefCell<Pin>>,
-        nmi_line: Rc<RefCell<IrqLine>>,
-    ) -> Rc<RefCell<dyn Chip>>;
+        port_a: Shared<IoPort>,
+        port_b: Shared<IoPort>,
+        flag_pin: Shared<Pin>,
+        nmi_line: Shared<IrqLine>,
+    ) -> Shared<dyn Chip>;
 
     /// Constructs SID chip.
     ///
@@ -110,8 +112,8 @@ pub trait ChipFactory {
         &self,
         chip_model: SidModel,
         system_clock: Rc<Clock>,
-        sound_buffer: Arc<Mutex<dyn SoundOutput>>,
-    ) -> Rc<RefCell<dyn Chip>>;
+        sound_buffer: Arc<dyn SoundOutput>,
+    ) -> Shared<dyn Chip>;
 
     /// Constructs VIC chip.
     ///
@@ -137,15 +139,15 @@ pub trait ChipFactory {
     fn new_vic(
         &self,
         chip_model: VicModel,
-        color_ram: Rc<RefCell<Ram>>,
-        ram: Rc<RefCell<Ram>>,
-        rom_charset: Rc<RefCell<Rom>>,
-        vic_base_address: Rc<Cell<u16>>,
-        frame_buffer: Rc<RefCell<dyn VideoOutput>>,
-        vsync_flag: Rc<Cell<bool>>,
-        ba_line: Rc<RefCell<Pin>>,
-        irq_line: Rc<RefCell<IrqLine>>,
-    ) -> Rc<RefCell<dyn Chip>>;
+        color_ram: Shared<Ram>,
+        ram: Shared<Ram>,
+        rom_charset: Shared<Rom>,
+        vic_base_address: SharedCell<u16>,
+        frame_buffer: Shared<dyn VideoOutput>,
+        vsync_flag: SharedCell<bool>,
+        ba_line: Shared<Pin>,
+        irq_line: Shared<IrqLine>,
+    ) -> Shared<dyn Chip>;
 
     // -- Memory
 
@@ -155,7 +157,7 @@ pub trait ChipFactory {
     ///
     /// # I/O
     /// `exp_io_line` - exposes cartridge GAME and EXROM lines (bits 3 and 4)
-    fn new_expansion_port(&self, exp_io_line: Rc<RefCell<IoPort>>) -> Rc<RefCell<dyn Addressable>>;
+    fn new_expansion_port(&self, exp_io_line: Shared<IoPort>) -> Shared<dyn Addressable>;
 
     /// Constructs memory controller.
     ///
@@ -164,21 +166,21 @@ pub trait ChipFactory {
     /// the memory configurations (LORAM, HIRAM, CHAREN, GAME, EXROM).
     fn new_memory(
         &self,
-        cia_1: Rc<RefCell<dyn Chip>>,
-        cia_2: Rc<RefCell<dyn Chip>>,
-        color_ram: Rc<RefCell<Ram>>,
-        expansion_port: Rc<RefCell<dyn Addressable>>,
-        ram: Rc<RefCell<Ram>>,
-        rom_basic: Rc<RefCell<Rom>>,
-        rom_charset: Rc<RefCell<Rom>>,
-        rom_kernal: Rc<RefCell<Rom>>,
-        sid: Rc<RefCell<dyn Chip>>,
-        vic: Rc<RefCell<dyn Chip>>,
-    ) -> Rc<RefCell<dyn Mmu>>;
+        cia_1: Shared<dyn Chip>,
+        cia_2: Shared<dyn Chip>,
+        color_ram: Shared<Ram>,
+        expansion_port: Shared<dyn Addressable>,
+        ram: Shared<Ram>,
+        rom_basic: Shared<Rom>,
+        rom_charset: Shared<Rom>,
+        rom_kernal: Shared<Rom>,
+        sid: Shared<dyn Chip>,
+        vic: Shared<dyn Chip>,
+    ) -> Shared<dyn Mmu>;
 
     /// Constructs RAM with the specified `capacity`.
-    fn new_ram(&self, capacity: usize) -> Rc<RefCell<Ram>>;
+    fn new_ram(&self, capacity: usize) -> Shared<Ram>;
 
     /// Constructs ROM based on the specified image file.
-    fn new_rom(&self, path: &Path, offset: u16) -> Result<Rc<RefCell<Rom>>, io::Error>;
+    fn new_rom(&self, data: &[u8], offset: u16) -> Shared<Rom>;
 }
