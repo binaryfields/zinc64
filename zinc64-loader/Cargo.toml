@@ -13,4 +13,5 @@ categories = ["emulators"]
 [dependencies]
 byteorder = "1.2"
 log = "0.3"
-zinc64 = { path = ".." }
+zinc64-emu = { path = "../zinc64-emu" }
+

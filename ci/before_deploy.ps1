@@ -10,7 +10,7 @@ Set-Location $STAGE
 
 $ZIP = "$SRC_DIR\$($Env:CRATE_NAME)-$($Env:APPVEYOR_REPO_TAG_NAME)-$($Env:TARGET).zip"
 
-Copy-Item "$SRC_DIR\target\$($Env:TARGET)\release\zinc64-sdl.exe" '.\'
+Copy-Item "$SRC_DIR\target\$($Env:TARGET)\release\zinc64.exe" '.\'
 Copy-Item "$SRC_DIR\res" '.\' -Recurse
 Copy-Item "$SRC_DIR\logger.conf" '.\'
 Copy-Item "$SRC_DIR\SDL2.dll" '.\'

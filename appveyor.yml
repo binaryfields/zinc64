@@ -35,7 +35,7 @@ test_script:
 build: false
 
 before_deploy:
-  - cargo build -p zinc64-sdl --target %TARGET% --release
+  - cargo build -p zinc64 --target %TARGET% --release
   - ps: ci\before_deploy.ps1
 
 deploy:

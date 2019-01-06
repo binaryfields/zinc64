@@ -12,9 +12,9 @@ use std::result::Result;
 use std::str;
 
 use byteorder::{BigEndian, ReadBytesExt};
-use zinc64::device::{Cartridge, Chip, ChipType, HwType};
-use zinc64::system::autostart;
-use zinc64::system::{Image, C64};
+use zinc64_emu::device::{Cartridge, Chip, ChipType, HwType};
+use zinc64_emu::system::autostart;
+use zinc64_emu::system::{Image, C64};
 
 use super::Loader;
 

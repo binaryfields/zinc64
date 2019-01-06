@@ -18,7 +18,7 @@ use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::{EventPump, Sdl};
 use time;
-use zinc64::system::C64;
+use zinc64_emu::system::C64;
 use zinc64_core::Shared;
 use zinc64_debug::{Command, Debugger, RapServer};
 

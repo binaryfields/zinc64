@@ -10,7 +10,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::result::Result;
 
-use zinc64::c64::C64;
+use zinc64_emu::c64::C64;
 
 use super::Loader;
 

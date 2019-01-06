@@ -5,7 +5,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use zinc64::cpu::Cpu6510;
+use zinc64_emu::cpu::Cpu6510;
 use zinc64_core::{Cpu, IoPort, IrqLine, Mmu, Pin, Ram, TickFn};
 
 struct MockMemory {

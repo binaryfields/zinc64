@@ -12,8 +12,8 @@ use sdl2;
 use sdl2::event::Event;
 use sdl2::joystick;
 use sdl2::keyboard::{Keycode, Mod};
-use zinc64::device::joystick::Button;
-use zinc64::device::{Joystick, Keyboard};
+use zinc64_emu::device::joystick::Button;
+use zinc64_emu::device::{Joystick, Keyboard};
 use zinc64_core::Shared;
 
 use self::keymap::KeyMap;

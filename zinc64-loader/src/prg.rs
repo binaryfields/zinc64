@@ -9,8 +9,8 @@ use std::path::Path;
 use std::result::Result;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use zinc64::system::autostart;
-use zinc64::system::{Autostart, AutostartMethod, Image, C64};
+use zinc64_emu::system::autostart;
+use zinc64_emu::system::{Autostart, AutostartMethod, Image, C64};
 
 use super::Loader;
 

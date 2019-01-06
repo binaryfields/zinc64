@@ -10,9 +10,9 @@ readme = "README.md"
 keywords = ["c64", "commodore", "emulator"]
 categories = ["emulators"]
 
-[dependencies]
-bit_field = "0.9"
-
 [features]
 default = ["std"]
 std = []
+
+[dependencies]
+bit_field = "0.9"

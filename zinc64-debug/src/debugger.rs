@@ -13,7 +13,7 @@ use std::u8;
 
 use bit_field::BitField;
 use byteorder::{BigEndian, ReadBytesExt};
-use zinc64::cpu::Instruction;
+use zinc64_emu::cpu::Instruction;
 
 use super::charset;
 use super::disassembler::Disassembler;

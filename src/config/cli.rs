@@ -10,8 +10,8 @@ use std::path::Path;
 use std::result::Result;
 
 use getopts;
-use zinc64::device;
-use zinc64::system::{Config, C64};
+use zinc64_emu::device;
+use zinc64_emu::system::{Config, C64};
 use zinc64_core::SystemModel;
 use zinc64_loader::{BinLoader, Loader, Loaders};
 

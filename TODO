@@ -1,7 +1,8 @@
 # TODO
 
-- add mouse support
-- add nostd support
+- update ci
+- update readme
+- device: add mouse support
 - device: add floppy support
 - app: add screenshot support
 - app: add ui/menus

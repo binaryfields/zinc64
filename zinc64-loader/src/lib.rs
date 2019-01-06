@@ -15,7 +15,7 @@ mod tap;
 use std::io;
 use std::path::Path;
 
-use zinc64::system::{AutostartMethod, Image};
+use zinc64_emu::system::{AutostartMethod, Image};
 
 pub use self::bin::BinLoader;
 pub use self::loaders::Loaders;

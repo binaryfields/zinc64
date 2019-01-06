@@ -18,7 +18,7 @@ use std::process;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use zinc64::system::{C64Factory, C64};
+use zinc64_emu::system::{C64Factory, C64};
 use zinc64_core::new_shared;
 
 use crate::config::Cli;

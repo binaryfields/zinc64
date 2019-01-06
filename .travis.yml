@@ -34,7 +34,7 @@ before_cache:
 
 before_deploy:
   - test -f Cargo.lock || cargo generate-lockfile
-  - cross build -p zinc64-sdl --target $TARGET --release
+  - cross build -p zinc64 --target $TARGET --release
   - sh ci/before_deploy.sh
 
 deploy:

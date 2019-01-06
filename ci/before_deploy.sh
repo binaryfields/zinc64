@@ -16,8 +16,8 @@ main() {
     esac
 
     test -f Cargo.lock || cargo generate-lockfile
-    cross build -p zinc64-sdl --target $TARGET --release
-    cp target/$TARGET/release/zinc64-sdl $stage/
+    cross build -p zinc64 --target $TARGET --release
+    cp target/$TARGET/release/zinc64 $stage/
     cp -R res $stage/
     cp logger.conf $stage/
     cd $stage

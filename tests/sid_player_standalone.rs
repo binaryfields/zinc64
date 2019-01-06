@@ -8,11 +8,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use zinc64::util::{Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Shared, SystemModel, TickFn};
-use zinc64::cpu::Cpu6510;
-use zinc64::sound::sid;
-use zinc64::sound::Sid;
-use zinc64::system::CircularBuffer;
+use zinc64_emu::util::{Chip, Clock, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, Shared, SystemModel, TickFn};
+use zinc64_emu::cpu::Cpu6510;
+use zinc64_emu::sound::sid;
+use zinc64_emu::sound::Sid;
+use zinc64_emu::system::CircularBuffer;
 
 struct SimpleMemory {
     mode: u8,

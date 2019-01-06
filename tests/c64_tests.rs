@@ -6,8 +6,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use zinc64::io::cia;
-use zinc64::system::{C64Factory, Config, C64};
+use zinc64_emu::io::cia;
+use zinc64_emu::system::{C64Factory, Config, C64};
 use zinc64_core::{new_shared, SoundOutput, SystemModel, TickFn, VideoOutput};
 
 /*

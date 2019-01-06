@@ -119,3 +119,7 @@
 ### Week 18 - 20181111
 
 - migration to rust 2018
+
+### Week 19 - 20190106
+
+- add no_std build support
