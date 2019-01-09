@@ -9,8 +9,14 @@ repository = "https://github.com/digitalstreamio/zinc64"
 readme = "README.md"
 keywords = ["c64", "commodore", "emulator"]
 categories = ["emulators"]
+publish = false
 
 [dependencies]
+alloc-cortex-m = "0.3"
+cortex-m = "0.5.8"
+cortex-m-rt = "0.6.5"
+cortex-m-semihosting = "0.3.2"
+panic-halt = "0.2.0"
 log = { version = "0.3", default-features = false }
 zinc64-core = { path = "../zinc64-core", default-features = false }
 zinc64-emu = { path = "../zinc64-emu", default-features = false }

@@ -17,16 +17,6 @@ std = []
 
 [dependencies]
 bit_field = "0.9"
-
-[target.'cfg(feature = "std")'.dependencies]
-byteorder = "1.2"
-log = "0.3"
-resid-rs = "1.0"
-zinc64-core = { path = "../zinc64-core" }
-
-[target.'cfg(not(feature = "std"))'.dependencies]
-byteorder = { version = "1.2", default-features = false }
 log = { version = "0.3", default-features = false }
 resid-rs = { version = "1.0", default-features = false }
 zinc64-core = { path = "../zinc64-core", default-features = false  }
-

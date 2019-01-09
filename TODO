@@ -3,7 +3,11 @@
 - test nostd build
 - update ci
 - update readme
+
 - device: add mouse support
 - device: add floppy support
 - app: add screenshot support
 - app: add ui/menus
+
+- cpu
+- video
