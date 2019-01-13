@@ -7,16 +7,14 @@ description = "Commodore 64 emulator Raspberry Pi client"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"
 readme = "README.md"
-keywords = ["c64", "commodore", "emulator"]
+keywords = ["c64", "commodore", "emulator", "no_std", "arm", "bare-metal", "raspi"]
 categories = ["emulators"]
 publish = false
 
 [dependencies]
-alloc-cortex-m = "0.3"
-cortex-m = "0.5.8"
-cortex-m-rt = "0.6.5"
-cortex-m-semihosting = "0.3.2"
-panic-halt = "0.2.0"
+cortex-a-semihosting = { git = "https://github.com/digitalstreamio/cortex-a-semihosting" }
+linked_list_allocator = "0.6.3"
 log = { version = "0.3", default-features = false }
+raspi3_boot = { path = "../raspi3_boot" }
 zinc64-core = { path = "../zinc64-core", default-features = false }
 zinc64-emu = { path = "../zinc64-emu", default-features = false }

@@ -1,11 +1,12 @@
 [workspace]
 members = [
+    "zinc64",
     "zinc64-core",
     "zinc64-emu",
     "zinc64-debug",
     "zinc64-loader",
     "zinc64-raspi",
-    "zinc64"
+    "raspi3_boot"
 ]
 default-members = [
     "zinc64-core",

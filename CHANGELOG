@@ -123,3 +123,7 @@
 ### Week 19 - 20190106
 
 - add no_std build support
+
+### Week 20 - 20190113
+
+- add initial raspi3 build

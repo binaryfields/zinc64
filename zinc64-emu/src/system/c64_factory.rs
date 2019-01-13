@@ -97,7 +97,7 @@ impl ChipFactory for C64Factory {
     ) -> Shared<dyn Chip> {
         let mut sid = Sid::new(chip_model, system_clock, sound_buffer);
         sid.set_sampling_parameters(
-            SamplingMethod::ResampleFast,
+            SamplingMethod::Fast,
             self.config.model.cpu_freq,
             self.config.sound.sample_rate,
         );

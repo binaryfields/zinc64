@@ -1,5 +1,6 @@
 # TODO
 
+- add uart log output
 - test nostd build
 - update ci
 - update readme
@@ -11,3 +12,5 @@
 
 - cpu
 - video
+
+- https://github.com/rust-embedded/panic-semihosting/blob/master/src/lib.rs
