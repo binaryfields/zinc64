@@ -12,6 +12,7 @@ extern crate alloc;
 extern crate log;
 
 mod app;
+mod charset;
 mod logger;
 
 use core::alloc::Layout;
