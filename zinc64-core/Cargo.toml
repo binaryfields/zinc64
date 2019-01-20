@@ -7,7 +7,7 @@ description = "Commodore 64 emulator debugger support"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"
 readme = "README.md"
-keywords = ["c64", "commodore", "emulator"]
+keywords = ["c64", "commodore", "emulator", "no_std"]
 categories = ["emulators"]
 
 [features]

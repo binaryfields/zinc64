@@ -8,8 +8,6 @@ environment:
   matrix:
     - TARGET: x86_64-pc-windows-msvc
 
-## Lifecycle
-
 install:
   - ps: >-
       If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
@@ -29,7 +27,7 @@ install:
 
 test_script:
   - if [%APPVEYOR_REPO_TAG%]==[false] (
-      cargo test --target %TARGET% --all
+      cargo test --target %TARGET%
     )
 
 build: false
@@ -48,8 +46,6 @@ deploy:
     RUST_VERSION: stable
     appveyor_repo_tag: true
 
-## Extras
-
 cache:
   - C:\Users\appveyor\.cargo\registry
   - target
@@ -59,4 +55,3 @@ branches:
     # Release tags
     - /^\d+\.\d+\.\d+.*$/
     - master
-

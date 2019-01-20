@@ -12,9 +12,10 @@ categories = ["emulators"]
 publish = false
 
 [dependencies]
-cortex-a-semihosting = { git = "https://github.com/digitalstreamio/cortex-a-semihosting" }
+cortex-a = "2.3.1"
 linked_list_allocator = "0.6.3"
 log = { version = "0.3", default-features = false }
 raspi3_boot = { path = "../raspi3_boot" }
+register = "0.3.2"
 zinc64-core = { path = "../zinc64-core", default-features = false }
 zinc64-emu = { path = "../zinc64-emu", default-features = false }

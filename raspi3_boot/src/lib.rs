@@ -69,7 +69,9 @@ unsafe fn reset() -> ! {
 fn setup_and_enter_el1_from_el2() -> ! {
     use cortex_a::{asm, regs::*};
 
-    const STACK_START: u64 = 0x80_000;
+    extern "C" {
+        static mut __stack_core0: u64;
+    }
 
     // Enable timer counter registers for EL1
     CNTHCTL_EL2.write(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
@@ -98,7 +100,9 @@ fn setup_and_enter_el1_from_el2() -> ! {
 
     // Set up SP_EL1 (stack pointer), which will be used by EL1 once
     // we "return" to it.
-    SP_EL1.set(STACK_START);
+    unsafe {
+        SP_EL1.set(&__stack_core0 as *const _ as u64);
+    }
 
     // Use `eret` to "return" to EL1. This will result in execution of
     // `reset()` in EL1.

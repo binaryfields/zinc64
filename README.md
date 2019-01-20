@@ -3,6 +3,8 @@
 [![Build Status](https://travis-ci.org/digitalstreamio/zinc64.svg?branch=master)](https://travis-ci.org/digitalstreamio/zinc64)
 [![Crates.io](https://img.shields.io/crates/v/zinc64.svg?maxAge=2592000)](https://crates.io/crates/zinc64)
 
+** **NOTE: zinc64 crate has been renamed to zinc64-emu** **
+
 ## Overview
 
 zinc64 is a Commodore 64 emulator toolkit "with batteries included but
@@ -25,7 +27,19 @@ to assemble various accessories required to get software onto it. Soon enough I
 had picked up a copy of C64 Programmer's Reference Guide and the rest is now
 history.
 
+2019 is bringing support for bare-metal environments, more specifically a bare-metal
+Raspberry Pi 3 port. See zinc64-raspi for an early preview.
+
 ## Design
+
+### Feature `std`
+
+zinc64-emu crate works without the standard library, such as in bare-metal environments. To use zinc64-emu in a #[no_std] environment, use: 
+
+```toml
+[dependencies]
+zinc64-emu = { version = "0.8.0", default-features = false }
+```
 
 ### Extensibility
 
@@ -41,24 +55,57 @@ Here is an example how these components are used together:
         let mut c64 = C64::new(config.clone(), chip_factory).unwrap();
         c64.reset(true);
 
-Four core traits used to model system operation are Chip, Cpu, Mmu and Addressable.
-A Chip trait represents a system component that is driven by clock signal.
+The four core traits used to model system operation are Chip, Cpu, Mmu and Addressable.
 
-        pub trait Chip {
-            /// The core method of the chip, emulates one clock cycle of the chip.
-            fn clock(&mut self);
-            /// Process delta cycles at once.
-            fn clock_delta(&mut self, delta: u32);
-            /// Handle vsync event.
-            fn process_vsync(&mut self);
-            /// Handle reset signal.
-            fn reset(&mut self);
-            // I/O
-            /// Read value from the specified register.
-            fn read(&mut self, reg: u8) -> u8;
-            /// Write value to the specified register.
-            fn write(&mut self, reg: u8, value: u8);
-        }
+    /// A chip represents a system component that is driven by clock signal.
+    pub trait Chip {
+        /// The core method of the chip, emulates one clock cycle of the chip.
+        fn clock(&mut self);
+        /// Process delta cycles at once.
+        fn clock_delta(&mut self, delta: u32);
+        /// Handle vsync event.
+        fn process_vsync(&mut self);
+        /// Handle reset signal.
+        fn reset(&mut self);
+        // I/O
+        /// Read value from the specified register.
+        fn read(&mut self, reg: u8) -> u8;
+        /// Write value to the specified register.
+        fn write(&mut self, reg: u8, value: u8);
+    }
+
+    /// CPU is responsible for decoding and executing instructions.
+    pub trait Cpu {
+        ...
+        /// The core method of the cpu, decodes and executes one instruction. Tick callback is invoked
+        /// for each elapsed clock cycle.
+        fn step(&mut self, tick_fn: &TickFn);
+        // I/O
+        /// Read byte from the specified address.
+        fn read(&self, address: u16) -> u8;
+        /// Write byte to the specified address.
+        fn write(&mut self, address: u16, value: u8);
+    }
+
+    /// Represents memory management unit which controls visible memory banks
+    /// and is used by CPU to read from and write to memory locations.
+    pub trait Mmu {
+        /// Change bank configuration based on the specified mode.
+        fn switch_banks(&mut self, mode: u8);
+        // I/O
+        /// Read byte from the specified address.
+        fn read(&self, address: u16) -> u8;
+        /// Write byte to the specified address.
+        fn write(&mut self, address: u16, value: u8);
+    }
+
+    /// Addressable represents a bank of memory.
+    pub trait Addressable {
+        /// Read byte from the specified address.
+        fn read(&self, address: u16) -> u8;
+        /// Write byte to the specified address.
+        fn write(&mut self, address: u16, value: u8);
+    }
 
 Since all system components with the exception of Cpu and Mmu implement Chip trait,
 interactions between chips and other components are limited to and handled through
@@ -79,6 +126,7 @@ of chips to be decoupled from each other.
 | Device   | Datassette    | Done
 | Device   | Keyboard      | Done
 | Device   | Joystick      | Done
+| Device   | Mouse         | Not Started
 | Debugger | Remote        | Done
 | Debugger | Radare2       | Done
 | Format   | Bin           | Done
@@ -88,11 +136,14 @@ of chips to be decoupled from each other.
 | Format   | Prg           | Done
 | Format   | Tap           | Done
 | Format   | T64           | Not Started
+| Client   | SDL           | In Progress
+| Client   | Raspi3        | In Progress
 
 ## Roadmap
 
-- v0.7  - zinc64 ui
-- v0.8  - floppy support
+- v0.8 - nostd support
+- v0.9  - zinc64 ui
+- v0.10  - floppy support
 
 ## Getting Started
 
@@ -115,11 +166,11 @@ of chips to be decoupled from each other.
 
 4. Run the emulator.
 
-        ./target/release/zinc64-sdl
+        ./target/release/zinc64
 
     or start a program
 
-    	./target/release/zinc64-sdl --autostart path
+    	./target/release/zinc64 --autostart path
 
 ### Windows Considerations
 
@@ -146,7 +197,7 @@ of chips to be decoupled from each other.
 To start the debugger, run the emulator with '-d' or '--debug' option. Optionally, you can specify '--debugaddress'
 to bind to a specific address.
 
-        ./target/release/zinc64-sdl --debug
+        ./target/release/zinc64 --debug
 
 To connect to the debugger, telnet to the address and port used by the debugger.
 
@@ -165,7 +216,7 @@ or to get help on a specific command:
 
 Initial support for radare2 has been merged in version 0.3. To start the emulator with RAP server support, run
 
-        ./target/release/zinc64-sdl --rap 127.0.0.1:9999
+        ./target/release/zinc64 --rap 127.0.0.1:9999
 
 and connect with
 
@@ -175,7 +226,7 @@ and connect with
 
 I've included a number of examples from Kick Assembler that I've used to test various components of the emulator. They can be found in the bin folder of this repository and started with the emulator's autostart option.
 
-        ./target/release/zinc64-sdl --autostart bin/SineAndGraphics.prg
+        ./target/release/zinc64 --autostart bin/SineAndGraphics.prg
 
 | Program                  | Status  |
 |--------------------------|---------|
@@ -193,7 +244,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 
 The cpu validation was performed with the help of [Klaus2m5 functional tests](https://github.com/Klaus2m5/6502_65C02_functional_tests) for the 6502 processor 
 
-        ./target/release/zinc64-sdl --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
+        ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
 
 ## Keyboard Shortcuts
 

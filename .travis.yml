@@ -5,11 +5,10 @@ rust: stable
 sudo: required
 dist: trusty
 services: docker
+
 env:
   global:
     - CRATE_NAME=zinc64
-
-## Jobs
 
 matrix:
   include:
@@ -19,7 +18,9 @@ matrix:
     # - env: TARGET=x86_64-apple-darwin
     #   os: osx
 
-## Lifecycle
+before_install:
+  - set -e
+  - rustup self update
 
 install:
   - source ~/.cargo/env || true
@@ -27,10 +28,7 @@ install:
   # docker build -t dsio/$CRATE_NAME-$TARGET:latest ci/docker/$TARGET
 
 script:
-  - cross test --target $TARGET --all
-
-before_cache:
-  - chmod -R a+r $HOME/.cargo
+  - cross test --target $TARGET
 
 before_deploy:
   - test -f Cargo.lock || cargo generate-lockfile
@@ -48,7 +46,8 @@ deploy:
     condition: $TRAVIS_RUST_VERSION = stable
     tags: true
 
-## Extras
+before_cache:
+  - chmod -R a+r $HOME/.cargo
 
 cache: cargo
 
@@ -57,3 +56,7 @@ branches:
     # release tags
     - /^\d+\.\d+\.\d+.*$/
     - master
+
+notifications:
+  email:
+    on_success: never
