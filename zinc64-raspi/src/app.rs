@@ -13,6 +13,7 @@ use zinc64_emu::system::{C64, C64Factory, Config};
 use crate::geo::Rect;
 use crate::hal::frame_buffer::FrameBuffer;
 use crate::hal::mbox::Mbox;
+use crate::loader::PrgLoader;
 use crate::null_output::NullSound;
 use crate::palette::Palette;
 use crate::video_buffer::VideoBuffer;
@@ -20,27 +21,24 @@ use crate::video_buffer::VideoBuffer;
 static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
 static RES_CHARSET_ROM: &[u8] = include_bytes!("../../res/rom/characters.rom");
 static RES_KERNAL_ROM: &[u8] = include_bytes!("../../res/rom/kernal.rom");
+static RES_APP_IMAGE: &[u8] = include_bytes!("../../bin/SineAndGraphics.prg");
 
 const FB_SIZE: (u32, u32) = (640, 480);
 const FB_BPP: u32 = 32;
 
 pub struct App {
     c64: C64,
-    frame_buffer: FrameBuffer,
     #[allow(unused)]
     mbox: Mbox,
     video_buffer: Shared<VideoBuffer>,
     viewport_rect: Rect,
+    // Runtime State
+    frame_buffer: FrameBuffer,
+    next_keyboard_event: u64,
 }
 
 impl App {
     pub fn build(mut mbox: Mbox) -> Result<App, &'static str> {
-        let frame_buffer = FrameBuffer::build_with_size(
-            &mut mbox,
-            FB_SIZE,
-            FB_BPP,
-        )?;
-        info!("Allocated frame buffer at 0x{:08x}", frame_buffer.as_ptr() as usize);
         let config = Rc::new(Config::new_with_roms(
             SystemModel::from("pal"),
             RES_BASIC_ROM,
@@ -64,16 +62,28 @@ impl App {
             config.model.viewport_offset,
             config.model.viewport_size,
         );
+        let frame_buffer = FrameBuffer::build(
+            &mut mbox,
+            FB_SIZE,
+            (config.model.viewport_size.0, config.model.viewport_size.1),
+            (0, 0),
+            FB_BPP,
+        )?;
+        info!("Allocated frame buffer at 0x{:08x}", frame_buffer.as_ptr() as usize);
         Ok(App {
             c64,
-            frame_buffer,
             mbox,
             video_buffer,
             viewport_rect,
+            frame_buffer,
+            next_keyboard_event: 0,
         })
     }
 
     pub fn run(&mut self) -> Result<(), &'static str> {
+        let mut autostart = PrgLoader::new().autostart(RES_APP_IMAGE)?;
+        autostart.execute(&mut self.c64);
+        info!("Running main loop");
         loop {
             self.c64.run_frame();
             if self.c64.is_cpu_jam() {
@@ -91,7 +101,18 @@ impl App {
                 self.video_buffer.borrow().get_pitch() as u32,
             );
             self.c64.reset_vsync();
+            self.handle_events();
         }
         Ok(())
+    }
+
+    fn handle_events(&mut self) {
+        let keyboard = self.c64.get_keyboard();
+        if keyboard.borrow().has_events()
+            && self.c64.get_cycles() >= self.next_keyboard_event
+        {
+            keyboard.borrow_mut().drain_event();
+            self.next_keyboard_event = self.c64.get_cycles().wrapping_add(20000);
+        }
     }
 }

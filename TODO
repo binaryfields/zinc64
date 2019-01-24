@@ -1,7 +1,6 @@
 # TODO
 
 - raspi: add exception handling
-- raspi/fb: scaling
 
 - device: add mouse support
 - device: add floppy support
@@ -18,3 +17,4 @@
 - https://github.com/rust-embedded/rust-raspi3-tutorial/tree/master/0C_virtual_memory
 - https://github.com/OllieLollie1/Raspi3-Kernel/tree/master/src
 - https://github.com/dwelch67/raspberrypi/tree/master/mmu
+- https://wiki.osdev.org/ARM_RaspberryPi

@@ -2,7 +2,6 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-// SPEC: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 // SPEC: https://github.com/raspberrypi/linux/blob/rpi-3.12.y/drivers/video/bcm2708_fb.c
 
 use core::ptr;
@@ -15,13 +14,13 @@ use super::mbox;
 
 #[allow(unused)]
 pub struct FrameBuffer {
-    base: usize,
     width: u32,
     height: u32,
     virtual_width: u32,
     virtual_height: u32,
     depth: u32,
     pitch: u32,
+    base: usize,
 }
 
 impl FrameBuffer {
@@ -94,12 +93,6 @@ impl FrameBuffer {
         }
     }
 
-    pub fn build_with_size(mbox: &mut mbox::Mbox,
-                           physical_size: (u32, u32),
-                           depth: u32) -> Result<FrameBuffer, &'static str> {
-        FrameBuffer::build(mbox, physical_size, physical_size, (0, 0), depth)
-    }
-
     pub fn as_ptr(&self) -> *mut u32 {
         self.base as *mut u32
     }
@@ -143,7 +136,6 @@ impl FrameBuffer {
         }
     }
 
-    #[allow(unused)]
     pub fn wait_for_vsync(&self, mbox: &mut mbox::Mbox) -> Result<(), &'static str> {
         let mut data = [0];
         mbox.property(mbox::Tag::SetVsync, &mut data)

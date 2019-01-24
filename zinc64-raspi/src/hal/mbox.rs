@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+// SPEC: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+
 use core::mem;
 use core::ops::Deref;
 use core::ptr;
@@ -74,20 +76,20 @@ pub struct Registers {
 #[repr(align(16))]
 pub struct Mbox {
     pub buffer: [u32; 36],
-    base: u64,
+    buffer_ptr: u64,
 }
 
 impl Mbox {
-    pub fn new() -> Self {
+    pub fn new(buffer_ptr: u64) -> Self {
         Mbox {
             buffer: [0; 36],
-            base: 878 * 1024 * 1024,
+            buffer_ptr,
         }
     }
 
     pub fn call(&mut self, channel: Channel) -> Result<(), &'static str> {
         self.upload_buffer();
-        let buf_ptr = self.base as u32;
+        let buf_ptr = self.buffer_ptr as u32;
         assert_eq!(buf_ptr & 0x0f, 0);
         let message = buf_ptr | channel as u32;
         while self.status.is_set(Status::FULL) {
@@ -99,8 +101,8 @@ impl Mbox {
                 asm::nop();
             }
             if self.read.get() == message {
-                compiler_fence(Ordering::Release);
                 self.download_buffer();
+                compiler_fence(Ordering::Release);
                 return match Code::from(self.buffer[1]) {
                     Code::ResponseSuccess => Ok(()),
                     Code::ResponseFailure => Err("mbox request failed"),
@@ -113,7 +115,7 @@ impl Mbox {
     pub fn call2(&mut self, channel: Channel) -> Result<(), &'static str> {
         info!("uploading buffer");
         self.upload_buffer();
-        let buf_ptr = self.base as u32;
+        let buf_ptr = self.buffer_ptr as u32;
         assert_eq!(buf_ptr & 0x0f, 0);
         let message = buf_ptr | channel as u32;
         info!("waiting until mbox becomes empty");
@@ -129,9 +131,9 @@ impl Mbox {
             }
             info!("reading mbox message");
             if self.read.get() == message {
-                compiler_fence(Ordering::Release);
                 info!("downloading buffer");
                 self.download_buffer();
+                compiler_fence(Ordering::Release);
                 info!("checking response 0x{:08x}", self.buffer[1]);
                 return match Code::from(self.buffer[1]) {
                     Code::ResponseSuccess => Ok(()),
@@ -163,7 +165,7 @@ impl Mbox {
     }
 
     fn base_ptr(&self) -> *mut u32 {
-        self.base as *mut u32
+        self.buffer_ptr as *mut u32
     }
 
     fn download_buffer(&mut self) {

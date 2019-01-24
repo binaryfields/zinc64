@@ -12,11 +12,16 @@ all: clean kernel
 $(BUILD_DIR)/zinc64-raspi: $(SOURCES)
 	cargo xbuild -p zinc64-raspi --target=$(TARGET) --release 
 
-kernel: $(BUILD_DIR)/zinc64-raspi
+$(BUILD_DIR)/kernel8.img: $(BUILD_DIR)/zinc64-raspi
 	$(OBJCOPY) --strip-all -O binary $< $(BUILD_DIR)/kernel8.img
+
+kernel: $(BUILD_DIR)/kernel8.img
 
 run: kernel
 	qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(BUILD_DIR)/kernel8.img
+
+sd: $(BUILD_DIR)/kernel8.img
+	cp $< /run/media/raytracer/rpi/
 
 clean:
 	cargo clean

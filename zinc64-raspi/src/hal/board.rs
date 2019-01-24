@@ -33,5 +33,10 @@ pub fn get_serial(mbox: &mut mbox::Mbox) -> Result<u64, &'static str> {
 pub fn set_clock_speed(mbox: &mut mbox::Mbox, clock: Clock, hz: u32) -> Result<(), &'static str> {
     let mut data = [clock as u32, hz, 0];
     mbox.property(mbox::Tag::SetClockRate, &mut data)
-        .map_err(|_| "failed to set clock speed")
+        .map_err(|_| "failed to set clock speed")?;
+    if data[0] == clock as u32 && data[1] == hz {
+        Ok(())
+    } else {
+        Err("failed to set clock speed")
+    }
 }

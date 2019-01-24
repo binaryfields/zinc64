@@ -12,6 +12,7 @@ categories = ["emulators"]
 publish = false
 
 [dependencies]
+byteorder = { version = "1.2", default-features = false }
 cortex-a = "2.3.1"
 linked_list_allocator = "0.6.3"
 log = { version = "0.3", default-features = false }

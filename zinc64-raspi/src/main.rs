@@ -16,6 +16,7 @@ mod app;
 mod debug;
 mod geo;
 mod hal;
+mod loader;
 mod logger;
 mod null_output;
 mod palette;
@@ -34,7 +35,7 @@ fn start() -> ! {
         static mut __heap_start: u64;
         static mut __heap_end: u64;
     }
-    let mut mbox = hal::mbox::Mbox::new();
+    let mut mbox = hal::mbox::Mbox::new(878 * 1024 * 1024);
     let gpio = hal::gpio::GPIO::new();
     let uart = hal::uart::Uart::new();
     match uart.init(&mut mbox, &gpio) {
@@ -49,7 +50,7 @@ fn start() -> ! {
         hal::mmu::init();
     }
     uart.puts("[0] Running POST ...\n");
-    post(&mut mbox, &uart);
+    run_post(&mut mbox, &uart);
     uart.puts("[0] Initializing heap ...\n");
     unsafe {
         ALLOCATOR.lock().init(
@@ -83,7 +84,7 @@ fn main(mut mbox: hal::mbox::Mbox) -> Result<(), &'static str> {
     app.run()
 }
 
-fn post(mbox: &mut hal::mbox::Mbox, uart: &hal::uart::Uart) {
+fn run_post(mbox: &mut hal::mbox::Mbox, uart: &hal::uart::Uart) {
     uart.puts("[0] Getting board serial ...\n");
     match hal::board::get_serial(mbox)  {
         Ok(serial) => {
