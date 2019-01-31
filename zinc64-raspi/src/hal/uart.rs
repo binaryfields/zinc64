@@ -140,7 +140,7 @@ pub struct Uart;
 
 #[allow(unused)]
 impl Uart {
-    pub fn new() -> Uart {
+    pub const fn new() -> Uart {
         Uart
     }
 

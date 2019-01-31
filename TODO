@@ -1,6 +1,8 @@
 # TODO
 
-- raspi: add exception handling
+- move to device setup
+- add memory map
+- add console
 
 - device: add mouse support
 - device: add floppy support

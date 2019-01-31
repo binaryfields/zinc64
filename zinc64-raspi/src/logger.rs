@@ -9,11 +9,11 @@ use log::{LogLevelFilter, SetLoggerError, ShutdownLoggerError, LogMetadata};
 use crate::hal::uart::Uart;
 
 pub struct SimpleLogger {
-    uart: Uart,
+    uart: &'static Uart,
 }
 
 impl SimpleLogger {
-    pub fn new(uart: Uart) -> Self {
+    pub fn new(uart: &'static Uart) -> Self {
         SimpleLogger {
             uart
         }
