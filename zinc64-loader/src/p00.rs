@@ -2,17 +2,14 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, Error, ErrorKind, Read};
-use std::path::Path;
-use std::result::Result;
-use std::str;
-
-use byteorder::{LittleEndian, ReadBytesExt};
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+use byteorder::LittleEndian;
+use core::str;
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Autostart, AutostartMethod, Image, C64};
 
+use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
 
 static HEADER_SIG: &'static str = "C64File";
@@ -43,14 +40,14 @@ impl Image for P00Image {
     fn unmount(&mut self, _c64: &mut C64) {}
 }
 
-pub struct P00Loader {}
+pub struct P00Loader;
 
 impl P00Loader {
-    pub fn new() -> Self {
+    pub fn new() -> impl Loader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
         let mut signature = [0u8; 7];
         let mut filename = [0u8; 16];
         let header = Header {
@@ -71,29 +68,27 @@ impl P00Loader {
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
         let sig = str::from_utf8(&header.signature)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid P00 signature"))?;
+            .map_err(|_| "invalid P00 signature".to_owned())?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::InvalidData, "invalid P00 signature"))
+            Err("invalid P00 signature".to_owned())
         }
     }
 }
 
 impl Loader for P00Loader {
-    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error> {
-        let image = self.load(path)?;
+    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<AutostartMethod> {
+        let image = self.load(reader)?;
         let autostart = Autostart::new(autostart::Mode::Run, image);
         Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
-        info!(target: "loader", "Loading P00 {}", path.to_str().unwrap());
-        let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
+    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+        info!(target: "loader", "Loading P00");
         let header = self
-            .read_header(&mut reader)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid P00 header"))?;
+            .read_header(reader)
+            .map_err(|_| "invalid P00 header".to_owned())?;
         self.validate_header(&header)?;
         let offset = reader.read_u16::<LittleEndian>()?;
         let mut data = Vec::new();

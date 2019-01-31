@@ -4,18 +4,17 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, Error, ErrorKind, Read};
-use std::path::Path;
-use std::result::Result;
-use std::str;
-
-use byteorder::{LittleEndian, ReadBytesExt};
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::vec;
+use byteorder::LittleEndian;
+use core::str;
 use zinc64_emu::device::Tape;
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Autostart, AutostartMethod, Image, C64};
 
+use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
@@ -45,14 +44,14 @@ impl Image for TapImage {
     }
 }
 
-pub struct TapLoader {}
+pub struct TapLoader;
 
 impl TapLoader {
-    pub fn new() -> Self {
+    pub fn new() -> impl Loader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
         let mut signature = [0u8; 12];
         let mut reserved = [0u8; 3];
         let header = Header {
@@ -72,36 +71,31 @@ impl TapLoader {
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
         let sig = str::from_utf8(&header.signature)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge signature"))?;
+            .map_err(|_| "invalid cartridge signature".to_owned())?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorKind::InvalidData,
-                "invalid cartridge signature",
-            ))
+            Err("invalid cartridge signature".to_owned())
         }
     }
 }
 
 impl Loader for TapLoader {
-    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error> {
-        let image = self.load(path)?;
+    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<AutostartMethod> {
+        let image = self.load(reader)?;
         let autostart = Autostart::new(autostart::Mode::Run, image);
         Ok(AutostartMethod::WithAutostart(Some(autostart)))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
-        info!(target: "loader", "Loading TAP {}", path.to_str().unwrap());
-        let file = File::open(path)?;
-        let mut rdr = BufReader::new(file);
+    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+        info!(target: "loader", "Loading TAP");
         let header = self
-            .read_header(&mut rdr)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid tape header"))?;
+            .read_header(reader)
+            .map_err(|_| "invalid tape header".to_owned())?;
         info!(target: "loader", "Found tape, version {}, size {}", header.version, header.size);
         self.validate_header(&header)?;
         let mut data = vec![0; header.size as usize];
-        rdr.read_exact(&mut data)?;
+        reader.read_exact(&mut data)?;
         let tape = TapTape {
             version: header.version,
             data,

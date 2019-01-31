@@ -4,6 +4,8 @@
 
 mod circular_buffer;
 mod logger;
+mod reader;
 
 pub use self::circular_buffer::CircularBuffer;
 pub use self::logger::Logger;
+pub use self::reader::FileReader;

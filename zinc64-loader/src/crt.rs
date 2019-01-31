@@ -4,18 +4,17 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::fs::File;
-use std::io;
-use std::io::{BufRead, BufReader, Error, ErrorKind, Read};
-use std::path::Path;
-use std::result::Result;
-use std::str;
-
-use byteorder::{BigEndian, ReadBytesExt};
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::vec;
+use byteorder::BigEndian;
+use core::str;
 use zinc64_emu::device::{Cartridge, Chip, ChipType, HwType};
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Image, C64};
 
+use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
@@ -58,10 +57,10 @@ impl Image for CrtImage {
     }
 }
 
-pub struct CrtLoader {}
+pub struct CrtLoader;
 
 impl CrtLoader {
-    pub fn new() -> Self {
+    pub fn new() -> impl Loader {
         Self {}
     }
 
@@ -87,7 +86,7 @@ impl CrtLoader {
         }
     }
 
-    fn read_chip_header(&self, rdr: &mut dyn Read) -> io::Result<Option<ChipHeader>> {
+    fn read_chip_header(&self, rdr: &mut dyn Reader) -> io::Result<Option<ChipHeader>> {
         let mut signature = [0u8; 4];
         match rdr.read(&mut signature)? {
             0 => Ok(None),
@@ -102,20 +101,17 @@ impl CrtLoader {
                 };
                 Ok(Some(header))
             }
-            size => Err(Error::new(
-                ErrorKind::UnexpectedEof,
-                format!("chip header error, expected {} got {}", 4, size),
-            )),
+            size => Err(format!("chip header error, expected {} got {}", 4, size)),
         }
     }
 
-    fn read_data(&self, rdr: &mut dyn Read, length: usize) -> io::Result<Vec<u8>> {
+    fn read_data(&self, rdr: &mut dyn Reader, length: usize) -> io::Result<Vec<u8>> {
         let mut data = vec![0; length];
         rdr.read_exact(&mut data)?;
         Ok(data)
     }
 
-    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
         let mut signature = [0u8; 16];
         let mut reserved = [0u8; 6];
         let mut name = [0u8; 32];
@@ -143,66 +139,56 @@ impl CrtLoader {
 
     fn validate_chip_header(&self, header: &ChipHeader) -> io::Result<()> {
         let sig = str::from_utf8(&header.signature)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid chip signature"))?;
+            .map_err(|_| "invalid chip signature".to_owned())?;
         if sig == CHIP_SIG {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::InvalidData, "invalid chip signature"))
+            Err("invalid chip signature".to_owned())
         }
     }
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
         let sig = str::from_utf8(&header.signature)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge signature"))?;
+            .map_err(|_| "invalid cartridge signature".to_owned())?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorKind::InvalidData,
-                "invalid cartridge signature",
-            ))
+            Err("invalid cartridge signature".to_owned())
         }
     }
 }
 
 impl Loader for CrtLoader {
-    fn autostart(&self, path: &Path) -> Result<autostart::AutostartMethod, io::Error> {
-        let image = self.load(path)?;
+    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<autostart::AutostartMethod> {
+        let image = self.load(reader)?;
         Ok(autostart::AutostartMethod::WithImage(image))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
-        info!(target: "loader", "Loading CRT {}", path.to_str().unwrap());
-        let file = File::open(path)?;
-        let mut rdr = BufReader::new(file);
+    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+        info!(target: "loader", "Loading CRT");
         let header = self
-            .read_header(&mut rdr)
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge header"))?;
+            .read_header(reader)
+            .map_err(|_| "invalid cartridge header".to_owned())?;
         info!(target: "loader", "Found cartridge {}, version {}.{}, type {}",
               str::from_utf8(&header.name).unwrap_or(""),
               header.version >> 8,
               header.version & 0xff,
               header.hw_type);
         self.validate_header(&header)?;
-        rdr.consume((header.header_length - 0x40) as usize);
+        reader.consume((header.header_length - 0x40) as usize);
         let mut cartridge = self.build_cartridge(&header);
         loop {
             let chip_header_opt = self
-                .read_chip_header(&mut rdr)
-                .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid cartridge chip header"))?;
+                .read_chip_header(reader)
+                .map_err(|_| "invalid cartridge chip header".to_owned())?;
             match chip_header_opt {
                 Some(chip_header) => {
                     info!(target: "loader", "Found chip {}, offset 0x{:x}, size {}",
                           chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
                     self.validate_chip_header(&chip_header)?;
                     let chip_data = self
-                        .read_data(&mut rdr, (chip_header.length - 0x10) as usize)
-                        .map_err(|_| {
-                            Error::new(
-                                ErrorKind::InvalidData,
-                                format!("invalid cartridge chip {} data", chip_header.bank_number),
-                            )
-                        })?;
+                        .read_data(reader, (chip_header.length - 0x10) as usize)
+                        .map_err(|_| format!("invalid cartridge chip {} data", chip_header.bank_number))?;
                     let chip = self.build_chip(&chip_header, chip_data);
                     cartridge.add(chip);
                 }

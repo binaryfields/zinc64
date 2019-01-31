@@ -8,12 +8,14 @@ use alloc::sync::Arc;
 use core::result::Result;
 use zinc64_core::{new_shared, Shared, SystemModel};
 use zinc64_emu::system::{C64, C64Factory, Config};
+use zinc64_loader::{LoaderKind, Loaders};
+use zorio::cursor::Cursor;
 
 // use crate::debug;
 use crate::geo::Rect;
 use crate::hal::frame_buffer::FrameBuffer;
 use crate::hal::mbox::Mbox;
-use crate::loader::PrgLoader;
+use crate::reader::ImageReader;
 use crate::null_output::NullSound;
 use crate::palette::Palette;
 use crate::video_buffer::VideoBuffer;
@@ -81,7 +83,10 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<(), &'static str> {
-        let mut autostart = PrgLoader::new().autostart(RES_APP_IMAGE)?;
+        let mut image = ImageReader(Cursor::new(RES_APP_IMAGE));
+        let loader = Loaders::from(LoaderKind::Prg);
+        let mut autostart = loader.autostart(&mut image)
+            .map_err(|_| "failed to load image")?;
         autostart.execute(&mut self.c64);
         info!("Running main loop");
         loop {

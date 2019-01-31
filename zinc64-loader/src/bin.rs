@@ -2,14 +2,11 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, Read};
-use std::path::Path;
-use std::result::Result;
-
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
 use zinc64_emu::system::{AutostartMethod, Image, C64};
 
+use crate::io::{self, Reader};
 use super::Loader;
 
 struct BinImage {
@@ -39,15 +36,13 @@ impl BinLoader {
 }
 
 impl Loader for BinLoader {
-    fn autostart(&self, path: &Path) -> Result<AutostartMethod, io::Error> {
-        let image = self.load(path)?;
+    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<AutostartMethod> {
+        let image = self.load(reader)?;
         Ok(AutostartMethod::WithBinImage(image))
     }
 
-    fn load(&self, path: &Path) -> Result<Box<dyn Image>, io::Error> {
-        info!(target: "loader", "Loading BIN {}", path.to_str().unwrap());
-        let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
+    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+        info!(target: "loader", "Loading BIN");
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         Ok(Box::new(BinImage {

@@ -2,20 +2,21 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::fs;
+use std::fs::{self, File};
 use std::io;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::result::Result;
 
 use getopts;
+use zinc64_core::SystemModel;
 use zinc64_emu::device;
 use zinc64_emu::system::{Config, C64};
-use zinc64_core::SystemModel;
-use zinc64_loader::{BinLoader, Loader, Loaders};
+use zinc64_loader::{BinLoader, Loader, LoaderKind, Loaders};
 
 use super::{JamAction, Options};
+use crate::util::FileReader;
 
 static NAME: &'static str = "zinc64";
 static VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -205,8 +206,12 @@ impl Cli {
         match matches.opt_str("autostart") {
             Some(image_path) => {
                 let path = Path::new(&image_path);
-                let loader = Loaders::from_path(path);
-                let mut autostart = loader.autostart(path).map_err(|err| format!("{}", err))?;
+                let ext = path.extension().map(|s| s.to_str().unwrap_or(""));
+                let file = File::open(path).map_err(|err| format!("{}", err))?;
+                let mut reader = FileReader(BufReader::new(file));
+                let loader_kind = LoaderKind::from_ext(ext);
+                let loader = Loaders::from(loader_kind.unwrap()); // FIXME unwrap
+                let mut autostart = loader.autostart(&mut reader)?;
                 autostart.execute(c64);
             }
             None => {
@@ -216,8 +221,10 @@ impl Cli {
                         .map(|s| s.parse::<u16>().unwrap())
                         .unwrap_or(0);
                     let path = Path::new(&binary_path);
+                    let file = File::open(path).map_err(|err| format!("{}", err))?;
+                    let mut reader = FileReader(BufReader::new(file));
                     let loader = BinLoader::new(offset);
-                    let mut image = loader.load(path).map_err(|err| format!("{}", err))?;
+                    let mut image = loader.load(&mut reader)?;
                     image.mount(c64);
                 }
             }

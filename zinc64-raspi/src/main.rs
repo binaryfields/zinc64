@@ -16,7 +16,7 @@ mod app;
 mod debug;
 mod geo;
 mod hal;
-mod loader;
+mod reader;
 mod logger;
 mod null_output;
 mod palette;
