@@ -28,10 +28,11 @@ static RES_APP_IMAGE: &[u8] = include_bytes!("../../bin/SineAndGraphics.prg");
 const FB_SIZE: (u32, u32) = (640, 480);
 const FB_BPP: u32 = 32;
 
-pub struct App {
+pub struct App<'a> {
+    // Dependencies
+    mbox: &'a mut Mbox<'a>,
+    // Components
     c64: C64,
-    #[allow(unused)]
-    mbox: Mbox,
     video_buffer: Shared<VideoBuffer>,
     viewport_rect: Rect,
     // Runtime State
@@ -39,8 +40,8 @@ pub struct App {
     next_keyboard_event: u64,
 }
 
-impl App {
-    pub fn build(mut mbox: Mbox) -> Result<App, &'static str> {
+impl<'a> App<'a> {
+    pub fn build(mbox: &'a mut Mbox<'a>) -> Result<App<'a>, &'static str> {
         let config = Rc::new(Config::new_with_roms(
             SystemModel::from("pal"),
             RES_BASIC_ROM,
@@ -65,7 +66,7 @@ impl App {
             config.model.viewport_size,
         );
         let frame_buffer = FrameBuffer::build(
-            &mut mbox,
+            mbox,
             FB_SIZE,
             (config.model.viewport_size.0, config.model.viewport_size.1),
             (0, 0),
@@ -73,8 +74,8 @@ impl App {
         )?;
         info!("Allocated frame buffer at 0x{:08x}", frame_buffer.as_ptr() as usize);
         Ok(App {
-            c64,
             mbox,
+            c64,
             video_buffer,
             viewport_rect,
             frame_buffer,

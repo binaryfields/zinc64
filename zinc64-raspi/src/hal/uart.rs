@@ -29,9 +29,6 @@ use register::{mmio::*, register_bitfields};
 
 use super::gpio;
 use super::mbox;
-use super::MMIO_BASE;
-
-pub const UART_PHYS_BASE: u32 = MMIO_BASE + 0x0020_1000;
 
 // PL011 UART registers.
 //
@@ -93,7 +90,6 @@ register_bitfields! {
             Disabled = 0,
             Enabled = 1
         ],
-
         /// Transmit enable. If this bit is set to 1, the transmit
         /// section of the UART is enabled. Data transmission occurs
         /// for UART signals. When the UART is disabled in the middle
@@ -103,7 +99,6 @@ register_bitfields! {
             Disabled = 0,
             Enabled = 1
         ],
-
         /// UART enable
         UARTEN OFFSET(0) NUMBITS(1) [
             /// If the UART is disabled in the middle of transmission
@@ -136,17 +131,21 @@ pub struct RegisterBlock {
     ICR: WriteOnly<u32, ICR::Register>,   // 0x44
 }
 
-pub struct Uart;
+pub struct Uart {
+    base_addr: usize,
+}
 
 #[allow(unused)]
 impl Uart {
-    pub const fn new() -> Uart {
-        Uart
+    pub const fn new(base_addr: usize) -> Self {
+        Uart {
+            base_addr
+        }
     }
 
     /// Returns a pointer to the register block
     fn ptr(&self) -> *const RegisterBlock {
-        UART_PHYS_BASE as *const _
+        self.base_addr as *const _
     }
 
     ///Set baud rate and characteristics (115200 8N1) and map to GPIO
@@ -183,21 +182,6 @@ impl Uart {
         Ok(())
     }
 
-    /// Send a character
-    pub fn send(&self, c: char) {
-        // wait until we can send
-        loop {
-            if !self.FR.is_set(FR::TXFF) {
-                break;
-            }
-
-            asm::nop();
-        }
-
-        // write the character to the buffer
-        self.DR.set(c as u32);
-    }
-
     /// Receive a character
     pub fn getc(&self) -> char {
         // wait until something is in the buffer
@@ -232,47 +216,22 @@ impl Uart {
         }
     }
 
-    /// Display a binary value in hexadecimal
-    pub fn hex(&self, d: u64) {
-        let mut n;
-
-        for i in 0..16 {
-            // get highest tetrad
-            n = d.wrapping_shr(60 - i * 4) & 0xF;
-
-            // 0-9 => '0'-'9', 10-15 => 'A'-'F'
-            // Add proper offset for ASCII table
-            if n > 9 {
-                n += 0x37;
-            } else {
-                n += 0x30;
-            }
-
-            self.send(n as u8 as char);
-        }
-    }
-
-    /// Display a binary value in decimal
-    pub fn dec(&self, d: u32) {
-        let mut digits: [char; 10] = ['\0'; 10];
-        let mut d = d;
-
-        for i in digits.iter_mut() {
-            *i = ((d % 10) + 0x30) as u8 as char;
-
-            d /= 10;
-
-            if d == 0 {
+    /// Send a character
+    pub fn send(&self, c: char) {
+        // wait until we can send
+        loop {
+            if !self.FR.is_set(FR::TXFF) {
                 break;
             }
+
+            asm::nop();
         }
 
-        for c in digits.iter().rev() {
-            self.send(*c);
-        }
+        // write the character to the buffer
+        self.DR.set(c as u32);
     }
 
-    pub fn wait_cycles(&self, cyc: u32) {
+    fn wait_cycles(&self, cyc: u32) {
         for _ in 0..cyc {
             asm::nop();
         }

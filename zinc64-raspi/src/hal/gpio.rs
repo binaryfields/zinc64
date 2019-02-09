@@ -25,16 +25,11 @@
 use core::ops::Deref;
 use register::{mmio::ReadWrite, register_bitfields};
 
-use super::MMIO_BASE;
-
 // Descriptions taken from
 // https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf
 
-const GPIO_BASE: u32 = MMIO_BASE + 0x0020_0000;
-
 register_bitfields! {
     u32,
-
     /// GPIO Function Select 1
     GPFSEL1 [
         /// Pin 15
@@ -45,7 +40,6 @@ register_bitfields! {
             RXD1 = 0b010  // Mini UART - Alternate function 5
 
         ],
-
         /// Pin 14
         FSEL14 OFFSET(12) NUMBITS(3) [
             Input = 0b000,
@@ -54,7 +48,6 @@ register_bitfields! {
             TXD1 = 0b010  // Mini UART - Alternate function 5
         ]
     ],
-
     /// GPIO Pull-up/down Clock Register 0
     GPPUDCLK0 [
         /// Pin 15
@@ -62,7 +55,6 @@ register_bitfields! {
             NoEffect = 0,
             AssertClock = 1
         ],
-
         /// Pin 14
         PUDCLK14 OFFSET(14) NUMBITS(1) [
             NoEffect = 0,
@@ -100,15 +92,19 @@ pub struct RegisterBlock {
     pub GPPUDCLK1: ReadWrite<u32>,                      // 0x9C
 }
 
-pub struct GPIO;
+pub struct GPIO {
+    base_addr: usize
+}
 
 impl GPIO {
-    pub fn new() -> GPIO {
-        GPIO
+    pub fn new(base_addr: usize) -> Self {
+        GPIO {
+            base_addr
+        }
     }
 
-    fn ptr() -> *const RegisterBlock {
-        GPIO_BASE as *const _
+    fn ptr(&self) -> *const RegisterBlock {
+        self.base_addr as *const _
     }
 }
 
@@ -116,6 +112,6 @@ impl Deref for GPIO {
     type Target = RegisterBlock;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*Self::ptr() }
+        unsafe { &*self.ptr() }
     }
 }

@@ -22,6 +22,7 @@ pub fn get_max_clock_rate(mbox: &mut mbox::Mbox, clock: Clock) -> Result<u32, &'
     }
 }
 
+#[allow(unused)]
 pub fn get_serial(mbox: &mut mbox::Mbox) -> Result<u64, &'static str> {
     let mut data = [0, 0];
     mbox.property(mbox::Tag::GetBoardSerial, &mut data)

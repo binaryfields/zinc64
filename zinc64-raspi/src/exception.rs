@@ -4,9 +4,10 @@
 
 // SPEC: AArch64 Reference Manual: D12.2.36 ESR_EL1, Exception Syndrome Register (EL1), p. 2770
 
-use super::UART;
 use cortex_a::asm;
 use register::{mmio::ReadOnly, register_bitfields};
+
+use crate::print;
 
 global_asm!(include_str!("vectors.S"));
 
@@ -42,7 +43,7 @@ pub struct ExceptionContext {
 
 #[no_mangle]
 unsafe extern "C" fn default_exception_handler() {
-    UART.puts("Unexpected exception. Halting CPU.\n");
+    print!("Unexpected exception. Halting CPU.\n");
     loop {
         asm::wfe()
     }
@@ -87,30 +88,16 @@ unsafe extern "C" fn current_elx_synchronous(ec: &mut ExceptionContext) {
         },
         _ => None,
     };
-    UART.puts("Synchronous exception: ");
-    UART.puts(class);
-    UART.puts("\n");
+    print!("Synchronous exception: {}\n", class);
     if let Some(cause) = cause {
-        UART.puts("    Cause: ");
-        UART.puts(cause.0);
-        UART.puts(", ");
-        UART.puts(cause.1);
-        UART.puts("\n");
+        print!("    Cause: {}, {}\n", cause.0, cause.1);
     }
-    print_reg("    ESR_EL1", ec.esr_el1.get());
-    print_reg("    ELR_EL1", ec.elr_el1);
-    print_reg("    SPSR_EL1", ec.spsr_el1);
+    print!("    ESR_EL1: 0x{:08x}\n", ec.esr_el1.get());
+    print!("    ELR_EL1: 0x{:08x}\n", ec.elr_el1);
+    print!("    SPSR_EL1: 0x{:08x}\n", ec.spsr_el1);
     loop {
         asm::wfe()
     }
     // asm! { "RESTORE_CONTEXT" }
     // asm::eret();
-}
-
-#[inline]
-fn print_reg(name: &str, value: u64) {
-    UART.puts(name);
-    UART.puts(": 0x");
-    UART.hex(value);
-    UART.puts("\n");
 }

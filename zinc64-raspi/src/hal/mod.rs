@@ -6,7 +6,4 @@ pub mod board;
 pub mod frame_buffer;
 pub mod gpio;
 pub mod mbox;
-pub mod mmu;
 pub mod uart;
-
-const MMIO_BASE: u32 = 0x3F00_0000;

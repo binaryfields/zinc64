@@ -1,9 +1,5 @@
 # TODO
 
-- move to device setup
-- add memory map
-- add console
-
 - device: add mouse support
 - device: add floppy support
 - app: add screenshot support

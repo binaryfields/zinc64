@@ -2,21 +2,14 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use alloc::fmt;
-// use cortex_a_semihosting::hprintln;
+use core::fmt::Write;
 use log::{LogLevelFilter, SetLoggerError, ShutdownLoggerError, LogMetadata};
 
-use crate::hal::uart::Uart;
-
-pub struct SimpleLogger {
-    uart: &'static Uart,
-}
+pub struct SimpleLogger;
 
 impl SimpleLogger {
-    pub fn new(uart: &'static Uart) -> Self {
-        SimpleLogger {
-            uart
-        }
+    pub fn new() -> Self {
+        SimpleLogger
     }
 
     pub fn init(&self) -> Result<(), SetLoggerError>{
@@ -38,14 +31,14 @@ impl SimpleLogger {
 impl log::Log for SimpleLogger {
     fn enabled(&self, _: &LogMetadata) -> bool { false }
     fn log(&self, record: &log::LogRecord) {
-        self.uart.puts(
-            fmt::format(format_args!(
+        unsafe {
+            crate::CONSOLE.write_fmt(format_args!(
                 "{} [{}] - {}\n",
                 record.level(),
                 record.target(),
                 record.args()
-            )).as_str()
-        );
+            )).unwrap();
+        }
     }
 }
 

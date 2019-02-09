@@ -4,18 +4,18 @@
 
 // SPEC: https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 
+use core::alloc::{GlobalAlloc, Layout};
 use core::mem;
 use core::ops::Deref;
-use core::ptr;
 use core::result::Result;
+use core::slice;
 use core::sync::atomic::{compiler_fence, Ordering};
 use cortex_a::asm;
 use register::mmio::{ReadOnly, WriteOnly};
 use register::register_bitfields;
 
-use super::MMIO_BASE;
-
-const VIDEOCORE_MBOX: u32 = MMIO_BASE + 0x0000_B880;
+const MBOX_ALIGNMENT: usize = 16;
+const MBOX_SIZE: usize = 36;
 
 #[derive(Copy, Clone)]
 pub enum Channel {
@@ -40,6 +40,7 @@ impl Code {
     }
 }
 
+#[allow(unused)]
 #[derive(Copy, Clone)]
 pub enum Tag {
     GetBoardSerial = 0x00010004,
@@ -72,24 +73,34 @@ pub struct Registers {
     write: WriteOnly<u32>,
 }
 
-#[repr(C)]
-#[repr(align(16))]
-pub struct Mbox {
-    pub buffer: [u32; 36],
-    buffer_ptr: u64,
+pub struct Mbox<'a> {
+    base_addr: usize,
+    pub buffer: &'a mut [u32],
 }
 
-impl Mbox {
-    pub fn new(buffer_ptr: u64) -> Self {
+impl<'a> Mbox<'a> {
+    pub fn build(base_addr: usize) -> Result<Mbox<'a>, &'static str> {
+        let layout = Layout::from_size_align(MBOX_SIZE * mem::size_of::<u32>(), MBOX_ALIGNMENT)
+            .map_err(|_| "invalid buffer alignment")?;
+        let ptr = unsafe { crate::DMA_ALLOCATOR.alloc_zeroed(layout) };
+        if ptr.is_null() {
+            return Err("failed to allocate buffer");
+        }
+        Ok(Mbox {
+            base_addr,
+            buffer: unsafe { slice::from_raw_parts_mut(ptr as *mut u32, MBOX_SIZE) },
+        })
+    }
+
+    pub fn new_with_buffer(base_addr: usize, buffer_ptr: usize, buffer_len: usize) -> Mbox<'a> {
         Mbox {
-            buffer: [0; 36],
-            buffer_ptr,
+            base_addr,
+            buffer: unsafe { slice::from_raw_parts_mut(buffer_ptr as *mut u32, buffer_len) },
         }
     }
 
     pub fn call(&mut self, channel: Channel) -> Result<(), &'static str> {
-        self.upload_buffer();
-        let buf_ptr = self.buffer_ptr as u32;
+        let buf_ptr = self.buffer.as_ptr() as u32;
         assert_eq!(buf_ptr & 0x0f, 0);
         let message = buf_ptr | channel as u32;
         while self.status.is_set(Status::FULL) {
@@ -101,8 +112,7 @@ impl Mbox {
                 asm::nop();
             }
             if self.read.get() == message {
-                self.download_buffer();
-                compiler_fence(Ordering::Release);
+                // compiler_fence(Ordering::Release);
                 return match Code::from(self.buffer[1]) {
                     Code::ResponseSuccess => Ok(()),
                     Code::ResponseFailure => Err("mbox request failed"),
@@ -114,8 +124,7 @@ impl Mbox {
 
     pub fn call2(&mut self, channel: Channel) -> Result<(), &'static str> {
         info!("uploading buffer");
-        self.upload_buffer();
-        let buf_ptr = self.buffer_ptr as u32;
+        let buf_ptr = self.buffer.as_ptr() as u32;
         assert_eq!(buf_ptr & 0x0f, 0);
         let message = buf_ptr | channel as u32;
         info!("waiting until mbox becomes empty");
@@ -132,7 +141,6 @@ impl Mbox {
             info!("reading mbox message");
             if self.read.get() == message {
                 info!("downloading buffer");
-                self.download_buffer();
                 compiler_fence(Ordering::Release);
                 info!("checking response 0x{:08x}", self.buffer[1]);
                 return match Code::from(self.buffer[1]) {
@@ -164,31 +172,15 @@ impl Mbox {
         Ok(())
     }
 
-    fn base_ptr(&self) -> *mut u32 {
-        self.buffer_ptr as *mut u32
-    }
-
-    fn download_buffer(&mut self) {
-        unsafe {
-            ptr::copy_nonoverlapping(self.base_ptr(), &mut self.buffer[0], self.buffer.len());
-        }
-    }
-
-    fn upload_buffer(&self) {
-        unsafe {
-            ptr::copy_nonoverlapping(&self.buffer[0], self.base_ptr(), self.buffer.len());
-        }
-    }
-
-    fn ptr() -> *const Registers {
-        VIDEOCORE_MBOX as *const _
+    fn ptr(&self) -> *const Registers {
+        self.base_addr as *const _
     }
 }
 
-impl Deref for Mbox {
+impl<'a> Deref for Mbox<'a> {
     type Target = Registers;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*Self::ptr() }
+        unsafe { &*self.ptr() }
     }
 }

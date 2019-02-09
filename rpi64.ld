@@ -1,40 +1,33 @@
 ENTRY(_boot_cores);
 
-heap_size = 0x100000; /* 1MB */
 stack_size = 0x80000; /* 512KB */
-
-MEMORY
-{
-    RAM : ORIGIN = 0x80000, LENGTH = 2M
-}
 
 SECTIONS
 {
-    . = ORIGIN(RAM);
-
+    . = 0x80000;
     __ro_start = .;
     .text :
     {
         KEEP(*(.text.boot)) *(.text .text.*)
-    } >RAM
+    }
 
     .vectors ALIGN(2048) :
     {
       *(.vectors)
-    } >RAM
+    }
 
     .rodata :
     {
         *(.rodata .rodata.*)
-    } >RAM
-    . = ALIGN(4096); /* Fill up to 4KiB */
+    }
+    . = ALIGN(4096);
     __ro_end = .;
 
     __rw_start = .;
     .data :
     {
         *(.data .data.*)
-    } >RAM
+    }
 
     .bss ALIGN(8) :
     {
@@ -42,15 +35,8 @@ SECTIONS
         *(.bss .bss.*)
         *(COMMON)
         __bss_end = .;
-    } >RAM
-
-    .heap ALIGN(4096) :
-    {
-        __heap_start = .;
-        . = . + heap_size;
-        . = ALIGN(16);
-        __heap_end = .;
-    } >RAM
+    }
+    __rw_end = .;
 
     .stack ALIGN(16) :
     {
@@ -59,9 +45,10 @@ SECTIONS
         __stack_core0 = .;
         . = ALIGN(16);
         __stack_core0_end = .;
-    } >RAM
-    . = ALIGN(4096);
-    __rw_end = .;
+    }
+
+    . = ALIGN(0x200000);
+    __heap_start = .;
 
     /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }
