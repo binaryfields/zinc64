@@ -12,13 +12,13 @@ use zinc64_loader::{LoaderKind, Loaders};
 use zorio::cursor::Cursor;
 
 // use crate::debug;
-use crate::geo::Rect;
-use crate::hal::frame_buffer::FrameBuffer;
-use crate::hal::mbox::Mbox;
-use crate::reader::ImageReader;
+use crate::device::frame_buffer::FrameBuffer;
+use crate::device::mbox::Mbox;
 use crate::null_output::NullSound;
 use crate::palette::Palette;
 use crate::video_buffer::VideoBuffer;
+use crate::util::geo::Rect;
+use crate::util::reader::ImageReader;
 
 static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
 static RES_CHARSET_ROM: &[u8] = include_bytes!("../../res/rom/characters.rom");

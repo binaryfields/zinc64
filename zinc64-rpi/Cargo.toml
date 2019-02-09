@@ -1,5 +1,5 @@
 [package]
-name = "zinc64-raspi"
+name = "zinc64-rpi"
 version = "0.8.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 edition = "2018"
@@ -7,7 +7,7 @@ description = "Commodore 64 emulator Raspberry Pi client"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"
 readme = "README.md"
-keywords = ["c64", "commodore", "emulator", "no_std", "arm", "bare-metal", "raspi"]
+keywords = ["c64", "commodore", "emulator", "no_std", "arm", "bare-metal", "rpi"]
 categories = ["emulators"]
 publish = false
 

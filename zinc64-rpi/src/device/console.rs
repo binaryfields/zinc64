@@ -4,11 +4,11 @@
 
 use core::fmt;
 
-use crate::hal;
+use super::uart;
 
 pub enum Output {
     None,
-    Uart(hal::uart::Uart)
+    Uart(uart::Uart)
 }
 
 pub struct Console {

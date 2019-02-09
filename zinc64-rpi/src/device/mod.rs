@@ -3,6 +3,7 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 pub mod board;
+pub mod console;
 pub mod frame_buffer;
 pub mod gpio;
 pub mod mbox;

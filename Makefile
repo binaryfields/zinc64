@@ -9,10 +9,10 @@ SOURCES = $(wildcard **/**/*.rs) $(wildcard **/**/**/*.rs) rpi64.ld
 
 all: clean kernel
 
-$(BUILD_DIR)/zinc64-raspi: $(SOURCES)
-	cargo xbuild -p zinc64-raspi --target=$(TARGET) --release 
+$(BUILD_DIR)/zinc64-rpi: $(SOURCES)
+	cargo xbuild -p zinc64-rpi --target=$(TARGET) --release
 
-$(BUILD_DIR)/kernel8.img: $(BUILD_DIR)/zinc64-raspi
+$(BUILD_DIR)/kernel8.img: $(BUILD_DIR)/zinc64-rpi
 	$(OBJCOPY) --strip-all -O binary $< $(BUILD_DIR)/kernel8.img
 
 kernel: $(BUILD_DIR)/kernel8.img

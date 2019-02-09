@@ -18,25 +18,22 @@ extern crate alloc;
 extern crate log;
 
 mod app;
-mod console;
 mod debug;
+mod device;
 mod exception;
-mod geo;
-mod hal;
 mod macros;
 mod memory;
-mod reader;
-mod logger;
 mod null_output;
 mod palette;
 mod video_buffer;
+mod util;
 
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 use cortex_a::asm;
 use linked_list_allocator::LockedHeap;
 
-use crate::console::{Console, Output};
+use crate::device::console::{Console, Output};
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
@@ -52,9 +49,9 @@ fn start() -> ! {
     print!("Initializing console ...\n");
     {
         let dma_range = memory::dma_heap_range();
-        let gpio = hal::gpio::GPIO::new(memory::map::GPIO_BASE);
-        let mut mbox = hal::mbox::Mbox::new_with_buffer(memory::map::MBOX_BASE, dma_range.0, 64);
-        let uart = hal::uart::Uart::new(memory::map::UART_BASE);
+        let gpio = device::gpio::GPIO::new(memory::map::GPIO_BASE);
+        let mut mbox = device::mbox::Mbox::new_with_buffer(memory::map::MBOX_BASE, dma_range.0, 64);
+        let uart = device::uart::Uart::new(memory::map::UART_BASE);
         uart.init(&mut mbox, &gpio).unwrap();
         unsafe {
             CONSOLE.set_output(Output::Uart(uart));
@@ -96,17 +93,17 @@ fn start() -> ! {
 }
 
 fn main() -> Result<(), &'static str> {
-    let mut mbox = hal::mbox::Mbox::build(memory::map::MBOX_BASE)?;
+    let mut mbox = device::mbox::Mbox::build(memory::map::MBOX_BASE)?;
     print!("Initializing logger ...\n");
-    let logger = logger::SimpleLogger::new();
+    let logger = util::logger::SimpleLogger::new();
     logger.init().map_err(|_| "failed to initialize log")?;
-    let max_clock = hal::board::get_max_clock_rate(&mut mbox, hal::board::Clock::Arm)?;
+    let max_clock = device::board::get_max_clock_rate(&mut mbox, device::board::Clock::Arm)?;
     print!("Setting ARM clock speed to {}\n", max_clock);
-    hal::board::set_clock_speed(&mut mbox, hal::board::Clock::Arm, max_clock)?;
+    device::board::set_clock_speed(&mut mbox, device::board::Clock::Arm, max_clock)?;
     print!("Starting app ...\n");
     let mut app = app::App::build(&mut mbox)?;
     app.run()?;
-    logger::shutdown().map_err(|_| "failed to shutdown log")
+    util::logger::shutdown().map_err(|_| "failed to shutdown log")
 }
 
 #[alloc_error_handler]

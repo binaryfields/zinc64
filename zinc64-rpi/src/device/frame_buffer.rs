@@ -9,7 +9,7 @@ use core::mem;
 use core::result::Result;
 use core::sync::atomic::{compiler_fence, Ordering};
 
-use crate::geo::Rect;
+use crate::util::geo::Rect;
 use super::mbox;
 
 #[allow(unused)]
