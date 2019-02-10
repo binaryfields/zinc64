@@ -63,4 +63,12 @@ impl Loaders {
             LoaderKind::Tap => Box::new(tap::TapLoader::new()),
         }
     }
+
+    pub fn from_ext(ext: Option<&str>) -> Option<Box<Loader>> {
+        if let Some(kind) = LoaderKind::from_ext(ext) {
+            Some(Loaders::from(kind))
+        } else {
+            None
+        }
+    }
 }

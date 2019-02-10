@@ -1,13 +1,5 @@
 # TODO
 
-init
-  exception
-  vectors
-
-util
-  geo
-  logger
-  reader
 
 - device: add mouse support
 - device: add floppy support

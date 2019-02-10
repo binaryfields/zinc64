@@ -94,14 +94,27 @@ fn start() -> ! {
 
 fn main() -> Result<(), &'static str> {
     let mut mbox = device::mbox::Mbox::build(memory::map::MBOX_BASE)?;
+
     print!("Initializing logger ...\n");
     let logger = util::logger::SimpleLogger::new();
     logger.init().map_err(|_| "failed to initialize log")?;
     let max_clock = device::board::get_max_clock_rate(&mut mbox, device::board::Clock::Arm)?;
+
     print!("Setting ARM clock speed to {}\n", max_clock);
     device::board::set_clock_speed(&mut mbox, device::board::Clock::Arm, max_clock)?;
+
+    print!("Initializing SD ...\n");
+    let gpio = device::gpio::GPIO::new(memory::map::GPIO_BASE);
+    let mut sd = device::sd::Sd::new(memory::map::EMMC_BASE);
+    sd.init(&gpio).map_err(|_| "failed to initialize sdcard")?;
+
+    print!("Initializing FAT32 ...\n");
+    let fat32 = device::fat32::Fat32::mount(sd, 0)?;
+    fat32.info();
+
     print!("Starting app ...\n");
-    let mut app = app::App::build(&mut mbox)?;
+    let mut app = app::App::build(&mut mbox, &fat32)?;
+    app.autostart(&fat32)?;
     app.run()?;
     util::logger::shutdown().map_err(|_| "failed to shutdown log")
 }

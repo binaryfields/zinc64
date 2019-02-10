@@ -85,7 +85,7 @@ pub struct RegisterBlock {
     GPEDS1: ReadWrite<u32>,                             // 0x44
     __reserved_4: [u32; 7],                             //
     GPHEN0: ReadWrite<u32>,                             // 0x64
-    GPHEN1: ReadWrite<u32>,                             // 0x68
+    pub GPHEN1: ReadWrite<u32>,                         // 0x68
     __reserved_5: [u32; 10],                            //
     pub GPPUD: ReadWrite<u32>,                          // 0x94
     pub GPPUDCLK0: ReadWrite<u32, GPPUDCLK0::Register>, // 0x98

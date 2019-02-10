@@ -4,7 +4,10 @@
 
 pub mod board;
 pub mod console;
+pub mod delay;
+pub mod fat32;
 pub mod frame_buffer;
 pub mod gpio;
 pub mod mbox;
+pub mod sd;
 pub mod uart;

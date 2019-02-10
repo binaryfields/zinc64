@@ -135,3 +135,7 @@
 ### Week 22 - 20190127
 
 - add raspi loader support
+
+### Week 23 - 20190210
+
+- add raspi fat32 support

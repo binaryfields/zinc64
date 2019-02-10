@@ -18,7 +18,7 @@ $(BUILD_DIR)/kernel8.img: $(BUILD_DIR)/zinc64-rpi
 kernel: $(BUILD_DIR)/kernel8.img
 
 run: kernel
-	qemu-system-aarch64 -M raspi3 -serial stdio -kernel $(BUILD_DIR)/kernel8.img
+	qemu-system-aarch64 -M raspi3 -drive file=sd.img,if=sd,format=raw -serial stdio -kernel $(BUILD_DIR)/kernel8.img
 
 sd: $(BUILD_DIR)/kernel8.img
 	cp $< /run/media/raytracer/rpi/
