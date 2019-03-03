@@ -6,16 +6,34 @@ pub mod mmu;
 
 use crate::print;
 
+#[allow(unused)]
 pub mod map {
-    pub const DMA_HEAP_SIZE: usize = 0x0020_0000;
+    pub const DMA_HEAP_SIZE: usize = 0x0100_0000;
     pub const VC_MEM_SIZE: usize = 0x0800_0000;
 
+    pub const BUS_IO_BASE: usize = 0x7E00_0000;
+    pub const BUS_MEM_BASE: usize = 0x4000_0000;
+
     pub const MMIO_BASE: usize = 0x3F00_0000;
-    pub const MMIO_END: usize = MMIO_BASE + 0x0100_0000;
-    pub const MBOX_BASE: usize = MMIO_BASE + 0x0000_b880;
+    pub const DMA_BASE: usize = MMIO_BASE + 0x0000_7000;
+    pub const DMA_REG_BASE: usize = MMIO_BASE + 0x0000_7fe0;
+    pub const INTERRUPT_BASE: usize = MMIO_BASE + 0x0000_B000;
+    pub const MBOX_BASE: usize = MMIO_BASE + 0x0000_B880;
+    pub const CM_BASE: usize = MMIO_BASE + 0x0010_1000;
     pub const GPIO_BASE: usize = MMIO_BASE + 0x0020_0000;
     pub const UART_BASE: usize = MMIO_BASE + 0x0020_1000;
+    pub const PWM_BASE: usize = MMIO_BASE + 0x0020_C000;
+    pub const PWM_FIF1: usize = PWM_BASE + 0x18;
     pub const EMMC_BASE: usize = MMIO_BASE + 0x0030_0000;
+    pub const MMIO_END: usize = MMIO_BASE + 0x0100_0000;
+}
+
+pub fn bus_address(address: usize) -> u32 {
+    ((address & 0x3FFF_FFFF) | map::BUS_MEM_BASE) as u32
+}
+
+pub fn bus_io_address(address: usize) -> u32 {
+    ((address & 0x00FF_FFFF) | map::BUS_IO_BASE) as u32
 }
 
 pub fn print_mmap() {

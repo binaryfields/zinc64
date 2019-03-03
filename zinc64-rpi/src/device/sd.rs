@@ -238,28 +238,28 @@ impl Sd {
     fn init_gpio(&self, gpio: &gpio::GPIO) {
         // gpio_cd
         gpio.GPFSEL4.set(gpio.GPFSEL4.get() & (!(7 << (7 * 3))));
-        gpio.GPPUD.set(2);
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Reserved);
         delay::wait_cycles(150);
         gpio.GPPUDCLK1.set(1 << 15);
         delay::wait_cycles(150);
-        gpio.GPPUD.set(0);
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         gpio.GPPUDCLK1.set(0);
         gpio.GPHEN1.set(gpio.GPHEN1.get() | (1 << 15));
         // gpio_clk, gpio_cd
         gpio.GPFSEL4.set(gpio.GPFSEL4.get() | (7 << (8 * 3)) | (7 << (9 * 3)));
-        gpio.GPPUD.set(2);
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Reserved);
         delay::wait_cycles(150);
         gpio.GPPUDCLK1.set((1 << 16) | (1 << 17));
         delay::wait_cycles(150);
-        gpio.GPPUD.set(0);
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         gpio.GPPUDCLK1.set(0);
         // gpio_dat0/1/2/3
         gpio.GPFSEL5.set(gpio.GPFSEL5.get() | ((7 << (0 * 3)) | (7 << (1 * 3)) | (7 << (2 * 3)) | (7 << (3 * 3))));
-        gpio.GPPUD.set(2);
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Reserved);
         delay::wait_cycles(150);
         gpio.GPPUDCLK1.set((1 << 18) | (1 << 19) | (1 << 20) | (1 << 21));
         delay::wait_cycles(150);
-        gpio.GPPUD.set(0);
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         gpio.GPPUDCLK1.set(0);
     }
 

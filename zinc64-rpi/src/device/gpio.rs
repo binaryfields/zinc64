@@ -1,95 +1,186 @@
-/*
- * MIT License
- *
- * Copyright (c) 2018 Andre Richter <andre.o.richter@gmail.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+// This file is part of zinc64.
+// Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
+// Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use core::ops::Deref;
 use register::{mmio::ReadWrite, register_bitfields};
 
-// Descriptions taken from
-// https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf
+#[allow(unused)]
+pub enum GPFSEL {
+    In = 0b000,
+    Out = 0b001,
+    Alt0 = 0b100,
+    Alt1 = 0b101,
+    Alt2 = 0b110,
+    Alt3 = 0b111,
+    Alt4 = 0b011,
+    Alt5 = 0b010,
+}
 
 register_bitfields! {
     u32,
-    /// GPIO Function Select 1
+    GPFSEL0 [
+        FSEL0 OFFSET(0) NUMBITS(3) [],
+        FSEL1 OFFSET(3) NUMBITS(3) [],
+        FSEL2 OFFSET(6) NUMBITS(3) [],
+        FSEL3 OFFSET(9) NUMBITS(3) [],
+        FSEL4 OFFSET(12) NUMBITS(3) [],
+        FSEL5 OFFSET(15) NUMBITS(3) [],
+        FSEL6 OFFSET(18) NUMBITS(3) [],
+        FSEL7 OFFSET(21) NUMBITS(3) [],
+        FSEL8 OFFSET(24) NUMBITS(3) [],
+        FSEL9 OFFSET(27) NUMBITS(3) []
+    ],
     GPFSEL1 [
-        /// Pin 15
-        FSEL15 OFFSET(15) NUMBITS(3) [
-            Input = 0b000,
-            Output = 0b001,
-            RXD0 = 0b100, // UART0     - Alternate function 0
-            RXD1 = 0b010  // Mini UART - Alternate function 5
-
-        ],
-        /// Pin 14
-        FSEL14 OFFSET(12) NUMBITS(3) [
-            Input = 0b000,
-            Output = 0b001,
-            TXD0 = 0b100, // UART0     - Alternate function 0
-            TXD1 = 0b010  // Mini UART - Alternate function 5
+        FSEL10 OFFSET(0) NUMBITS(3) [],
+        FSEL11 OFFSET(3) NUMBITS(3) [],
+        FSEL12 OFFSET(6) NUMBITS(3) [],
+        FSEL13 OFFSET(9) NUMBITS(3) [],
+        FSEL14 OFFSET(12) NUMBITS(3) [],
+        FSEL15 OFFSET(15) NUMBITS(3) [],
+        FSEL16 OFFSET(18) NUMBITS(3) [],
+        FSEL17 OFFSET(21) NUMBITS(3) [],
+        FSEL18 OFFSET(24) NUMBITS(3) [],
+        FSEL19 OFFSET(27) NUMBITS(3) []
+    ],
+    GPFSEL2 [
+        FSEL20 OFFSET(0) NUMBITS(3) [],
+        FSEL21 OFFSET(3) NUMBITS(3) [],
+        FSEL22 OFFSET(6) NUMBITS(3) [],
+        FSEL23 OFFSET(9) NUMBITS(3) [],
+        FSEL24 OFFSET(12) NUMBITS(3) [],
+        FSEL25 OFFSET(15) NUMBITS(3) [],
+        FSEL26 OFFSET(18) NUMBITS(3) [],
+        FSEL27 OFFSET(21) NUMBITS(3) [],
+        FSEL28 OFFSET(24) NUMBITS(3) [],
+        FSEL29 OFFSET(27) NUMBITS(3) []
+    ],
+    GPFSEL3 [
+        FSEL30 OFFSET(0) NUMBITS(3) [],
+        FSEL31 OFFSET(3) NUMBITS(3) [],
+        FSEL32 OFFSET(6) NUMBITS(3) [],
+        FSEL33 OFFSET(9) NUMBITS(3) [],
+        FSEL34 OFFSET(12) NUMBITS(3) [],
+        FSEL35 OFFSET(15) NUMBITS(3) [],
+        FSEL36 OFFSET(18) NUMBITS(3) [],
+        FSEL37 OFFSET(21) NUMBITS(3) [],
+        FSEL38 OFFSET(24) NUMBITS(3) [],
+        FSEL39 OFFSET(27) NUMBITS(3) []
+    ],
+    GPFSEL4 [
+        FSEL40 OFFSET(0) NUMBITS(3) [],
+        FSEL41 OFFSET(3) NUMBITS(3) [],
+        FSEL42 OFFSET(6) NUMBITS(3) [],
+        FSEL43 OFFSET(9) NUMBITS(3) [],
+        FSEL44 OFFSET(12) NUMBITS(3) [],
+        FSEL45 OFFSET(15) NUMBITS(3) [],
+        FSEL46 OFFSET(18) NUMBITS(3) [],
+        FSEL47 OFFSET(21) NUMBITS(3) [],
+        FSEL48 OFFSET(24) NUMBITS(3) [],
+        FSEL49 OFFSET(27) NUMBITS(3) []
+    ],
+    GPFSEL5 [
+        FSEL50 OFFSET(0) NUMBITS(3) [],
+        FSEL51 OFFSET(3) NUMBITS(3) [],
+        FSEL52 OFFSET(6) NUMBITS(3) [],
+        FSEL53 OFFSET(9) NUMBITS(3) []
+    ],
+    GPPUD [
+        PUD OFFSET(0) NUMBITS(2) [
+            Off = 0b00,
+            PullDown = 0b01,
+            PullUp = 0b10,
+            Reserved = 0b11
         ]
     ],
-    /// GPIO Pull-up/down Clock Register 0
-    GPPUDCLK0 [
-        /// Pin 15
-        PUDCLK15 OFFSET(15) NUMBITS(1) [
-            NoEffect = 0,
-            AssertClock = 1
-        ],
-        /// Pin 14
-        PUDCLK14 OFFSET(14) NUMBITS(1) [
-            NoEffect = 0,
-            AssertClock = 1
-        ]
+    GPREGSET0 [
+        P0 0,
+        P1 1,
+        P2 2,
+        P3 3,
+        P4 4,
+        P5 5,
+        P6 6,
+        P7 7,
+        P8 8,
+        P9 9,
+        P10 10,
+        P11 11,
+        P12 12,
+        P13 13,
+        P14 14,
+        P15 15,
+        P16 16,
+        P17 17,
+        P18 18,
+        P19 19,
+        P20 20,
+        P21 21,
+        P22 22,
+        P23 23,
+        P24 24,
+        P25 25,
+        P26 26,
+        P27 27,
+        P28 28,
+        P29 29,
+        P30 30,
+        P31 31
+    ],
+    GPREGSET1 [
+        P32 0,
+        P33 1,
+        P34 2,
+        P35 3,
+        P36 4,
+        P37 5,
+        P38 6,
+        P39 7,
+        P40 8,
+        P41 9,
+        P42 10,
+        P43 11,
+        P44 12,
+        P45 13,
+        P46 14,
+        P47 15,
+        P48 16,
+        P49 17,
+        P50 18,
+        P51 19,
+        P52 20,
+        P53 21
     ]
 }
 
 #[allow(non_snake_case)]
 #[repr(C)]
 pub struct RegisterBlock {
-    pub GPFSEL0: ReadWrite<u32>,                        // 0x00
-    pub GPFSEL1: ReadWrite<u32, GPFSEL1::Register>,     // 0x04
-    pub GPFSEL2: ReadWrite<u32>,                        // 0x08
-    pub GPFSEL3: ReadWrite<u32>,                        // 0x0C
-    pub GPFSEL4: ReadWrite<u32>,                        // 0x10
-    pub GPFSEL5: ReadWrite<u32>,                        // 0x14
-    __reserved_0: u32,                                  // 0x18
-    GPSET0: ReadWrite<u32>,                             // 0x1C
-    GPSET1: ReadWrite<u32>,                             // 0x20
-    __reserved_1: u32,                                  //
-    GPCLR0: ReadWrite<u32>,                             // 0x28
-    __reserved_2: [u32; 2],                             //
-    GPLEV0: ReadWrite<u32>,                             // 0x34
-    GPLEV1: ReadWrite<u32>,                             // 0x38
-    __reserved_3: u32,                                  //
-    GPEDS0: ReadWrite<u32>,                             // 0x40
-    GPEDS1: ReadWrite<u32>,                             // 0x44
-    __reserved_4: [u32; 7],                             //
-    GPHEN0: ReadWrite<u32>,                             // 0x64
-    pub GPHEN1: ReadWrite<u32>,                         // 0x68
-    __reserved_5: [u32; 10],                            //
-    pub GPPUD: ReadWrite<u32>,                          // 0x94
-    pub GPPUDCLK0: ReadWrite<u32, GPPUDCLK0::Register>, // 0x98
-    pub GPPUDCLK1: ReadWrite<u32>,                      // 0x9C
+    pub GPFSEL0: ReadWrite<u32, GPFSEL0::Register>,
+    pub GPFSEL1: ReadWrite<u32, GPFSEL1::Register>,
+    pub GPFSEL2: ReadWrite<u32, GPFSEL2::Register>,
+    pub GPFSEL3: ReadWrite<u32, GPFSEL3::Register>,
+    pub GPFSEL4: ReadWrite<u32, GPFSEL4::Register>,
+    pub GPFSEL5: ReadWrite<u32, GPFSEL5::Register>,
+    __reserved_0: u32,
+    pub GPSET0: ReadWrite<u32, GPREGSET0::Register>,
+    pub GPSET1: ReadWrite<u32, GPREGSET1::Register>,
+    __reserved_1: u32,
+    pub GPCLR0: ReadWrite<u32, GPREGSET0::Register>,
+    pub GPCLR1: ReadWrite<u32, GPREGSET1::Register>,
+    __reserved_2: u32,
+    pub GPLEV0: ReadWrite<u32, GPREGSET0::Register>,
+    pub GPLEV1: ReadWrite<u32, GPREGSET1::Register>,
+    __reserved_3: u32,
+    pub GPEDS0: ReadWrite<u32, GPREGSET0::Register>,
+    pub GPEDS1: ReadWrite<u32, GPREGSET1::Register>,
+    __reserved_4: [u32; 7],
+    pub GPHEN0: ReadWrite<u32, GPREGSET0::Register>,
+    pub GPHEN1: ReadWrite<u32, GPREGSET1::Register>,
+    __reserved_5: [u32; 10],
+    pub GPPUD: ReadWrite<u32, GPPUD::Register>,
+    pub GPPUDCLK0: ReadWrite<u32, GPREGSET0::Register>,
+    pub GPPUDCLK1: ReadWrite<u32, GPREGSET1::Register>,
 }
 
 pub struct GPIO {

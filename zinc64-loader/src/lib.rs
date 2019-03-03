@@ -33,6 +33,7 @@ pub trait Loader {
 }
 
 pub enum LoaderKind {
+    Bin,
     Crt,
     P00,
     Prg,
@@ -42,6 +43,7 @@ pub enum LoaderKind {
 impl LoaderKind {
     pub fn from_ext(ext: Option<&str>) -> Option<LoaderKind> {
         match ext {
+            Some("bin") => Some(LoaderKind::Bin),
             Some("crt") => Some(LoaderKind::Crt),
             Some("p00") => Some(LoaderKind::P00),
             Some("P00") => Some(LoaderKind::P00),
@@ -57,6 +59,7 @@ pub struct Loaders;
 impl Loaders {
     pub fn from(kind: LoaderKind) -> Box<Loader> {
         match kind {
+            LoaderKind::Bin => Box::new(bin::BinLoader::new(1024)),
             LoaderKind::Crt => Box::new(crt::CrtLoader::new()),
             LoaderKind::P00 => Box::new(p00::P00Loader::new()),
             LoaderKind::Prg => Box::new(prg::PrgLoader::new()),

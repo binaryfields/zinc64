@@ -4,6 +4,14 @@
 
 use cortex_a::{asm, regs::*};
 
+pub fn get_counter() -> u64 {
+    CNTPCT_EL0.get()
+}
+
+pub fn get_counter_freq() -> u32 {
+    CNTFRQ_EL0.get()
+}
+
 pub fn wait_cycles(cycles: u32) {
     for _ in 0..cycles {
         asm::nop();
@@ -21,4 +29,12 @@ pub fn wait_msec(ms: u32) {
         }
     }
     CNTP_CTL_EL0.modify(CNTP_CTL_EL0::ENABLE::CLEAR);
+}
+
+pub fn wait_counter(target: u64) {
+    loop {
+        if CNTPCT_EL0.get() >= target {
+            break;
+        }
+    }
 }

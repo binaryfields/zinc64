@@ -4,13 +4,34 @@
 
 #![allow(unused)]
 
+use alloc::sync::Arc;
 use zinc64_core::{SoundOutput, VideoOutput};
+
+use crate::device::snd::SndCallback;
 
 pub struct NullSound;
 
 impl SoundOutput for NullSound {
     fn reset(&self) {}
     fn write(&self, _samples: &[i16]) {}
+}
+
+pub struct NullSoundCallback {
+    null_sound: Arc<NullSound>,
+}
+
+impl NullSoundCallback {
+    pub fn new(null_sound: Arc<NullSound>) -> Self {
+        NullSoundCallback {
+            null_sound,
+        }
+    }
+}
+
+impl SndCallback for NullSoundCallback {
+    fn callback(&mut self, buffer: &mut [u32]) {
+        self.null_sound.clone();
+    }
 }
 
 pub struct NullVideo;

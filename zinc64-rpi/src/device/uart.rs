@@ -119,16 +119,16 @@ register_bitfields! {
 #[allow(non_snake_case)]
 #[repr(C)]
 pub struct RegisterBlock {
-    DR: ReadWrite<u32>,                   // 0x00
-    __reserved_0: [u32; 5],               // 0x04
-    FR: ReadOnly<u32, FR::Register>,      // 0x18
-    __reserved_1: [u32; 2],               // 0x1c
-    IBRD: WriteOnly<u32, IBRD::Register>, // 0x24
-    FBRD: WriteOnly<u32, FBRD::Register>, // 0x28
-    LCRH: WriteOnly<u32, LCRH::Register>, // 0x2C
-    CR: WriteOnly<u32, CR::Register>,     // 0x30
-    __reserved_2: [u32; 4],               // 0x34
-    ICR: WriteOnly<u32, ICR::Register>,   // 0x44
+    DR: ReadWrite<u32>,
+    __reserved_0: [u32; 5],
+    FR: ReadOnly<u32, FR::Register>,
+    __reserved_1: [u32; 2],
+    IBRD: WriteOnly<u32, IBRD::Register>,
+    FBRD: WriteOnly<u32, FBRD::Register>,
+    LCRH: WriteOnly<u32, LCRH::Register>,
+    CR: WriteOnly<u32, CR::Register>,
+    __reserved_2: [u32; 4],
+    ICR: WriteOnly<u32, ICR::Register>,
 }
 
 pub struct Uart {
@@ -159,25 +159,29 @@ impl Uart {
             .map_err(|_| "failed to set uart clock rate")?;
 
         // map UART0 to GPIO pins
-        gpio.GPFSEL1
-            .modify(gpio::GPFSEL1::FSEL14::TXD0 + gpio::GPFSEL1::FSEL15::RXD0);
+        gpio.GPFSEL1.modify(
+            gpio::GPFSEL1::FSEL14.val(gpio::GPFSEL::Alt0 as u32)
+                + gpio::GPFSEL1::FSEL15.val(gpio::GPFSEL::Alt0 as u32)
+        );
 
-        gpio.GPPUD.set(0); // enable pins 14 and 15
+        gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         self.wait_cycles(150);
-
         gpio.GPPUDCLK0.modify(
-            gpio::GPPUDCLK0::PUDCLK14::AssertClock + gpio::GPPUDCLK0::PUDCLK15::AssertClock,
+            gpio::GPREGSET0::P14::SET
+                + gpio::GPREGSET0::P15::SET,
         );
         self.wait_cycles(150);
-
         gpio.GPPUDCLK0.set(0);
 
         self.ICR.write(ICR::ALL::CLEAR);
         self.IBRD.write(IBRD::IBRD.val(2)); // Results in 115200 baud
         self.FBRD.write(FBRD::FBRD.val(0xB));
         self.LCRH.write(LCRH::WLEN::EightBit); // 8N1
-        self.CR
-            .write(CR::UARTEN::Enabled + CR::TXE::Enabled + CR::RXE::Enabled);
+        self.CR.write(
+            CR::UARTEN::Enabled
+                + CR::TXE::Enabled
+                + CR::RXE::Enabled
+        );
 
         Ok(())
     }
@@ -236,7 +240,6 @@ impl Uart {
             asm::nop();
         }
     }
-
 }
 
 impl ops::Deref for Uart {

@@ -50,6 +50,13 @@ unsafe extern "C" fn default_exception_handler() {
 }
 
 #[no_mangle]
+unsafe extern "C" fn current_elx_irq(_ec: &mut ExceptionContext) {
+    crate::IRQ_CONTROL.lock(|ctl| {
+        ctl.handle_irq();
+    });
+}
+
+#[no_mangle]
 unsafe extern "C" fn current_elx_synchronous(ec: &mut ExceptionContext) {
     let class = match ec.esr_el1.read_as_enum(ESR_EL1::EC) {
         Some(ESR_EL1::EC::Value::TrappedWFIorWFE) => "TrappedWFIorWFE",
@@ -64,7 +71,7 @@ unsafe extern "C" fn current_elx_synchronous(ec: &mut ExceptionContext) {
         Some(ESR_EL1::EC::Value::FloatingPoint) => "FloatingPoint",
         _ => "Unknown",
     };
-    let cause  = match ec.esr_el1.read_as_enum(ESR_EL1::EC) {
+    let cause = match ec.esr_el1.read_as_enum(ESR_EL1::EC) {
         Some(ESR_EL1::EC::Value::DataAbortLowerEL) | Some(ESR_EL1::EC::Value::DataAbortSameEL) => {
             let fault = match ec.esr_el1.read(ESR_EL1::ISS) >> 2 & 0x03 {
                 0 => Some("Address size fault"),
@@ -85,7 +92,7 @@ unsafe extern "C" fn current_elx_synchronous(ec: &mut ExceptionContext) {
             } else {
                 None
             }
-        },
+        }
         _ => None,
     };
     print!("Synchronous exception: {}\n", class);

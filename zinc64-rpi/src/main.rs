@@ -18,6 +18,7 @@ extern crate alloc;
 extern crate log;
 
 mod app;
+mod audio;
 mod debug;
 mod device;
 mod exception;
@@ -25,7 +26,9 @@ mod macros;
 mod memory;
 mod null_output;
 mod palette;
+mod sound_buffer;
 mod video_buffer;
+mod video_renderer;
 mod util;
 
 use core::alloc::Layout;
@@ -34,12 +37,17 @@ use cortex_a::asm;
 use linked_list_allocator::LockedHeap;
 
 use crate::device::console::{Console, Output};
+use crate::device::interrupt::{InterruptControl, Irq};
+use crate::util::sync::NullLock;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
 static DMA_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 static mut CONSOLE: Console = Console::new();
+static IRQ_CONTROL: NullLock<InterruptControl> = NullLock::new(
+    InterruptControl::new()
+);
 
 fn start() -> ! {
     extern "C" {
@@ -93,6 +101,7 @@ fn start() -> ! {
 }
 
 fn main() -> Result<(), &'static str> {
+    let gpio = device::gpio::GPIO::new(memory::map::GPIO_BASE);
     let mut mbox = device::mbox::Mbox::build(memory::map::MBOX_BASE)?;
 
     print!("Initializing logger ...\n");
@@ -103,8 +112,12 @@ fn main() -> Result<(), &'static str> {
     print!("Setting ARM clock speed to {}\n", max_clock);
     device::board::set_clock_speed(&mut mbox, device::board::Clock::Arm, max_clock)?;
 
+    print!("Initializing interrupts ...\n");
+    IRQ_CONTROL.lock(|ctl| {
+        ctl.init();
+    });
+
     print!("Initializing SD ...\n");
-    let gpio = device::gpio::GPIO::new(memory::map::GPIO_BASE);
     let mut sd = device::sd::Sd::new(memory::map::EMMC_BASE);
     sd.init(&gpio).map_err(|_| "failed to initialize sdcard")?;
 
@@ -113,9 +126,14 @@ fn main() -> Result<(), &'static str> {
     fat32.info();
 
     print!("Starting app ...\n");
-    let mut app = app::App::build(&mut mbox, &fat32)?;
+    let mut app = app::App::build(&gpio, &fat32)?;
+    crate::IRQ_CONTROL.lock(|ctl| {
+        ctl.register(Irq::Dma0, app.audio_engine.make_irq_handler());
+        ctl.enable(Irq::Dma0);
+    });
     app.autostart(&fat32)?;
     app.run()?;
+
     util::logger::shutdown().map_err(|_| "failed to shutdown log")
 }
 

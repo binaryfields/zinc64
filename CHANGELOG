@@ -139,3 +139,7 @@
 ### Week 23 - 20190210
 
 - add raspi fat32 support
+
+## Week 24 - 20190303
+
+- add raspi sound output

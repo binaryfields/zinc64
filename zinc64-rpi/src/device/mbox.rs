@@ -84,7 +84,7 @@ impl<'a> Mbox<'a> {
             .map_err(|_| "invalid buffer alignment")?;
         let ptr = unsafe { crate::DMA_ALLOCATOR.alloc_zeroed(layout) };
         if ptr.is_null() {
-            return Err("failed to allocate buffer");
+           return Err("failed to allocate buffer");
         }
         Ok(Mbox {
             base_addr,

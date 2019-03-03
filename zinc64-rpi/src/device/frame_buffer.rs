@@ -135,10 +135,4 @@ impl FrameBuffer {
             Err("unable to set virtual offset")
         }
     }
-
-    pub fn wait_for_vsync(&self, mbox: &mut mbox::Mbox) -> Result<(), &'static str> {
-        let mut data = [0];
-        mbox.property(mbox::Tag::SetVsync, &mut data)
-            .map_err(|_| "unable to set vsync")
-    }
 }

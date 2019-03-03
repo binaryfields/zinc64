@@ -41,3 +41,9 @@ pub fn set_clock_speed(mbox: &mut mbox::Mbox, clock: Clock, hz: u32) -> Result<(
         Err("failed to set clock speed")
     }
 }
+
+pub fn wait_for_vsync(mbox: &mut mbox::Mbox) -> Result<(), &'static str> {
+    let mut data = [0];
+    mbox.property(mbox::Tag::SetVsync, &mut data)
+        .map_err(|_| "unable to set vsync")
+}

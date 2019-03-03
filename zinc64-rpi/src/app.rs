@@ -6,38 +6,44 @@ use alloc::prelude::*;
 use alloc::rc::Rc;
 use alloc::sync::Arc;
 use core::result::Result;
-use zinc64_core::{new_shared, Shared, SystemModel};
+use zinc64_core::{new_shared, SystemModel};
 use zinc64_emu::system::{C64, C64Factory, Config};
 use zinc64_loader::Loaders;
 use zorio::cursor::Cursor;
 
 // use crate::debug;
-use crate::device::frame_buffer::FrameBuffer;
+use crate::audio::AudioEngine;
+use crate::device::board;
+use crate::device::delay;
+use crate::device::gpio::GPIO;
 use crate::device::mbox::Mbox;
 use crate::device::fat32::{self, Fat32};
-use crate::null_output::NullSound;
+use crate::memory;
 use crate::palette::Palette;
 use crate::video_buffer::VideoBuffer;
-use crate::util::geo::Rect;
 use crate::util::reader::ImageReader;
+use crate::sound_buffer::SoundBuffer;
+use crate::video_renderer::VideoRenderer;
 
 // static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
 // static RES_CHARSET_ROM: &[u8] = include_bytes!("../../res/rom/characters.rom");
 // static RES_KERNAL_ROM: &[u8] = include_bytes!("../../res/rom/kernal.rom");
 // static RES_APP_IMAGE: &[u8] = include_bytes!("../../bin/SineAndGraphics.prg");
 
-const FB_SIZE: (u32, u32) = (640, 480);
-const FB_BPP: u32 = 32;
+// TODO impl app state/audio state
 
+#[allow(unused)]
 pub struct App<'a> {
-    // Dependencies
-    mbox: &'a mut Mbox<'a>,
     // Components
     c64: C64,
-    video_buffer: Shared<VideoBuffer>,
-    viewport_rect: Rect,
+    pub audio_engine: AudioEngine<'a>,
+    video_renderer: VideoRenderer,
+    // Resources
+    mbox: Mbox<'a>,
     // Runtime State
-    frame_buffer: FrameBuffer,
+    frame_duration: u64,
+    idle_counter: u64,
+    next_frame_ts: u64,
     next_keyboard_event: u64,
 }
 
@@ -66,44 +72,54 @@ fn read_res(fat32: &Fat32, path: &str) -> Result<Vec<u8>, &'static str> {
 }
 
 impl<'a> App<'a> {
-    pub fn build(mbox: &'a mut Mbox<'a>, fat32: &Fat32) -> Result<App<'a>, &'static str> {
+    pub fn build(gpio: &GPIO, fat32: &Fat32) -> Result<App<'a>, &'static str> {
+        // Initialize emulator
         let config = Rc::new(Config::new_with_roms(
             SystemModel::from("pal"),
             read_res(fat32, "res/rom/basic.rom")?.as_ref(),
             read_res(fat32, "res/rom/charac~1.rom")?.as_ref(),
             read_res(fat32, "res/rom/kernal.rom")?.as_ref(),
         ));
-        let chip_factory = Box::new(C64Factory::new(config.clone()));
+        let sound_buffer = Arc::new(
+            SoundBuffer::new(config.sound.buffer_size << 4)
+        );
         let video_buffer = new_shared(VideoBuffer::new(
             config.model.frame_buffer_size.0,
             config.model.frame_buffer_size.1,
             Palette::default(),
         ));
-        let sound_buffer = Arc::new(NullSound {});
+        let chip_factory = Box::new(C64Factory::new(config.clone()));
         let mut c64 = C64::build(
             config.clone(),
             &*chip_factory,
             video_buffer.clone(),
             sound_buffer.clone());
         c64.reset(false);
-        let viewport_rect = Rect::new_with_origin(
+        // Initialize audio
+        let audio_engine = AudioEngine::build(
+            gpio,
+            config.sound.sample_rate,
+            config.sound.buffer_size << 3,
+            sound_buffer.clone(),
+        )?;
+        // Initialize video
+        let mut mbox = Mbox::build(memory::map::MBOX_BASE)?;
+        let video_renderer = VideoRenderer::build(
+            &mut mbox,
+            video_buffer.clone(),
             config.model.viewport_offset,
             config.model.viewport_size,
-        );
-        let frame_buffer = FrameBuffer::build(
-            mbox,
-            FB_SIZE,
-            (config.model.viewport_size.0, config.model.viewport_size.1),
-            (0, 0),
-            FB_BPP,
         )?;
-        info!("Allocated frame buffer at 0x{:08x}", frame_buffer.as_ptr() as usize);
+        let frame_duration = delay::get_counter_freq() as u64
+                * config.model.cycles_per_frame as u64 / config.model.cpu_freq as u64;
         Ok(App {
-            mbox,
             c64,
-            video_buffer,
-            viewport_rect,
-            frame_buffer,
+            audio_engine,
+            video_renderer,
+            mbox,
+            frame_duration,
+            idle_counter: 0,
+            next_frame_ts: 0,
             next_keyboard_event: 0,
         })
     }
@@ -134,7 +150,7 @@ impl<'a> App<'a> {
                         break;
                     }
                 }
-            },
+            }
             Err(_) => debug!("autorun not found"),
         }
         Ok(())
@@ -142,23 +158,15 @@ impl<'a> App<'a> {
 
     pub fn run(&mut self) -> Result<(), &'static str> {
         info!("Running main loop");
+        self.audio_engine.start();
+        self.next_frame_ts = delay::get_counter() + self.frame_duration;
         loop {
             self.c64.run_frame();
-            if self.c64.is_cpu_jam() {
-                info!("CPU JAM detected at 0x{:x}", self.c64.get_cpu().get_pc());
-                break;
-            }
-            if self.c64.get_frame_count() % (self.c64.get_config().model.refresh_rate as u32) == 0 {
-                info!("Frame {}", self.c64.get_frame_count());
-                // debug::dump_screen(&c64);
-            }
-            self.frame_buffer.wait_for_vsync(&mut self.mbox)?;
-            self.frame_buffer.blit(
-                self.video_buffer.borrow().get_data(),
-                &self.viewport_rect,
-                self.video_buffer.borrow().get_pitch() as u32,
-            );
-            self.c64.reset_vsync();
+            // if self.c64.is_cpu_jam() {
+            //     info!("CPU JAM detected at 0x{:x}", self.c64.get_cpu().get_pc());
+            //     break;
+            // }
+            self.process_vsync()?;
             self.handle_events();
         }
         Ok(())
@@ -173,4 +181,30 @@ impl<'a> App<'a> {
             self.next_keyboard_event = self.c64.get_cycles().wrapping_add(20000);
         }
     }
+
+    fn process_vsync(&mut self) -> Result<(), &'static str> {
+        let refresh_rate = self.c64.get_config().model.refresh_rate as u32;
+        self.idle_counter += self.next_frame_ts - delay::get_counter();
+        self.sync_frame();
+        self.video_renderer.render()?;
+        self.c64.reset_vsync();
+        if self.c64.get_frame_count() % refresh_rate == 0 {
+            let idle_pct = self.idle_counter * 100 / delay::get_counter_freq() as u64;
+            self.idle_counter = 0;
+            info!("Frame {}, idle {}", self.c64.get_frame_count(), idle_pct);
+        }
+        Ok(())
+    }
+
+    fn sync_frame(&mut self) {
+        delay::wait_counter(self.next_frame_ts);
+        self.next_frame_ts += self.frame_duration;
+    }
+
+    #[allow(unused)]
+    fn wait_for_vsync(&mut self) -> Result<(), &'static str> {
+        board::wait_for_vsync(&mut self.mbox)
+    }
 }
+
+
