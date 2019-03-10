@@ -4,40 +4,40 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-mod keymap;
-
 use std::collections::HashSet;
 
 use sdl2;
 use sdl2::event::Event;
 use sdl2::joystick;
 use sdl2::keyboard::{Keycode, Mod};
+use zinc64_core::Shared;
 use zinc64_emu::device::joystick::Button;
 use zinc64_emu::device::{Joystick, Keyboard};
-use zinc64_core::Shared;
 
-use self::keymap::KeyMap;
+use crate::util::keymap::KeyMap;
 
-pub struct Input {
-    //event_pump: EventPump,
+pub struct InputSystem {
+    // Components
     keyboard: Shared<Keyboard>,
     joystick1: Option<Shared<Joystick>>,
     joystick2: Option<Shared<Joystick>>,
+    // Resources
     #[allow(dead_code)]
     sdl_joystick1: Option<joystick::Joystick>,
     #[allow(dead_code)]
     sdl_joystick2: Option<joystick::Joystick>,
+    // Runtime state
     pressed_joy_keys: HashSet<Keycode>,
     pressed_joy_buttons: Vec<Button>,
 }
 
-impl Input {
+impl InputSystem {
     pub fn build(
         sdl_joystick: &sdl2::JoystickSubsystem,
         keyboard: Shared<Keyboard>,
         joystick1: Option<Shared<Joystick>>,
         joystick2: Option<Shared<Joystick>>,
-    ) -> Result<Input, String> {
+    ) -> Result<InputSystem, String> {
         sdl_joystick.set_event_state(true);
         let sdl_joystick1 = joystick1.as_ref().and_then(|joystick| {
             if !joystick.borrow().is_virtual() {
@@ -55,7 +55,7 @@ impl Input {
                 None
             }
         });
-        let io = Input {
+        let input_system = InputSystem {
             //event_pump: sdl_context.event_pump().unwrap(),
             keyboard,
             joystick1,
@@ -65,7 +65,7 @@ impl Input {
             pressed_joy_keys: HashSet::new(),
             pressed_joy_buttons: Vec::new(),
         };
-        Ok(io)
+        Ok(input_system)
     }
 
     pub fn handle_event(&mut self, event: &Event) {

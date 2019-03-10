@@ -18,28 +18,58 @@ use sdl2::keyboard;
 use sdl2::keyboard::Keycode;
 use sdl2::{EventPump, Sdl};
 use time;
-use zinc64_emu::system::C64;
 use zinc64_core::Shared;
 use zinc64_debug::{Command, Debugger, RapServer};
+use zinc64_emu::system::C64;
 
-use crate::config::{JamAction, Options};
-use crate::input::Input;
-use crate::output::{AppAudio, FrameBuffer, Renderer, SoundBuffer};
+use crate::audio::AudioRenderer;
+use crate::execution::{ExecutionEngine, State};
+use crate::input::InputSystem;
+use crate::sound_buffer::SoundBuffer;
+use crate::video_buffer::VideoBuffer;
+use crate::video_renderer::VideoRenderer;
 
-use super::execution::{ExecutionEngine, State};
+pub enum JamAction {
+    Continue,
+    Quit,
+    Reset,
+}
+
+impl JamAction {
+    pub fn from(action: &str) -> JamAction {
+        match action {
+            "continue" => JamAction::Continue,
+            "quit" => JamAction::Quit,
+            "reset" => JamAction::Reset,
+            _ => panic!("invalid jam action {}", action),
+        }
+    }
+}
+
+pub struct Options {
+    pub fullscreen: bool,
+    pub window_size: (u32, u32),
+    pub speed: u8,
+    pub warp_mode: bool,
+    // Debug
+    pub debug: bool,
+    pub dbg_address: Option<SocketAddr>,
+    pub jam_action: JamAction,
+    pub rap_address: Option<SocketAddr>,
+}
 
 pub struct App {
     // Dependencies
     options: Options,
+    sdl_context: Sdl,
     // Components
-    audio_device: AudioDevice<AppAudio>,
+    audio_device: AudioDevice<AudioRenderer>,
+    input_system: InputSystem,
+    video_renderer: VideoRenderer,
+    // Runtime State
     command_rx: mpsc::Receiver<Command>,
     execution_engine: ExecutionEngine,
-    input: Input,
-    renderer: Renderer,
-    sdl_context: Sdl,
-    // Runtime State
-    frame_buffer: Shared<FrameBuffer>,
+    video_buffer: Shared<VideoBuffer>,
     next_frame_ns: u64,
     next_keyboard_event: u64,
 }
@@ -47,15 +77,24 @@ pub struct App {
 impl App {
     pub fn build(
         c64: C64,
-        frame_buffer: Shared<FrameBuffer>,
+        video_buffer: Shared<VideoBuffer>,
         sound_buffer: Arc<SoundBuffer>,
         options: Options,
     ) -> Result<App, String> {
         let sdl_context = sdl2::init()?;
+        // Initialize audio
+        let sdl_audio = sdl_context.audio()?;
+        let audio_device = AudioRenderer::new_device(
+            &sdl_audio,
+            c64.get_config().sound.sample_rate as i32,
+            1,
+            c64.get_config().sound.buffer_size as u16,
+            sound_buffer.clone(),
+        )?;
         // Initialize video
         let sdl_video = sdl_context.video()?;
         info!(target: "app", "Opening app window {}x{}", options.window_size.0, options.window_size.1);
-        let renderer = Renderer::build(
+        let video_renderer = VideoRenderer::build(
             &sdl_video,
             options.window_size,
             c64.get_config().model.frame_buffer_size,
@@ -63,19 +102,9 @@ impl App {
             c64.get_config().model.viewport_size,
             options.fullscreen,
         )?;
-        // Initialize audio
-        let sdl_audio = sdl_context.audio()?;
-        let mut audio_device = AppAudio::new_device(
-            &sdl_audio,
-            c64.get_config().sound.sample_rate as i32,
-            1,
-            c64.get_config().sound.buffer_size as u16,
-            sound_buffer.clone(),
-        )?;
-        audio_device.lock().set_volume(100);
         // Initialize I/O
         let sdl_joystick = sdl_context.joystick()?;
-        let io = Input::build(
+        let input_system = InputSystem::build(
             &sdl_joystick,
             c64.get_keyboard(),
             c64.get_joystick1(),
@@ -104,13 +133,13 @@ impl App {
         }
         let app = App {
             options,
+            sdl_context,
             audio_device,
+            input_system,
+            video_renderer,
             command_rx,
             execution_engine: ExecutionEngine::new(c64),
-            input: io,
-            renderer,
-            sdl_context,
-            frame_buffer,
+            video_buffer,
             next_frame_ns: 0,
             next_keyboard_event: 0,
         };
@@ -180,8 +209,8 @@ impl App {
             if !self.options.warp_mode {
                 self.sync_frame();
             }
-            self.renderer
-                .render(&self.frame_buffer.borrow())
+            self.video_renderer
+                .render(&self.video_buffer.borrow())
                 .expect("Failed to render frame");
             self.execution_engine.get_c64().reset_vsync();
         }
@@ -242,8 +271,7 @@ impl App {
     }
 
     fn toggle_warp(&mut self) {
-        let warp_mode = self.options.warp_mode;
-        self.options.warp_mode = !warp_mode;
+        self.options.warp_mode = !self.options.warp_mode;
     }
 
     fn update_audio_state(&mut self) {
@@ -352,10 +380,10 @@ impl App {
                     repeat: false,
                     ..
                 } if keymod.contains(keyboard::LALTMOD) => {
-                    self.renderer.toggle_fullscreen();
+                    self.video_renderer.toggle_fullscreen();
                 }
                 _ => {
-                    self.input.handle_event(&event);
+                    self.input_system.handle_event(&event);
                 }
             }
         }

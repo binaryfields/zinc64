@@ -2,30 +2,37 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use getopts;
 #[macro_use]
 extern crate log;
 
-mod config;
+mod app;
+mod audio;
+mod cli;
 mod console;
+mod execution;
 mod input;
-mod output;
-mod ui;
+mod palette;
+mod sound_buffer;
 mod util;
+mod video_buffer;
+mod video_renderer;
 
 use std::env;
 use std::process;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use zinc64_emu::system::{C64Factory, C64};
+use getopts;
 use zinc64_core::new_shared;
+use zinc64_emu::system::{C64Factory, C64};
 
-use crate::config::Cli;
+use crate::app::App;
+use crate::cli::Cli;
 use crate::console::ConsoleApp;
-use crate::output::{FrameBuffer, Palette, SoundBuffer};
-use crate::ui::App;
+use crate::palette::Palette;
+use crate::sound_buffer::SoundBuffer;
 use crate::util::Logger;
+use crate::video_buffer::VideoBuffer;
 
 static NAME: &str = "zinc64";
 
@@ -67,17 +74,17 @@ fn run(args: &[String]) -> Result<(), String> {
         init_logging(&matches)?;
         info!("Starting {}", NAME);
         let config = Rc::new(Cli::parse_system_config(&matches)?);
-        let chip_factory = Box::new(C64Factory::new(config.clone()));
-        let frame_buffer = new_shared(FrameBuffer::new(
+        let sound_buffer = Arc::new(SoundBuffer::new(config.sound.buffer_size << 2));
+        let video_buffer = new_shared(VideoBuffer::new(
             config.model.frame_buffer_size.0,
             config.model.frame_buffer_size.1,
             Palette::default(),
         ));
-        let sound_buffer = Arc::new(SoundBuffer::new(config.sound.buffer_size << 2));
+        let chip_factory = Box::new(C64Factory::new(config.clone()));
         let mut c64 = C64::build(
             config.clone(),
             &*chip_factory,
-            frame_buffer.clone(),
+            video_buffer.clone(),
             sound_buffer.clone(),
         );
         c64.reset(true);
@@ -87,7 +94,7 @@ fn run(args: &[String]) -> Result<(), String> {
             app.run();
         } else {
             let options = Cli::parse_app_options(&matches)?;
-            let mut app = App::build(c64, frame_buffer.clone(), sound_buffer.clone(), options)?;
+            let mut app = App::build(c64, video_buffer.clone(), sound_buffer.clone(), options)?;
             app.run()?;
         }
     }

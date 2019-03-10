@@ -15,7 +15,7 @@ use zinc64_emu::device;
 use zinc64_emu::system::{Config, C64};
 use zinc64_loader::{BinLoader, Loader, LoaderKind, Loaders};
 
-use super::{JamAction, Options};
+use crate::app::{JamAction, Options};
 use crate::util::FileReader;
 
 static NAME: &'static str = "zinc64";
@@ -159,6 +159,13 @@ impl Cli {
         opts
     }
 
+    fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
+        let mut data = Vec::new();
+        let mut file = fs::File::open(path)?;
+        file.read_to_end(&mut data)?;
+        Ok(data)
+    }
+
     fn parse_device_config(config: &mut Config, matches: &getopts::Matches) -> Result<(), String> {
         if let Some(joydev) = matches.opt_str("joydev1") {
             config.joystick.joystick_1 = device::joystick::Mode::from(&joydev);
@@ -169,13 +176,6 @@ impl Cli {
             config.joystick.joystick_2 = device::joystick::Mode::Numpad;
         }
         Ok(())
-    }
-
-    fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
-        let mut data = Vec::new();
-        let mut file = fs::File::open(path)?;
-        file.read_to_end(&mut data)?;
-        Ok(data)
     }
 
     fn parse_rom_config(config: &mut Config, _matches: &getopts::Matches) -> Result<(), String> {

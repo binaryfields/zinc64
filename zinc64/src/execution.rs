@@ -7,8 +7,8 @@
 use std::sync::mpsc::Sender;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use zinc64_emu::system::C64;
 use zinc64_debug::{Command, CommandResult, RegData, RegOp};
+use zinc64_emu::system::C64;
 
 // DEFERRED debugger: impl io
 

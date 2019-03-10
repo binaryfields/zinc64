@@ -9,7 +9,7 @@ use std::sync::Arc;
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 
-use super::SoundBuffer;
+use crate::sound_buffer::SoundBuffer;
 
 // TODO app: audio warp handling
 
@@ -17,34 +17,38 @@ const SCALER_MAX: i32 = 4096;
 const SCALER_SHIFT: usize = 12;
 const VOLUME_MAX: u8 = 100;
 
-pub struct AppAudio {
+pub struct AudioRenderer {
+    // Resources
     buffer: Arc<SoundBuffer>,
+    // Runtime state
     mute: bool,
     scaler: i32,
     volume: u8,
 }
 
-impl AppAudio {
+impl AudioRenderer {
     pub fn new_device(
         sdl_audio: &sdl2::AudioSubsystem,
-        sample_rate: i32,
+        freq: i32,
         channels: u8,
-        buffer_size: u16,
+        samples: u16,
         buffer: Arc<SoundBuffer>,
-    ) -> Result<AudioDevice<AppAudio>, String> {
+    ) -> Result<AudioDevice<AudioRenderer>, String> {
         let audio_spec = AudioSpecDesired {
-            freq: Some(sample_rate),
+            freq: Some(freq),
             channels: Some(channels),
-            samples: Some(buffer_size),
+            samples: Some(samples),
         };
         let audio_device = sdl_audio.open_playback(None, &audio_spec, |spec| {
             info!(target: "audio", "{:?}", spec);
-            AppAudio {
+            let mut renderer = AudioRenderer {
                 buffer,
                 mute: false,
                 scaler: SCALER_MAX,
                 volume: VOLUME_MAX,
-            }
+            };
+            renderer.set_volume(VOLUME_MAX);
+            renderer
         })?;
         Ok(audio_device)
     }
@@ -55,12 +59,11 @@ impl AppAudio {
     }
 
     pub fn toggle_mute(&mut self) {
-        let mute = self.mute;
-        self.mute = !mute;
+        self.mute = !self.mute;
     }
 }
 
-impl AudioCallback for AppAudio {
+impl AudioCallback for AudioRenderer {
     type Channel = i16;
 
     fn callback(&mut self, out: &mut [i16]) {
