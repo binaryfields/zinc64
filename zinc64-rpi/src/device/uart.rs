@@ -138,9 +138,7 @@ pub struct Uart {
 #[allow(unused)]
 impl Uart {
     pub const fn new(base_addr: usize) -> Self {
-        Uart {
-            base_addr
-        }
+        Uart { base_addr }
     }
 
     /// Returns a pointer to the register block
@@ -161,15 +159,13 @@ impl Uart {
         // map UART0 to GPIO pins
         gpio.GPFSEL1.modify(
             gpio::GPFSEL1::FSEL14.val(gpio::GPFSEL::Alt0 as u32)
-                + gpio::GPFSEL1::FSEL15.val(gpio::GPFSEL::Alt0 as u32)
+                + gpio::GPFSEL1::FSEL15.val(gpio::GPFSEL::Alt0 as u32),
         );
 
         gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         self.wait_cycles(150);
-        gpio.GPPUDCLK0.modify(
-            gpio::GPREGSET0::P14::SET
-                + gpio::GPREGSET0::P15::SET,
-        );
+        gpio.GPPUDCLK0
+            .modify(gpio::GPREGSET0::P14::SET + gpio::GPREGSET0::P15::SET);
         self.wait_cycles(150);
         gpio.GPPUDCLK0.set(0);
 
@@ -177,11 +173,8 @@ impl Uart {
         self.IBRD.write(IBRD::IBRD.val(2)); // Results in 115200 baud
         self.FBRD.write(FBRD::FBRD.val(0xB));
         self.LCRH.write(LCRH::WLEN::EightBit); // 8N1
-        self.CR.write(
-            CR::UARTEN::Enabled
-                + CR::TXE::Enabled
-                + CR::RXE::Enabled
-        );
+        self.CR
+            .write(CR::UARTEN::Enabled + CR::TXE::Enabled + CR::RXE::Enabled);
 
         Ok(())
     }

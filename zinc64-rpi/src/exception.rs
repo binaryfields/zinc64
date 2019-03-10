@@ -78,7 +78,7 @@ unsafe extern "C" fn current_elx_synchronous(ec: &mut ExceptionContext) {
                 1 => Some("Translation fault"),
                 2 => Some("Access flag fault"),
                 3 => Some("Permission fault"),
-                _ => None
+                _ => None,
             };
             if let Some(fault) = fault {
                 let level = match ec.esr_el1.read(ESR_EL1::ISS) & 0x03 {

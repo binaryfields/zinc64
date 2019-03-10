@@ -129,7 +129,11 @@ impl DirectoryEntry {
     }
 
     pub fn get_size(&self) -> Option<usize> {
-        if self.is_dir() { None } else { Some(self.file_size as usize) }
+        if self.is_dir() {
+            None
+        } else {
+            Some(self.file_size as usize)
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -155,8 +159,7 @@ struct Buffer<'a> {
 
 impl<'a> Buffer<'a> {
     pub fn build(size: usize) -> Result<Buffer<'a>> {
-        let layout = Layout::from_size_align(size, 8)
-            .map_err(|_| "invalid buffer alignment")?;
+        let layout = Layout::from_size_align(size, 8).map_err(|_| "invalid buffer alignment")?;
         let ptr = unsafe { crate::DMA_ALLOCATOR.alloc_zeroed(layout) };
         if ptr.is_null() {
             return Err("failed to allocate buffer");
@@ -194,8 +197,8 @@ pub struct File<'a> {
 
 impl<'a> File<'a> {
     pub fn build(cluster: u32, size: Option<usize>) -> Result<File<'a>> {
-        let layout = Layout::from_size_align(BLOCK_SIZE, 8)
-            .map_err(|_| "invalid buffer alignment")?;
+        let layout =
+            Layout::from_size_align(BLOCK_SIZE, 8).map_err(|_| "invalid buffer alignment")?;
         let ptr = unsafe { crate::DMA_ALLOCATOR.alloc_zeroed(layout) };
         if ptr.is_null() {
             return Err("failed to allocate buffer");
@@ -211,16 +214,13 @@ impl<'a> File<'a> {
     }
 
     pub fn get_remaining_bytes(&self) -> usize {
-        self.size
-            .map(|size| size - self.pos)
-            .unwrap_or(0xffff)
+        self.size.map(|size| size - self.pos).unwrap_or(0xffff)
     }
 
     pub fn is_eof(&self) -> bool {
         !(self.cluster > 0
             && self.cluster < 0x0ffffff6
-            && self.size.map(|size| self.pos < size)
-            .unwrap_or(true))
+            && self.size.map(|size| self.pos < size).unwrap_or(true))
     }
 }
 
@@ -303,8 +303,8 @@ impl Fat32 {
         let fat = if bpb.fat_size_16 == 0 && bpb.root_entry_count == 0 {
             info!("Found FAT32 ...");
             let ebpb: ExtBiosParamBlock32 = unsafe { ptr::read(buffer.buf.as_ptr() as *const _) };
-            let ssa = bpb.reserved_sector_count as u32
-                + (bpb.num_of_fats as u32 * ebpb.fat_size_32);
+            let ssa =
+                bpb.reserved_sector_count as u32 + (bpb.num_of_fats as u32 * ebpb.fat_size_32);
             Fat32 {
                 device,
                 mode: Mode::Fat32,
@@ -325,7 +325,8 @@ impl Fat32 {
             let mut ssa = bpb.reserved_sector_count as u32
                 + (bpb.num_of_fats as u32 * bpb.fat_size_16 as u32);
             let root_size = bpb.root_entry_count as usize * mem::size_of::<DirectoryEntry>();
-            ssa += (root_size as u32 + bpb.bytes_per_sector as u32 - 1) / bpb.bytes_per_sector as u32;
+            ssa +=
+                (root_size as u32 + bpb.bytes_per_sector as u32 - 1) / bpb.bytes_per_sector as u32;
             Fat32 {
                 device,
                 mode: Mode::Fat16,
@@ -352,13 +353,19 @@ impl Fat32 {
         info!("Filesystem type: {}", mode);
         info!("Disk label: {}", self.label);
         info!("Total sectors: {}", self.total_sectors);
-        info!("Disk size: {}", self.total_sectors * self.bytes_per_sector as u32);
+        info!(
+            "Disk size: {}",
+            self.total_sectors * self.bytes_per_sector as u32
+        );
         info!("Bytes per sector: {}", self.bytes_per_sector);
         info!("Sectors per cluster: {}", self.sectors_per_cluster);
         info!("Reserved sectors: {}", self.reserved_sectors);
         info!("Hidden sectors: {}", self.hidden_sectors);
         info!("Sectors per FAT: {}", self.sectors_per_fat);
-        info!("FAT size: {}", self.sectors_per_fat * self.bytes_per_sector as u32);
+        info!(
+            "FAT size: {}",
+            self.sectors_per_fat * self.bytes_per_sector as u32
+        );
         info!("Data start sector: {}", self.data_start_sector);
         info!("Root directory cluster: {}", self.root_dir_cluster);
         info!("Partition start sector: {}", self.partition_lba);
@@ -424,18 +431,20 @@ impl Fat32 {
             Mode::Fat32 => 4,
             Mode::Fat16 => 2,
         };
-        let entry_sector = self.reserved_sectors as u32
-            + cluster * entry_size / self.bytes_per_sector as u32;
+        let entry_sector =
+            self.reserved_sectors as u32 + cluster * entry_size / self.bytes_per_sector as u32;
         let entry_offset = (cluster * entry_size % self.bytes_per_sector as u32) as usize;
-        self.device.read(self.to_lba(entry_sector), 1, &mut buffer.buf)?;
+        self.device
+            .read(self.to_lba(entry_sector), 1, &mut buffer.buf)?;
         let result = match &self.mode {
-            Mode::Fat32 => {
-                unsafe { ptr::read::<u32>(buffer.buf[entry_offset..].as_ptr() as *const _) }
+            Mode::Fat32 => unsafe {
+                ptr::read::<u32>(buffer.buf[entry_offset..].as_ptr() as *const _)
             },
             Mode::Fat16 => {
-                let result = unsafe { ptr::read::<u16>(buffer.buf[entry_offset..].as_ptr() as *const _) };
+                let result =
+                    unsafe { ptr::read::<u16>(buffer.buf[entry_offset..].as_ptr() as *const _) };
                 result as u32
-            },
+            }
         };
         Ok(result)
     }
@@ -497,10 +506,10 @@ impl Fat32 {
         // to a logical sector number LSN:
         // Determine LSN=SSA+(CN−2)×SC, where the sectors per cluster SCare stored at offset 0x00D."
         match &self.mode {
-            Mode::Fat16 if cluster == 2 =>
-                self.data_start_sector - 32 + (cluster - 2) * self.sectors_per_cluster as u32,
-            _ =>
-                self.data_start_sector + (cluster - 2) * self.sectors_per_cluster as u32,
+            Mode::Fat16 if cluster == 2 => {
+                self.data_start_sector - 32 + (cluster - 2) * self.sectors_per_cluster as u32
+            }
+            _ => self.data_start_sector + (cluster - 2) * self.sectors_per_cluster as u32,
         }
     }
 }
@@ -518,8 +527,7 @@ mod util {
     }
 
     pub fn to_str(buffer: &[u8]) -> Result<&str> {
-        core::str::from_utf8(buffer.as_ref())
-            .map_err(|_| "invalid utf8")
+        core::str::from_utf8(buffer.as_ref()).map_err(|_| "invalid utf8")
     }
 
     pub fn to_str_trimmed(buffer: &[u8]) -> Result<&str> {
@@ -530,7 +538,6 @@ mod util {
                 break;
             }
         }
-        core::str::from_utf8(&buffer[0..end])
-            .map_err(|_| "invalid utf8")
+        core::str::from_utf8(&buffer[0..end]).map_err(|_| "invalid utf8")
     }
 }

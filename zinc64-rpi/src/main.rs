@@ -27,9 +27,9 @@ mod memory;
 mod null_output;
 mod palette;
 mod sound_buffer;
+mod util;
 mod video_buffer;
 mod video_renderer;
-mod util;
 
 use core::alloc::Layout;
 use core::panic::PanicInfo;
@@ -45,9 +45,7 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 static DMA_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 static mut CONSOLE: Console = Console::new();
-static IRQ_CONTROL: NullLock<InterruptControl> = NullLock::new(
-    InterruptControl::new()
-);
+static IRQ_CONTROL: NullLock<InterruptControl> = NullLock::new(InterruptControl::new());
 
 fn start() -> ! {
     extern "C" {
@@ -84,8 +82,12 @@ fn start() -> ! {
     unsafe {
         let heap_range = memory::app_heap_range();
         let dma_range = memory::dma_heap_range();
-        ALLOCATOR.lock().init(heap_range.0, heap_range.1 - heap_range.0);
-        DMA_ALLOCATOR.lock().init(dma_range.0, dma_range.1 - dma_range.0);
+        ALLOCATOR
+            .lock()
+            .init(heap_range.0, heap_range.1 - heap_range.0);
+        DMA_ALLOCATOR
+            .lock()
+            .init(dma_range.0, dma_range.1 - dma_range.0);
     }
 
     memory::print_mmap();

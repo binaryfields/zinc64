@@ -39,15 +39,17 @@ pub struct Snd<'a> {
 
 #[allow(unused)]
 impl<'a> Snd<'a> {
-    pub fn open(gpio: &GPIO, freq: u32, channels: usize, samples: usize, cb: Box<SndCallback>) -> Result<Snd<'a>, &'static str> {
-        let dev = Rc::new(
-            NullLock::new(
-                SndDev::open(gpio, freq, channels, samples, cb)?
-            )
-        );
-        Ok(Snd {
-            dev
-        })
+    pub fn open(
+        gpio: &GPIO,
+        freq: u32,
+        channels: usize,
+        samples: usize,
+        cb: Box<SndCallback>,
+    ) -> Result<Snd<'a>, &'static str> {
+        let dev = Rc::new(NullLock::new(SndDev::open(
+            gpio, freq, channels, samples, cb,
+        )?));
+        Ok(Snd { dev })
     }
 
     pub fn close(&self) {
@@ -82,9 +84,7 @@ pub struct SndIrqHandler<'a> {
 
 impl<'a> SndIrqHandler<'a> {
     pub fn new(dev: Rc<NullLock<SndDev<'a>>>) -> Self {
-        SndIrqHandler {
-            dev,
-        }
+        SndIrqHandler { dev }
     }
 }
 
@@ -118,7 +118,13 @@ pub struct SndDev<'a> {
 
 #[allow(unused)]
 impl<'a> SndDev<'a> {
-    pub fn open(gpio: &GPIO, freq: u32, channels: usize, samples: usize, cb: Box<SndCallback>) -> Result<SndDev<'a>, &'static str> {
+    pub fn open(
+        gpio: &GPIO,
+        freq: u32,
+        channels: usize,
+        samples: usize,
+        cb: Box<SndCallback>,
+    ) -> Result<SndDev<'a>, &'static str> {
         info!("Initializing device ...");
         let buffer = [
             Buffer::alloc(samples * channels)?,
@@ -146,11 +152,7 @@ impl<'a> SndDev<'a> {
         );
         control_block.set_next(control_block_2.ptr());
         control_block_2.set_next(control_block.ptr());
-        let clock = Clock::new(
-            memory::map::CM_BASE,
-            ClockInstance::Pwm,
-            ClockSource::PllD,
-        );
+        let clock = Clock::new(memory::map::CM_BASE, ClockInstance::Pwm, ClockSource::PllD);
         let pwm = PWM::new(memory::map::PWM_BASE);
         let dma_channel = DmaChannel::new(memory::map::DMA_BASE, DMA_CHANNEL_PWM);
         // $1624 ; Range = 12bit 44100Hz Stereo
@@ -181,11 +183,12 @@ impl<'a> SndDev<'a> {
         // Set GPIO 40 & 45 (Phone Jack) To Alternate PWM Function 0
         gpio.GPFSEL4.modify(
             gpio::GPFSEL4::FSEL40.val(gpio::GPFSEL::Alt0 as u32)
-                + gpio::GPFSEL4::FSEL45.val(gpio::GPFSEL::Alt0 as u32)
+                + gpio::GPFSEL4::FSEL45.val(gpio::GPFSEL::Alt0 as u32),
         );
         gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         delay::wait_cycles(150);
-        gpio.GPPUDCLK1.write(gpio::GPREGSET1::P40::SET + gpio::GPREGSET1::P45::SET);
+        gpio.GPPUDCLK1
+            .write(gpio::GPREGSET1::P40::SET + gpio::GPREGSET1::P45::SET);
         delay::wait_cycles(150);
         gpio.GPPUD.set(0);
         gpio.GPPUDCLK1.set(0);
@@ -248,7 +251,7 @@ impl<'a> SndDev<'a> {
                 // self.dma_channel.dump();
                 self.dma_channel.resume();
                 self.fill_buffer();
-            },
+            }
             _ => (),
         }
     }

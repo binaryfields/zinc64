@@ -9,8 +9,8 @@ use core::str;
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Autostart, AutostartMethod, Image, C64};
 
-use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
+use crate::io::{self, ReadBytesExt, Reader};
 
 static HEADER_SIG: &'static str = "C64File";
 
@@ -67,8 +67,8 @@ impl P00Loader {
     }
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
-        let sig = str::from_utf8(&header.signature)
-            .map_err(|_| "invalid P00 signature".to_owned())?;
+        let sig =
+            str::from_utf8(&header.signature).map_err(|_| "invalid P00 signature".to_owned())?;
         if sig == HEADER_SIG {
             Ok(())
         } else {

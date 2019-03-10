@@ -26,7 +26,7 @@ pub enum Channel {
 pub enum Code {
     Request = 0x0000_0000,
     ResponseSuccess = 0x8000_0000,
-    ResponseFailure= 0x8000_0001,
+    ResponseFailure = 0x8000_0001,
     Unknown = 0xffff_ffff,
 }
 
@@ -84,7 +84,7 @@ impl<'a> Mbox<'a> {
             .map_err(|_| "invalid buffer alignment")?;
         let ptr = unsafe { crate::DMA_ALLOCATOR.alloc_zeroed(layout) };
         if ptr.is_null() {
-           return Err("failed to allocate buffer");
+            return Err("failed to allocate buffer");
         }
         Ok(Mbox {
             base_addr,

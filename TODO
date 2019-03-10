@@ -1,5 +1,6 @@
 # TODO
 
+- zinc64: switch to clap
 - device: add mouse support
 - device: add floppy support
 - app: add screenshot support

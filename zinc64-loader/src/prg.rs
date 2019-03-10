@@ -8,8 +8,8 @@ use byteorder::LittleEndian;
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Autostart, AutostartMethod, Image, C64};
 
-use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
+use crate::io::{self, ReadBytesExt, Reader};
 
 struct PrgImage {
     data: Vec<u8>,

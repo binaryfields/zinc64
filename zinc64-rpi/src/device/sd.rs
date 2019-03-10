@@ -6,9 +6,8 @@ use core::cmp;
 use core::ops::Deref;
 use core::result;
 use register::{
-    Field,
     mmio::{ReadOnly, ReadWrite},
-    register_bitfields,
+    register_bitfields, Field,
 };
 
 use super::delay;
@@ -210,7 +209,7 @@ impl Sd {
         self.send_if_cond(0x000001aa)?;
         let ocr = self.send_op_cond(ACMD41_ARG_HC)?;
         if ocr & ACMD41_VOLTAGE == 0 {
-            return Err(Error::InvalidVoltage)
+            return Err(Error::InvalidVoltage);
         }
         self.card_type = if ocr & OCR_CARD_CAPACITY != 0 {
             CardType::Type2Hc
@@ -232,7 +231,8 @@ impl Sd {
     }
 
     pub fn read(&self, lba: u32, num: u32, buffer: &mut [u8]) -> result::Result<(), &'static str> {
-        self.read_block(lba, num, buffer).map_err(|_| "failed to read block")
+        self.read_block(lba, num, buffer)
+            .map_err(|_| "failed to read block")
     }
 
     fn init_gpio(&self, gpio: &gpio::GPIO) {
@@ -246,7 +246,8 @@ impl Sd {
         gpio.GPPUDCLK1.set(0);
         gpio.GPHEN1.set(gpio.GPHEN1.get() | (1 << 15));
         // gpio_clk, gpio_cd
-        gpio.GPFSEL4.set(gpio.GPFSEL4.get() | (7 << (8 * 3)) | (7 << (9 * 3)));
+        gpio.GPFSEL4
+            .set(gpio.GPFSEL4.get() | (7 << (8 * 3)) | (7 << (9 * 3)));
         gpio.GPPUD.write(gpio::GPPUD::PUD::Reserved);
         delay::wait_cycles(150);
         gpio.GPPUDCLK1.set((1 << 16) | (1 << 17));
@@ -254,10 +255,14 @@ impl Sd {
         gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         gpio.GPPUDCLK1.set(0);
         // gpio_dat0/1/2/3
-        gpio.GPFSEL5.set(gpio.GPFSEL5.get() | ((7 << (0 * 3)) | (7 << (1 * 3)) | (7 << (2 * 3)) | (7 << (3 * 3))));
+        gpio.GPFSEL5.set(
+            gpio.GPFSEL5.get()
+                | ((7 << (0 * 3)) | (7 << (1 * 3)) | (7 << (2 * 3)) | (7 << (3 * 3))),
+        );
         gpio.GPPUD.write(gpio::GPPUD::PUD::Reserved);
         delay::wait_cycles(150);
-        gpio.GPPUDCLK1.set((1 << 18) | (1 << 19) | (1 << 20) | (1 << 21));
+        gpio.GPPUDCLK1
+            .set((1 << 18) | (1 << 19) | (1 << 20) | (1 << 21));
         delay::wait_cycles(150);
         gpio.GPPUD.write(gpio::GPPUD::PUD::Off);
         gpio.GPPUDCLK1.set(0);
@@ -267,8 +272,12 @@ impl Sd {
         let mut divider = cmp::min((SD_FREQ + freq - 1) / freq, 0x3ff);
         if self.slotisr_ver.read(SlotIsr::SDVERSION) < 2 {
             let mut shift = find_last_set_bit(divider);
-            if shift > 0 { shift -= 1; }
-            if shift > 7 { shift = 7; }
+            if shift > 0 {
+                shift -= 1;
+            }
+            if shift > 7 {
+                shift = 7;
+            }
             divider = 1 << shift;
         } else {
             if divider < 3 {
@@ -279,14 +288,15 @@ impl Sd {
         self.wait_if_busy()?;
         self.control1.modify(Control1::CLK_EN::CLEAR);
         delay::wait_msec(10);
-        self.control1.modify(Control1::CLK_FREQ8.val(divider & 0xff));
-        self.control1.modify(Control1::CLK_FREQ_MS2.val((divider & 0x300) >> 8));
+        self.control1
+            .modify(Control1::CLK_FREQ8.val(divider & 0xff));
+        self.control1
+            .modify(Control1::CLK_FREQ_MS2.val((divider & 0x300) >> 8));
         delay::wait_msec(10);
         self.control1.modify(Control1::CLK_EN::SET);
         delay::wait_msec(10);
         let mut counter = 10000;
-        while !self.control1.is_set(Control1::CLK_STABLE)
-            && counter != 0 {
+        while !self.control1.is_set(Control1::CLK_STABLE) && counter != 0 {
             delay::wait_msec(10);
             counter -= 1;
         }
@@ -331,7 +341,7 @@ impl Sd {
                 } else {
                     Err(Error::CmdError)
                 }
-            },
+            }
             // RESP0 contains card status
             ResponseType::Resp48Bit => {
                 let resp = self.resp0.get();
@@ -342,7 +352,7 @@ impl Sd {
                             ((resp & 0x00002000) << 6) | // 13 maps to status 19 ERROR
                             ((resp & 0x00004000) << 8) | // 14 maps to status 22 ILLEGAL_COMMAND
                             ((resp & 0x00008000) << 8)
-                    },
+                    }
                     // RESP0 should match arg
                     Command::SendIfCond => 0,
                     // RESP0 contains OCR register
@@ -355,7 +365,7 @@ impl Sd {
                 } else {
                     Err(Error::CmdError)
                 }
-            },
+            }
             // RESP0..3 contains 128 bit CID or CSD shifted down by 8 bits as no CRC
             ResponseType::Resp136Bit => {
                 let mut data = [0u32; 4];
@@ -373,7 +383,9 @@ impl Sd {
             self.send_cmd_int(&Command::AppCmd, 0)?;
             Ok(())
         } else {
-            let status = self.send_cmd_int(&Command::AppCmdRspns48, self.rca)?.to_resp48()?;
+            let status = self
+                .send_cmd_int(&Command::AppCmdRspns48, self.rca)?
+                .to_resp48()?;
             if status & ST_APP_CMD != 0 {
                 Ok(())
             } else {
@@ -415,7 +427,11 @@ impl Sd {
             self.send_cmd(&Command::SetBlockcnt, num)?;
         }
         self.blksizecnt.set((num << 16) | 512);
-        let read_command = if num == 1 { Command::ReadSingle } else { Command::ReadMulti };
+        let read_command = if num == 1 {
+            Command::ReadSingle
+        } else {
+            Command::ReadMulti
+        };
         let address = match self.card_type {
             CardType::Type2Sc => lba << 9,
             _ => lba,
@@ -424,7 +440,7 @@ impl Sd {
         for block in 0..num {
             self.wait_for_interrupt(Interrupt::READ_RDY)?;
             let offset = block as usize * 512;
-            for i in (offset..offset + 512).step_by(4)  {
+            for i in (offset..offset + 512).step_by(4) {
                 let data = self.data.get();
                 buffer[i] = (data & 0xff) as u8;
                 buffer[i + 1] = ((data >> 8) & 0xff) as u8;
@@ -493,13 +509,15 @@ impl Sd {
         let mut counter = 1000000u32;
         while !self.interrupt.is_set(field)
             && self.interrupt.get() & INT_ERROR_MASK == 0
-            && counter != 0 {
+            && counter != 0
+        {
             delay::wait_msec(1);
             counter -= 1;
         }
         if counter == 0
             || self.interrupt.is_set(Interrupt::CMD_TIMEOUT)
-            || self.interrupt.is_set(Interrupt::DATA_TIMEOUT) {
+            || self.interrupt.is_set(Interrupt::DATA_TIMEOUT)
+        {
             self.interrupt.set(self.interrupt.get());
             Err(Error::Timeout)
         } else if self.interrupt.get() & INT_ERROR_MASK != 0 {
@@ -514,7 +532,8 @@ impl Sd {
     fn wait_if_busy(&self) -> Result<()> {
         let mut counter = 100000u32;
         while (self.status.is_set(Status::CMD_INHIBIT) || self.status.is_set(Status::DAT_INHIBIT))
-            && counter != 0 {
+            && counter != 0
+        {
             delay::wait_msec(1);
             counter -= 1;
         }
@@ -529,7 +548,8 @@ impl Sd {
         let mut counter = 500000u32;
         while self.status.is_set(field)
             && self.interrupt.get() & INT_ERROR_MASK == 0
-            && counter != 0 {
+            && counter != 0
+        {
             delay::wait_msec(1);
             counter -= 1;
         }

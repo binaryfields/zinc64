@@ -22,9 +22,7 @@ pub struct NullSoundCallback {
 
 impl NullSoundCallback {
     pub fn new(null_sound: Arc<NullSound>) -> Self {
-        NullSoundCallback {
-            null_sound,
-        }
+        NullSoundCallback { null_sound }
     }
 }
 

@@ -4,8 +4,8 @@
 
 use zinc64_core::Shared;
 
-use crate::device::mbox::Mbox;
 use crate::device::frame_buffer::FrameBuffer;
+use crate::device::mbox::Mbox;
 use crate::util::geo::Rect;
 use crate::video_buffer::VideoBuffer;
 
@@ -27,10 +27,7 @@ impl VideoRenderer {
         viewport_offset: (u32, u32),
         viewport_size: (u32, u32),
     ) -> Result<VideoRenderer, &'static str> {
-        let viewport_rect = Rect::new_with_origin(
-            viewport_offset,
-            viewport_size,
-        );
+        let viewport_rect = Rect::new_with_origin(viewport_offset, viewport_size);
         let frame_buffer = FrameBuffer::build(
             mbox,
             FB_SIZE,

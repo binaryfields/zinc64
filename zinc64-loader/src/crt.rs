@@ -14,8 +14,8 @@ use zinc64_emu::device::{Cartridge, Chip, ChipType, HwType};
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Image, C64};
 
-use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
+use crate::io::{self, ReadBytesExt, Reader};
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
@@ -138,8 +138,8 @@ impl CrtLoader {
     }
 
     fn validate_chip_header(&self, header: &ChipHeader) -> io::Result<()> {
-        let sig = str::from_utf8(&header.signature)
-            .map_err(|_| "invalid chip signature".to_owned())?;
+        let sig =
+            str::from_utf8(&header.signature).map_err(|_| "invalid chip signature".to_owned())?;
         if sig == CHIP_SIG {
             Ok(())
         } else {
@@ -188,7 +188,9 @@ impl Loader for CrtLoader {
                     self.validate_chip_header(&chip_header)?;
                     let chip_data = self
                         .read_data(reader, (chip_header.length - 0x10) as usize)
-                        .map_err(|_| format!("invalid cartridge chip {} data", chip_header.bank_number))?;
+                        .map_err(|_| {
+                            format!("invalid cartridge chip {} data", chip_header.bank_number)
+                        })?;
                     let chip = self.build_chip(&chip_header, chip_data);
                     cartridge.add(chip);
                 }

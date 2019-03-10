@@ -45,7 +45,7 @@ pub enum Irq {
     Dma9 = 25,
     Dma10 = 26,
     Dma11 = 27,
-    Dma12= 28,
+    Dma12 = 28,
     Aux = 29,
     Arm = 30,
     VpUdma = 31,
@@ -80,13 +80,8 @@ impl InterruptControl {
         InterruptControl {
             base_addr: memory::map::INTERRUPT_BASE + 0x200,
             handlers: [
-                None, None, None, None,
-                None, None, None, None,
-                None, None, None, None,
-                None, None, None, None,
-                None, None, None, None,
-                None, None, None, None,
-                None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None, None, None, None,
             ],
         }
@@ -117,7 +112,8 @@ impl InterruptControl {
     }
 
     pub fn handle_irq(&mut self) {
-        if let Some(handler) = &mut self.handlers[Irq::Dma0 as usize] { // FIXME
+        if let Some(handler) = &mut self.handlers[Irq::Dma0 as usize] {
+            // FIXME
             handler.handle_interrupt();
         }
     }
@@ -142,4 +138,3 @@ impl Deref for InterruptControl {
         unsafe { &*self.ptr() }
     }
 }
-

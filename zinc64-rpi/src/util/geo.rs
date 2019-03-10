@@ -11,7 +11,12 @@ pub struct Rect {
 
 impl Rect {
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
-        Rect { x, y, w: width, h: height }
+        Rect {
+            x,
+            y,
+            w: width,
+            h: height,
+        }
     }
 
     pub fn new_with_origin(origin: (u32, u32), size: (u32, u32)) -> Self {

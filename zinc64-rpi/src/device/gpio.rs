@@ -184,14 +184,12 @@ pub struct RegisterBlock {
 }
 
 pub struct GPIO {
-    base_addr: usize
+    base_addr: usize,
 }
 
 impl GPIO {
     pub fn new(base_addr: usize) -> Self {
-        GPIO {
-            base_addr
-        }
+        GPIO { base_addr }
     }
 
     fn ptr(&self) -> *const RegisterBlock {

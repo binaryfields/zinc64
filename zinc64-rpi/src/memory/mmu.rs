@@ -103,7 +103,8 @@ pub unsafe fn init_page_table() {
         + STAGE1_DESCRIPTOR::SH::InnerShareable
         + STAGE1_DESCRIPTOR::AF::True
         + STAGE1_DESCRIPTOR::XN::False
-        + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KB.val(0)).value;
+        + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KB.val(0))
+    .value;
 
     let common = STAGE1_DESCRIPTOR::VALID::True
         + STAGE1_DESCRIPTOR::TYPE::Block
@@ -123,11 +124,9 @@ pub unsafe fn init_page_table() {
             STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL_NON_CACHEABLE)
                 + STAGE1_DESCRIPTOR::SH::InnerShareable
         } else if mmio_range.contains(&i) {
-            STAGE1_DESCRIPTOR::AttrIndx.val(mair::DEVICE)
-                + STAGE1_DESCRIPTOR::SH::OuterShareable
+            STAGE1_DESCRIPTOR::AttrIndx.val(mair::DEVICE) + STAGE1_DESCRIPTOR::SH::OuterShareable
         } else {
-            STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL)
-                + STAGE1_DESCRIPTOR::SH::InnerShareable
+            STAGE1_DESCRIPTOR::AttrIndx.val(mair::NORMAL) + STAGE1_DESCRIPTOR::SH::InnerShareable
         };
         *entry = (common + mattr + STAGE1_DESCRIPTOR::LVL2_OUTPUT_ADDR_4KB.val(i as u64)).value;
     }
@@ -160,11 +159,7 @@ pub unsafe fn init() {
             + TCR_EL1::T0SZ.val(34),
     );
     // Switch MMU on and enable page translation
-    SCTLR_EL1.modify(
-        SCTLR_EL1::M::Enable
-            + SCTLR_EL1::C::Cacheable
-            + SCTLR_EL1::I::Cacheable,
-    );
+    SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
     // Force MMU init to complete
     barrier::isb(barrier::SY);
 }

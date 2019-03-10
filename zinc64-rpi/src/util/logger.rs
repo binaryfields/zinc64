@@ -3,7 +3,7 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use core::fmt::Write;
-use log::{LogLevelFilter, SetLoggerError, ShutdownLoggerError, LogMetadata};
+use log::{LogLevelFilter, LogMetadata, SetLoggerError, ShutdownLoggerError};
 
 pub struct SimpleLogger;
 
@@ -12,7 +12,7 @@ impl SimpleLogger {
         SimpleLogger
     }
 
-    pub fn init(&self) -> Result<(), SetLoggerError>{
+    pub fn init(&self) -> Result<(), SetLoggerError> {
         unsafe {
             log::set_logger_raw(move |max_log_level| {
                 max_log_level.set(LogLevelFilter::Info);
@@ -29,15 +29,19 @@ impl SimpleLogger {
 }
 
 impl log::Log for SimpleLogger {
-    fn enabled(&self, _: &LogMetadata) -> bool { false }
+    fn enabled(&self, _: &LogMetadata) -> bool {
+        false
+    }
     fn log(&self, record: &log::LogRecord) {
         unsafe {
-            crate::CONSOLE.write_fmt(format_args!(
-                "{} [{}] - {}\n",
-                record.level(),
-                record.target(),
-                record.args()
-            )).unwrap();
+            crate::CONSOLE
+                .write_fmt(format_args!(
+                    "{} [{}] - {}\n",
+                    record.level(),
+                    record.target(),
+                    record.args()
+                ))
+                .unwrap();
         }
     }
 }

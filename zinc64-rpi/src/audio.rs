@@ -39,9 +39,7 @@ impl<'a> AudioEngine<'a> {
         samples: usize,
         buffer: Arc<SoundBuffer>,
     ) -> Result<AudioEngine<'a>, &'static str> {
-        let renderer = Rc::new(
-            AudioRenderer::new(buffer)
-        );
+        let renderer = Rc::new(AudioRenderer::new(buffer));
         let snd_dev = Snd::open(
             &gpio,
             freq,
@@ -49,10 +47,7 @@ impl<'a> AudioEngine<'a> {
             samples,
             Box::new(AudioCallback(renderer.clone())),
         )?;
-        Ok(AudioEngine {
-            renderer,
-            snd_dev,
-        })
+        Ok(AudioEngine { renderer, snd_dev })
     }
 
     pub fn make_irq_handler(&self) -> impl IrqHandler + 'a {

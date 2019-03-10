@@ -8,11 +8,11 @@ use super::uart;
 
 pub enum Output {
     None,
-    Uart(uart::Uart)
+    Uart(uart::Uart),
 }
 
 pub struct Console {
-    output: Output
+    output: Output,
 }
 
 impl Console {

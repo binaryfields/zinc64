@@ -4,13 +4,13 @@
 
 // SPEC: https://github.com/raspberrypi/linux/blob/rpi-3.12.y/drivers/video/bcm2708_fb.c
 
-use core::ptr;
 use core::mem;
+use core::ptr;
 use core::result::Result;
 use core::sync::atomic::{compiler_fence, Ordering};
 
-use crate::util::geo::Rect;
 use super::mbox;
+use crate::util::geo::Rect;
 
 #[allow(unused)]
 pub struct FrameBuffer {
@@ -24,11 +24,13 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
-    pub fn build(mbox: &mut mbox::Mbox,
-                 physical_size: (u32, u32),
-                 virtual_size: (u32, u32),
-                 virtual_offset: (u32, u32),
-                 depth: u32) -> Result<FrameBuffer, &'static str> {
+    pub fn build(
+        mbox: &mut mbox::Mbox,
+        physical_size: (u32, u32),
+        virtual_size: (u32, u32),
+        virtual_offset: (u32, u32),
+        depth: u32,
+    ) -> Result<FrameBuffer, &'static str> {
         let buf = &mut mbox.buffer;
         buf[0] = 35 * mem::size_of::<u32>() as u32;
         buf[1] = mbox::Code::Request as u32;
@@ -125,7 +127,12 @@ impl FrameBuffer {
     }
 
     #[allow(unused)]
-    pub fn set_virtual_offset(&self, mbox: &mut mbox::Mbox, x: u32, y: u32) -> Result<(), &'static str> {
+    pub fn set_virtual_offset(
+        &self,
+        mbox: &mut mbox::Mbox,
+        x: u32,
+        y: u32,
+    ) -> Result<(), &'static str> {
         let mut data = [x, y];
         mbox.property(mbox::Tag::SetVirtualOffset, &mut data)
             .map_err(|_| "unable to set virtual offset")?;

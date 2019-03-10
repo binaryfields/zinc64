@@ -24,8 +24,8 @@ mod tap;
 use alloc::prelude::*;
 use zinc64_emu::system::{AutostartMethod, Image};
 
-pub use crate::io::{Reader, Result};
 pub use crate::bin::BinLoader;
+pub use crate::io::{Reader, Result};
 
 pub trait Loader {
     fn autostart(&self, path: &mut dyn Reader) -> io::Result<AutostartMethod>;

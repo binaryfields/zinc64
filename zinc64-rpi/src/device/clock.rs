@@ -125,21 +125,19 @@ impl Clock {
         self.divisor.write(
             Divisor::DIVI.val(div_i)
                 + Divisor::DIVF.val(div_f)
-                + Divisor::PASSWD.val(CLOCK_PASSWORD)
+                + Divisor::PASSWD.val(CLOCK_PASSWORD),
         );
         self.control.write(
             Control::ENAB::SET
                 + Control::SRC.val(self.source as u32)
                 + Control::MASH.val(mash)
-                + Control::PASSWD.val(CLOCK_PASSWORD)
+                + Control::PASSWD.val(CLOCK_PASSWORD),
         );
     }
 
     pub fn stop(&self) {
-        self.control.write(
-            Control::PASSWD.val(CLOCK_PASSWORD)
-                + Control::KILL::SET
-        );
+        self.control
+            .write(Control::PASSWD.val(CLOCK_PASSWORD) + Control::KILL::SET);
         while self.control.is_set(Control::BUSY) {
             asm::nop();
         }

@@ -6,8 +6,8 @@
 use alloc::prelude::*;
 use zinc64_emu::system::{AutostartMethod, Image, C64};
 
-use crate::io::{self, Reader};
 use super::Loader;
+use crate::io::{self, Reader};
 
 struct BinImage {
     data: Vec<u8>,

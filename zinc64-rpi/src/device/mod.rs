@@ -13,6 +13,6 @@ pub mod gpio;
 pub mod interrupt;
 pub mod mbox;
 pub mod pwm;
-pub mod snd;
 pub mod sd;
+pub mod snd;
 pub mod uart;

@@ -13,9 +13,7 @@ pub struct SoundBuffer {
 
 impl SoundBuffer {
     pub fn new(length: usize) -> Self {
-        let buffer = NullLock::new(
-            CircularBuffer::new(length)
-        );
+        let buffer = NullLock::new(CircularBuffer::new(length));
         SoundBuffer { buffer }
     }
 

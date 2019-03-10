@@ -24,8 +24,7 @@ pub struct Buffer<'a, T> {
 impl<'a, T> Buffer<'a, T> {
     pub fn alloc(len: usize) -> Result<Buffer<'a, T>, &'static str> {
         let size = len * mem::size_of::<T>();
-        let layout = Layout::from_size_align(size, 8)
-            .map_err(|_| "invalid buffer alignment")?;
+        let layout = Layout::from_size_align(size, 8).map_err(|_| "invalid buffer alignment")?;
         unsafe {
             let ptr = crate::DMA_ALLOCATOR.alloc_zeroed(layout);
             if ptr.is_null() {
@@ -80,17 +79,14 @@ pub struct ControlBlockWrapper<'a> {
 impl<'a> ControlBlockWrapper<'a> {
     pub fn alloc() -> Result<ControlBlockWrapper<'a>, &'static str> {
         let size = mem::size_of::<ControlBlock>();
-        let layout = Layout::from_size_align(size, 32)
-            .map_err(|_| "invalid buffer alignment")?;
+        let layout = Layout::from_size_align(size, 32).map_err(|_| "invalid buffer alignment")?;
         unsafe {
             let ptr = crate::DMA_ALLOCATOR.alloc_zeroed(layout);
             if ptr.is_null() {
                 return Err("failed to allocate buffer");
             }
             let cb_ptr = mem::transmute::<*mut u8, *mut ControlBlock>(ptr);
-            Ok(ControlBlockWrapper {
-                cb: &mut *cb_ptr,
-            })
+            Ok(ControlBlockWrapper { cb: &mut *cb_ptr })
         }
     }
 
@@ -240,11 +236,13 @@ pub struct Dma;
 #[allow(unused)]
 impl Dma {
     pub fn disable(&self, channel: &DmaChannel) {
-        self.enable.set(self.enable.get() & !(1 << channel.get_instance()));
+        self.enable
+            .set(self.enable.get() & !(1 << channel.get_instance()));
     }
 
     pub fn enable(&self, channel: &DmaChannel) {
-        self.enable.set(self.enable.get() | (1 << channel.get_instance()));
+        self.enable
+            .set(self.enable.get() | (1 << channel.get_instance()));
     }
 
     pub fn is_interrupt(&self, channel: &DmaChannel) -> bool {
@@ -370,14 +368,12 @@ impl DmaChannel {
 
     pub fn start(&self, control_block: &ControlBlockWrapper) {
         assert!(!self.cs.is_set(CS::INT));
-        self.conblk_ad.set(
-            memory::bus_address(control_block.ptr() as usize)
-        );
+        self.conblk_ad
+            .set(memory::bus_address(control_block.ptr() as usize));
         self.cs.write(
-            CS::ACTIVE::SET
-            //+ CS::PRIORITY.val(1)
-            //+ CS::PANIC_PRIORITY.val(15)
-            //+ CS::WAIT_FOR_OUTSTANDING_WRITES::SET
+            CS::ACTIVE::SET, //+ CS::PRIORITY.val(1)
+                             //+ CS::PANIC_PRIORITY.val(15)
+                             //+ CS::WAIT_FOR_OUTSTANDING_WRITES::SET
         );
     }
 

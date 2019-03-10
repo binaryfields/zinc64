@@ -63,14 +63,12 @@ pub struct RegisterBlock {
 }
 
 pub struct PWM {
-    base_addr: usize
+    base_addr: usize,
 }
 
 impl PWM {
     pub fn new(base_addr: usize) -> Self {
-        PWM {
-            base_addr
-        }
+        PWM { base_addr }
     }
 
     pub fn disable_dma(&self) {
@@ -78,22 +76,17 @@ impl PWM {
     }
 
     pub fn enable_dma(&self) {
-        self.dmac.write(
-            DMAC::ENAB::SET
-                + DMAC::DREQ.val(1)
-                + DMAC::PANIC.val(0)
-        );
+        self.dmac
+            .write(DMAC::ENAB::SET + DMAC::DREQ.val(1) + DMAC::PANIC.val(0));
     }
 
     pub fn set_repeat_last(&self, enabled: bool) {
         if enabled {
-            self.control.modify(
-                Control::RPTL1::SET
-                    + Control::RPTL2::SET);
+            self.control
+                .modify(Control::RPTL1::SET + Control::RPTL2::SET);
         } else {
-            self.control.modify(
-                Control::RPTL1::CLEAR
-                    + Control::RPTL2::CLEAR);
+            self.control
+                .modify(Control::RPTL1::CLEAR + Control::RPTL2::CLEAR);
         }
     }
 
@@ -105,7 +98,7 @@ impl PWM {
                 + Control::USEF1::SET
                 + Control::PWEN2::SET
                 + Control::USEF2::SET
-                + Control::CLRF1::SET
+                + Control::CLRF1::SET,
         );
     }
 

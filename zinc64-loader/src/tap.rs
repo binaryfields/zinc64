@@ -14,8 +14,8 @@ use zinc64_emu::device::Tape;
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Autostart, AutostartMethod, Image, C64};
 
-use crate::io::{self, Reader, ReadBytesExt};
 use super::Loader;
+use crate::io::{self, ReadBytesExt, Reader};
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
 

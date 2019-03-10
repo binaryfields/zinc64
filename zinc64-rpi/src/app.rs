@@ -7,7 +7,7 @@ use alloc::rc::Rc;
 use alloc::sync::Arc;
 use core::result::Result;
 use zinc64_core::{new_shared, SystemModel};
-use zinc64_emu::system::{C64, C64Factory, Config};
+use zinc64_emu::system::{C64Factory, Config, C64};
 use zinc64_loader::Loaders;
 use zorio::cursor::Cursor;
 
@@ -15,14 +15,14 @@ use zorio::cursor::Cursor;
 use crate::audio::AudioEngine;
 use crate::device::board;
 use crate::device::delay;
+use crate::device::fat32::{self, Fat32};
 use crate::device::gpio::GPIO;
 use crate::device::mbox::Mbox;
-use crate::device::fat32::{self, Fat32};
 use crate::memory;
 use crate::palette::Palette;
-use crate::video_buffer::VideoBuffer;
-use crate::util::reader::ImageReader;
 use crate::sound_buffer::SoundBuffer;
+use crate::util::reader::ImageReader;
+use crate::video_buffer::VideoBuffer;
 use crate::video_renderer::VideoRenderer;
 
 // static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
@@ -47,7 +47,11 @@ pub struct App<'a> {
     next_keyboard_event: u64,
 }
 
-fn read_to_end(fat32: &Fat32, file: &mut fat32::File, buf: &mut Vec<u8>) -> Result<usize, &'static str> {
+fn read_to_end(
+    fat32: &Fat32,
+    file: &mut fat32::File,
+    buf: &mut Vec<u8>,
+) -> Result<usize, &'static str> {
     let mut buffer = [0u8; 512];
     let mut total = 0;
     loop {
@@ -80,9 +84,7 @@ impl<'a> App<'a> {
             read_res(fat32, "res/rom/charac~1.rom")?.as_ref(),
             read_res(fat32, "res/rom/kernal.rom")?.as_ref(),
         ));
-        let sound_buffer = Arc::new(
-            SoundBuffer::new(config.sound.buffer_size << 4)
-        );
+        let sound_buffer = Arc::new(SoundBuffer::new(config.sound.buffer_size << 4));
         let video_buffer = new_shared(VideoBuffer::new(
             config.model.frame_buffer_size.0,
             config.model.frame_buffer_size.1,
@@ -93,7 +95,8 @@ impl<'a> App<'a> {
             config.clone(),
             &*chip_factory,
             video_buffer.clone(),
-            sound_buffer.clone());
+            sound_buffer.clone(),
+        );
         c64.reset(false);
         // Initialize audio
         let audio_engine = AudioEngine::build(
@@ -111,7 +114,8 @@ impl<'a> App<'a> {
             config.model.viewport_size,
         )?;
         let frame_duration = delay::get_counter_freq() as u64
-                * config.model.cycles_per_frame as u64 / config.model.cpu_freq as u64;
+            * config.model.cycles_per_frame as u64
+            / config.model.cpu_freq as u64;
         Ok(App {
             c64,
             audio_engine,
@@ -135,16 +139,16 @@ impl<'a> App<'a> {
             Ok(entries) => {
                 for entry in entries.iter() {
                     debug!("Checking {}", entry.name);
-                    if let Some(loader) = Loaders::from_ext(Some(entry.ext.to_lowercase().as_ref())) {
+                    if let Some(loader) = Loaders::from_ext(Some(entry.ext.to_lowercase().as_ref()))
+                    {
                         let mut path = String::new();
                         path.push_str("res/autorun/");
                         path.push_str(entry.name.as_ref());
                         info!("Preparing to autostart {}", path);
                         let image_res = read_res(fat32, &path)?;
-                        let mut image = ImageReader(
-                            Cursor::new(image_res.as_ref())
-                        );
-                        let mut autostart = loader.autostart(&mut image)
+                        let mut image = ImageReader(Cursor::new(image_res.as_ref()));
+                        let mut autostart = loader
+                            .autostart(&mut image)
                             .map_err(|_| "failed to load image")?;
                         autostart.execute(&mut self.c64);
                         break;
@@ -174,9 +178,7 @@ impl<'a> App<'a> {
 
     fn handle_events(&mut self) {
         let keyboard = self.c64.get_keyboard();
-        if keyboard.borrow().has_events()
-            && self.c64.get_cycles() >= self.next_keyboard_event
-        {
+        if keyboard.borrow().has_events() && self.c64.get_cycles() >= self.next_keyboard_event {
             keyboard.borrow_mut().drain_event();
             self.next_keyboard_event = self.c64.get_cycles().wrapping_add(20000);
         }
@@ -206,5 +208,3 @@ impl<'a> App<'a> {
         board::wait_for_vsync(&mut self.mbox)
     }
 }
-
-

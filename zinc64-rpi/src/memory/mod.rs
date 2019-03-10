@@ -44,12 +44,21 @@ pub fn print_mmap() {
     let vc_range = vc_range();
     let mmio_range = mmio_range();
     print!("Memory layout:\n");
-    print!("0x{:08x} - 0x{:08x} - Kernel code\n", kernel_ro_range.0, kernel_ro_range.1);
-    print!("0x{:08x} - 0x{:08x} - Kernel data\n", kernel_rw_range.0, kernel_rw_range.1);
+    print!(
+        "0x{:08x} - 0x{:08x} - Kernel code\n",
+        kernel_ro_range.0, kernel_ro_range.1
+    );
+    print!(
+        "0x{:08x} - 0x{:08x} - Kernel data\n",
+        kernel_rw_range.0, kernel_rw_range.1
+    );
     print!("0x{:08x} - 0x{:08x} - App heap\n", app_range.0, app_range.1);
     print!("0x{:08x} - 0x{:08x} - DMA heap\n", dma_range.0, dma_range.1);
     print!("0x{:08x} - 0x{:08x} - VC memory\n", vc_range.0, vc_range.1);
-    print!("0x{:08x} - 0x{:08x} - Device IO\n", mmio_range.0, mmio_range.1);
+    print!(
+        "0x{:08x} - 0x{:08x} - Device IO\n",
+        mmio_range.0, mmio_range.1
+    );
 }
 
 pub fn app_heap_range() -> (usize, usize) {
@@ -68,9 +77,7 @@ pub fn heap_range() -> (usize, usize) {
         static __heap_start: u64;
     }
     let vc_range = vc_range();
-    unsafe {
-        (&__heap_start as *const _ as usize, vc_range.0)
-    }
+    unsafe { (&__heap_start as *const _ as usize, vc_range.0) }
 }
 
 pub fn mmio_range() -> (usize, usize) {
@@ -86,7 +93,10 @@ pub fn ro_range() -> (usize, usize) {
         static __ro_end: u64;
     }
     unsafe {
-        (&__ro_start as *const _ as usize, &__ro_end as *const _ as usize)
+        (
+            &__ro_start as *const _ as usize,
+            &__ro_end as *const _ as usize,
+        )
     }
 }
 
@@ -99,11 +109,13 @@ pub fn rw_range() -> (usize, usize) {
         static __rw_end: u64;
     }
     unsafe {
-        (&__rw_start as *const _ as usize, &__rw_end as *const _ as usize)
+        (
+            &__rw_start as *const _ as usize,
+            &__rw_end as *const _ as usize,
+        )
     }
 }
 
 pub fn vc_range() -> (usize, usize) {
     (map::MMIO_BASE - map::VC_MEM_SIZE, map::MMIO_BASE)
 }
-

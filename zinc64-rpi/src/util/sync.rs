@@ -22,8 +22,8 @@
  * SOFTWARE.
  */
 
-use core::cell::UnsafeCell;
 use crate::device::interrupt::InterruptControl;
+use core::cell::UnsafeCell;
 
 pub struct NullLock<T> {
     data: UnsafeCell<T>,
@@ -52,8 +52,8 @@ impl<T> NullLock<T> {
 
 impl<T> NullLock<T> {
     pub fn lock<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce(&mut T) -> R,
+    where
+        F: FnOnce(&mut T) -> R,
     {
         // In a real lock, there would be code around this line that ensures
         // that this mutable reference will ever only be given out to one thread
