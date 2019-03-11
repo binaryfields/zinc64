@@ -22,7 +22,7 @@ impl Button {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     None = 0xff,
     Numpad = 0xfe,

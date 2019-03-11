@@ -11,9 +11,9 @@ keywords = ["c64", "commodore", "emulator"]
 categories = ["emulators"]
 
 [dependencies]
-byteorder = "1.2"
-getopts = "0.2"
+byteorder = "1.3"
 log = "0.3"
+structopt = "0.2"
 time = "0.1"
 zinc64-core = { path = "../zinc64-core" }
 zinc64-emu = { path = "../zinc64-emu" }

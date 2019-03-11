@@ -17,7 +17,7 @@ pub struct Logger {
 }
 
 impl Logger {
-    pub fn build(level: &str) -> Result<Logger, String> {
+    pub fn build(level: &str, target_levels: &Vec<(String, String)>) -> Result<Logger, String> {
         let loglevel =
             LogLevel::from_str(&level).map_err(|_| format!("invalid log level {}", level))?;
         let mut logger = Logger {
@@ -26,6 +26,9 @@ impl Logger {
         };
         let path = Path::new("logger.conf");
         logger.load_config(path)?;
+        for target_level in target_levels {
+            logger.add_target(target_level.0.clone(), target_level.1.as_str())?;
+        }
         Ok(logger)
     }
 

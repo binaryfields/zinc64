@@ -29,21 +29,11 @@ use crate::sound_buffer::SoundBuffer;
 use crate::video_buffer::VideoBuffer;
 use crate::video_renderer::VideoRenderer;
 
+#[derive(Copy, Clone, Debug)]
 pub enum JamAction {
     Continue,
     Quit,
     Reset,
-}
-
-impl JamAction {
-    pub fn from(action: &str) -> JamAction {
-        match action {
-            "continue" => JamAction::Continue,
-            "quit" => JamAction::Quit,
-            "reset" => JamAction::Reset,
-            _ => panic!("invalid jam action {}", action),
-        }
-    }
 }
 
 pub struct Options {
@@ -53,9 +43,9 @@ pub struct Options {
     pub warp_mode: bool,
     // Debug
     pub debug: bool,
-    pub dbg_address: Option<SocketAddr>,
+    pub dbg_address: SocketAddr,
     pub jam_action: JamAction,
-    pub rap_address: Option<SocketAddr>,
+    pub rap_address: SocketAddr,
 }
 
 pub struct App {
@@ -113,9 +103,7 @@ impl App {
         // Initialize debuggers
         let (command_tx, command_rx) = mpsc::channel::<Command>();
         if options.debug {
-            let address = options
-                .dbg_address
-                .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 9999)));
+            let address = options.dbg_address;
             info!(target: "app", "Starting debugger at {}", address);
             let command_tx_clone = command_tx.clone();
             thread::spawn(move || {
@@ -123,6 +111,7 @@ impl App {
                 debugger.start(address).expect("Failed to start debugger");
             });
         }
+        /* FIXME
         if let Some(address) = options.rap_address {
             info!(target: "app", "Starting rap server at {}", address);
             let command_tx_clone = command_tx.clone();
@@ -131,6 +120,7 @@ impl App {
                 rap_server.start(address).expect("Failed to start debugger");
             });
         }
+        */
         let app = App {
             options,
             sdl_context,
