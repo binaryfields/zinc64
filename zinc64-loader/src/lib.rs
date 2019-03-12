@@ -27,12 +27,7 @@ use zinc64_emu::system::{AutostartMethod, Image};
 pub use crate::bin::BinLoader;
 pub use crate::io::{Reader, Result};
 
-pub trait Loader {
-    fn autostart(&self, path: &mut dyn Reader) -> io::Result<AutostartMethod>;
-    fn load(&self, path: &mut dyn Reader) -> io::Result<Box<dyn Image>>;
-}
-
-pub enum LoaderKind {
+pub enum Format {
     Bin,
     Crt,
     P00,
@@ -40,38 +35,43 @@ pub enum LoaderKind {
     Tap,
 }
 
-impl LoaderKind {
-    pub fn from_ext(ext: Option<&str>) -> Option<LoaderKind> {
+impl Format {
+    pub fn from_ext(ext: Option<&str>) -> Option<Format> {
         match ext {
-            Some("bin") => Some(LoaderKind::Bin),
-            Some("crt") => Some(LoaderKind::Crt),
-            Some("p00") => Some(LoaderKind::P00),
-            Some("P00") => Some(LoaderKind::P00),
-            Some("prg") => Some(LoaderKind::Prg),
-            Some("tap") => Some(LoaderKind::Tap),
+            Some("bin") => Some(Format::Bin),
+            Some("crt") => Some(Format::Crt),
+            Some("p00") => Some(Format::P00),
+            Some("P00") => Some(Format::P00),
+            Some("prg") => Some(Format::Prg),
+            Some("tap") => Some(Format::Tap),
             _ => None,
         }
     }
 }
 
+pub trait Loader {
+    fn autostart(&self, path: &mut dyn Reader) -> io::Result<AutostartMethod>;
+    fn load(&self, path: &mut dyn Reader) -> io::Result<Box<dyn Image>>;
+}
+
 pub struct Loaders;
 
 impl Loaders {
-    pub fn from(kind: LoaderKind) -> Box<Loader> {
+    pub fn from(kind: Format) -> Box<Loader> {
         match kind {
-            LoaderKind::Bin => Box::new(bin::BinLoader::new(1024)),
-            LoaderKind::Crt => Box::new(crt::CrtLoader::new()),
-            LoaderKind::P00 => Box::new(p00::P00Loader::new()),
-            LoaderKind::Prg => Box::new(prg::PrgLoader::new()),
-            LoaderKind::Tap => Box::new(tap::TapLoader::new()),
+            Format::Bin => Box::new(bin::BinLoader::new(1024)),
+            Format::Crt => Box::new(crt::CrtLoader::new()),
+            Format::P00 => Box::new(p00::P00Loader::new()),
+            Format::Prg => Box::new(prg::PrgLoader::new()),
+            Format::Tap => Box::new(tap::TapLoader::new()),
         }
     }
 
-    pub fn from_ext(ext: Option<&str>) -> Option<Box<Loader>> {
-        if let Some(kind) = LoaderKind::from_ext(ext) {
-            Some(Loaders::from(kind))
+    pub fn from_ext(ext: Option<&str>) -> Result<Box<Loader>> {
+        if let Some(kind) = Format::from_ext(ext) {
+            Ok(Loaders::from(kind))
         } else {
-            None
+            Err(format!("Unknown image extension {}", ext.unwrap_or("")))
         }
     }
 }

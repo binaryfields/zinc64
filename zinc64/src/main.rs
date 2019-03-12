@@ -32,6 +32,7 @@ use crate::palette::Palette;
 use crate::sound_buffer::SoundBuffer;
 use crate::util::Logger;
 use crate::video_buffer::VideoBuffer;
+use std::path::Path;
 
 static NAME: &str = "zinc64";
 
@@ -64,14 +65,20 @@ fn run(opt: &Opt) -> Result<(), String> {
         video_buffer.clone(),
         sound_buffer.clone(),
     );
-    c64.reset(true);
     cli::set_c64_options(&mut c64, opt)?;
+    c64.reset(true);
     if opt.console {
         let mut app = ConsoleApp::new(c64);
+        if let Some(image_path) = &opt.image {
+            app.load_image(Path::new(image_path))?;
+        }
         app.run();
     } else {
         let options = cli::build_app_options(opt)?;
         let mut app = App::build(c64, video_buffer.clone(), sound_buffer.clone(), options)?;
+        if let Some(image_path) = &opt.image {
+            app.load_image(Path::new(image_path))?;
+        }
         app.run()?;
     }
     Ok(())

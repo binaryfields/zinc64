@@ -1,5 +1,8 @@
 # TODO
 
+- sdl: rewrite threading
+- rpi: add usb
+
 - device: add mouse support
 - device: add floppy support
 - app: add screenshot support

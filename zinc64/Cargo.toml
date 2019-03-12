@@ -21,6 +21,6 @@ zinc64-debug = { path = "../zinc64-debug" }
 zinc64-loader = { path = "../zinc64-loader" }
 
 [dependencies.sdl2]
-version = "0.31"
+version = "0.32"
 default-features = false
 features = ["unsafe_textures"]

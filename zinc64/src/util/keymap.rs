@@ -13,14 +13,14 @@ impl KeyMap {
         match keycode {
             // Numerical
             Keycode::Num0
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::new(Key::Num9))
             }
             Keycode::Num0 => Some(KeyEvent::new(Key::Num0)),
             Keycode::Num1 => Some(KeyEvent::new(Key::Num1)),
             Keycode::Num2
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::with_disabled_shift(Key::At))
             }
@@ -29,25 +29,25 @@ impl KeyMap {
             Keycode::Num4 => Some(KeyEvent::new(Key::Num4)),
             Keycode::Num5 => Some(KeyEvent::new(Key::Num5)),
             Keycode::Num6
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::new(Key::Num7))
             }
             Keycode::Num6 => Some(KeyEvent::new(Key::Num6)),
             Keycode::Num7
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::new(Key::Num6))
             }
             Keycode::Num7 => Some(KeyEvent::new(Key::Num7)),
             Keycode::Num8
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::with_disabled_shift(Key::Asterisk))
             }
             Keycode::Num8 => Some(KeyEvent::new(Key::Num8)),
             Keycode::Num9
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::new(Key::Num8))
             }
@@ -83,7 +83,7 @@ impl KeyMap {
             Keycode::Asterisk => Some(KeyEvent::new(Key::Asterisk)),
             Keycode::At => Some(KeyEvent::new(Key::At)),
             Keycode::Backslash
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::with_mod(Key::Minus, Key::LShift))
             }
@@ -93,7 +93,7 @@ impl KeyMap {
             Keycode::Comma => Some(KeyEvent::new(Key::Comma)),
             Keycode::Dollar => Some(KeyEvent::new(Key::Dollar)),
             Keycode::Equals
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::with_disabled_shift(Key::Plus))
             }
@@ -103,7 +103,7 @@ impl KeyMap {
             Keycode::Period => Some(KeyEvent::new(Key::Period)),
             Keycode::Plus => Some(KeyEvent::new(Key::Plus)),
             Keycode::Quote
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::new(Key::Num2))
             }
@@ -111,7 +111,7 @@ impl KeyMap {
             Keycode::Return => Some(KeyEvent::new(Key::Return)),
             Keycode::RightBracket => Some(KeyEvent::with_mod(Key::Semicolon, Key::LShift)),
             Keycode::Semicolon
-                if keymod.contains(keyboard::LSHIFTMOD) || keymod.contains(keyboard::RSHIFTMOD) =>
+                if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
             {
                 Some(KeyEvent::with_disabled_shift(Key::Colon))
             }

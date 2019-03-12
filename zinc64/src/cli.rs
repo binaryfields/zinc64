@@ -4,18 +4,16 @@
 
 use std::error::Error;
 use std::fs::File;
-use std::io::{self, BufReader, Read};
+use std::io::{self, Read};
 use std::net::SocketAddr;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
 use zinc64_core::SystemModel;
 use zinc64_emu::device::joystick;
-use zinc64_emu::system::{C64, Config};
-use zinc64_loader::{LoaderKind, Loaders};
+use zinc64_emu::system::{Config, C64};
 
 use crate::app::{self, JamAction};
-use crate::util::FileReader;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "zinc64")]
@@ -37,11 +35,15 @@ pub struct Opt {
     #[structopt(long = "warp")]
     pub warp_mode: bool,
     /// set cpu jam handling
-    #[structopt(long = "jamaction", default_value = "continue", parse(try_from_str = "parse_jam_action"), group = "debug")]
+    #[structopt(
+        long = "jamaction",
+        default_value = "continue",
+        parse(try_from_str = "parse_jam_action"),
+        group = "debug"
+    )]
     pub jam_action: JamAction,
 
     // -- Ui
-
     /// window width
     #[structopt(long, default_value = "800")]
     pub width: u32,
@@ -53,16 +55,24 @@ pub struct Opt {
     pub fullscreen: bool,
 
     // -- Devices
-
     /// set device for joystick 1
-    #[structopt(long = "joydev1", default_value = "none", parse(try_from_str = "parse_joy_mode"), group = "devices")]
+    #[structopt(
+        long = "joydev1",
+        default_value = "none",
+        parse(try_from_str = "parse_joy_mode"),
+        group = "devices"
+    )]
     pub joydev_1: joystick::Mode,
     /// set device for joystick 2
-    #[structopt(long = "joydev2", default_value = "numpad", parse(try_from_str = "parse_joy_mode"), group = "devices")]
+    #[structopt(
+        long = "joydev2",
+        default_value = "numpad",
+        parse(try_from_str = "parse_joy_mode"),
+        group = "devices"
+    )]
     pub joydev_2: joystick::Mode,
 
     // -- Roms
-
     /// filename of the basic ROM
     #[structopt(long, parse(from_os_str), group = "rom")]
     pub basic: Option<PathBuf>,
@@ -73,7 +83,6 @@ pub struct Opt {
     #[structopt(long, parse(from_os_str), group = "rom")]
     pub kernal: Option<PathBuf>,
     // -- Sound
-
     /// disable sound playback
     #[structopt(long = "nosound")]
     pub no_sound: bool,
@@ -88,7 +97,6 @@ pub struct Opt {
     pub sound_samples: u32,
 
     // -- Debug
-
     /// set breakpoint at this address
     #[structopt(long)]
     pub bp: Vec<u16>,
@@ -96,14 +104,23 @@ pub struct Opt {
     #[structopt(long)]
     pub debug: bool,
     /// start debugger bound to the specified address
-    #[structopt(long = "dbg-address", default_value = "127.0.0.1:9999", parse(try_from_str = "parse_socket_addr"), group = "debug")]
+    #[structopt(
+        long = "dbg-address",
+        default_value = "127.0.0.1:9999",
+        parse(try_from_str = "parse_socket_addr"),
+        group = "debug"
+    )]
     pub dbg_address: SocketAddr,
     /// start rap server bound to the specified address
-    #[structopt(long = "rap-address", default_value = "127.0.0.1:9999", parse(try_from_str = "parse_socket_addr"), group = "debug")]
+    #[structopt(
+        long = "rap-address",
+        default_value = "127.0.0.1:9999",
+        parse(try_from_str = "parse_socket_addr"),
+        group = "debug"
+    )]
     pub rap_address: SocketAddr,
 
     // -- Logging
-
     /// set log level
     #[structopt(long = "loglevel", default_value = "info")]
     pub log_level: String,
@@ -131,26 +148,26 @@ pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
     config.joystick.joystick_1 = opt.joydev_1;
     config.joystick.joystick_2 = opt.joydev_2;
     let basic_path = Path::new(
-        opt.basic.as_ref()
+        opt.basic
+            .as_ref()
             .map(|path| Path::new(path))
-            .unwrap_or(Path::new("res/rom/basic.rom"))
+            .unwrap_or(Path::new("res/rom/basic.rom")),
     );
     let charset_path = Path::new(
-        opt.charset.as_ref()
+        opt.charset
+            .as_ref()
             .map(|path| Path::new(path))
-            .unwrap_or(Path::new("res/rom/characters.rom"))
+            .unwrap_or(Path::new("res/rom/characters.rom")),
     );
     let kernal_path = Path::new(
-        opt.kernal.as_ref()
+        opt.kernal
+            .as_ref()
             .map(|path| Path::new(path))
-            .unwrap_or(Path::new("res/rom/kernal.rom"))
+            .unwrap_or(Path::new("res/rom/kernal.rom")),
     );
-    config.roms.basic = load_file(basic_path)
-        .map_err(|_| format!("Invalid rom: basic"))?;
-    config.roms.charset = load_file(charset_path)
-        .map_err(|_| format!("Invalid rom: charset"))?;
-    config.roms.kernal = load_file(kernal_path)
-        .map_err(|_| format!("Invalid rom: kernal"))?;
+    config.roms.basic = load_file(basic_path).map_err(|_| format!("Invalid rom: basic"))?;
+    config.roms.charset = load_file(charset_path).map_err(|_| format!("Invalid rom: charset"))?;
+    config.roms.kernal = load_file(kernal_path).map_err(|_| format!("Invalid rom: kernal"))?;
     config.sound.enable = !opt.no_sound;
     config.sound.buffer_size = opt.sound_samples as usize;
     config.sound.sample_rate = opt.sound_rate;
@@ -160,21 +177,6 @@ pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
 
 pub fn set_c64_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
     set_c64_debug_options(c64, opt)?;
-    set_c64_autostart_options(c64, opt)?;
-    Ok(())
-}
-
-fn set_c64_autostart_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
-    if let Some(image_path) = &opt.image {
-        let path = Path::new(image_path);
-        let ext = path.extension().map(|s| s.to_str().unwrap_or(""));
-        let file = File::open(path).map_err(|err| format!("{}", err))?;
-        let mut reader = FileReader(BufReader::new(file));
-        let loader_kind = LoaderKind::from_ext(ext);
-        let loader = Loaders::from(loader_kind.unwrap()); // FIXME unwrap
-        let mut autostart = loader.autostart(&mut reader)?;
-        autostart.execute(c64);
-    }
     Ok(())
 }
 
@@ -212,11 +214,11 @@ fn parse_joy_mode(mode: &str) -> Result<joystick::Mode, Box<Error>> {
 }
 
 fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<Error>>
-    where
-        T: std::str::FromStr,
-        T::Err: Error + 'static,
-        U: std::str::FromStr,
-        U::Err: Error + 'static,
+where
+    T: std::str::FromStr,
+    T::Err: Error + 'static,
+    U: std::str::FromStr,
+    U::Err: Error + 'static,
 {
     let pos = s
         .find('=')

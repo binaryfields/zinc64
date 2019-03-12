@@ -139,7 +139,7 @@ impl<'a> App<'a> {
             Ok(entries) => {
                 for entry in entries.iter() {
                     debug!("Checking {}", entry.name);
-                    if let Some(loader) = Loaders::from_ext(Some(entry.ext.to_lowercase().as_ref()))
+                    if let Ok(loader) = Loaders::from_ext(Some(entry.ext.to_lowercase().as_ref()))
                     {
                         let mut path = String::new();
                         path.push_str("res/autorun/");

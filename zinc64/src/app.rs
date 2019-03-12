@@ -4,7 +4,10 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
+use std::fs::File;
+use std::io::BufReader;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::result::Result;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -21,6 +24,7 @@ use time;
 use zinc64_core::Shared;
 use zinc64_debug::{Command, Debugger, RapServer};
 use zinc64_emu::system::C64;
+use zinc64_loader::Loaders;
 
 use crate::audio::AudioRenderer;
 use crate::execution::{ExecutionEngine, State};
@@ -28,6 +32,7 @@ use crate::input::InputSystem;
 use crate::sound_buffer::SoundBuffer;
 use crate::video_buffer::VideoBuffer;
 use crate::video_renderer::VideoRenderer;
+use crate::util::FileReader;
 
 #[derive(Copy, Clone, Debug)]
 pub enum JamAction {
@@ -134,6 +139,16 @@ impl App {
             next_keyboard_event: 0,
         };
         Ok(app)
+    }
+
+    pub fn load_image(&mut self, path: &Path) -> Result<(), String> {
+        let ext = path.extension().map(|s| s.to_str().unwrap());
+        let loader = Loaders::from_ext(ext)?;
+        let file = File::open(path).map_err(|err| format!("{}", err))?;
+        let mut reader = FileReader(BufReader::new(file));
+        let mut autostart = loader.autostart(&mut reader)?;
+        autostart.execute(self.execution_engine.get_c64_mut());
+        Ok(())
     }
 
     pub fn run(&mut self) -> Result<(), String> {
@@ -298,79 +313,48 @@ impl App {
     fn handle_events(&mut self, events: &mut EventPump) {
         for event in events.poll_iter() {
             match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => {
+                Event::Quit { .. } => {
+                    self.set_state(State::Stopped);
+                } Event::KeyDown { keycode: Some(keycode), .. } if keycode == Keycode::Escape => {
                     self.set_state(State::Stopped);
                 }
                 Event::KeyDown {
-                    keycode: Some(Keycode::H),
+                    keycode: Some(keycode),
                     keymod,
                     repeat: false,
                     ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    match self.execution_engine.halt() {
+                }  => {
+                    if keymod.contains(keyboard::Mod::LALTMOD) || keymod.contains(keyboard::Mod::RALTMOD) {
+                        if keycode == Keycode::H {
+                            match self.execution_engine.halt() {
+                                Ok(_) => (),
+                                Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
+                            };
+                        } else if keycode == Keycode::M {
+                            self.toggle_mute();
+                        } else if keycode == Keycode::P {
+                            self.toggle_pause();
+                        } else if keycode == Keycode::Q {
+                            self.set_state(State::Stopped);
+                        } else if keycode == Keycode::W {
+                            self.toggle_warp();
+                        } else if keycode == Keycode::Return {
+                            self.video_renderer.toggle_fullscreen();
+                        }
+                    } else if keymod.contains(keyboard::Mod::LCTRLMOD) || keymod.contains(keyboard::Mod::RCTRLMOD) {
+                        if keycode == Keycode::F1 {
+                            self.toggle_datassette_play();
+                        } else if keycode == Keycode::F9 {
+                            self.reset();
+                        }
+                    }
+                }
+                Event::DropFile{filename, ..} => {
+                    info!("Dropped file {}", filename);
+                    match self.load_image(&Path::new(&filename)) {
                         Ok(_) => (),
-                        Err(error) => error!(target: "app", "Failed to execute halt: {}", error),
-                    };
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::M),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_mute();
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::P),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_pause();
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Q),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    self.set_state(State::Stopped);
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::W),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    self.toggle_warp();
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::F9),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    self.reset();
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::F1),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LCTRLMOD) => {
-                    self.toggle_datassette_play();
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Return),
-                    keymod,
-                    repeat: false,
-                    ..
-                } if keymod.contains(keyboard::LALTMOD) => {
-                    self.video_renderer.toggle_fullscreen();
+                        Err(err) => error!("Failed to load image, error: {}", err),
+                    }
                 }
                 _ => {
                     self.input_system.handle_event(&event);
