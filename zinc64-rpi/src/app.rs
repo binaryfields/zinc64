@@ -139,8 +139,7 @@ impl<'a> App<'a> {
             Ok(entries) => {
                 for entry in entries.iter() {
                     debug!("Checking {}", entry.name);
-                    if let Ok(loader) = Loaders::from_ext(Some(entry.ext.to_lowercase().as_ref()))
-                    {
+                    if let Ok(loader) = Loaders::from_ext(Some(entry.ext.to_lowercase().as_ref())) {
                         let mut path = String::new();
                         path.push_str("res/autorun/");
                         path.push_str(entry.name.as_ref());
@@ -160,6 +159,7 @@ impl<'a> App<'a> {
         Ok(())
     }
 
+    #[allow(unreachable_code)]
     pub fn run(&mut self) -> Result<(), &'static str> {
         info!("Running main loop");
         self.audio_engine.start();
@@ -177,9 +177,9 @@ impl<'a> App<'a> {
     }
 
     fn handle_events(&mut self) {
-        let keyboard = self.c64.get_keyboard();
-        if keyboard.borrow().has_events() && self.c64.get_cycles() >= self.next_keyboard_event {
-            keyboard.borrow_mut().drain_event();
+        if self.c64.get_keyboard().has_events() && self.c64.get_cycles() >= self.next_keyboard_event
+        {
+            self.c64.get_keyboard().drain_event();
             self.next_keyboard_event = self.c64.get_cycles().wrapping_add(20000);
         }
     }

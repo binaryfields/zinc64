@@ -17,7 +17,7 @@ use zinc64_emu::cpu::Instruction;
 
 use super::charset;
 use super::disassembler::Disassembler;
-use super::{Command, CommandResult, RegData, RegOp};
+use super::{Command, Output, RegData, RegOp};
 
 // SPEC: Vice -> Alt-H -> help -> [Enter]
 
@@ -97,8 +97,8 @@ struct Connection {
     reader: BufReader<TcpStream>,
     writer: BufWriter<TcpStream>,
     command_tx: mpsc::Sender<Command>,
-    response_rx: mpsc::Receiver<CommandResult>,
-    response_tx: mpsc::Sender<CommandResult>,
+    response_rx: mpsc::Receiver<Output>,
+    response_tx: mpsc::Sender<Output>,
     // Runtime State
     regs: Option<RegData>,
     running: bool,
@@ -108,7 +108,7 @@ impl Connection {
     pub fn build(command_tx: mpsc::Sender<Command>, stream: &TcpStream) -> io::Result<Self> {
         let reader = BufReader::new(stream.try_clone()?);
         let writer = BufWriter::new(stream.try_clone()?);
-        let (response_tx, response_rx) = mpsc::channel::<CommandResult>();
+        let (response_tx, response_rx) = mpsc::channel::<Output>();
         let conn = Self {
             command_parser: CommandParser::new(),
             reader,
@@ -187,16 +187,16 @@ impl Connection {
 
     fn read_mem(&mut self, start: u16, end: u16) -> io::Result<Vec<u8>> {
         match self.execute_emu(Command::MemRead(start, end))? {
-            CommandResult::Buffer(data) => Ok(data),
-            CommandResult::Error(error) => Err(Error::new(ErrorKind::Other, error)),
+            Output::Buffer(data) => Ok(data),
+            Output::Error(error) => Err(Error::new(ErrorKind::Other, error)),
             _ => Err(Error::new(ErrorKind::Other, "Invalid debugger result")),
         }
     }
 
     fn read_regs(&mut self) -> io::Result<RegData> {
         match self.execute_emu(Command::RegRead)? {
-            CommandResult::Registers(regs) => Ok(regs),
-            CommandResult::Error(error) => Err(Error::new(ErrorKind::Other, error)),
+            Output::Registers(regs) => Ok(regs),
+            Output::Error(error) => Err(Error::new(ErrorKind::Other, error)),
             _ => Err(Error::new(ErrorKind::Other, "Invalid debugger result")),
         }
     }
@@ -586,7 +586,7 @@ impl Connection {
 
     // -- Helpers
 
-    fn execute_emu(&mut self, command: Command) -> io::Result<CommandResult> {
+    fn execute_emu(&mut self, command: Command) -> io::Result<Output> {
         self.command_tx.send(command).unwrap();
         self.response_rx
             .recv()
@@ -595,32 +595,32 @@ impl Connection {
 
     fn execute_buffer_cmd(&mut self, command: Command) -> io::Result<Vec<u8>> {
         match self.execute_emu(command)? {
-            CommandResult::Buffer(buffer) => Ok(buffer),
-            CommandResult::Error(error) => Err(Error::new(ErrorKind::Other, error)),
+            Output::Buffer(buffer) => Ok(buffer),
+            Output::Error(error) => Err(Error::new(ErrorKind::Other, error)),
             _ => Err(Error::new(ErrorKind::Other, "Invalid debugger result")),
         }
     }
 
     fn execute_num_cmd(&mut self, command: Command) -> io::Result<u16> {
         match self.execute_emu(command)? {
-            CommandResult::Number(num) => Ok(num),
-            CommandResult::Error(error) => Err(Error::new(ErrorKind::Other, error)),
+            Output::Number(num) => Ok(num),
+            Output::Error(error) => Err(Error::new(ErrorKind::Other, error)),
             _ => Err(Error::new(ErrorKind::Other, "Invalid debugger result")),
         }
     }
 
     fn execute_text_cmd(&mut self, command: Command) -> io::Result<String> {
         match self.execute_emu(command)? {
-            CommandResult::Text(text) => Ok(text),
-            CommandResult::Error(error) => Err(Error::new(ErrorKind::Other, error)),
+            Output::Text(text) => Ok(text),
+            Output::Error(error) => Err(Error::new(ErrorKind::Other, error)),
             _ => Err(Error::new(ErrorKind::Other, "Invalid debugger result")),
         }
     }
 
     fn execute_unit_cmd(&mut self, command: Command) -> io::Result<String> {
         match self.execute_emu(command)? {
-            CommandResult::Unit => Ok(String::new()),
-            CommandResult::Error(error) => Err(Error::new(ErrorKind::Other, error)),
+            Output::Unit => Ok(String::new()),
+            Output::Error(error) => Err(Error::new(ErrorKind::Other, error)),
             _ => Err(Error::new(ErrorKind::Other, "Invalid debugger result")),
         }
     }

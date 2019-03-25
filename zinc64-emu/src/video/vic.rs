@@ -446,8 +446,9 @@ impl Vic {
         */
         for i in 0..8 {
             if self.sprite_units[i].expansion_flop {
-                self.raster_unit.mc_base[i] += 1;
-                if self.raster_unit.mc_base[i] == 63 {
+                // FIXME wrapping add
+                self.raster_unit.mc_base[i] = self.raster_unit.mc_base[i].wrapping_add(1);
+                if self.raster_unit.mc_base[i] >= 63 {
                     self.raster_unit.sprite_dma[i] = false;
                     self.sprite_units[i].display = false;
                 }
@@ -693,7 +694,8 @@ impl Chip for Vic {
                 */
                 for i in 0..8 {
                     if self.sprite_units[i].expansion_flop {
-                        self.raster_unit.mc_base[i] += 2;
+                        // FIXME wrapping add
+                        self.raster_unit.mc_base[i] = self.raster_unit.mc_base[i].wrapping_add(2);
                     }
                 }
                 let is_bad_line = self.raster_unit.is_bad_line;

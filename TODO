@@ -1,21 +1,12 @@
 # TODO
 
-- sdl: rewrite threading
+- refactor run_frame to result Option<Event> Halt|Vsync
+- core: add apply_config hardwareconfig
 - rpi: add usb
-
 - device: add mouse support
 - device: add floppy support
 - app: add screenshot support
 - app: add ui/menus
 
-- https://github.com/rust-embedded/panic-semihosting/blob/master/src/lib.rs
-- https://www.raspberrypi.org/forums/viewtopic.php?t=212930
-- https://github.com/LdB-ECM/Raspberry-Pi/blob/master/Multicore/rpi-SmartStart.c
-- https://github.com/rsta2/circle
-- https://github.com/LdB-ECM/Raspberry-Pi/tree/master/Multicore
-- https://www.raspberrypi.org/forums/viewtopic.php?t=215949
 - https://github.com/bztsrc/raspi3-tutorial/tree/master/10_virtualmemory
-- https://github.com/rust-embedded/rust-raspi3-tutorial/tree/master/0C_virtual_memory
-- https://github.com/OllieLollie1/Raspi3-Kernel/tree/master/src
-- https://github.com/dwelch67/raspberrypi/tree/master/mmu
 - https://wiki.osdev.org/ARM_RaspberryPi

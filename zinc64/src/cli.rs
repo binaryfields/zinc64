@@ -132,13 +132,13 @@ pub struct Opt {
 pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
     Ok(app::Options {
         fullscreen: opt.fullscreen,
-        window_size: (opt.width, opt.height),
+        jam_action: opt.jam_action,
         speed: opt.speed.unwrap_or(100),
         warp_mode: opt.warp_mode,
+        window_size: (opt.width, opt.height),
         debug: opt.debug,
         dbg_address: opt.dbg_address,
         rap_address: SocketAddr::from(([127, 0, 0, 1], 9999)), // opt.rap_address,
-        jam_action: opt.jam_action,
     })
 }
 

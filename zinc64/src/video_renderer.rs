@@ -8,17 +8,19 @@ use sdl2;
 use sdl2::pixels;
 use sdl2::rect::Rect;
 use sdl2::render;
-use sdl2::video;
 use time;
+use zinc64_core::Shared;
 
 use crate::video_buffer::VideoBuffer;
+use sdl2::render::Canvas;
+use sdl2::video::Window;
 
 pub struct VideoRenderer {
     // Configuration
     viewport_rect: Rect,
     // Resources
-    canvas: render::WindowCanvas,
-    texture: render::Texture,
+    video_buffer: Shared<VideoBuffer>,
+    viewport_tex: render::Texture,
     // Runtime state
     frame_count: u32,
     last_frame_ts: u64,
@@ -26,29 +28,13 @@ pub struct VideoRenderer {
 
 impl VideoRenderer {
     pub fn build(
-        sdl_video: &sdl2::VideoSubsystem,
-        window_size: (u32, u32),
+        window: &Canvas<Window>,
         screen_size: (u32, u32),
         viewport_offset: (u32, u32),
         viewport_size: (u32, u32),
-        fullscreen: bool,
+        video_buffer: Shared<VideoBuffer>,
     ) -> Result<VideoRenderer, String> {
-        let mut builder = sdl_video.window("zinc64", window_size.0, window_size.1);
-        builder.opengl();
-        if fullscreen {
-            builder.fullscreen();
-        } else {
-            builder.position_centered();
-            builder.resizable();
-        }
-        let window = builder.build().map_err(|_| "failed to create window")?;
-        let canvas = window
-            .into_canvas()
-            .accelerated()
-            .present_vsync()
-            .build()
-            .map_err(|_| "failed to create canvas")?;
-        let texture = canvas
+        let texture = window
             .texture_creator()
             .create_texture_streaming(
                 pixels::PixelFormatEnum::ARGB8888,
@@ -64,40 +50,27 @@ impl VideoRenderer {
         );
         let renderer = VideoRenderer {
             viewport_rect,
-            canvas,
-            texture,
+            video_buffer,
+            viewport_tex: texture,
             frame_count: 0,
             last_frame_ts: 0,
         };
         Ok(renderer)
     }
 
-    pub fn render(&mut self, frame_buffer: &VideoBuffer) -> Result<(), String> {
-        self.texture
+    pub fn render(&mut self, window: &mut render::WindowCanvas) -> Result<(), String> {
+        self.viewport_tex
             .update(
                 None,
-                frame_buffer.get_pixel_data(),
-                frame_buffer.get_pitch(),
+                self.video_buffer.borrow().get_pixel_data(),
+                self.video_buffer.borrow().get_pitch(),
             )
             .map_err(|_| "failed to update texture")?;
-        self.canvas.clear();
-        self.canvas
-            .copy(&self.texture, Some(self.viewport_rect), None)?;
-        self.canvas.present();
+        window.clear();
+        window.copy(&self.viewport_tex, Some(self.viewport_rect), None)?;
+        window.present();
         self.frame_count = self.frame_count.wrapping_add(1);
         self.last_frame_ts = time::precise_time_ns();
         Ok(())
-    }
-
-    pub fn toggle_fullscreen(&mut self) {
-        let window = self.canvas.window_mut();
-        match window.fullscreen_state() {
-            video::FullscreenType::Off => {
-                window.set_fullscreen(video::FullscreenType::True).unwrap();
-            }
-            video::FullscreenType::True | video::FullscreenType::Desktop => {
-                window.set_fullscreen(video::FullscreenType::Off).unwrap();
-            }
-        }
     }
 }

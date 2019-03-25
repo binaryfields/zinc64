@@ -5,6 +5,7 @@
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
+use std::path::Path;
 use zinc64_loader::{Reader, Result};
 
 pub struct FileReader(pub BufReader<File>);
@@ -29,4 +30,12 @@ impl Reader for FileReader {
     fn consume(&mut self, amt: usize) {
         self.0.consume(amt)
     }
+}
+
+pub fn read_file(path: &Path) -> Result<Vec<u8>> {
+    let file = File::open(path).map_err(|err| format!("{}", err))?;
+    let mut reader = FileReader(BufReader::new(file));
+    let mut data = Vec::new();
+    reader.read_to_end(&mut data)?;
+    Ok(data)
 }

@@ -3,10 +3,13 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 mod circular_buffer;
+pub mod font;
+pub mod gfx;
 pub mod keymap;
 mod logger;
 mod reader;
 
 pub use self::circular_buffer::CircularBuffer;
+pub use self::font::Font;
 pub use self::logger::Logger;
 pub use self::reader::FileReader;

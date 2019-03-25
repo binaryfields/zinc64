@@ -9,14 +9,16 @@ mod app;
 mod audio;
 mod cli;
 mod console;
-mod execution;
+mod debug;
 mod input;
 mod palette;
 mod sound_buffer;
+mod ui;
 mod util;
 mod video_buffer;
 mod video_renderer;
 
+use std::path::Path;
 use std::process;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -30,9 +32,11 @@ use crate::cli::Opt;
 use crate::console::ConsoleApp;
 use crate::palette::Palette;
 use crate::sound_buffer::SoundBuffer;
-use crate::util::Logger;
+use crate::util::{FileReader, Logger};
 use crate::video_buffer::VideoBuffer;
-use std::path::Path;
+use std::fs::File;
+use std::io::BufReader;
+use zinc64_loader::Loaders;
 
 static NAME: &str = "zinc64";
 
@@ -45,6 +49,16 @@ fn main() {
             process::exit(1)
         }
     };
+}
+
+fn load_image(c64: &mut C64, path: &Path) -> Result<(), String> {
+    let ext = path.extension().map(|s| s.to_str().unwrap());
+    let loader = Loaders::from_ext(ext)?;
+    let file = File::open(path).map_err(|err| format!("{}", err))?;
+    let mut reader = FileReader(BufReader::new(file));
+    let mut autostart = loader.autostart(&mut reader)?;
+    autostart.execute(c64);
+    Ok(())
 }
 
 fn run(opt: &Opt) -> Result<(), String> {
@@ -67,18 +81,15 @@ fn run(opt: &Opt) -> Result<(), String> {
     );
     cli::set_c64_options(&mut c64, opt)?;
     c64.reset(true);
+    if let Some(image_path) = &opt.image {
+        load_image(&mut c64, Path::new(image_path))?;
+    }
     if opt.console {
         let mut app = ConsoleApp::new(c64);
-        if let Some(image_path) = &opt.image {
-            app.load_image(Path::new(image_path))?;
-        }
         app.run();
     } else {
         let options = cli::build_app_options(opt)?;
-        let mut app = App::build(c64, video_buffer.clone(), sound_buffer.clone(), options)?;
-        if let Some(image_path) = &opt.image {
-            app.load_image(Path::new(image_path))?;
-        }
+        let mut app = App::build(c64, sound_buffer.clone(), video_buffer.clone(), options)?;
         app.run()?;
     }
     Ok(())

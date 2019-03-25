@@ -55,12 +55,12 @@ pub struct C64 {
     // Peripherals
     datassette: Shared<Datassette>,
     expansion_port: Shared<ExpansionPort>,
-    joystick_1: Option<Shared<Joystick>>,
-    joystick_2: Option<Shared<Joystick>>,
-    keyboard: Shared<Keyboard>,
+    joystick_1: Option<Joystick>,
+    joystick_2: Option<Joystick>,
+    keyboard: Keyboard,
     // Buffers
-    frame_buffer: Shared<VideoOutput>,
-    sound_buffer: Arc<SoundOutput>,
+    frame_buffer: Shared<dyn VideoOutput>,
+    sound_buffer: Arc<dyn SoundOutput>,
     // Configuration
     autostart: Option<Autostart>,
     breakpoints: BreakpointManager,
@@ -162,24 +162,24 @@ impl C64 {
         // Peripherals
         let datassette = new_shared(Datassette::new(cia_1_flag_pin.clone(), cpu_io_port.clone()));
         let joystick1 = if config.joystick.joystick_1 != joystick::Mode::None {
-            Some(new_shared(Joystick::new(
+            Some(Joystick::new(
                 config.joystick.joystick_1,
                 config.joystick.axis_motion_threshold,
                 joystick_1_state.clone(),
-            )))
+            ))
         } else {
             None
         };
         let joystick2 = if config.joystick.joystick_2 != joystick::Mode::None {
-            Some(new_shared(Joystick::new(
+            Some(Joystick::new(
                 config.joystick.joystick_2,
                 config.joystick.axis_motion_threshold,
                 joystick_2_state.clone(),
-            )))
+            ))
         } else {
             None
         };
-        let keyboard = new_shared(Keyboard::new(keyboard_matrix.clone()));
+        let keyboard = Keyboard::new(keyboard_matrix.clone());
 
         // Observers
         let exp_io_line_clone_1 = exp_io_line.clone();
@@ -235,7 +235,7 @@ impl C64 {
             expansion_port: expansion_port.clone(),
             joystick_1: joystick1,
             joystick_2: joystick2,
-            keyboard: keyboard.clone(),
+            keyboard,
             frame_buffer: frame_buffer.clone(),
             sound_buffer: sound_buffer.clone(),
             autostart: None,
@@ -292,30 +292,24 @@ impl C64 {
         self.frame_count
     }
 
-    pub fn get_joystick(&self, index: u8) -> Option<Shared<Joystick>> {
-        if let Some(ref joystick) = self.joystick_1 {
-            if joystick.borrow().get_index() == index {
-                return Some(joystick.clone());
-            }
-        }
-        if let Some(ref joystick) = self.joystick_2 {
-            if joystick.borrow().get_index() == index {
-                return Some(joystick.clone());
-            }
-        }
-        None
+    pub fn get_joystick1(&self) -> &Option<Joystick> {
+        &self.joystick_1
     }
 
-    pub fn get_joystick1(&self) -> Option<Shared<Joystick>> {
-        self.joystick_1.clone()
+    pub fn get_joystick1_mut(&mut self) -> &mut Option<Joystick> {
+        &mut self.joystick_1
     }
 
-    pub fn get_joystick2(&self) -> Option<Shared<Joystick>> {
-        self.joystick_2.clone()
+    pub fn get_joystick2(&self) -> &Option<Joystick> {
+        &self.joystick_2
     }
 
-    pub fn get_keyboard(&self) -> Shared<Keyboard> {
-        self.keyboard.clone()
+    pub fn get_joystick2_mut(&mut self) -> &mut Option<Joystick> {
+        &mut self.joystick_2
+    }
+
+    pub fn get_keyboard(&mut self) -> &mut Keyboard {
+        &mut self.keyboard
     }
 
     pub fn get_sid(&self) -> Shared<dyn Chip> {
@@ -376,13 +370,13 @@ impl C64 {
         self.expansion_port.borrow_mut().reset();
         // Peripherals
         self.datassette.borrow_mut().reset();
-        if let Some(ref joystick) = self.joystick_1 {
-            joystick.borrow_mut().reset();
+        if let Some(ref mut joystick) = self.joystick_1 {
+            joystick.reset();
         }
-        if let Some(ref joystick) = self.joystick_2 {
-            joystick.borrow_mut().reset();
+        if let Some(ref mut joystick) = self.joystick_2 {
+            joystick.reset();
         }
-        self.keyboard.borrow_mut().reset();
+        self.keyboard.reset();
         self.frame_buffer.borrow_mut().reset();
         self.sound_buffer.reset();
         // Runtime State

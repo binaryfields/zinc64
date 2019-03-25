@@ -16,7 +16,7 @@ use std::u8;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use super::{Command, CommandResult};
+use super::{Command, Output};
 
 // SPEC: https://github.com/radare/radare2/blob/master/doc/rap
 // SPEC: https://github.com/radare/radare2/blob/master/libr/io/p/io_rap.c
@@ -104,8 +104,8 @@ struct Connection {
     reader: BufReader<TcpStream>,
     writer: BufWriter<TcpStream>,
     command_tx: Sender<Command>,
-    response_rx: Receiver<CommandResult>,
-    response_tx: Sender<CommandResult>,
+    response_rx: Receiver<Output>,
+    response_tx: Sender<Output>,
     // Runtime State
     offset: u16,
     running: bool,
@@ -115,7 +115,7 @@ impl Connection {
     pub fn build(command_tx: Sender<Command>, stream: &TcpStream) -> io::Result<Self> {
         let reader = BufReader::new(stream.try_clone()?);
         let writer = BufWriter::new(stream.try_clone()?);
-        let (response_tx, response_rx) = mpsc::channel::<CommandResult>();
+        let (response_tx, response_rx) = mpsc::channel::<Output>();
         let conn = Self {
             command_parser: CommandParser::new(),
             reader,
@@ -174,7 +174,7 @@ impl Connection {
     fn handle_close(&mut self) -> io::Result<()> {
         let _fd = self.reader.read_u32::<BigEndian>()?;
         match self.execute_emu(Command::Detach)? {
-            CommandResult::Unit => Ok(()),
+            Output::Unit => Ok(()),
             result => Err(self.invalid_response(&result)),
         }?;
         self.running = false;
@@ -191,7 +191,7 @@ impl Connection {
         self.reader.read_exact(&mut data)?;
         let tx = self.response_tx.clone();
         match self.execute_emu(Command::Attach(tx))? {
-            CommandResult::Unit => Ok(()),
+            Output::Unit => Ok(()),
             result => Err(self.invalid_response(&result)),
         }?;
         self.writer
@@ -210,7 +210,7 @@ impl Connection {
         let end = self.offset.wrapping_add(len as u16);
         let command = Command::MemRead(start, end);
         let data = match self.execute_emu(command)? {
-            CommandResult::Buffer(data) => Ok(data),
+            Output::Buffer(data) => Ok(data),
             result => Err(self.invalid_response(&result)),
         }?;
         self.writer
@@ -246,7 +246,7 @@ impl Connection {
         self.reader.read_exact(&mut data)?;
         let command = Command::MemWrite(self.offset, data);
         match self.execute_emu(command)? {
-            CommandResult::Unit => Ok(()),
+            Output::Unit => Ok(()),
             result => Err(self.invalid_response(&result)),
         }?;
         self.writer
@@ -255,7 +255,7 @@ impl Connection {
         self.writer.flush()
     }
 
-    fn invalid_response(&self, _result: &CommandResult) -> Error {
+    fn invalid_response(&self, _result: &Output) -> Error {
         Error::new(ErrorKind::Other, "Invalid debugger result")
     }
 
@@ -263,7 +263,7 @@ impl Connection {
 
     fn cmd_registers(&mut self) -> io::Result<String> {
         match self.execute_emu(Command::RegRead)? {
-            CommandResult::Registers(regs) => {
+            Output::Registers(regs) => {
                 let mut buffer = String::new();
                 buffer.push_str(format!("a = 0x{:02x}\n", regs.a).as_str());
                 buffer.push_str(format!("x = 0x{:02x}\n", regs.x).as_str());
@@ -290,10 +290,10 @@ impl Connection {
         }
     }
 
-    fn execute_emu(&mut self, command: Command) -> io::Result<CommandResult> {
+    fn execute_emu(&mut self, command: Command) -> io::Result<Output> {
         self.command_tx.send(command).unwrap();
         match self.response_rx.recv() {
-            Ok(CommandResult::Error(error)) => Err(Error::new(ErrorKind::Other, error)),
+            Ok(Output::Error(error)) => Err(Error::new(ErrorKind::Other, error)),
             Ok(result) => Ok(result),
             Err(error) => Err(Error::new(ErrorKind::Other, error)),
         }

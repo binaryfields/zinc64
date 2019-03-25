@@ -24,7 +24,8 @@ impl SoundBuffer {
             debug!(target: "app", "audio callback underflow {}/{}", out.len(), input.len());
         }
         for x in out.iter_mut() {
-            *x = ((input.pop() as i32 * scaler) >> scaler_shift) as i16;
+            let sample = input.pop().unwrap_or(0);
+            *x = ((sample as i32 * scaler) >> scaler_shift) as i16;
         }
     }
 }

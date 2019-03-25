@@ -16,9 +16,10 @@ pub use self::debugger::Debugger;
 pub use self::rap_server::RapServer;
 
 pub enum Command {
-    Attach(Sender<CommandResult>),
+    Attach(Sender<Output>),
     Detach,
-    // Breakpoint
+    Continue,
+    Step,
     BpClear,
     BpCondition(u16, String, u32),
     BpDisable(u16),
@@ -29,22 +30,17 @@ pub enum Command {
     BpList,
     BpRemove(u16),
     BpSet(u16, bool),
-    // Debugger
-    Continue,
-    RegRead,
-    RegWrite(Vec<RegOp>),
-    Step,
-    // Memory
     MemRead(u16, u16),
     MemWrite(u16, Vec<u8>),
-    // System
+    RegRead,
+    RegWrite(Vec<RegOp>),
     SysQuit,
     SysReset(bool),
     SysScreen,
     SysStopwatch(bool),
 }
 
-pub enum CommandResult {
+pub enum Output {
     Await,
     Buffer(Vec<u8>),
     Error(String),

@@ -30,7 +30,7 @@ impl Autostart {
         self.image.mount(c64);
         let keyboard = c64.get_keyboard();
         let command = self.get_command().to_string() + "\n";
-        keyboard.borrow_mut().enqueue(&command);
+        keyboard.enqueue(&command);
     }
 
     fn get_command(&self) -> &str {
