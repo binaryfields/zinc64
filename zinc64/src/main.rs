@@ -8,6 +8,7 @@ extern crate log;
 mod app;
 mod audio;
 mod cli;
+mod command;
 mod console;
 mod debug;
 mod input;

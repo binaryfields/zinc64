@@ -16,7 +16,7 @@ default-members = [
     "zinc64"
 ]
 
-[profile.release]
+[xprofile.release]
 codegen-units = 1
 debug = true
 lto = true

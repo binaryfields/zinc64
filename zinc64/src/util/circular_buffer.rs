@@ -73,6 +73,15 @@ impl<T: Copy + Default> CircularBuffer<T> {
         self.head = 0;
         self.tail = 0;
     }
+
+    pub fn restore_pos(&mut self, pos: (usize, usize)) {
+        self.head = pos.0;
+        self.tail = pos.1;
+    }
+
+    pub fn snapshot_pos(&self) -> (usize, usize) {
+        (self.head, self.tail)
+    }
 }
 
 pub struct Iter<'a, T: 'a + Copy + Default> {

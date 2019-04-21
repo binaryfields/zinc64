@@ -18,17 +18,17 @@ pub fn draw_char(
     ch: u8,
     x_start: u32,
     y_start: u32,
-    _fg_color: u32,
-    _bg_color: u32,
+    fg_color: Color,
+    bg_color: Color,
 ) -> Result<(), String> {
     let glyph = font.get_glyph(ch);
     for y in y_start..(y_start + font.get_height()) {
         let mut data = glyph[(y - y_start) as usize * font.get_width() as usize / 8];
         for x in x_start..(x_start + font.get_width()) {
             let color = if data.get_bit(7) {
-                Color::RGBA(255, 255, 255, 255) // FIXME fg_color
+                fg_color
             } else {
-                Color::RGBA(0, 0, 0, 255) // FIXME bg_color
+                bg_color
             };
             canvas.set_draw_color(color);
             canvas.draw_point(Point::new(x as i32, y as i32))?;

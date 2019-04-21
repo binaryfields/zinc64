@@ -15,15 +15,13 @@ use zinc64_debug::{Command, Debugger};
 use zinc64_emu::system::C64;
 
 use crate::debug::Debug;
-use crate::palette::Palette;
 use crate::sound_buffer::SoundBuffer;
 use crate::ui::{Action, ConsoleScreen, MainScreen, Screen};
 use crate::util::Font;
 use crate::video_buffer::VideoBuffer;
 use std::path::Path;
+use sdl2::pixels::Color;
 
-const CONSOLE_COLS: u32 = 80;
-const CONSOLE_ROWS: u32 = 40;
 const CONSOLE_BUFFER: usize = 2048;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -139,6 +137,28 @@ impl App {
                 debugger.start(address).expect("Failed to start debugger");
             });
         }
+        // Initialize screens
+        let main_screen = new_shared(MainScreen::build(
+            &sdl_context,
+            &c64,
+            window.clone(),
+            sound_buffer,
+            video_buffer,
+        )?);
+        let font = Font::load_psf(Path::new("res/font/font.psf"))?;
+        let console_palette = [
+            Color::from((45, 45, 45)),
+            Color::from((143, 135, 114))
+        ];
+        let console_screen = new_shared(ConsoleScreen::build(
+            options.window_size.0 / font.get_width(),
+            options.window_size.1 / font.get_height(),
+            CONSOLE_BUFFER,
+            font,
+            100,
+            console_palette,
+            window.clone(),
+        )?);
         // Initialize state
         let state = AppState {
             c64,
@@ -146,22 +166,6 @@ impl App {
             debug: Debug::new(debug_rx),
             options,
         };
-        // Initialize screens
-        let main_screen = new_shared(MainScreen::build(
-            &sdl_context,
-            &state.c64,
-            window.clone(),
-            sound_buffer,
-            video_buffer,
-        )?);
-        let console_screen = new_shared(ConsoleScreen::build(
-            CONSOLE_COLS,
-            CONSOLE_ROWS,
-            CONSOLE_BUFFER,
-            Font::load_psf(Path::new("res/font/font.psf"))?,
-            Palette::default(),
-            window.clone(),
-        )?);
         Ok(App {
             sdl_context,
             sdl_joystick1,

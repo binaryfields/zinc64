@@ -6,59 +6,59 @@ use std::iter::Iterator;
 use std::result::Result;
 
 use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use sdl2::keyboard::{Keycode, Mod};
 use sdl2::pixels::{Color, PixelFormatEnum};
+use sdl2::rect::{Point, Rect};
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 use sdl2::EventPump;
 use zinc64_core::Shared;
 
 use crate::app::AppState;
-use crate::util::gfx;
-use crate::util::{CircularBuffer, Font};
+use crate::command::CmdHandler;
+use crate::util::{circular_buffer, CircularBuffer, Font};
+use crate::util::{gfx, keymap};
 
 use super::{Action, BaseScreen, Screen};
 
-const BG_COLOR: usize = 0;
-const FG_COLOR: usize = 1;
-
-// TODO fix colors
-// TODO add read line
+const BLANK_CHAR: u8 = 32;
+const CURSOR_BLINK_DUR: u32 = 25;
+const CURSOR_CHAR: u8 = 8;
+const PROMPT: &str = "> ";
 
 struct Console {
     // Configuration
     cols: u32,
     rows: u32,
-    // Resources
-    font: Font,
-    // Runtime State
+    // Runtime state
     buffer: CircularBuffer<u8>,
-    buffer_pos: usize,
-    screen: Vec<u8>,
+    buffer_pos_snapshot: (usize, usize),
+    screen_pos: usize,
+    screen_pos_snapshot: usize,
 }
 
 impl Console {
-    pub fn new(cols: u32, rows: u32, buffer_size: usize, font: Font) -> Self {
+    fn new(cols: u32, rows: u32, buffer_size: usize) -> Self {
         Console {
-            cols,
             rows,
-            font,
+            cols,
             buffer: CircularBuffer::new(buffer_size),
-            buffer_pos: 0,
-            screen: vec![0x7f; (cols * rows) as usize],
+            buffer_pos_snapshot: (0, 0),
+            screen_pos: 0,
+            screen_pos_snapshot: 0,
         }
     }
 
-    pub fn advance(&mut self) {
-        if self.buffer.remaining(self.buffer_pos) > self.screen.len() {
+    fn advance(&mut self) {
+        if self.buffer.remaining(self.screen_pos) > ((self.rows - 1) * self.cols) as usize {
             for _ in 0..self.cols {
-                self.buffer_pos = self.buffer.advance(self.buffer_pos);
+                self.screen_pos = self.buffer.advance(self.screen_pos);
             }
         }
     }
 
-    pub fn print(&mut self, text: &[u8]) {
-        let mut col = self.buffer.remaining(self.buffer_pos) as u32 % self.cols;
+    fn print(&mut self, text: &[u8]) {
+        let mut col = self.buffer.remaining(self.screen_pos) as u32 % self.cols;
         for ch in text {
             if *ch == '\n' as u8 {
                 while col < self.cols {
@@ -76,17 +76,64 @@ impl Console {
         }
     }
 
-    pub fn update(&mut self, canvas: &mut Canvas<Window>) -> Result<(), String> {
-        let mut buffer_iter = self.buffer.iter_from(self.buffer_pos);
+    fn restore_pos(&mut self) {
+        self.buffer.restore_pos(self.buffer_pos_snapshot);
+        self.screen_pos = self.screen_pos_snapshot;
+    }
+
+    fn save_pos(&mut self) {
+        self.buffer_pos_snapshot = self.buffer.snapshot_pos();
+        self.screen_pos_snapshot = self.screen_pos;
+    }
+
+    fn screen_data(&self) -> circular_buffer::Iter<u8> {
+        self.buffer.iter_from(self.screen_pos)
+    }
+}
+
+struct Renderer {
+    // Configuration
+    cols: u32,
+    rows: u32,
+    font: Font,
+    palette: [Color; 2],
+    // Runtime State
+    screen: Vec<u8>,
+}
+
+impl Renderer {
+    fn new(cols: u32, rows: u32, font: Font, palette: [Color; 2]) -> Self {
+        Renderer {
+            cols,
+            rows,
+            font,
+            palette,
+            screen: vec![0x7f; (cols * rows) as usize],
+        }
+    }
+
+    fn render(
+        &mut self,
+        buffer: &mut circular_buffer::Iter<u8>,
+        canvas: &mut Canvas<Window>,
+    ) -> Result<(), String> {
         let mut screen_pos = 0;
         let mut y = 0;
         for _ in 0..self.rows {
             let mut x = 0;
             for _ in 0..self.cols {
-                let ch = buffer_iter.next().unwrap_or(&0x7f);
+                let ch = buffer.next().unwrap_or(&BLANK_CHAR);
                 if *ch != self.screen[screen_pos] {
                     self.screen[screen_pos] = *ch;
-                    gfx::draw_char(canvas, &self.font, *ch, x, y, 1, 0)?;
+                    gfx::draw_char(
+                        canvas,
+                        &self.font,
+                        *ch,
+                        x,
+                        y,
+                        self.palette[1],
+                        self.palette[0],
+                    )?;
                 }
                 screen_pos += 1;
                 x += self.font.get_width();
@@ -97,50 +144,164 @@ impl Console {
     }
 }
 
-#[allow(unused)]
 pub struct ConsoleScreen {
     // Dependencies
-    palette: [u32; 16],
     window: Shared<Canvas<Window>>,
+    // Configuration
+    bg_color: Color,
+    scale_pct: u32,
+    screen_dim: (u32, u32),
     // Resources
-    console: Console,
+    cmd_handler: CmdHandler,
+    renderer: Renderer,
     screen_tex: Texture,
+    // Runtime state
+    console: Console,
+    cursor_timer: u32,
+    cursor_visibility: bool,
+    history: Vec<String>,
+    history_pos: isize,
+    input_buffer: Vec<u8>,
 }
 
-#[allow(unused)]
 impl ConsoleScreen {
     pub fn build(
         cols: u32,
         rows: u32,
         buffer_size: usize,
         font: Font,
-        palette: [u32; 16],
+        scale_pct: u32,
+        palette: [Color; 2],
         window: Shared<Canvas<Window>>,
     ) -> Result<ConsoleScreen, String> {
-        let mut screen_tex = window
+        let screen_dim = (cols * font.get_width(), rows * font.get_height());
+        let screen_tex = window
             .borrow()
             .texture_creator()
-            .create_texture_target(
-                PixelFormatEnum::RGBA8888,
-                cols * font.get_width(),
-                rows * font.get_height(),
-            )
+            .create_texture_target(PixelFormatEnum::RGBA8888, screen_dim.0, screen_dim.1)
             .map_err(|_| "failed to create texture")?;
-        window
-            .borrow_mut()
-            .with_texture_canvas(&mut screen_tex, |canvas| {
-                canvas.set_draw_color(Color::RGBA(0, 0, 0, 255));
-                canvas.clear();
-            })
-            .map_err(|e| e.to_string())?;
-        let mut console = Console::new(cols, rows, buffer_size, font);
-        console.print("Hello world 1\nHello world 2\nHello world 3\n".as_ref()); // FIXME
+        info!("Creating console {}x{}", cols, rows);
+        let mut console = Console::new(cols, rows, buffer_size);
+        console.print("Type ? for the list of available commands\n".as_bytes());
+        console.save_pos();
         Ok(ConsoleScreen {
-            palette,
             window,
-            console,
+            bg_color: palette[0],
+            scale_pct,
+            screen_dim,
+            cmd_handler: CmdHandler::new(),
+            renderer: Renderer::new(cols, rows, font, palette),
             screen_tex,
+            console,
+            cursor_timer: CURSOR_BLINK_DUR,
+            cursor_visibility: false,
+            history: Vec::new(),
+            history_pos: -1,
+            input_buffer: Vec::new(),
         })
+    }
+
+    fn blink_cursor(&mut self) {
+        self.cursor_timer -= 1;
+        if self.cursor_timer == 0 {
+            self.reset_cursor(!self.cursor_visibility);
+            self.print_input();
+        }
+    }
+
+    fn get_viewport_rect(&self, output_size: &(u32, u32)) -> Rect {
+        let center = Point::new(output_size.0 as i32 / 2, output_size.1 as i32 / 2);
+        Rect::from_center(
+            center,
+            self.screen_dim.0 * self.scale_pct / 100,
+            self.screen_dim.1 * self.scale_pct / 100,
+        )
+    }
+
+    fn handle_input(&mut self, keycode: &Keycode, keymod: &Mod) -> Option<String> {
+        match *keycode {
+            Keycode::Return => {
+                self.console.restore_pos();
+                self.console.print(PROMPT.as_ref());
+                self.console.print(&self.input_buffer);
+                self.console.print(&['\n' as u8]);
+                self.console.save_pos();
+                let input = std::str::from_utf8(&self.input_buffer).unwrap().to_string();
+                self.input_buffer.clear();
+                if !input.is_empty() {
+                    let recent = self.history.get(0).map(|s| s.as_str()).unwrap_or("");
+                    if input.as_str() != recent {
+                        self.history.insert(0, input.clone());
+                    }
+                    self.history_pos = -1;
+                    self.reset_cursor(true);
+                    self.print_input();
+                    Some(input)
+                } else {
+                    self.history_pos = -1;
+                    self.reset_cursor(true);
+                    self.print_input();
+                    None
+                }
+            }
+            Keycode::Backspace => {
+                self.input_buffer.pop();
+                self.reset_cursor(true);
+                self.print_input();
+                None
+            }
+            Keycode::Up => {
+                if self.history_pos < (self.history.len() - 1) as isize {
+                    self.history_pos += 1;
+                    let input = self.history[self.history_pos as usize].as_bytes();
+                    self.input_buffer.clear();
+                    self.input_buffer.extend_from_slice(input);
+                    self.reset_cursor(true);
+                    self.print_input();
+                }
+                None
+            }
+            Keycode::Down => {
+                if self.history_pos >= 0 {
+                    self.history_pos -= 1;
+                    if self.history_pos >= 0 {
+                        let input = self.history[self.history_pos as usize].as_bytes();
+                        self.input_buffer.clear();
+                        self.input_buffer.extend_from_slice(input);
+                    } else {
+                        self.input_buffer.clear();
+                    }
+                    self.reset_cursor(true);
+                    self.print_input();
+                }
+                None
+            }
+            _ => {
+                let c = keymap::to_ascii(keycode, keymod);
+                if c != '\0' {
+                    self.input_buffer.push(c as u8);
+                    self.reset_cursor(true);
+                    self.print_input();
+                }
+                None
+            }
+        }
+    }
+
+    fn print_input(&mut self) {
+        self.console.restore_pos();
+        self.console.print(PROMPT.as_ref());
+        if !self.input_buffer.is_empty() {
+            self.console.print(&self.input_buffer);
+        }
+        if self.cursor_visibility {
+            self.console.print(&[CURSOR_CHAR]);
+        }
+    }
+
+    fn reset_cursor(&mut self, visible: bool) {
+        self.cursor_timer = CURSOR_BLINK_DUR;
+        self.cursor_visibility = visible;
     }
 }
 
@@ -153,29 +314,53 @@ impl BaseScreen<AppState> for ConsoleScreen {
                 ..
             } if *keycode == Keycode::Escape => Some(Action::Main),
             Event::KeyDown {
-                keycode: Some(_keycode),
+                keycode: Some(keycode),
+                keymod,
                 repeat: false,
                 ..
-            } => None,
+            } => {
+                if let Some(input) = self.handle_input(keycode, keymod) {
+                    self.console.restore_pos();
+                    match self.cmd_handler.handle(&input, &mut _state.c64) {
+                        Ok(output) => {
+                            self.console.print(output.as_bytes());
+                        }
+                        Err(error) => {
+                            self.console.print("ERROR: ".as_bytes());
+                            self.console.print(error.as_bytes());
+                            self.console.print(&['\n' as u8]);
+                        }
+                    }
+                    self.console.save_pos();
+                }
+                None
+            }
             _ => None,
         }
     }
 
     fn render(&mut self) -> Result<(), String> {
-        let console = &mut self.console;
+        let mut screen_data = self.console.screen_data();
+        let renderer = &mut self.renderer;
         self.window
             .borrow_mut()
             .with_texture_canvas(&mut self.screen_tex, |canvas| {
-                console
-                    .update(canvas)
+                renderer
+                    .render(&mut screen_data, canvas)
                     .expect("Failed to render console output");
             })
             .map_err(|e| e.to_string())?;
         let window = &mut self.window.borrow_mut();
+        let output_size = window.output_size()?;
+        window.set_draw_color(self.bg_color);
         window.clear();
-        window.copy(&self.screen_tex, None, None)?;
+        window.copy(&self.screen_tex, None, self.get_viewport_rect(&output_size))?;
         window.present();
         Ok(())
+    }
+
+    fn tick(&mut self) {
+        self.blink_cursor();
     }
 }
 

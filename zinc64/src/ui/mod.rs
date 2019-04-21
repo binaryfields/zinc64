@@ -30,6 +30,8 @@ pub trait BaseScreen<T>: Screen<T> {
 
     fn render(&mut self) -> Result<(), String>;
 
+    fn tick(&mut self);
+
     fn run(&mut self, events: &mut EventPump, state: &mut T) -> Result<Action, String> {
         'running: loop {
             for event in events.poll_iter() {
@@ -37,6 +39,7 @@ pub trait BaseScreen<T>: Screen<T> {
                     return Ok(action);
                 }
             }
+            self.tick();
             self.render()?;
             thread::sleep(Duration::from_millis(20));
         }
