@@ -10,7 +10,11 @@ readme = "README.md"
 keywords = ["c64", "commodore", "emulator", "no_std"]
 categories = ["emulators"]
 
+[features]
+default = ["std"]
+std = []
+
 [dependencies]
 byteorder = { version = "1.2", default-features = false }
 log = { version = "0.3", default-features = false }
-zinc64-emu = { path = "../zinc64-emu", default-features = false  }
+zinc64-emu = { path = "../zinc64-emu" }

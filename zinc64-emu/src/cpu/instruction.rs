@@ -332,7 +332,7 @@ impl fmt::Display for Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zinc64_core::{make_noop, new_shared, Addressable, IoPort, IrqLine, Mmu, Pin, Ram};
+    use zinc64_core::{make_noop, new_shared, Addressable, IoPort, IrqLine, Pin, Ram};
 
     struct MockMemory {
         ram: Ram,
