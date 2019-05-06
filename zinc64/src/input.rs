@@ -76,7 +76,7 @@ impl InputSystem {
                     joystick.on_key_up(button);
                 }
             }
-            if let Some(ref mut joystick) = c64.get_joystick1_mut() {
+            if let Some(ref mut joystick) = c64.get_joystick2_mut() {
                 if joystick.is_virtual() {
                     joystick.on_key_up(button);
                 }

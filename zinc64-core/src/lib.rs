@@ -63,6 +63,27 @@ pub trait Addressable {
     fn write(&mut self, address: u16, value: u8);
 }
 
+/// Addressable represents a bank of memory that may be faded by RAM.
+pub trait AddressableFaded {
+    /// Read byte from the specified address.
+    fn read(&mut self, address: u16) -> Option<u8>;
+    /// Write byte to the specified address.
+    fn write(&mut self, address: u16, value: u8);
+}
+
+/// Memory bank type used with MMU to determine how to map a memory address
+#[derive(Clone, Copy)]
+pub enum Bank {
+    Basic,
+    Charset,
+    Kernal,
+    Io,
+    Ram,
+    RomH,
+    RomL,
+    Disabled,
+}
+
 /// A chip represents a system component that is driven by clock signal.
 pub trait Chip {
     /// The core method of the chip, emulates one clock cycle of the chip.
@@ -105,16 +126,12 @@ pub trait Cpu {
     fn write(&mut self, address: u16, value: u8);
 }
 
-/// Represents memory management unit which controls visible memory banks
-/// and is used by CPU to read from and write to memory locations.
+/// Represents memory management unit which controls visible memory banks.
 pub trait Mmu {
+    /// Map address to currently mapped in memory bank.
+    fn map(&self, address: u16) -> Bank;
     /// Change bank configuration based on the specified mode.
     fn switch_banks(&mut self, mode: u8);
-    // I/O
-    /// Read byte from the specified address.
-    fn read(&self, address: u16) -> u8;
-    /// Write byte to the specified address.
-    fn write(&mut self, address: u16, value: u8);
 }
 
 /// Sound output used by SID chip.

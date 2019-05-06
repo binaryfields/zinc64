@@ -5,7 +5,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use zinc64_core::{Cpu, IoPort, IrqLine, Mmu, Pin, Ram, TickFn};
+use zinc64_core::{Addressable, Cpu, IoPort, IrqLine, Mmu, Pin, Ram, TickFn};
 use zinc64_emu::cpu::Cpu6510;
 
 struct MockMemory {
@@ -18,9 +18,7 @@ impl MockMemory {
     }
 }
 
-impl Mmu for MockMemory {
-    fn switch_banks(&mut self, _mode: u8) {}
-
+impl Addressable for MockMemory {
     fn read(&self, address: u16) -> u8 {
         self.ram.read(address)
     }
@@ -181,7 +179,7 @@ const OPCODE_TIMING: [u8; 256] = [
     2, // 88 DEY
     0, // 89 SKB* #$ab
     2, // 8A TXA
-    0, // 8B ANE* #$ab
+    2, // 8B ANE* #$ab
     4, // 8C STY $abcd
     4, // 8D STA $abcd
     4, // 8E STX $abcd

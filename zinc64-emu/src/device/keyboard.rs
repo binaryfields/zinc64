@@ -72,7 +72,7 @@ pub enum Key {
     Left,
     LGui,
     LShift,
-    Pause,
+    RunStop,
     CrsrRight,
     RShift,
     // Function
@@ -116,13 +116,13 @@ impl KeyEvent {
 }
 
 pub struct Keyboard {
-    matrix: Shared<[u8; 8]>,
+    matrix: Shared<[u8; 16]>,
     queue: Vec<(KeyEvent, bool)>,
     disabled_shift: u8,
 }
 
 impl Keyboard {
-    pub fn new(matrix: Shared<[u8; 8]>) -> Self {
+    pub fn new(matrix: Shared<[u8; 16]>) -> Self {
         Self {
             matrix,
             queue: Vec::new(),
@@ -130,12 +130,12 @@ impl Keyboard {
         }
     }
 
-    pub fn get_row(&self, row: u8) -> u8 {
-        self.matrix.borrow()[row as usize]
+    pub fn get_col(&self, col: u8) -> u8 {
+        self.matrix.borrow()[8 + col as usize]
     }
 
-    pub fn set_row(&mut self, row: u8, value: u8) {
-        self.matrix.borrow_mut()[row as usize] = value;
+    pub fn get_row(&self, row: u8) -> u8 {
+        self.matrix.borrow()[row as usize]
     }
 
     pub fn drain_event(&mut self) {
@@ -162,20 +162,27 @@ impl Keyboard {
     }
 
     pub fn reset(&mut self) {
-        for i in 0..8 {
-            self.set_row(i, 0xff);
+        let mut matrix = self.matrix.borrow_mut();
+        for i in 0..16 {
+            matrix[i] = 0xff;
         }
         self.queue.clear();
+    }
+
+    pub fn set_key(&mut self, keycode: Key, enabled: bool) {
+        let mapping = self.map_keycode(keycode);
+        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
+        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
+    }
+
+    pub fn set_matrix(&mut self, mapping: (usize, usize), enabled: bool) {
+        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
+        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
     }
 
     fn is_pressed(&self, keycode: Key) -> bool {
         let mapping = self.map_keycode(keycode);
         !self.matrix.borrow()[mapping.0].get_bit(mapping.1)
-    }
-
-    fn set_key(&mut self, keycode: Key, enabled: bool) {
-        let mapping = self.map_keycode(keycode);
-        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
     }
 
     // -- Event Handlers
@@ -355,7 +362,7 @@ impl Keyboard {
             Key::Space => (7, 4),
             Key::LGui => (7, 5),
             Key::Q => (7, 6),
-            Key::Pause => (7, 7),
+            Key::RunStop => (7, 7),
         }
     }
 }
@@ -367,7 +374,7 @@ mod tests {
 
     #[test]
     fn enqueue_key_event() {
-        let matrix = new_shared([0; 8]);
+        let matrix = new_shared([0; 16]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         assert_eq!(false, keyboard.has_events());
@@ -377,7 +384,7 @@ mod tests {
 
     #[test]
     fn drain_key_event() {
-        let matrix = new_shared([0; 8]);
+        let matrix = new_shared([0; 16]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");
@@ -389,7 +396,7 @@ mod tests {
 
     #[test]
     fn emulate_key_press() {
-        let matrix = new_shared([0; 8]);
+        let matrix = new_shared([0; 16]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");

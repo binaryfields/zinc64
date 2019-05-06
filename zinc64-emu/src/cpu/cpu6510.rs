@@ -6,7 +6,7 @@
 
 use core::fmt;
 use log::LogLevel;
-use zinc64_core::{make_noop, Cpu, IoPort, IrqLine, Mmu, Pin, Shared, TickFn};
+use zinc64_core::{make_noop, Addressable, Cpu, IoPort, IrqLine, Pin, Shared, TickFn};
 
 use super::instruction::Instruction;
 
@@ -83,9 +83,10 @@ impl Registers {
 
 pub struct Cpu6510 {
     // Dependencies
-    mem: Shared<dyn Mmu>,
+    mem: Shared<dyn Addressable>,
     // Runtime State
     regs: Registers,
+    last_nmi: bool,
     // I/O
     ba_line: Shared<Pin>,
     io_port: Shared<IoPort>,
@@ -95,7 +96,7 @@ pub struct Cpu6510 {
 
 impl Cpu6510 {
     pub fn new(
-        mem: Shared<dyn Mmu>,
+        mem: Shared<dyn Addressable>,
         io_port: Shared<IoPort>,
         ba_line: Shared<Pin>,
         irq_line: Shared<IrqLine>,
@@ -104,6 +105,7 @@ impl Cpu6510 {
         Self {
             mem,
             regs: Registers::new(),
+            last_nmi: false,
             ba_line,
             io_port,
             irq_line,
@@ -473,6 +475,11 @@ impl Cpu6510 {
                 tick_fn();
             }
             // Undocumented
+            Instruction::ANE(ref op) => {
+                let result = self.regs.a & self.regs.x & op.get(self, tick_fn);
+                self.update_nz(result);
+                self.regs.a = result;
+            }
             Instruction::AXS(ref op) => {
                 let result =
                     ((self.regs.a & self.regs.x) as u16).wrapping_sub(op.get(self, tick_fn) as u16);
@@ -567,7 +574,7 @@ impl Cpu6510 {
     pub fn read_internal(&self, address: u16, tick_fn: &TickFn) -> u8 {
         let value = match address {
             0x0000 => self.io_port.borrow().get_direction(),
-            0x0001 => self.io_port.borrow().get_value(),
+            0x0001 => self.io_port.borrow().get_value() & 0x3f,
             _ => self.mem.borrow().read(address),
         };
         tick_fn();
@@ -642,6 +649,7 @@ impl Cpu for Cpu6510 {
 
     fn reset(&mut self) {
         self.regs.reset();
+        self.last_nmi = false;
         self.io_port.borrow_mut().set_value(0xff);
         self.irq_line.borrow_mut().reset();
         self.nmi_line.borrow_mut().reset();
@@ -667,6 +675,7 @@ impl Cpu for Cpu6510 {
             trace!(target: "cpu::ins", "0x{:04x}: {:14}; {}", pc, op_value, &self);
         }
         self.execute(&instr, tick_fn);
+        self.last_nmi = self.nmi_line.borrow().is_low();
     }
 
     // -- I/O
@@ -744,9 +753,7 @@ mod tests {
         }
     }
 
-    impl Mmu for MockMemory {
-        fn switch_banks(&mut self, _mode: u8) {}
-
+    impl Addressable for MockMemory {
         fn read(&self, address: u16) -> u8 {
             self.ram.read(address)
         }

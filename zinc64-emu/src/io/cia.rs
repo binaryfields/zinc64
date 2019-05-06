@@ -32,53 +32,23 @@ impl Mode {
     }
 }
 
-#[derive(Copy, Clone)]
-pub enum Reg {
-    PRA = 0x00,
-    PRB = 0x01,
-    DDRA = 0x02,
-    DDRB = 0x03,
-    TALO = 0x04,
-    TAHI = 0x05,
-    TBLO = 0x06,
-    TBHI = 0x07,
-    TODTS = 0x08,
-    TODSEC = 0x09,
-    TODMIN = 0x0a,
-    TODHR = 0x0b,
-    SDR = 0x0c,
-    ICR = 0x0d,
-    CRA = 0x0e,
-    CRB = 0x0f,
-}
-
-impl Reg {
-    pub fn from(reg: u8) -> Reg {
-        match reg {
-            0x00 => Reg::PRA,
-            0x01 => Reg::PRB,
-            0x02 => Reg::DDRA,
-            0x03 => Reg::DDRB,
-            0x04 => Reg::TALO,
-            0x05 => Reg::TAHI,
-            0x06 => Reg::TBLO,
-            0x07 => Reg::TBHI,
-            0x08 => Reg::TODTS,
-            0x09 => Reg::TODSEC,
-            0x0a => Reg::TODMIN,
-            0x0b => Reg::TODHR,
-            0x0c => Reg::SDR,
-            0x0d => Reg::ICR,
-            0x0e => Reg::CRA,
-            0x0f => Reg::CRB,
-            _ => panic!("invalid reg {}", reg),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn addr(self) -> u8 {
-        self as u8
-    }
+pub mod reg {
+    pub const PRA: u8 = 0x00;
+    pub const PRB: u8 = 0x01;
+    pub const DDRA: u8 = 0x02;
+    pub const DDRB: u8 = 0x03;
+    pub const TALO: u8 = 0x04;
+    pub const TAHI: u8 = 0x05;
+    pub const TBLO: u8 = 0x06;
+    pub const TBHI: u8 = 0x07;
+    pub const TODTS: u8 = 0x08;
+    pub const TODSEC: u8 = 0x09;
+    pub const TODMIN: u8 = 0x0a;
+    pub const TODHR: u8 = 0x0b;
+    pub const SDR: u8 = 0x0c;
+    pub const ICR: u8 = 0x0d;
+    pub const CRA: u8 = 0x0e;
+    pub const CRB: u8 = 0x0f;
 }
 
 pub struct Cia {
@@ -86,7 +56,7 @@ pub struct Cia {
     mode: Mode,
     joystick_1: Option<SharedCell<u8>>,
     joystick_2: Option<SharedCell<u8>>,
-    keyboard_matrix: Option<Shared<[u8; 8]>>,
+    keyboard_matrix: Option<Shared<[u8; 16]>>,
     // Functional Units
     irq_control: IrqControl,
     irq_delay: CycleCounter,
@@ -109,7 +79,7 @@ impl Cia {
         mode: Mode,
         joystick_1: Option<SharedCell<u8>>,
         joystick_2: Option<SharedCell<u8>>,
-        keyboard_matrix: Option<Shared<[u8; 8]>>,
+        keyboard_matrix: Option<Shared<[u8; 16]>>,
         port_a: Shared<IoPort>,
         port_b: Shared<IoPort>,
         flag_pin: Shared<Pin>,
@@ -137,27 +107,31 @@ impl Cia {
     }
 
     fn read_cia1_port_a(&self) -> u8 {
+        let active_columns = self.port_b.borrow().get_value();
+        let keyboard_state = self.scan_keyboard_active_cols(active_columns);
         let joystick_state = self.scan_joystick(&self.joystick_2);
-        self.port_a.borrow().get_value() & joystick_state
+        let result = self.port_a.borrow().get_value_2(keyboard_state);
+        result & joystick_state
     }
 
     fn read_cia1_port_b(&self) -> u8 {
-        // let timer_a_out = 1u8 << 6;
-        // let timer_b_out = 1u8 << 7;
-        let keyboard_state = match self.port_a.borrow().get_value() {
-            0x00 => 0x00,
-            0xff => 0xff,
-            _ => self.scan_keyboard(!self.port_a.borrow().get_value()),
-        };
+        let active_rows = self.port_a.borrow().get_value();
+        let keyboard_state = self.scan_keyboard_active_rows(active_rows);
         let joystick_state = self.scan_joystick(&self.joystick_1);
-        let mut result = self.port_b.borrow().get_value() & keyboard_state & joystick_state;
+        let mut result = self.port_b.borrow().get_value_2(keyboard_state);
+        /*
+        http://unusedino.de/ec64/technical/misc/cia6526/timers.html
+        A control bit allows the timer output to appear on a PORT B output line
+        (PB6 for TIMER A and PB7 for TIMER B). This function overrides the DDRB
+        control bit and forces the appropriate PB line to an output.
+        */
         if self.timer_a.is_pb_on() {
             result.set_bit(6, self.timer_a.get_pb_output());
         }
         if self.timer_b.is_pb_on() {
             result.set_bit(7, self.timer_b.get_pb_output());
         }
-        result
+        result & joystick_state
     }
 
     fn read_cia2_port_a(&self) -> u8 {
@@ -184,17 +158,31 @@ impl Cia {
         }
     }
 
-    fn scan_keyboard(&self, columns: u8) -> u8 {
-        if let Some(ref keyboard_matrix) = self.keyboard_matrix {
-            let mut result = 0;
-            for i in 0..8 as usize {
-                if columns.get_bit(i) {
-                    result |= keyboard_matrix.borrow()[i];
+    fn scan_keyboard_active_cols(&self, active_columns: u8) -> u8 {
+        if let Some(matrix) = self.keyboard_matrix.as_ref() {
+            let mut result = 0xff;
+            for col in 0..8 as usize {
+                if active_columns.get_bit(col) == false {
+                    result &= matrix.borrow()[8 + col];
                 }
             }
             result
         } else {
-            0
+            0xff
+        }
+    }
+
+    fn scan_keyboard_active_rows(&self, active_rows: u8) -> u8 {
+        if let Some(matrix) = self.keyboard_matrix.as_ref() {
+            let mut result = 0xff;
+            for row in 0..8 as usize {
+                if active_rows.get_bit(row) == false {
+                    result &= matrix.borrow()[row];
+                }
+            }
+            result
+        } else {
+            0xff
         }
     }
 }
@@ -282,34 +270,34 @@ impl Chip for Cia {
     // I/O
 
     fn read(&mut self, reg: u8) -> u8 {
-        let value = match Reg::from(reg) {
-            Reg::PRA => match self.mode {
+        let value = match reg {
+            reg::PRA => match self.mode {
                 Mode::Cia1 => self.read_cia1_port_a(),
                 Mode::Cia2 => self.read_cia2_port_a(),
             },
-            Reg::PRB => match self.mode {
+            reg::PRB => match self.mode {
                 Mode::Cia1 => self.read_cia1_port_b(),
                 Mode::Cia2 => self.read_cia2_port_b(),
             },
-            Reg::DDRA => self.port_a.borrow().get_direction(),
-            Reg::DDRB => self.port_b.borrow().get_direction(),
-            Reg::TALO => self.timer_a.get_counter_lo(),
-            Reg::TAHI => self.timer_a.get_counter_hi(),
-            Reg::TBLO => self.timer_b.get_counter_lo(),
-            Reg::TBHI => self.timer_b.get_counter_hi(),
-            Reg::TODTS => {
+            reg::DDRA => self.port_a.borrow().get_direction(),
+            reg::DDRB => self.port_b.borrow().get_direction(),
+            reg::TALO => self.timer_a.get_counter_lo(),
+            reg::TAHI => self.timer_a.get_counter_hi(),
+            reg::TBLO => self.timer_b.get_counter_lo(),
+            reg::TBHI => self.timer_b.get_counter_hi(),
+            reg::TODTS => {
                 self.tod_clock.set_enabled(true);
                 to_bcd(self.tod_clock.get_tenth())
             }
-            Reg::TODSEC => to_bcd(self.tod_clock.get_seconds()),
-            Reg::TODMIN => to_bcd(self.tod_clock.get_minutes()),
-            Reg::TODHR => {
+            reg::TODSEC => to_bcd(self.tod_clock.get_seconds()),
+            reg::TODMIN => to_bcd(self.tod_clock.get_minutes()),
+            reg::TODHR => {
                 let mut result = to_bcd(self.tod_clock.get_hours());
                 result.set_bit(7, self.tod_clock.get_pm());
                 result
             }
-            Reg::SDR => 0,
-            Reg::ICR => {
+            reg::SDR => 0,
+            reg::ICR => {
                 /*
                 In a multi-chip system, the IR bit can be polled to detect which chip has generated
                 an interrupt request. The interrupt DATA register
@@ -324,12 +312,13 @@ impl Chip for Cia {
                     .set_low(self.mode.irq_source(), false);
                 data
             }
-            Reg::CRA => self.timer_a.get_config(),
-            Reg::CRB => {
+            reg::CRA => self.timer_a.get_config(),
+            reg::CRB => {
                 let mut config = self.timer_b.get_config();
                 config.set_bit(7, self.tod_set_alarm);
                 config
             }
+            _ => panic!("invalid reg {}", reg),
         };
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cia::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
@@ -341,32 +330,32 @@ impl Chip for Cia {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cia::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
-        match Reg::from(reg) {
-            Reg::PRA => {
+        match reg {
+            reg::PRA => {
                 self.port_a.borrow_mut().set_value(value);
             }
-            Reg::PRB => {
+            reg::PRB => {
                 self.port_b.borrow_mut().set_value(value);
             }
-            Reg::DDRA => {
+            reg::DDRA => {
                 self.port_a.borrow_mut().set_direction(value);
             }
-            Reg::DDRB => {
+            reg::DDRB => {
                 self.port_b.borrow_mut().set_direction(value);
             }
-            Reg::TALO => {
+            reg::TALO => {
                 self.timer_a.set_latch_lo(value);
             }
-            Reg::TAHI => {
+            reg::TAHI => {
                 self.timer_a.set_latch_hi(value);
             }
-            Reg::TBLO => {
+            reg::TBLO => {
                 self.timer_b.set_latch_lo(value);
             }
-            Reg::TBHI => {
+            reg::TBHI => {
                 self.timer_b.set_latch_hi(value);
             }
-            Reg::TODTS => {
+            reg::TODTS => {
                 let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
@@ -374,7 +363,7 @@ impl Chip for Cia {
                 };
                 tod.set_tenth(from_bcd(value & 0x0f));
             }
-            Reg::TODSEC => {
+            reg::TODSEC => {
                 let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
@@ -382,7 +371,7 @@ impl Chip for Cia {
                 };
                 tod.set_seconds(from_bcd(value & 0x7f));
             }
-            Reg::TODMIN => {
+            reg::TODMIN => {
                 let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
@@ -390,7 +379,7 @@ impl Chip for Cia {
                 };
                 tod.set_minutes(from_bcd(value & 0x7f));
             }
-            Reg::TODHR => {
+            reg::TODHR => {
                 let tod = if !self.tod_set_alarm {
                     &mut self.tod_clock
                 } else {
@@ -400,8 +389,8 @@ impl Chip for Cia {
                 tod.set_hours(from_bcd(value & 0x7f));
                 tod.set_pm(value.get_bit(7));
             }
-            Reg::SDR => {}
-            Reg::ICR => {
+            reg::SDR => {}
+            reg::ICR => {
                 /*
                 The MASK register provides convenient control of
                 individual mask bits. When writing to the MASK register,
@@ -419,13 +408,14 @@ impl Chip for Cia {
                     self.irq_delay.feed(IntDelay::Interrupt0 as u16);
                 }
             }
-            Reg::CRA => {
+            reg::CRA => {
                 self.timer_a.set_config(value);
             }
-            Reg::CRB => {
+            reg::CRB => {
                 self.timer_b.set_config(value);
                 self.tod_set_alarm = value.get_bit(7);
             }
+            _ => panic!("invalid reg {}", reg),
         }
     }
 }
@@ -448,7 +438,7 @@ mod tests {
         let cia_port_a = new_shared(IoPort::new(0x00, 0xff));
         let cia_port_b = new_shared(IoPort::new(0x00, 0xff));
         let cpu_irq = new_shared(IrqLine::new("irq"));
-        let keyboard_matrix = new_shared([0xff; 8]);
+        let keyboard_matrix = new_shared([0xff; 16]);
         let mut cia = Cia::new(
             Mode::Cia1,
             None,
@@ -464,7 +454,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn setup_cia_with_keyboard(keyboard_matrix: Shared<[u8; 8]>) -> Cia {
+    fn setup_cia_with_keyboard(keyboard_matrix: Shared<[u8; 16]>) -> Cia {
         let cia_flag = new_shared(Pin::new_low());
         let cia_port_a = new_shared(IoPort::new(0x00, 0xff));
         let cia_port_b = new_shared(IoPort::new(0x00, 0xff));
@@ -486,33 +476,33 @@ mod tests {
     #[test]
     fn read_regs() {
         let mut cia = setup_cia();
-        assert_eq!(0xff, cia.read(Reg::PRA.addr()));
-        assert_eq!(0xff, cia.read(Reg::PRB.addr()));
-        assert_eq!(0x00, cia.read(Reg::DDRA.addr()));
-        assert_eq!(0x00, cia.read(Reg::DDRB.addr()));
-        assert_eq!(0x00, cia.read(Reg::TALO.addr()));
-        assert_eq!(0x00, cia.read(Reg::TAHI.addr()));
-        assert_eq!(0x00, cia.read(Reg::TBLO.addr()));
-        assert_eq!(0x00, cia.read(Reg::TBHI.addr()));
-        assert_eq!(0x00, cia.read(Reg::TODTS.addr()));
-        assert_eq!(0x00, cia.read(Reg::TODSEC.addr()));
-        assert_eq!(0x00, cia.read(Reg::TODMIN.addr()));
-        assert_eq!(0x00, cia.read(Reg::TODHR.addr()));
-        assert_eq!(0x00, cia.read(Reg::SDR.addr()));
-        assert_eq!(0x00, cia.read(Reg::ICR.addr()));
-        assert_eq!(0x08, cia.read(Reg::CRA.addr()));
-        assert_eq!(0x08, cia.read(Reg::CRB.addr()));
+        assert_eq!(0xff, cia.read(reg::PRA));
+        assert_eq!(0xff, cia.read(reg::PRB));
+        assert_eq!(0x00, cia.read(reg::DDRA));
+        assert_eq!(0x00, cia.read(reg::DDRB));
+        assert_eq!(0x00, cia.read(reg::TALO));
+        assert_eq!(0x00, cia.read(reg::TAHI));
+        assert_eq!(0x00, cia.read(reg::TBLO));
+        assert_eq!(0x00, cia.read(reg::TBHI));
+        assert_eq!(0x00, cia.read(reg::TODTS));
+        assert_eq!(0x00, cia.read(reg::TODSEC));
+        assert_eq!(0x00, cia.read(reg::TODMIN));
+        assert_eq!(0x00, cia.read(reg::TODHR));
+        assert_eq!(0x00, cia.read(reg::SDR));
+        assert_eq!(0x00, cia.read(reg::ICR));
+        assert_eq!(0x08, cia.read(reg::CRA));
+        assert_eq!(0x08, cia.read(reg::CRB));
     }
 
     #[test]
     fn timer_a_interrupt() {
         let mut cia = setup_cia();
-        cia.write(Reg::TALO.addr(), 0x01);
-        cia.write(Reg::TAHI.addr(), 0x00);
+        cia.write(reg::TALO, 0x01);
+        cia.write(reg::TAHI, 0x00);
         cia.clock(); // LOAD0
         cia.clock(); // LOAD1
-        cia.write(Reg::ICR.addr(), 0x81); // enable irq for timer a
-        cia.write(Reg::CRA.addr(), 0b_0000_1001_u8);
+        cia.write(reg::ICR, 0x81); // enable irq for timer a
+        cia.write(reg::CRA, 0b_0000_1001_u8);
         {
             cia.clock(); // COUNT0|COUNT1
             let cpu_irq = cia.irq_line.borrow();
@@ -539,14 +529,14 @@ mod tests {
     #[test]
     fn timer_b_interrupt() {
         let mut cia = setup_cia();
-        cia.write(Reg::TBLO.addr(), 0x01);
-        cia.write(Reg::TBHI.addr(), 0x00);
+        cia.write(reg::TBLO, 0x01);
+        cia.write(reg::TBHI, 0x00);
         cia.clock(); // LOAD0
         assert_eq!(0, cia.timer_b.get_counter());
         cia.clock(); // LOAD1
         assert_eq!(1, cia.timer_b.get_counter());
-        cia.write(Reg::ICR.addr(), 0x82); // enable irq for timer b
-        cia.write(Reg::CRB.addr(), 0b_0000_1001_u8);
+        cia.write(reg::ICR, 0x82); // enable irq for timer b
+        cia.write(reg::CRB, 0b_0000_1001_u8);
         {
             cia.clock(); // COUNT0|COUNT1
             let cpu_irq = cia.irq_line.borrow();
@@ -573,74 +563,74 @@ mod tests {
     #[test]
     fn write_reg_0x00() {
         let mut cia = setup_cia();
-        cia.write(Reg::PRA.addr(), 0xff);
+        cia.write(reg::PRA, 0xff);
         assert_eq!(0xff, cia.port_a.borrow().get_value());
     }
 
     #[test]
     fn write_reg_0x01() {
         let mut cia = setup_cia();
-        cia.write(Reg::PRB.addr(), 0xff);
+        cia.write(reg::PRB, 0xff);
         assert_eq!(0xff, cia.port_b.borrow().get_value());
     }
 
     #[test]
     fn write_reg_0x02() {
         let mut cia = setup_cia();
-        cia.write(Reg::DDRA.addr(), 0xff);
+        cia.write(reg::DDRA, 0xff);
         assert_eq!(0xff, cia.port_a.borrow().get_direction());
     }
 
     #[test]
     fn write_reg_0x03() {
         let mut cia = setup_cia();
-        cia.write(Reg::DDRB.addr(), 0xff);
+        cia.write(reg::DDRB, 0xff);
         assert_eq!(0xff, cia.port_b.borrow().get_direction());
     }
 
     #[test]
     fn write_reg_0x04() {
         let mut cia = setup_cia();
-        cia.write(Reg::TALO.addr(), 0xab);
+        cia.write(reg::TALO, 0xab);
         assert_eq!(0xab, cia.timer_a.get_latch() & 0x00ff);
     }
 
     #[test]
     fn write_reg_0x05() {
         let mut cia = setup_cia();
-        cia.write(Reg::TAHI.addr(), 0xcd);
+        cia.write(reg::TAHI, 0xcd);
         assert_eq!(0xcd, (cia.timer_a.get_latch() & 0xff00) >> 8);
     }
 
     #[test]
     fn write_reg_0x06() {
         let mut cia = setup_cia();
-        cia.write(Reg::TBLO.addr(), 0xab);
+        cia.write(reg::TBLO, 0xab);
         assert_eq!(0xab, cia.timer_b.get_latch() & 0x00ff);
     }
 
     #[test]
     fn write_reg_0x07() {
         let mut cia = setup_cia();
-        cia.write(Reg::TBHI.addr(), 0xcd);
+        cia.write(reg::TBHI, 0xcd);
         assert_eq!(0xcd, (cia.timer_b.get_latch() & 0xff00) >> 8);
     }
 
     #[test]
     fn write_reg_0x0d() {
         let mut cia = setup_cia();
-        cia.write(Reg::ICR.addr(), 0b10000011u8);
+        cia.write(reg::ICR, 0b10000011u8);
         assert_eq!(0b00000011u8, cia.irq_control.get_mask());
-        cia.write(Reg::ICR.addr(), 0b00000010u8);
+        cia.write(reg::ICR, 0b00000010u8);
         assert_eq!(0b00000001u8, cia.irq_control.get_mask());
     }
 
     #[test]
     fn write_timer_a_value() {
         let mut cia = setup_cia();
-        cia.write(Reg::TALO.addr(), 0xab);
+        cia.write(reg::TALO, 0xab);
         assert_eq!(0x0000, cia.timer_a.get_counter());
-        cia.write(Reg::TAHI.addr(), 0xcd);
+        cia.write(reg::TAHI, 0xcd);
         assert_eq!(0x0000, cia.timer_a.get_counter());
         cia.clock();
         cia.clock();
@@ -650,9 +640,9 @@ mod tests {
     #[test]
     fn write_timer_b_value() {
         let mut cia = setup_cia();
-        cia.write(Reg::TBLO.addr(), 0xab);
+        cia.write(reg::TBLO, 0xab);
         assert_eq!(0x00, cia.timer_b.get_counter());
-        cia.write(Reg::TBHI.addr(), 0xcd);
+        cia.write(reg::TBHI, 0xcd);
         cia.clock();
         cia.clock();
         assert_eq!(0xcdab, cia.timer_b.get_counter());
@@ -673,79 +663,79 @@ mod tests {
     #[test]
     fn program_cia1tab() {
         let mut cia = setup_cia();
-        cia.write(Reg::DDRB.addr(), 0x7f);
-        cia.write(Reg::ICR.addr(), 0x82);
-        cia.write(Reg::CRA.addr(), 0x00);
-        cia.write(Reg::CRB.addr(), 0x00);
-        cia.write(Reg::TALO.addr(), 0x02);
-        cia.write(Reg::TAHI.addr(), 0x00);
-        cia.write(Reg::TBLO.addr(), 0x02);
-        cia.write(Reg::TBHI.addr(), 0x00);
+        cia.write(reg::DDRB, 0x7f);
+        cia.write(reg::ICR, 0x82);
+        cia.write(reg::CRA, 0x00);
+        cia.write(reg::CRB, 0x00);
+        cia.write(reg::TALO, 0x02);
+        cia.write(reg::TAHI, 0x00);
+        cia.write(reg::TBLO, 0x02);
+        cia.write(reg::TBHI, 0x00);
         cia.clock();
         cia.clock();
-        cia.write(Reg::CRB.addr(), 0x47);
-        cia.write(Reg::CRA.addr(), 0x03);
+        cia.write(reg::CRB, 0x47);
+        cia.write(reg::CRA, 0x03);
         cia.clock(); // Count0|Count1
         cia.clock(); // Count2
         cia.clock(); // Count3
         assert_eq!(cia.timer_a.get_counter(), 0x01);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.read(reg::PRB), 0x80);
         assert_eq!(cia.irq_control.get_raw_data(), 0x00);
         cia.clock(); // Count3|Underflow|Load1
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0xc0);
+        assert_eq!(cia.read(reg::PRB), 0xc0);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count2
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.read(reg::PRB), 0x80);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count3
         assert_eq!(cia.timer_a.get_counter(), 0x01);
         assert_eq!(cia.timer_b.get_counter(), 0x01);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.read(reg::PRB), 0x80);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count3|Underflow|Load1
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x01);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0xc0);
+        assert_eq!(cia.read(reg::PRB), 0xc0);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count2
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x01);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.read(reg::PRB), 0x80);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count3
         assert_eq!(cia.timer_a.get_counter(), 0x01);
         assert_eq!(cia.timer_b.get_counter(), 0x00);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x80);
+        assert_eq!(cia.read(reg::PRB), 0x80);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count3|Underflow|Load1
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x00);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0xc0);
+        assert_eq!(cia.read(reg::PRB), 0xc0);
         assert_eq!(cia.irq_control.get_raw_data(), 0x01);
         cia.clock(); // Count2
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x00);
+        assert_eq!(cia.read(reg::PRB), 0x00);
         assert_eq!(cia.irq_control.get_raw_data(), 0x03);
         cia.clock(); // Count3
         assert_eq!(cia.timer_a.get_counter(), 0x01);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x00);
+        assert_eq!(cia.read(reg::PRB), 0x00);
         assert_eq!(cia.irq_control.get_raw_data(), 0x03); // 0x83
         cia.clock(); // Count3|Underflow|Load1
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x40);
+        assert_eq!(cia.read(reg::PRB), 0x40);
         assert_eq!(cia.irq_control.get_raw_data(), 0x03); // 0x83
         cia.clock(); // Count2
         assert_eq!(cia.timer_a.get_counter(), 0x02);
         assert_eq!(cia.timer_b.get_counter(), 0x02);
-        assert_eq!(cia.read(Reg::PRB.addr()), 0x00);
+        assert_eq!(cia.read(reg::PRB), 0x00);
         assert_eq!(cia.irq_control.get_raw_data(), 0x03); // 0x83
     }
 }

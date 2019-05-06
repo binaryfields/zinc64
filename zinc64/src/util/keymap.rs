@@ -13,50 +13,50 @@ impl KeyMap {
         match keycode {
             // Numerical
             Keycode::Num0
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num9))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num9))
+            }
             Keycode::Num0 => Some(KeyEvent::new(Key::Num0)),
             Keycode::Num1 => Some(KeyEvent::new(Key::Num1)),
             Keycode::Num2
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::At))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::At))
+            }
             Keycode::Num2 => Some(KeyEvent::new(Key::Num2)),
             Keycode::Num3 => Some(KeyEvent::new(Key::Num3)),
             Keycode::Num4 => Some(KeyEvent::new(Key::Num4)),
             Keycode::Num5 => Some(KeyEvent::new(Key::Num5)),
             Keycode::Num6
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num7))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num7))
+            }
             Keycode::Num6 => Some(KeyEvent::new(Key::Num6)),
             Keycode::Num7
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num6))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num6))
+            }
             Keycode::Num7 => Some(KeyEvent::new(Key::Num7)),
             Keycode::Num8
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::Asterisk))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::Asterisk))
+            }
             Keycode::Num8 => Some(KeyEvent::new(Key::Num8)),
             Keycode::Num9
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num8))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num8))
+            }
             Keycode::Num9 => Some(KeyEvent::new(Key::Num9)),
             // Alpha
             Keycode::A => Some(KeyEvent::new(Key::A)),
@@ -89,42 +89,42 @@ impl KeyMap {
             Keycode::Asterisk => Some(KeyEvent::new(Key::Asterisk)),
             Keycode::At => Some(KeyEvent::new(Key::At)),
             Keycode::Backslash
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_mod(Key::Minus, Key::LShift))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_mod(Key::Minus, Key::LShift))
+            }
             Keycode::Backspace => Some(KeyEvent::new(Key::Backspace)),
             Keycode::Caret => Some(KeyEvent::new(Key::Caret)),
             Keycode::Colon => Some(KeyEvent::new(Key::Colon)),
             Keycode::Comma => Some(KeyEvent::new(Key::Comma)),
             Keycode::Dollar => Some(KeyEvent::new(Key::Dollar)),
             Keycode::Equals
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::Plus))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::Plus))
+            }
             Keycode::Equals => Some(KeyEvent::new(Key::Equals)),
             Keycode::LeftBracket => Some(KeyEvent::with_mod(Key::Colon, Key::LShift)),
             Keycode::Minus => Some(KeyEvent::new(Key::Minus)),
             Keycode::Period => Some(KeyEvent::new(Key::Period)),
             Keycode::Plus => Some(KeyEvent::new(Key::Plus)),
             Keycode::Quote
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::new(Key::Num2))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::new(Key::Num2))
+            }
             Keycode::Quote => Some(KeyEvent::with_mod(Key::Num7, Key::LShift)),
             Keycode::Return => Some(KeyEvent::new(Key::Return)),
             Keycode::RightBracket => Some(KeyEvent::with_mod(Key::Semicolon, Key::LShift)),
             Keycode::Semicolon
-            if keymod.contains(keyboard::Mod::LSHIFTMOD)
-                || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
-                {
-                    Some(KeyEvent::with_disabled_shift(Key::Colon))
-                }
+                if keymod.contains(keyboard::Mod::LSHIFTMOD)
+                    || keymod.contains(keyboard::Mod::RSHIFTMOD) =>
+            {
+                Some(KeyEvent::with_disabled_shift(Key::Colon))
+            }
             Keycode::Semicolon => Some(KeyEvent::new(Key::Semicolon)),
             Keycode::Slash => Some(KeyEvent::new(Key::Slash)),
             Keycode::Space => Some(KeyEvent::new(Key::Space)),
@@ -135,10 +135,10 @@ impl KeyMap {
             Keycode::Left => Some(KeyEvent::with_mod(Key::CrsrRight, Key::LShift)),
             Keycode::LGui => Some(KeyEvent::new(Key::LGui)),
             Keycode::LShift => Some(KeyEvent::new(Key::LShift)),
-            Keycode::Pause => Some(KeyEvent::new(Key::Pause)),
             Keycode::RCtrl => Some(KeyEvent::new(Key::Ctrl)),
             Keycode::Right => Some(KeyEvent::new(Key::CrsrRight)),
             Keycode::RShift => Some(KeyEvent::new(Key::RShift)),
+            Keycode::Tab => Some(KeyEvent::new(Key::RunStop)),
             Keycode::Up => Some(KeyEvent::with_mod(Key::CrsrDown, Key::LShift)),
             // Function
             Keycode::F1 => Some(KeyEvent::new(Key::F1)),
@@ -151,61 +151,61 @@ impl KeyMap {
 }
 
 pub fn to_ascii(keycode: &Keycode, keymod: &Mod) -> char {
-    let c = if keymod.contains(keyboard::Mod::LSHIFTMOD)
-        || keymod.contains(keyboard::Mod::RSHIFTMOD) {
-        match keycode {
-            Keycode::Quote => '"',
-            Keycode::Comma => '<',
-            Keycode::Minus => '-',
-            Keycode::Period => '>',
-            Keycode::Slash => '?',
-            Keycode::Backslash => '|',
-            Keycode::Num0 => '!',
-            Keycode::Num1 => '@',
-            Keycode::Num2 => '#',
-            Keycode::Num3 => '$',
-            Keycode::Num4 => '%',
-            Keycode::Num5 => '^',
-            Keycode::Num6 => '&',
-            Keycode::Num7 => '*',
-            Keycode::Num8 => '(',
-            Keycode::Num9 => ')',
-            Keycode::LeftBracket => '{',
-            Keycode::RightBracket => '}',
-            Keycode::Semicolon => ':',
-            Keycode::Equals => '+',
-            Keycode::Backquote => '~',
-            Keycode::A => 'A',
-            Keycode::B => 'B',
-            Keycode::C => 'C',
-            Keycode::D => 'D',
-            Keycode::E => 'E',
-            Keycode::F => 'F',
-            Keycode::G => 'G',
-            Keycode::H => 'H',
-            Keycode::I => 'I',
-            Keycode::J => 'J',
-            Keycode::K => 'K',
-            Keycode::L => 'L',
-            Keycode::M => 'M',
-            Keycode::N => 'N',
-            Keycode::O => 'O',
-            Keycode::P => 'P',
-            Keycode::Q => 'Q',
-            Keycode::R => 'R',
-            Keycode::S => 'S',
-            Keycode::T => 'T',
-            Keycode::U => 'U',
-            Keycode::V => 'V',
-            Keycode::W => 'W',
-            Keycode::X => 'X',
-            Keycode::Y => 'Y',
-            Keycode::Z => 'Z',
-            _ => '\0',
-        }
-    } else {
-        '\0'
-    };
+    let c =
+        if keymod.contains(keyboard::Mod::LSHIFTMOD) || keymod.contains(keyboard::Mod::RSHIFTMOD) {
+            match keycode {
+                Keycode::Quote => '"',
+                Keycode::Comma => '<',
+                Keycode::Minus => '_',
+                Keycode::Period => '>',
+                Keycode::Slash => '?',
+                Keycode::Backslash => '|',
+                Keycode::Num0 => '!',
+                Keycode::Num1 => '@',
+                Keycode::Num2 => '#',
+                Keycode::Num3 => '$',
+                Keycode::Num4 => '%',
+                Keycode::Num5 => '^',
+                Keycode::Num6 => '&',
+                Keycode::Num7 => '*',
+                Keycode::Num8 => '(',
+                Keycode::Num9 => ')',
+                Keycode::LeftBracket => '{',
+                Keycode::RightBracket => '}',
+                Keycode::Semicolon => ':',
+                Keycode::Equals => '+',
+                Keycode::Backquote => '~',
+                Keycode::A => 'A',
+                Keycode::B => 'B',
+                Keycode::C => 'C',
+                Keycode::D => 'D',
+                Keycode::E => 'E',
+                Keycode::F => 'F',
+                Keycode::G => 'G',
+                Keycode::H => 'H',
+                Keycode::I => 'I',
+                Keycode::J => 'J',
+                Keycode::K => 'K',
+                Keycode::L => 'L',
+                Keycode::M => 'M',
+                Keycode::N => 'N',
+                Keycode::O => 'O',
+                Keycode::P => 'P',
+                Keycode::Q => 'Q',
+                Keycode::R => 'R',
+                Keycode::S => 'S',
+                Keycode::T => 'T',
+                Keycode::U => 'U',
+                Keycode::V => 'V',
+                Keycode::W => 'W',
+                Keycode::X => 'X',
+                Keycode::Y => 'Y',
+                Keycode::Z => 'Z',
+                _ => '\0',
+            }
+        } else {
+            '\0'
+        };
     if c != '\0' {
         c
     } else {

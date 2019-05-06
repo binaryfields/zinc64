@@ -1,5 +1,11 @@
 # TODO
 
+- console: add clear
+- cpu: fix nmi handling
+- input: implement swap joystick
+- vic: fix sprite turn off logic
+- vic: implement invalidtext mode
+
 - refactor run_frame to result Option<Event> Halt|Vsync
 - core: add apply_config hardwareconfig
 - rpi: add usb
@@ -8,5 +14,5 @@
 - app: add screenshot support
 - app: add ui/menus
 
-- https://github.com/bztsrc/raspi3-tutorial/tree/master/10_virtualmemory
-- https://wiki.osdev.org/ARM_RaspberryPi
+- fix rambo
+- fix mario 0x0830

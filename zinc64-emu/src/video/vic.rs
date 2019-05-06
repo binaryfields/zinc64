@@ -503,11 +503,7 @@ impl Vic {
                         | self.raster_unit.rc as u16;
                     self.mem.read(address)
                 }
-                Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-                _ => panic!(
-                    "unsupported graphics mode {}",
-                    self.gfx_seq.config.mode.value()
-                ),
+                Mode::InvalidText | Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
             };
             let c_data = self.raster_unit.vm_data_line[self.raster_unit.vmli];
             let c_color = self.raster_unit.vm_color_line[self.raster_unit.vmli];

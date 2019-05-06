@@ -35,6 +35,10 @@ impl IoPort {
         (self.output & self.direction) | (self.input & !self.direction)
     }
 
+    pub fn get_value_2(&self, input: u8) -> u8 {
+        (self.output & self.direction) | (input & !self.direction)
+    }
+
     pub fn set_direction(&mut self, direction: u8) {
         self.direction = direction;
         self.notify_observer();

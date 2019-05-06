@@ -69,18 +69,9 @@ fn program_cia1tab() {
         if test_flag_clone.get() {
             if test_cycle_clone.get() >= 1 && test_cycle_clone.get() < 13 {
                 let i = test_cycle_clone.get() - 1;
-                assert_eq!(
-                    cia1_clone.borrow_mut().read(cia::Reg::TALO.addr()),
-                    CIA1TAB_TA[i]
-                );
-                assert_eq!(
-                    cia1_clone.borrow_mut().read(cia::Reg::TBLO.addr()),
-                    CIA1TAB_TB[i]
-                );
-                assert_eq!(
-                    cia1_clone.borrow_mut().read(cia::Reg::PRB.addr()),
-                    CIA1TAB_PB[i]
-                );
+                assert_eq!(cia1_clone.borrow_mut().read(cia::reg::TALO), CIA1TAB_TA[i]);
+                assert_eq!(cia1_clone.borrow_mut().read(cia::reg::TBLO), CIA1TAB_TB[i]);
+                assert_eq!(cia1_clone.borrow_mut().read(cia::reg::PRB), CIA1TAB_PB[i]);
             }
             test_cycle_clone.set(test_cycle_clone.get() + 1);
         }
@@ -121,7 +112,7 @@ fn exec_keyboard_read() {
     let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
     c64.load(&code.to_vec(), 0xc000);
     let keyboard = c64.get_keyboard();
-    keyboard.borrow_mut().set_row(1, !(1 << 5));
+    keyboard.set_matrix((1, 5), true);
     c64.get_cpu_mut().write(0x0001, 0x06);
     c64.get_cpu_mut().set_pc(0xc000);
     let mut branch_count = 0;
@@ -148,10 +139,10 @@ fn read_keyboard_s() {
     let mut cia = setup_cia_with_keyboard(keyboard_matrix.clone());
     keyboard.borrow_mut().enqueue("S");
     keyboard.borrow_mut().drain_event();
-    cia.write(Reg::DDRA.addr(), 0xff);
-    cia.write(Reg::DDRB.addr(), 0x00);
-    cia.write(Reg::PRA.addr(), 0xfd);
-    assert_eq!(!(1 << 5), cia.read(Reg::PRB.addr()));
+    cia.write(reg::DDRA.addr(), 0xff);
+    cia.write(reg::DDRB.addr(), 0x00);
+    cia.write(reg::PRA.addr(), 0xfd);
+    assert_eq!(!(1 << 5), cia.read(reg::PRB.addr()));
 }
 */
 

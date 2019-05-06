@@ -4,24 +4,17 @@
 
 // SPEC: https://www.c64-wiki.com/index.php/Bank_Switching
 
-#[derive(Clone, Copy)]
-pub enum Bank {
-    Basic,
-    Charset,
-    Kernal,
-    Io,
-    Ram,
-    RomH,
-    RomL,
-    Disabled,
-}
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+use log::LogLevel;
+use zinc64_core::{Bank, Mmu};
 
 #[derive(Clone, Copy)]
-pub struct Configuration {
+struct Mode {
     banks: [Bank; 0x10],
 }
 
-impl Configuration {
+impl Mode {
     pub fn new(config: [Bank; 7]) -> Self {
         let mut banks = [Bank::Disabled; 0x10];
         for (i, bank) in banks.iter_mut().enumerate().take(0x10) {
@@ -36,7 +29,7 @@ impl Configuration {
                 _ => panic!("invalid bank {}", i),
             };
         }
-        Configuration { banks }
+        Mode { banks }
     }
 
     pub fn get(&self, zone: u8) -> Bank {
@@ -44,8 +37,35 @@ impl Configuration {
     }
 }
 
-pub struct MemoryMap {
-    modes: [Configuration; 31],
+pub struct Pla {
+    map: MemoryMap,
+    mode: Mode,
+}
+
+impl Pla {
+    pub fn new() -> Self {
+        let map = MemoryMap::default();
+        let configuration = map.get(0);
+        Pla { map, mode: configuration }
+    }
+}
+
+impl Mmu for Pla {
+    fn map(&self, address: u16) -> Bank {
+        let zone = address >> 12;
+        self.mode.get(zone as u8)
+    }
+
+    fn switch_banks(&mut self, mode: u8) {
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "mem::banks", "Switching to {}", mode);
+        }
+        self.mode = self.map.get(mode);
+    }
+}
+
+struct MemoryMap {
+    modes: [Mode; 32],
 }
 
 impl Default for MemoryMap {
@@ -170,8 +190,8 @@ impl Default for MemoryMap {
         let m5 = [
             Bank::Ram,
             Bank::Ram,
-            Bank::RomL,
-            Bank::RomH,
+            Bank::Ram,
+            Bank::Ram,
             Bank::Ram,
             Bank::Io,
             Bank::Ram,
@@ -205,46 +225,47 @@ impl Default for MemoryMap {
         ];
         MemoryMap {
             modes: [
-                Configuration::new(m1),
-                Configuration::new(m2),
-                Configuration::new(m3),
-                Configuration::new(m12_8_4_0),
-                Configuration::new(m5),
-                Configuration::new(m6),
-                Configuration::new(m7),
-                Configuration::new(m12_8_4_0),
-                Configuration::new(m25_9),
-                Configuration::new(m26_10),
-                Configuration::new(m11),
-                Configuration::new(m12_8_4_0),
-                Configuration::new(m29_13),
-                Configuration::new(m30_14),
-                Configuration::new(m15),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m23_16),
-                Configuration::new(m28_24),
-                Configuration::new(m25_9),
-                Configuration::new(m26_10),
-                Configuration::new(m27),
-                Configuration::new(m28_24),
-                Configuration::new(m29_13),
-                Configuration::new(m30_14),
-                Configuration::new(m31),
+                Mode::new(m12_8_4_0),
+                Mode::new(m1),
+                Mode::new(m2),
+                Mode::new(m3),
+                Mode::new(m12_8_4_0),
+                Mode::new(m5),
+                Mode::new(m6),
+                Mode::new(m7),
+                Mode::new(m12_8_4_0),
+                Mode::new(m25_9),
+                Mode::new(m26_10),
+                Mode::new(m11),
+                Mode::new(m12_8_4_0),
+                Mode::new(m29_13),
+                Mode::new(m30_14),
+                Mode::new(m15),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m23_16),
+                Mode::new(m28_24),
+                Mode::new(m25_9),
+                Mode::new(m26_10),
+                Mode::new(m27),
+                Mode::new(m28_24),
+                Mode::new(m29_13),
+                Mode::new(m30_14),
+                Mode::new(m31),
             ],
         }
     }
 }
 
 impl MemoryMap {
-    pub fn get(&self, mode: u8) -> Configuration {
+    pub fn get(&self, mode: u8) -> Mode {
         match mode {
-            1...31 => self.modes[(mode - 1) as usize],
+            0...31 => self.modes[mode as usize],
             _ => panic!("invalid mode {}", mode),
         }
     }

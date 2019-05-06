@@ -12,7 +12,7 @@ pub type Result<T> = result::Result<T, String>;
 pub trait Reader {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize>;
-    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()>;
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<()>;
     fn consume(&mut self, amt: usize);
 }
 

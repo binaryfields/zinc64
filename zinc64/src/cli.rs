@@ -59,16 +59,14 @@ pub struct Opt {
     #[structopt(
         long = "joydev1",
         default_value = "none",
-        parse(try_from_str = "parse_joy_mode"),
-        group = "devices"
+        parse(try_from_str = "parse_joy_mode")
     )]
     pub joydev_1: joystick::Mode,
     /// set device for joystick 2
     #[structopt(
         long = "joydev2",
         default_value = "numpad",
-        parse(try_from_str = "parse_joy_mode"),
-        group = "devices"
+        parse(try_from_str = "parse_joy_mode")
     )]
     pub joydev_2: joystick::Mode,
 
@@ -107,16 +105,14 @@ pub struct Opt {
     #[structopt(
         long = "dbg-address",
         default_value = "127.0.0.1:9999",
-        parse(try_from_str = "parse_socket_addr"),
-        group = "debug"
+        parse(try_from_str = "parse_socket_addr")
     )]
     pub dbg_address: SocketAddr,
     /// start rap server bound to the specified address
     #[structopt(
         long = "rap-address",
         default_value = "127.0.0.1:9999",
-        parse(try_from_str = "parse_socket_addr"),
-        group = "debug"
+        parse(try_from_str = "parse_socket_addr")
     )]
     pub rap_address: SocketAddr,
 

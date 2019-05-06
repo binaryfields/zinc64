@@ -143,3 +143,25 @@
 ## Week 24 - 20190303
 
 - add raspi sound output
+
+## Week 25 - 20190324
+
+- landed console part 1
+
+## Week 26 - 20190421
+
+- landed console part 2
+
+## Week 27 - 20190505
+
+- landed cartridge mapping rewrite
+- landed various game fixes
+  - fixed cart memory mapping modes (sotb)
+  - fixed sid reg reading (pang)
+  - fixed kb scanning (rr)
+  - fixed kb run/stop mapping (pitstop2)
+  - fixed joy2 regression (sotb)
+  - fixed cpu nmi handling (super mario)
+  - fixed cpu opcode ane (1942)
+- run sotb.crt
+

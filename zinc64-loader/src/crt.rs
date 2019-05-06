@@ -10,7 +10,7 @@ use alloc::prelude::*;
 use alloc::vec;
 use byteorder::BigEndian;
 use core::str;
-use zinc64_emu::device::{Cartridge, Chip, ChipType, HwType};
+use zinc64_emu::device::cartridge;
 use zinc64_emu::system::autostart;
 use zinc64_emu::system::{Image, C64};
 
@@ -44,7 +44,7 @@ struct ChipHeader {
 }
 
 struct CrtImage {
-    cartridge: Option<Cartridge>,
+    cartridge: Option<cartridge::Cartridge>,
 }
 
 impl Image for CrtImage {
@@ -64,21 +64,18 @@ impl CrtLoader {
         Self {}
     }
 
-    fn build_cartridge(&self, header: &Header) -> Cartridge {
-        Cartridge {
-            version: header.version,
-            hw_type: HwType::from(header.hw_type as u8),
-            exrom: header.exrom_line != 0,
-            game: header.game_line != 0,
-            banks: Vec::new(),
-            bank_lo: 0,
-            bank_hi: 0,
-        }
+    fn build_cartridge(&self, header: &Header) -> cartridge::Cartridge {
+        cartridge::Cartridge::new(
+            header.version,
+            cartridge::HwType::from(header.hw_type as u8),
+            header.exrom_line != 0,
+            header.game_line != 0,
+        )
     }
 
-    fn build_chip(&self, header: &ChipHeader, data: Vec<u8>) -> Chip {
-        Chip {
-            chip_type: ChipType::from(header.chip_type),
+    fn build_chip(&self, header: &ChipHeader, data: Vec<u8>) -> cartridge::Chip {
+        cartridge::Chip {
+            chip_type: cartridge::ChipType::from(header.chip_type),
             bank_number: header.bank_number as u8,
             offset: header.load_address,
             size: header.image_size,
@@ -183,8 +180,8 @@ impl Loader for CrtLoader {
                 .map_err(|_| "invalid cartridge chip header".to_owned())?;
             match chip_header_opt {
                 Some(chip_header) => {
-                    info!(target: "loader", "Found chip {}, offset 0x{:x}, size {}",
-                          chip_header.bank_number, chip_header.load_address, chip_header.length - 0x10);
+                    info!(target: "loader", "Found chip {}, type {}, offset 0x{:x}, size {}",
+                          chip_header.bank_number, chip_header.chip_type, chip_header.load_address, chip_header.length - 0x10);
                     self.validate_chip_header(&chip_header)?;
                     let chip_data = self
                         .read_data(reader, (chip_header.length - 0x10) as usize)

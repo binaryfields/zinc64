@@ -27,8 +27,9 @@ to assemble various accessories required to get software onto it. Soon enough I
 had picked up a copy of C64 Programmer's Reference Guide and the rest is now
 history.
 
-2019 is bringing support for bare-metal environments, more specifically a bare-metal
-Raspberry Pi 3 port. See zinc64-raspi for an early preview.
+2019 is bringing support for revised SDL port with console support and
+bare-metal environments, more specifically a bare-metal Raspberry Pi 3 port.
+See zinc64-rpi for an early preview.
 
 ## Design
 
@@ -141,8 +142,7 @@ of chips to be decoupled from each other.
 
 ## Roadmap
 
-- v0.8 - nostd support
-- v0.9  - zinc64 ui
+- v0.9  - rpi port
 - v0.10  - floppy support
 
 ## Getting Started
@@ -250,6 +250,7 @@ The cpu validation was performed with the help of [Klaus2m5 functional tests](ht
 
 | Shortcut  | Function          |
 |-----------|-------------------|
+| Escape    | Console
 | Alt-Enter | Toggle Full Screen
 | Alt-F9    | Reset
 | Alt-H     | Activate Debugger

@@ -80,6 +80,7 @@ pub enum Instruction {
     SEI,
     RTI,
     // Undocumented
+    ANE(Operand),
     AXS(Operand),
     LAX(Operand),
 }
@@ -87,321 +88,169 @@ pub enum Instruction {
 impl Instruction {
     pub fn decode(cpu: &mut Cpu6510, opcode: u8, tick_fn: &TickFn) -> Instruction {
         match opcode {
-            // BRK
             0x00 => Instruction::BRK,
-            // ORA (Oper,X)
             0x01 => Instruction::ORA(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // ORA Oper
             0x05 => Instruction::ORA(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // ASL Oper
             0x06 => Instruction::ASL(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // PHP
             0x08 => Instruction::PHP,
-            // ORA #Oper
             0x09 => Instruction::ORA(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // ASL A
             0x0a => Instruction::ASL(Operand::Accumulator),
-            // ORA Oper
             0x0d => Instruction::ORA(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // ASL Oper
             0x0e => Instruction::ASL(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BPL
             0x10 => Instruction::BPL(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // ORA (Oper),Y
             0x11 => Instruction::ORA(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // ORA Oper,X
             0x15 => Instruction::ORA(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // ASL Oper,X
             0x16 => Instruction::ASL(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // CLC
             0x18 => Instruction::CLC,
-            // ORA Oper,Y
             0x19 => Instruction::ORA(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // ORA Oper,X (NOTE doc lists as 0x10)
             0x1d => Instruction::ORA(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // ASL Oper,X
             0x1e => Instruction::ASL(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // JSR Oper
             0x20 => Instruction::JSR(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // AND (Oper,X)
             0x21 => Instruction::AND(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // BIT Oper
             0x24 => Instruction::BIT(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // AND Oper
             0x25 => Instruction::AND(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // ROL Oper
             0x26 => Instruction::ROL(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // PLP
             0x28 => Instruction::PLP,
-            // AND #Oper
             0x29 => Instruction::AND(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // ROL A
             0x2a => Instruction::ROL(Operand::Accumulator),
-            // BIT Oper
             0x2c => Instruction::BIT(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // AND Oper
             0x2d => Instruction::AND(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // ROL Oper
             0x2e => Instruction::ROL(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BMI
             0x30 => Instruction::BMI(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // AND (Oper),Y
             0x31 => Instruction::AND(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // AND Oper,X
             0x35 => Instruction::AND(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // ROL Oper,X
             0x36 => Instruction::ROL(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // SEC
             0x38 => Instruction::SEC,
-            // AND Oper,Y
             0x39 => Instruction::AND(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // AND Oper,X
+            0x3a => Instruction::NOP,
             0x3d => Instruction::AND(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // ROL Oper,X
             0x3e => Instruction::ROL(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // RTI (doc lists as 0x4d)
             0x40 => Instruction::RTI,
-            // EOR (Oper,X)
             0x41 => Instruction::EOR(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // EOR Oper
             0x45 => Instruction::EOR(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // LSR Oper
             0x46 => Instruction::LSR(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // PHA
             0x48 => Instruction::PHA,
-            // EOR #Oper
             0x49 => Instruction::EOR(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // LSR A
             0x4a => Instruction::LSR(Operand::Accumulator),
-            // JMP Oper
             0x4c => Instruction::JMP(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // EOR Oper (doc lists as 0x40)
             0x4d => Instruction::EOR(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // LSR Oper
             0x4e => Instruction::LSR(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BVC
             0x50 => Instruction::BVC(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // EOR (Oper),Y
             0x51 => Instruction::EOR(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // EOR Oper,X
             0x55 => Instruction::EOR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // LSR Oper,X
             0x56 => Instruction::LSR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // CLI
             0x58 => Instruction::CLI,
-            // EOR Oper,Y
             0x59 => Instruction::EOR(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // EOR Oper,X (doc lists as 0x50)
             0x5d => Instruction::EOR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // LSR Oper,X
             0x5e => Instruction::LSR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // RTS
             0x60 => Instruction::RTS,
-            // ADC (Oper,X)
             0x61 => Instruction::ADC(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // ADC Oper
             0x65 => Instruction::ADC(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // ROR Oper
             0x66 => Instruction::ROR(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // PLA
             0x68 => Instruction::PLA,
-            // ADC #Oper
             0x69 => Instruction::ADC(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // ROR A
             0x6a => Instruction::ROR(Operand::Accumulator),
-            // JMP (Oper)
             0x6c => Instruction::JMP(Operand::Indirect(cpu.fetch_word(tick_fn))),
-            // ADC Oper (doc lists as 0x60)
             0x6d => Instruction::ADC(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // ROR Oper
             0x6e => Instruction::ROR(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BVS
             0x70 => Instruction::BVS(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // ADC (Oper),Y
             0x71 => Instruction::ADC(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // ADC Oper,X
             0x75 => Instruction::ADC(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // ROR Oper,X
             0x76 => Instruction::ROR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // SEI
             0x78 => Instruction::SEI,
-            // ADC Oper,Y
             0x79 => Instruction::ADC(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // ADC Oper,X (doc lists as 0x70)
             0x7d => Instruction::ADC(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // ROR Oper,X
             0x7e => Instruction::ROR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // STA (Oper,X)
             0x81 => Instruction::STA(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // STY Oper
             0x84 => Instruction::STY(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // STA Oper
             0x85 => Instruction::STA(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // STX Oper
             0x86 => Instruction::STX(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // DEY
             0x88 => Instruction::DEY,
-            // TXA
             0x8a => Instruction::TXA,
-            // STY Oper
+            0x8b => Instruction::ANE(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0x8c => Instruction::STY(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // STA Oper (doc lists as 0x80)
             0x8d => Instruction::STA(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // STX Oper
             0x8e => Instruction::STX(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BCC
             0x90 => Instruction::BCC(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // STA (Oper),Y
             0x91 => Instruction::STA(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // STY Oper,X
             0x94 => {
                 tick_fn(); // HACK
                 Instruction::STY(Operand::ZeroPageX(cpu.fetch_byte(tick_fn)))
             }
-            // STA Oper,X
             0x95 => {
                 tick_fn(); // HACK
                 Instruction::STA(Operand::ZeroPageX(cpu.fetch_byte(tick_fn)))
             }
-            // STX Oper,Y
             0x96 => Instruction::STX(Operand::ZeroPageY(cpu.fetch_byte(tick_fn))),
-            // TYA
             0x98 => Instruction::TYA,
-            // STA Oper,Y
             0x99 => Instruction::STA(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // TXS
             0x9a => Instruction::TXS,
-            // STA Oper,X (doc lists as 0x90)
             0x9d => Instruction::STA(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // LDY #Oper
             0xa0 => Instruction::LDY(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // LDA (Oper,X)
             0xa1 => Instruction::LDA(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // LDX #Oper
             0xa2 => Instruction::LDX(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // LDY Oper
             0xa4 => Instruction::LDY(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // LDA Oper
             0xa5 => Instruction::LDA(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // LDX Oper
             0xa6 => Instruction::LDX(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // LAX Oper
             0xa7 => Instruction::LAX(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // TAY
             0xa8 => Instruction::TAY,
-            // LDA #Oper
             0xa9 => Instruction::LDA(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // TAX
             0xaa => Instruction::TAX,
-            // LDY Oper
             0xac => Instruction::LDY(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // LDA Oper
             0xad => Instruction::LDA(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // LDX Oper
             0xae => Instruction::LDX(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BCS
             0xb0 => Instruction::BCS(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // LDA (Oper),Y
             0xb1 => Instruction::LDA(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // LAX (Oper),Y
             0xb3 => Instruction::LAX(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // LDY Oper,X
             0xb4 => Instruction::LDY(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // LDA Oper,X
             0xb5 => Instruction::LDA(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // LDX Oper,Y
             0xb6 => Instruction::LDX(Operand::ZeroPageY(cpu.fetch_byte(tick_fn))),
-            // CLV
             0xb8 => Instruction::CLV,
-            // LDA Oper,Y
             0xb9 => Instruction::LDA(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // TSX
             0xba => Instruction::TSX,
-            // LDY Oper,X
             0xbc => Instruction::LDY(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // LDA Oper,X
             0xbd => Instruction::LDA(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // LDX Oper,Y
             0xbe => Instruction::LDX(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // CPY *Oper
             0xc0 => Instruction::CPY(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // CMP (Oper,X)
             0xc1 => Instruction::CMP(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // CPY Oper
             0xc4 => Instruction::CPY(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // CMP Oper
             0xc5 => Instruction::CMP(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // DEC Oper
             0xc6 => Instruction::DEC(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // INY
             0xc8 => Instruction::INY,
-            // CMP #Oper
             0xc9 => Instruction::CMP(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // DEX
             0xca => Instruction::DEX,
-            // AXS
             0xcb => Instruction::AXS(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // CPY Oper
             0xcc => Instruction::CPY(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // CMP Oper
             0xcd => Instruction::CMP(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // DEC Oper
             0xce => Instruction::DEC(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BNE
             0xd0 => Instruction::BNE(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // CMP (Oper),Y
             0xd1 => Instruction::CMP(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // CMP Oper,X
             0xd5 => Instruction::CMP(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // DEC Oper,X
             0xd6 => Instruction::DEC(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // CLD
             0xd8 => Instruction::CLD,
-            // CMP Oper,Y
             0xd9 => Instruction::CMP(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // CMP Oper,X
             0xdd => Instruction::CMP(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // DEC Oper,X
             0xde => Instruction::DEC(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // CPX *Oper
             0xe0 => Instruction::CPX(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // SBC (Oper,X)
             0xe1 => Instruction::SBC(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
-            // CPX Oper
             0xe4 => Instruction::CPX(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // SBC Oper
             0xe5 => Instruction::SBC(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // INC Oper
             0xe6 => Instruction::INC(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
-            // INX
             0xe8 => Instruction::INX,
-            // SBC #Oper
             0xe9 => Instruction::SBC(Operand::Immediate(cpu.fetch_byte(tick_fn))),
-            // NOP
             0xea => Instruction::NOP,
-            // CPX Oper
             0xec => Instruction::CPX(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // SBC Oper
             0xed => Instruction::SBC(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // INC Oper
             0xee => Instruction::INC(Operand::Absolute(cpu.fetch_word(tick_fn))),
-            // BEQ
             0xf0 => Instruction::BEQ(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
-            // SBC (Oper),Y
             0xf1 => Instruction::SBC(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
-            // SBC Oper,X
             0xf5 => Instruction::SBC(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // INC Oper,X
             0xf6 => Instruction::INC(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
-            // SED
             0xf8 => Instruction::SED,
-            // SBC Oper,Y
             0xf9 => Instruction::SBC(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
-            // SBC Oper,X
+            0xfc => Instruction::NOP,
             0xfd => Instruction::SBC(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // INC Oper,X
             0xfe => Instruction::INC(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            // catch all
             _ => panic!("invalid opcode 0x{:x} at 0x{:x}", opcode, cpu.get_pc()),
         }
     }
@@ -473,6 +322,7 @@ impl fmt::Display for Instruction {
             Instruction::SEI => write!(f, "sei"),
             Instruction::RTI => write!(f, "rti"),
             // Undocumented
+            Instruction::ANE(ref operand) => write!(f, "ane {}", operand),
             Instruction::AXS(ref operand) => write!(f, "axs {}", operand),
             Instruction::LAX(ref operand) => write!(f, "lax {}", operand),
         }
@@ -482,7 +332,7 @@ impl fmt::Display for Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zinc64_core::{make_noop, new_shared, IoPort, IrqLine, Mmu, Pin, Ram};
+    use zinc64_core::{make_noop, new_shared, Addressable, IoPort, IrqLine, Mmu, Pin, Ram};
 
     struct MockMemory {
         ram: Ram,
@@ -494,9 +344,7 @@ mod tests {
         }
     }
 
-    impl Mmu for MockMemory {
-        fn switch_banks(&mut self, _mode: u8) {}
-
+    impl Addressable for MockMemory {
         fn read(&self, address: u16) -> u8 {
             self.ram.read(address)
         }

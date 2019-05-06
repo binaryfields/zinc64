@@ -19,8 +19,8 @@ use crate::sound_buffer::SoundBuffer;
 use crate::ui::{Action, ConsoleScreen, MainScreen, Screen};
 use crate::util::Font;
 use crate::video_buffer::VideoBuffer;
-use std::path::Path;
 use sdl2::pixels::Color;
+use std::path::Path;
 
 const CONSOLE_BUFFER: usize = 2048;
 
@@ -146,10 +146,7 @@ impl App {
             video_buffer,
         )?);
         let font = Font::load_psf(Path::new("res/font/font.psf"))?;
-        let console_palette = [
-            Color::from((45, 45, 45)),
-            Color::from((143, 135, 114))
-        ];
+        let console_palette = [Color::from((45, 45, 45)), Color::from((143, 135, 114))];
         let console_screen = new_shared(ConsoleScreen::build(
             options.window_size.0 / font.get_width(),
             options.window_size.1 / font.get_height(),

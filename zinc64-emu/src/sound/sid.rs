@@ -126,7 +126,7 @@ impl Chip for Sid {
             trace!(target: "sid::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
         self.sync();
-        self.resid.write(reg, value);
+        self.resid.write(reg, value)
     }
 }
 

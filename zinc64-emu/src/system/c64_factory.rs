@@ -16,7 +16,6 @@ use zinc64_core::*;
 
 use super::Config;
 use crate::cpu::Cpu6510;
-use crate::device::ExpansionPort;
 use crate::io::cia;
 use crate::io::Cia;
 use crate::mem::{Memory, Mmio};
@@ -37,7 +36,7 @@ impl C64Factory {
 impl ChipFactory for C64Factory {
     fn new_cpu(
         &self,
-        mem: Shared<dyn Mmu>,
+        mem: Shared<dyn Addressable>,
         io_port: Shared<IoPort>,
         ba_line: Shared<Pin>,
         irq_line: Shared<IrqLine>,
@@ -52,7 +51,7 @@ impl ChipFactory for C64Factory {
         &self,
         joystick_1: SharedCell<u8>,
         joystick_2: SharedCell<u8>,
-        keyboard_matrix: Shared<[u8; 8]>,
+        keyboard_matrix: Shared<[u8; 16]>,
         port_a: Shared<IoPort>,
         port_b: Shared<IoPort>,
         flag_pin: Shared<Pin>,
@@ -131,32 +130,23 @@ impl ChipFactory for C64Factory {
 
     // -- Memory
 
-    fn new_expansion_port(&self, exp_io_line: Shared<IoPort>) -> Shared<dyn Addressable> {
-        new_shared(ExpansionPort::new(exp_io_line))
-    }
-
     fn new_memory(
         &self,
+        mmu: Shared<dyn Mmu>,
         cia_1: Shared<dyn Chip>,
         cia_2: Shared<dyn Chip>,
         color_ram: Shared<Ram>,
-        expansion_port: Shared<dyn Addressable>,
+        expansion_port: Shared<dyn AddressableFaded>,
         ram: Shared<Ram>,
         rom_basic: Shared<Rom>,
         rom_charset: Shared<Rom>,
         rom_kernal: Shared<Rom>,
         sid: Shared<dyn Chip>,
         vic: Shared<dyn Chip>,
-    ) -> Shared<dyn Mmu> {
-        let io = Box::new(Mmio::new(
-            cia_1,
-            cia_2,
-            color_ram,
-            expansion_port.clone(),
-            sid,
-            vic,
-        ));
+    ) -> Shared<dyn Addressable> {
+        let io = Mmio::new(cia_1, cia_2, color_ram, expansion_port.clone(), sid, vic);
         new_shared(Memory::new(
+            mmu,
             expansion_port.clone(),
             io,
             ram,

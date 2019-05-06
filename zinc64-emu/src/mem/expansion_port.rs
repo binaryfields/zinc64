@@ -3,9 +3,9 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use bit_field::BitField;
-use zinc64_core::{Addressable, IoPort, Shared};
+use zinc64_core::{AddressableFaded, IoPort, Shared};
 
-use super::cartridge::Cartridge;
+use crate::device::cartridge::Cartridge;
 
 // DEFERRED device: expansion port test cases
 
@@ -35,31 +35,27 @@ impl ExpansionPort {
         }
     }
 
-    pub fn attach(&mut self, cartridge: Cartridge) {
-        let mut io_value = 0u8;
-        io_value.set_bit(IoLine::Game.value(), cartridge.get_game());
-        io_value.set_bit(IoLine::Exrom.value(), cartridge.get_exrom());
-        self.io_line.borrow_mut().set_value(io_value);
+    pub fn attach(&mut self, mut cartridge: Cartridge) {
+        let io_line_clone = self.io_line.clone();
+        cartridge.set_io_observer(Some(Box::new(move |config| {
+            let mut io_value = 0u8;
+            io_value.set_bit(IoLine::Game.value(), config.game);
+            io_value.set_bit(IoLine::Exrom.value(), config.exrom);
+            io_line_clone.borrow_mut().set_value(io_value);
+        })));
         self.cartridge = Some(cartridge);
     }
 
     pub fn detach(&mut self) {
-        if self.cartridge.is_some() {
-            self.cartridge = None;
-            let mut io_value = 0u8;
-            io_value.set_bit(IoLine::Game.value(), true);
-            io_value.set_bit(IoLine::Exrom.value(), true);
-            self.io_line.borrow_mut().set_value(io_value);
+        let mut cartridge = self.cartridge.take();
+        if let Some(ref mut cartridge) = cartridge {
+            cartridge.set_io_observer(None);
         }
     }
 
     pub fn reset(&mut self) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.reset();
-            let mut io_value = 0u8;
-            io_value.set_bit(IoLine::Game.value(), cartridge.get_game());
-            io_value.set_bit(IoLine::Exrom.value(), cartridge.get_exrom());
-            self.io_line.borrow_mut().set_value(io_value);
         } else {
             let mut io_value = 0u8;
             io_value.set_bit(IoLine::Game.value(), true);
@@ -69,13 +65,9 @@ impl ExpansionPort {
     }
 }
 
-impl Addressable for ExpansionPort {
-    fn read(&self, address: u16) -> u8 {
-        if let Some(ref cartridge) = self.cartridge {
-            cartridge.read(address)
-        } else {
-            0
-        }
+impl AddressableFaded for ExpansionPort {
+    fn read(&mut self, address: u16) -> Option<u8> {
+        self.cartridge.as_mut().and_then(|crt| crt.read(address))
     }
 
     fn write(&mut self, address: u16, value: u8) {

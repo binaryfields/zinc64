@@ -136,7 +136,7 @@ impl fmt::Display for Operand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zinc64_core::{make_noop, new_shared, IoPort, IrqLine, Mmu, Pin, Ram};
+    use zinc64_core::{make_noop, new_shared, Addressable, IoPort, IrqLine, Mmu, Pin, Ram};
 
     struct MockMemory {
         ram: Ram,
@@ -148,9 +148,7 @@ mod tests {
         }
     }
 
-    impl Mmu for MockMemory {
-        fn switch_banks(&mut self, _mode: u8) {}
-
+    impl Addressable for MockMemory {
         fn read(&self, address: u16) -> u8 {
             self.ram.read(address)
         }

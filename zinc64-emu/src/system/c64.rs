@@ -19,7 +19,8 @@ use zinc64_core::*;
 use super::breakpoint::BreakpointManager;
 use super::{Autostart, Config};
 use crate::device::joystick;
-use crate::device::{Cartridge, Datassette, ExpansionPort, Joystick, Keyboard, Tape};
+use crate::device::{Cartridge, Datassette, Joystick, Keyboard, Tape};
+use crate::mem::{ExpansionPort, Pla};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
@@ -51,20 +52,19 @@ pub struct C64 {
     vic: Shared<dyn Chip>,
     // Memory
     color_ram: Shared<Ram>,
+    expansion_port: Shared<ExpansionPort>,
     ram: Shared<Ram>,
     // Peripherals
     datassette: Shared<Datassette>,
-    expansion_port: Shared<ExpansionPort>,
     joystick_1: Option<Joystick>,
     joystick_2: Option<Joystick>,
     keyboard: Keyboard,
     // Buffers
     frame_buffer: Shared<dyn VideoOutput>,
     sound_buffer: Arc<dyn SoundOutput>,
-    // Configuration
+    // Runtime State
     autostart: Option<Autostart>,
     breakpoints: BreakpointManager,
-    // Runtime State
     clock: Rc<Clock>,
     frame_count: u32,
     last_pc: u16,
@@ -84,7 +84,7 @@ impl C64 {
         let clock = Rc::new(Clock::default());
         let joystick_1_state = new_shared_cell(0u8);
         let joystick_2_state = new_shared_cell(0u8);
-        let keyboard_matrix = new_shared([0; 8]);
+        let keyboard_matrix = new_shared([0; 16]);
         let vsync_flag = new_shared_cell(false);
         let vic_base_address = new_shared_cell(0u16);
 
@@ -139,7 +139,9 @@ impl C64 {
 
         // Memory Controller and Processor
         let expansion_port = new_shared(ExpansionPort::new(exp_io_line.clone()));
+        let mmu = new_shared(Pla::new());
         let mem = factory.new_memory(
+            mmu.clone(),
             cia_1.clone(),
             cia_2.clone(),
             color_ram.clone(),
@@ -183,23 +185,23 @@ impl C64 {
 
         // Observers
         let exp_io_line_clone_1 = exp_io_line.clone();
-        let mem_clone_1 = mem.clone();
+        let mmu_clone_1 = mmu.clone();
         cpu_io_port
             .borrow_mut()
             .set_observer(Box::new(move |cpu_port| {
                 let expansion_port_io = exp_io_line_clone_1.borrow().get_value();
                 let mode = cpu_port & 0x07 | expansion_port_io & 0x18;
-                mem_clone_1.borrow_mut().switch_banks(mode);
+                mmu_clone_1.borrow_mut().switch_banks(mode);
             }));
 
         let cpu_io_port_clone_2 = cpu_io_port.clone();
-        let mem_clone_2 = mem.clone();
+        let mmu_clone_2 = mmu.clone();
         exp_io_line
             .borrow_mut()
             .set_observer(Box::new(move |expansion_port_io| {
                 let cpu_port_io = cpu_io_port_clone_2.borrow().get_value();
                 let mode = cpu_port_io & 0x07 | expansion_port_io & 0x18;
-                mem_clone_2.borrow_mut().switch_banks(mode);
+                mmu_clone_2.borrow_mut().switch_banks(mode);
             }));
         let vic_base_address_clone = vic_base_address.clone();
         cia_2_port_a
@@ -230,9 +232,9 @@ impl C64 {
             sid: sid.clone(),
             vic: vic.clone(),
             color_ram: color_ram.clone(),
+            expansion_port: expansion_port.clone(),
             ram: ram.clone(),
             datassette,
-            expansion_port: expansion_port.clone(),
             joystick_1: joystick1,
             joystick_2: joystick2,
             keyboard,
@@ -351,6 +353,7 @@ impl C64 {
 
     pub fn reset(&mut self, hard: bool) {
         info!(target: "c64", "Resetting system");
+        self.clock.reset();
         // Memory
         if hard {
             for i in 0..self.config.model.memory_size as u16 {
@@ -380,7 +383,6 @@ impl C64 {
         self.frame_buffer.borrow_mut().reset();
         self.sound_buffer.reset();
         // Runtime State
-        // self.clock.reset();
         self.frame_count = 0;
         self.last_pc = 0;
         self.vsync_flag.set(false);

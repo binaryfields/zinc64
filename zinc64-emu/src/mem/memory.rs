@@ -4,10 +4,9 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
-use log::LogLevel;
-use zinc64_core::{Addressable, Mmu, Ram, Rom, Shared};
+use zinc64_core::{Addressable, AddressableFaded, Bank, Mmu, Ram, Rom, Shared};
 
-use super::{Bank, Configuration, MemoryMap};
+use crate::mem::{BaseAddr, Mmio};
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
 // Design:
@@ -17,69 +16,41 @@ use super::{Bank, Configuration, MemoryMap};
 //   memory layout.
 
 pub struct Memory {
-    // Configuration
-    map: MemoryMap,
-    configuration: Configuration,
-    // Addressable
+    mmu: Shared<dyn Mmu>,
+    expansion_port: Shared<dyn AddressableFaded>,
+    io: Mmio,
+    ram: Shared<Ram>,
     basic: Shared<Rom>,
     charset: Shared<Rom>,
-    expansion_port: Shared<dyn Addressable>,
-    io: Box<dyn Addressable>,
     kernal: Shared<Rom>,
-    ram: Shared<Ram>,
-}
-
-#[allow(dead_code)]
-#[derive(Copy, Clone)]
-enum BaseAddr {
-    Basic = 0xa000,
-    Charset = 0xd000,
-    Kernal = 0xe000,
-}
-
-impl BaseAddr {
-    pub fn addr(self) -> u16 {
-        self as u16
-    }
 }
 
 impl Memory {
     pub fn new(
-        expansion_port: Shared<dyn Addressable>,
-        io: Box<dyn Addressable>,
+        mmu: Shared<dyn Mmu>,
+        expansion_port: Shared<dyn AddressableFaded>,
+        io: Mmio,
         ram: Shared<Ram>,
         rom_basic: Shared<Rom>,
         rom_charset: Shared<Rom>,
         rom_kernal: Shared<Rom>,
     ) -> Self {
-        let map = MemoryMap::default();
-        let configuration = map.get(1);
         Memory {
-            map,
-            configuration,
-            basic: rom_basic,
-            charset: rom_charset,
+            mmu,
             expansion_port,
             io,
-            kernal: rom_kernal,
             ram,
+            basic: rom_basic,
+            charset: rom_charset,
+            kernal: rom_kernal,
         }
     }
 }
 
-impl Mmu for Memory {
-    fn switch_banks(&mut self, mode: u8) {
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "mem::banks", "Switching to {}", mode);
-        }
-        self.configuration = self.map.get(mode);
-    }
-
-    // I/O
-
+impl Addressable for Memory {
     fn read(&self, address: u16) -> u8 {
-        let zone = address >> 12;
-        match self.configuration.get(zone as u8) {
+        let bank = self.mmu.borrow().map(address);
+        match bank {
             Bank::Ram => self.ram.borrow().read(address),
             Bank::Basic => self.basic.borrow().read(address),
             Bank::Charset => self
@@ -87,16 +58,24 @@ impl Mmu for Memory {
                 .borrow()
                 .read(address - BaseAddr::Charset.addr()),
             Bank::Kernal => self.kernal.borrow().read(address),
-            Bank::RomL => self.expansion_port.borrow().read(address),
-            Bank::RomH => self.expansion_port.borrow().read(address),
+            Bank::RomL => self
+                .expansion_port
+                .borrow_mut()
+                .read(address)
+                .unwrap_or(self.ram.borrow().read(address)),
+            Bank::RomH => self
+                .expansion_port
+                .borrow_mut()
+                .read(address)
+                .unwrap_or(self.ram.borrow().read(address)),
             Bank::Io => self.io.read(address),
             Bank::Disabled => 0,
         }
     }
 
     fn write(&mut self, address: u16, value: u8) {
-        let zone = address >> 12;
-        match self.configuration.get(zone as u8) {
+        let bank = self.mmu.borrow().map(address);
+        match bank {
             Bank::Ram => self.ram.borrow_mut().write(address, value),
             Bank::Basic => self.ram.borrow_mut().write(address, value),
             Bank::Charset => self.ram.borrow_mut().write(address, value),

@@ -633,7 +633,7 @@ impl Connection {
         }
         buffer.push_str(
             format!(
-                "${:04x}: {:12} {:16} A:{:02x} X:{:02x} Y:{:02x} SP:{:02x} {}{}{}{}{}{}{}\n",
+                "${:04x}: {:12} {:16} A:{:02x} X:{:02x} Y:{:02x} SP:{:02x} {}{}{}{}{}{}{}  {}\n",
                 regs.pc,
                 instr_bytes2,
                 format!("{}", instr),
@@ -675,7 +675,8 @@ impl Connection {
                     "C"
                 } else {
                     "c"
-                }
+                },
+                regs.clock,
             )
             .as_str(),
         );

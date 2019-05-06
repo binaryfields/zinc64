@@ -60,6 +60,7 @@ pub struct RegData {
     pub pc: u16,
     pub port_00: u8,
     pub port_01: u8,
+    pub clock: u64,
 }
 
 pub enum RegOp {

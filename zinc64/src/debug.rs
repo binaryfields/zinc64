@@ -235,6 +235,7 @@ impl Debug {
     }
 
     fn reg_read(&self, c64: &mut C64) -> Result<CmdResult, String> {
+        let clock = c64.get_clock().get();
         let cpu = c64.get_cpu();
         let regs = RegData {
             a: cpu.get_a(),
@@ -245,6 +246,7 @@ impl Debug {
             pc: cpu.get_pc(),
             port_00: cpu.read(0x00),
             port_01: cpu.read(0x01),
+            clock,
         };
         CmdResult::ok(Output::Registers(regs))
     }

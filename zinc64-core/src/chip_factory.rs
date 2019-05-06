@@ -44,7 +44,7 @@ pub trait ChipFactory {
     /// `nmi_line` - non-maskable interrupt request input
     fn new_cpu(
         &self,
-        mem: Shared<dyn Mmu>,
+        mem: Shared<dyn Addressable>,
         io_port: Shared<IoPort>,
         ba_line: Shared<Pin>,
         irq_line: Shared<IrqLine>,
@@ -72,7 +72,7 @@ pub trait ChipFactory {
         &self,
         joystick_1: SharedCell<u8>,
         joystick_2: SharedCell<u8>,
-        keyboard_matrix: Shared<[u8; 8]>,
+        keyboard_matrix: Shared<[u8; 16]>,
         port_a: Shared<IoPort>,
         port_b: Shared<IoPort>,
         flag_pin: Shared<Pin>,
@@ -151,32 +151,26 @@ pub trait ChipFactory {
 
     // -- Memory
 
-    /// Constructs expansion port that is used to connect cartridges.
-    ///
-    /// GAME and EXROM lines are use for memory bank switching.
-    ///
-    /// # I/O
-    /// `exp_io_line` - exposes cartridge GAME and EXROM lines (bits 3 and 4)
-    fn new_expansion_port(&self, exp_io_line: Shared<IoPort>) -> Shared<dyn Addressable>;
-
     /// Constructs memory controller.
     ///
-    /// Memory controller is used by the CPU to access banks of memory accessible at
+    /// Memory is used by the CPU to access banks of memory accessible at
     /// any given time. Bank switching is controlled through 5 latch bits that control
-    /// the memory configurations (LORAM, HIRAM, CHAREN, GAME, EXROM).
+    /// the memory management unit (LORAM, HIRAM, CHAREN, GAME, EXROM) that does address
+    /// translation.
     fn new_memory(
         &self,
+        mmu: Shared<dyn Mmu>,
         cia_1: Shared<dyn Chip>,
         cia_2: Shared<dyn Chip>,
         color_ram: Shared<Ram>,
-        expansion_port: Shared<dyn Addressable>,
+        expansion_port: Shared<dyn AddressableFaded>,
         ram: Shared<Ram>,
         rom_basic: Shared<Rom>,
         rom_charset: Shared<Rom>,
         rom_kernal: Shared<Rom>,
         sid: Shared<dyn Chip>,
         vic: Shared<dyn Chip>,
-    ) -> Shared<dyn Mmu>;
+    ) -> Shared<dyn Addressable>;
 
     /// Constructs RAM with the specified `capacity`.
     fn new_ram(&self, capacity: usize) -> Shared<Ram>;

@@ -4,8 +4,8 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
-use core::iter::Iterator;
-use zinc64_core::Addressable;
+use bit_field::BitField;
+use log::LogLevel;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
@@ -36,124 +36,243 @@ pub struct Chip {
     pub data: Vec<u8>,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum HwType {
     Normal,
-    ActionReplay,
-    KCSPower,
+    EasyFlash,
     Final3,
+    GameSystem,
+    MagicDesk,
     SimonsBasic,
     OceanType1,
-    Expert,
 }
 
 impl HwType {
     pub fn from(value: u8) -> HwType {
         match value {
             0 => HwType::Normal,
-            1 => HwType::ActionReplay,
-            2 => HwType::KCSPower,
             3 => HwType::Final3,
             4 => HwType::SimonsBasic,
             5 => HwType::OceanType1,
-            6 => HwType::Expert,
+            15 => HwType::GameSystem,
+            19 => HwType::MagicDesk,
+            32 => HwType::EasyFlash,
             _ => panic!("invalid hardware type {}", value),
         }
     }
+
+    pub fn is_mirrowed(&self) -> bool {
+        match *self {
+            HwType::OceanType1 | HwType::MagicDesk | HwType::Normal => true,
+            _ => false,
+        }
+    }
 }
 
-pub struct Cartridge {
-    pub version: u16,
-    pub hw_type: HwType,
+pub struct IoConfig {
     pub exrom: bool,
     pub game: bool,
-    pub banks: Vec<Chip>,
-    pub bank_lo: usize,
-    pub bank_hi: usize,
+}
+
+impl IoConfig {
+    pub fn new() -> Self {
+        IoConfig {
+            exrom: true,
+            game: true,
+        }
+    }
+}
+
+#[allow(unused)]
+pub struct Cartridge {
+    version: u16,
+    hw_type: HwType,
+    exrom: bool,
+    game: bool,
+    banks: [Option<Chip>; 64],
+    io_observer: Option<Box<dyn Fn(&IoConfig)>>,
+    is_mirrowed: bool,
+    // Runtime state
+    bank_lo: Option<usize>,
+    bank_hi: Option<usize>,
+    io_config: IoConfig,
+    reg_value: u8,
 }
 
 impl Cartridge {
-    pub fn get_exrom(&self) -> bool {
-        self.exrom
+    pub fn new(version: u16, hw_type: HwType, exrom: bool, game: bool) -> Self {
+        Cartridge {
+            version,
+            hw_type,
+            exrom,
+            game,
+            banks: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None,
+            ],
+            io_observer: None,
+            is_mirrowed: hw_type.is_mirrowed(),
+            bank_lo: None,
+            bank_hi: None,
+            io_config: IoConfig::new(),
+            reg_value: 0,
+        }
     }
 
-    pub fn get_game(&self) -> bool {
-        self.game
+    pub fn set_io_observer(&mut self, observer: Option<Box<dyn Fn(&IoConfig)>>) {
+        self.io_observer = observer;
     }
 
     pub fn add(&mut self, chip: Chip) {
-        self.banks.push(chip);
+        let bank_num = chip.bank_number as usize;
+        self.banks[bank_num] = Some(chip);
     }
 
     pub fn reset(&mut self) {
-        self.switch_bank(0);
+        self.bank_lo = None;
+        self.bank_hi = None;
+        self.io_config = IoConfig {
+            exrom: self.exrom,
+            game: self.game,
+        };
+        if !self.banks.is_empty() {
+            self.switch_bank(0);
+        }
+        self.notify_io_changed();
+    }
+
+    fn notify_io_changed(&self) {
+        if let Some(ref observer) = self.io_observer {
+            observer(&self.io_config);
+        }
     }
 
     fn switch_bank(&mut self, bank_number: u8) {
-        let bank_lo = self
-            .banks
-            .iter()
-            .find(|&bank| bank.bank_number == bank_number && bank.offset < 0xa000);
-        let bank_hi = self
-            .banks
-            .iter()
-            .find(|&bank| bank.bank_number == bank_number && bank.offset >= 0xa000);
-        match bank_lo {
-            Some(ref bank) => self.bank_lo = bank.bank_number as usize,
-            None => panic!("invalid bank number {}", bank_number),
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "cart::banks", "Switching to bank {} game {} exrom {}", bank_number, self.io_config.game, self.io_config.exrom);
         }
-        match bank_hi {
-            Some(ref bank) => self.bank_hi = bank.bank_number as usize,
-            None => {
-                if self.banks[self.bank_lo].size >= 0x4000 {
-                    self.bank_hi = self.bank_lo;
-                } else {
-                    panic!("invalid bank number {}", bank_number);
+        if let Some(ref bank) = self.banks[bank_number as usize] {
+            match bank.offset {
+                0x8000 => {
+                    self.bank_lo = Some(bank.bank_number as usize);
+                    if self.is_mirrowed {
+                        self.bank_hi = self.bank_lo;
+                    } else {
+                        self.bank_hi = None;
+                    }
                 }
+                0xa000 => {
+                    self.bank_hi = Some(bank.bank_number as usize);
+                    if self.is_mirrowed {
+                        self.bank_lo = self.bank_hi;
+                    } else {
+                        self.bank_lo = None;
+                    }
+                }
+                _ => panic!("invalid load address {:04x}", bank.bank_number),
             }
+        } else {
+            panic!("invalid bank number {}", bank_number);
         }
     }
 
     // -- Device I/O
 
-    fn read_io(&self, _address: u16) -> u8 {
-        0
+    fn read_io(&mut self, address: u16) -> u8 {
+        match self.hw_type {
+            HwType::GameSystem => match address {
+                0xde00...0xdeff => {
+                    self.switch_bank((address & 0x3f) as u8);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        self.reg_value
     }
 
     fn write_io(&mut self, address: u16, value: u8) {
-        match address {
-            0xde00 if self.hw_type == HwType::SimonsBasic => {
-                self.game = value == 0x01;
-                // TODO crt: update memory layout
+        self.reg_value = value;
+        match self.hw_type {
+            HwType::EasyFlash => {
+                if address == 0xde00 {
+                    self.switch_bank(value & 0x3f);
+                }
             }
-            0xde00 if self.hw_type == HwType::OceanType1 => {
-                self.switch_bank(value & 0x3f);
+            HwType::Final3 => {
+                if address == 0xde00 {
+                    self.switch_bank(value - 0x40);
+                }
             }
-            0xdfff if self.hw_type == HwType::Final3 => {
-                self.switch_bank(value - 0x40);
+            HwType::MagicDesk => {
+                if address == 0xde00 {
+                    if value.get_bit(7) == false {
+                        self.switch_bank(value & 0x3f);
+                        self.io_config.exrom = self.exrom;
+                        self.io_config.game = self.game;
+                        self.notify_io_changed();
+                    } else {
+                        self.io_config.exrom = true;
+                        self.io_config.game = true;
+                        self.notify_io_changed();
+                    }
+                }
+            }
+            HwType::Normal => {
+                if address == 0xde00 {
+                    self.switch_bank(value & 0x3f);
+                }
+            }
+            HwType::OceanType1 => {
+                if address == 0xde00 {
+                    if value.get_bit(7) == true {
+                        self.switch_bank(value & 0x3f);
+                    } else {
+                        panic!("should not be here");
+                    }
+                }
+            }
+            HwType::SimonsBasic => {
+                if address == 0xde00 {
+                    self.io_config.game = value == 0x01;
+                    self.notify_io_changed();
+                }
             }
             _ => {}
         }
     }
-}
 
-impl Addressable for Cartridge {
-    fn read(&self, address: u16) -> u8 {
+    pub fn read(&mut self, address: u16) -> Option<u8> {
         match address {
             0x8000...0x9fff => {
-                let bank = &self.banks[self.bank_lo];
-                bank.data[(address - bank.offset) as usize]
+                if let Some(bank_num) = self.bank_lo {
+                    let bank = self.banks[bank_num].as_ref().unwrap();
+                    Some(bank.data[(address - 0x8000) as usize])
+                } else {
+                    None
+                }
             }
             0xa000...0xbfff => {
-                let bank = &self.banks[self.bank_hi];
-                bank.data[(address - bank.offset) as usize]
+                if let Some(bank_num) = self.bank_hi {
+                    let bank = self.banks[bank_num].as_ref().unwrap();
+                    if bank.offset == 0x8000 {
+                        Some(bank.data[(address - 0x8000) as usize])
+                    } else {
+                        Some(bank.data[(address - 0xa000) as usize])
+                    }
+                } else {
+                    None
+                }
             }
-            0xde00...0xdfff => self.read_io(address),
-            _ => panic!("invalid address {}", address),
+            0xde00...0xdfff => Some(self.read_io(address)),
+            _ => panic!("invalid address {:04x}", address),
         }
     }
 
-    fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0xde00...0xdfff => self.write_io(address, value),
             _ => panic!("writes to cartridge are not supported"),
