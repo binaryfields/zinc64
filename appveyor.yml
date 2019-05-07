@@ -4,7 +4,7 @@ environment:
   global:
     RUST_VERSION: stable
     CRATE_NAME: zinc64
-    SDL_VERSION: 2.0.7
+    SDL_VERSION: 2.0.9
   matrix:
     - TARGET: x86_64-pc-windows-msvc
 

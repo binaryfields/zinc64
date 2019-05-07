@@ -1,5 +1,8 @@
 # TODO
 
+- upgrade deps
+- switch vic to reg const
+
 - console: add clear
 - cpu: fix nmi handling
 - input: implement swap joystick

@@ -6,7 +6,7 @@ edition = "2018"
 description = "Commodore 64 emulator debugger support"
 license = "GPL-3.0+"
 repository = "https://github.com/digitalstreamio/zinc64"
-readme = "README.md"
+readme = "../README.md"
 keywords = ["c64", "commodore", "emulator"]
 categories = ["emulators"]
 
@@ -14,4 +14,4 @@ categories = ["emulators"]
 bit_field = "0.9"
 byteorder = "1.2"
 log = "0.3"
-zinc64-emu = { path = "../zinc64-emu" }
+zinc64-emu = { path = "../zinc64-emu", version = "0.8" }
