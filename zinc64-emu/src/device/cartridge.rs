@@ -184,7 +184,7 @@ impl Cartridge {
     fn read_io(&mut self, address: u16) -> u8 {
         match self.hw_type {
             HwType::GameSystem => match address {
-                0xde00...0xdeff => {
+                0xde00..=0xdeff => {
                     self.switch_bank((address & 0x3f) as u8);
                 }
                 _ => {}
@@ -247,7 +247,7 @@ impl Cartridge {
 
     pub fn read(&mut self, address: u16) -> Option<u8> {
         match address {
-            0x8000...0x9fff => {
+            0x8000..=0x9fff => {
                 if let Some(bank_num) = self.bank_lo {
                     let bank = self.banks[bank_num].as_ref().unwrap();
                     Some(bank.data[(address - 0x8000) as usize])
@@ -255,7 +255,7 @@ impl Cartridge {
                     None
                 }
             }
-            0xa000...0xbfff => {
+            0xa000..=0xbfff => {
                 if let Some(bank_num) = self.bank_hi {
                     let bank = self.banks[bank_num].as_ref().unwrap();
                     if bank.offset == 0x8000 {
@@ -267,14 +267,14 @@ impl Cartridge {
                     None
                 }
             }
-            0xde00...0xdfff => Some(self.read_io(address)),
+            0xde00..=0xdfff => Some(self.read_io(address)),
             _ => panic!("invalid address {:04x}", address),
         }
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0xde00...0xdfff => self.write_io(address, value),
+            0xde00..=0xdfff => self.write_io(address, value),
             _ => panic!("writes to cartridge are not supported"),
         }
     }

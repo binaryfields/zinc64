@@ -2,25 +2,82 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use zinc64_emu::system::C64;
+use std::io::{Error, Write};
 
-pub struct ConsoleApp {
-    c64: C64,
+use crate::util::{circular_buffer, CircularBuffer};
+
+pub struct Console {
+    // Configuration
+    pub cols: u32,
+    pub rows: u32,
+    // Runtime state
+    buffer: CircularBuffer<u8>,
+    buffer_pos_snapshot: (usize, usize),
+    screen_pos: usize,
+    screen_pos_snapshot: usize,
 }
 
-impl ConsoleApp {
-    pub fn new(c64: C64) -> Self {
-        Self { c64 }
+impl Console {
+    pub fn new(cols: u32, rows: u32, buffer_size: usize) -> Self {
+        Console {
+            rows,
+            cols,
+            buffer: CircularBuffer::new(buffer_size),
+            buffer_pos_snapshot: (0, 0),
+            screen_pos: 0,
+            screen_pos_snapshot: 0,
+        }
     }
 
-    pub fn run(&mut self) {
-        loop {
-            self.c64.run_frame();
-            self.c64.reset_vsync();
-            if self.c64.is_cpu_jam() {
-                warn!(target: "main", "CPU JAM detected at 0x{:x}", self.c64.get_cpu().get_pc());
-                break;
+    pub fn advance(&mut self) {
+        if self.buffer.remaining(self.screen_pos) > ((self.rows - 1) * self.cols) as usize {
+            for _ in 0..self.cols {
+                self.screen_pos = self.buffer.advance(self.screen_pos);
             }
         }
+    }
+
+    pub fn print(&mut self, text: &[u8]) {
+        let mut col = self.buffer.remaining(self.screen_pos) as u32 % self.cols;
+        for ch in text {
+            if *ch == '\n' as u8 {
+                while col < self.cols {
+                    self.buffer.push(' ' as u8);
+                    col += 1;
+                }
+            } else {
+                self.buffer.push(*ch);
+                col += 1;
+            }
+            if col == self.cols {
+                col = 0;
+                self.advance();
+            }
+        }
+    }
+
+    pub fn restore_pos(&mut self) {
+        self.buffer.restore_pos(self.buffer_pos_snapshot);
+        self.screen_pos = self.screen_pos_snapshot;
+    }
+
+    pub fn save_pos(&mut self) {
+        self.buffer_pos_snapshot = self.buffer.snapshot_pos();
+        self.screen_pos_snapshot = self.screen_pos;
+    }
+
+    pub fn screen_data(&self) -> circular_buffer::Iter<u8> {
+        self.buffer.iter_from(self.screen_pos)
+    }
+}
+
+impl Write for Console {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+        self.print(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(())
     }
 }

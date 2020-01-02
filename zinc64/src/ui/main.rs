@@ -1,79 +1,62 @@
 // This file is part of zinc64.
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
-#![allow(unused)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::result::Result;
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
 
+use sdl2;
 use sdl2::audio::AudioDevice;
 use sdl2::event::Event;
 use sdl2::keyboard::{self, Keycode};
-use sdl2::render::Canvas;
-use sdl2::video::{self, Window};
-use sdl2::{self, EventPump, Sdl};
-use time;
-use zinc64_core::Shared;
-use zinc64_emu::system::C64;
+use sdl2::video;
 use zinc64_loader::Loaders;
 
-use crate::app::{AppState, JamAction, State};
+use crate::app::{App, AppState, JamAction, RuntimeState};
 use crate::audio::AudioRenderer;
-use crate::debug::Debug;
 use crate::input::InputSystem;
-use crate::sound_buffer::SoundBuffer;
-use crate::ui::{Action, Screen};
+use crate::ui::console::ConsoleScreen;
+use crate::ui::{Screen2, Transition};
 use crate::util::FileReader;
-use crate::video_buffer::VideoBuffer;
-use crate::video_renderer::VideoRenderer;
+use crate::video::VideoRenderer;
 
 pub struct MainScreen {
-    // Dependencies
-    window: Shared<Canvas<Window>>,
     // Components
     audio_device: AudioDevice<AudioRenderer>,
     input_system: InputSystem,
     video_renderer: VideoRenderer,
     // Runtime State
+    #[allow(unused)]
     next_frame_ns: u64,
     next_keyboard_event: u64,
 }
 
 impl MainScreen {
-    pub fn build(
-        sdl_context: &Sdl,
-        c64: &C64,
-        window: Shared<Canvas<Window>>,
-        sound_buffer: Arc<SoundBuffer>,
-        video_buffer: Shared<VideoBuffer>,
-    ) -> Result<MainScreen, String> {
+    pub fn build(ctx: &mut AppState) -> Result<MainScreen, String> {
         // Initialize audio
-        let sdl_audio = sdl_context.audio()?;
-        let audio_device = AudioRenderer::new_device(
-            &sdl_audio,
-            c64.get_config().sound.sample_rate as i32,
+        let audio_sys = ctx.platform.sdl.audio()?;
+        let audio_device = AudioRenderer::build_device(
+            &audio_sys,
+            ctx.c64.get_config().sound.sample_rate as i32,
             1,
-            c64.get_config().sound.buffer_size as u16,
-            sound_buffer.clone(),
+            ctx.c64.get_config().sound.buffer_size as u16,
+            ctx.sound_buffer.clone(),
         )?;
+        audio_device.resume();
         // Initialize video
         let video_renderer = VideoRenderer::build(
-            &window.borrow(),
-            c64.get_config().model.frame_buffer_size,
-            c64.get_config().model.viewport_offset,
-            c64.get_config().model.viewport_size,
-            video_buffer.clone(),
+            &ctx.platform.window,
+            ctx.c64.get_config().model.frame_buffer_size,
+            ctx.c64.get_config().model.viewport_offset,
+            ctx.c64.get_config().model.viewport_size,
+            ctx.video_buffer.clone(),
         )?;
         // Initialize input
         let input_system = InputSystem::build()?;
         Ok(MainScreen {
-            window,
             audio_device,
             input_system,
             video_renderer,
@@ -82,61 +65,9 @@ impl MainScreen {
         })
     }
 
-    fn handle_event(&mut self, event: &Event, state: &mut AppState) -> Option<Action> {
-        match event {
-            Event::Quit { .. } => Some(Action::Exit),
-            Event::KeyDown {
-                keycode: Some(keycode),
-                ..
-            } if *keycode == Keycode::Escape => Some(Action::Console),
-            Event::KeyDown {
-                keycode: Some(keycode),
-                keymod,
-                repeat: false,
-                ..
-            } => {
-                if keymod.contains(keyboard::Mod::LALTMOD)
-                    || keymod.contains(keyboard::Mod::RALTMOD)
-                {
-                    if *keycode == Keycode::H {
-                        self.halt(state);
-                    } else if *keycode == Keycode::M {
-                        self.toggle_mute();
-                    } else if *keycode == Keycode::P {
-                        self.toggle_pause(state);
-                    } else if *keycode == Keycode::Q {
-                        self.set_state(state, State::Stopped);
-                    } else if *keycode == Keycode::W {
-                        self.toggle_warp(state);
-                    } else if *keycode == Keycode::Return {
-                        self.toggle_fullscreen();
-                    }
-                } else if keymod.contains(keyboard::Mod::LCTRLMOD)
-                    || keymod.contains(keyboard::Mod::RCTRLMOD)
-                {
-                    if *keycode == Keycode::F1 {
-                        self.toggle_datassette_play(state);
-                    } else if *keycode == Keycode::F9 {
-                        self.reset(state);
-                    }
-                }
-                None
-            }
-            Event::DropFile { filename, .. } => {
-                info!("Dropped file {}", filename);
-                match self.load_image(state, &Path::new(&filename)) {
-                    Ok(_) => (),
-                    Err(err) => error!("Failed to load image, error: {}", err),
-                }
-                None
-            }
-            _ => None,
-        }
-    }
-
-    fn halt(&mut self, state: &mut AppState) {
-        self.set_state(state, State::Halted);
-        state.debug.halt();
+    fn halt(&mut self, state: &mut AppState) -> Result<(), String> {
+        self.set_state(state, RuntimeState::Halted);
+        state.debug.halt()
     }
 
     fn load_image(&mut self, state: &mut AppState, path: &Path) -> Result<(), String> {
@@ -151,12 +82,12 @@ impl MainScreen {
 
     #[allow(dead_code)]
     fn process_cpu_jam(&mut self, state: &mut AppState) -> bool {
-        let jam_action = state.options.jam_action;
+        let jam_action = JamAction::Quit; // FIXME state.options.jam_action;
         match jam_action {
             JamAction::Continue => true,
             JamAction::Quit => {
                 warn!("CPU JAM detected at 0x{:x}", state.c64.get_cpu().get_pc());
-                self.set_state(state, State::Stopped);
+                self.set_state(state, RuntimeState::Stopped);
                 false
             }
             JamAction::Reset => {
@@ -176,29 +107,19 @@ impl MainScreen {
         }
     }
 
-    fn process_vsync(&mut self, state: &mut AppState) -> Result<(), String> {
-        if state.c64.get_vsync() {
-            if !state.options.warp_mode {
-                self.sync_frame(state);
-            }
-            self.video_renderer.render(&mut self.window.borrow_mut())?;
-            state.c64.reset_vsync();
-        }
-        Ok(())
-    }
-
     fn reset(&mut self, state: &mut AppState) {
         state.c64.reset(false);
         self.next_keyboard_event = 0;
     }
 
-    fn set_state(&mut self, state: &mut AppState, new_state: State) {
+    fn set_state(&mut self, state: &mut AppState, new_state: RuntimeState) {
         if state.state != new_state {
             state.state = new_state;
             self.update_audio_state(state);
         }
     }
 
+    /*
     fn sync_frame(&mut self, state: &mut AppState) {
         let refresh_rate = state.c64.get_config().model.refresh_rate;
         let frame_duration_ns = (1_000_000_000.0 / refresh_rate) as u32;
@@ -214,6 +135,7 @@ impl MainScreen {
         }
         self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
     }
+    */
 
     fn toggle_datassette_play(&mut self, state: &mut AppState) {
         let datassette = state.c64.get_datasette();
@@ -224,8 +146,8 @@ impl MainScreen {
         }
     }
 
-    fn toggle_fullscreen(&mut self) {
-        let tmp = &mut self.window.borrow_mut();
+    fn toggle_fullscreen(&mut self, state: &mut AppState) {
+        let tmp = &mut state.platform.window;
         let window = tmp.window_mut();
         match window.fullscreen_state() {
             video::FullscreenType::Off => {
@@ -244,80 +166,149 @@ impl MainScreen {
     fn toggle_pause(&mut self, state: &mut AppState) {
         let emu_state = state.state;
         match emu_state {
-            State::Running => self.set_state(state, State::Paused),
-            State::Paused => self.set_state(state, State::Running),
+            RuntimeState::Running => self.set_state(state, RuntimeState::Paused),
+            RuntimeState::Paused => self.set_state(state, RuntimeState::Running),
             _ => (),
         };
     }
 
-    fn toggle_warp(&mut self, state: &mut AppState) {
+    fn toggle_warp(&mut self, ctx: &mut App, state: &mut AppState) {
         let value = state.options.warp_mode;
         state.options.warp_mode = !value;
+        let fps = if !state.options.warp_mode {
+            Some(state.c64.get_config().model.refresh_rate as f64)
+        } else {
+            None
+        };
+        ctx.time.set_fps(fps);
     }
 
     fn update_audio_state(&mut self, state: &mut AppState) {
         let emu_state = state.state;
         match emu_state {
-            State::Running => self.audio_device.resume(),
-            State::Paused => self.audio_device.pause(),
-            State::Halted => self.audio_device.pause(),
-            State::Stopped => self.audio_device.pause(),
-            _ => (),
+            RuntimeState::Running => self.audio_device.resume(),
+            RuntimeState::Paused => self.audio_device.pause(),
+            RuntimeState::Halted => self.audio_device.pause(),
+            RuntimeState::Stopped => self.audio_device.pause(),
         }
     }
 }
 
-impl Screen<AppState> for MainScreen {
-    fn run(&mut self, events: &mut EventPump, state: &mut AppState) -> Result<Action, String> {
-        // handle event
-        // update
-        // render
-        // sleep
-        'running: loop {
-            for event in events.poll_iter() {
-                if let Some(action) = self.handle_event(&event, state) {
-                    return Ok(action);
-                }
-                self.input_system.handle_event(&mut state.c64, &event);
+impl Screen2<AppState> for MainScreen {
+    fn handle_event(
+        &mut self,
+        ctx: &mut App,
+        state: &mut AppState,
+        event: Event,
+    ) -> Result<Transition<AppState>, String> {
+        let transition = match &event {
+            Event::Quit { .. } => Ok(Transition::Pop),
+            Event::KeyDown {
+                keycode: Some(keycode),
+                ..
+            } if *keycode == Keycode::Escape => {
+                let screen = ConsoleScreen::build(state)?;
+                Ok(Transition::Push(Box::new(screen)))
             }
-            self.process_keyboard_events(state);
-            loop {
-                let debugging = state.state == State::Halted;
-                let command_maybe = state.debug.poll(debugging);
-                if let Some(command) = command_maybe {
-                    let result = state.debug.execute(&mut state.c64, &command);
-                    match result {
-                        Ok(Some(new_state)) => self.set_state(state, new_state),
-                        _ => (),
+            Event::KeyDown {
+                keycode: Some(keycode),
+                keymod,
+                repeat: false,
+                ..
+            } => {
+                if keymod.contains(keyboard::Mod::LALTMOD)
+                    || keymod.contains(keyboard::Mod::RALTMOD)
+                {
+                    if *keycode == Keycode::H {
+                        self.halt(state)?;
+                    } else if *keycode == Keycode::M {
+                        self.toggle_mute();
+                    } else if *keycode == Keycode::P {
+                        self.toggle_pause(state);
+                    } else if *keycode == Keycode::Q {
+                        self.set_state(state, RuntimeState::Stopped);
+                    } else if *keycode == Keycode::W {
+                        self.toggle_warp(ctx, state);
+                    } else if *keycode == Keycode::Return {
+                        self.toggle_fullscreen(state);
                     }
-                } else {
-                    break;
+                } else if keymod.contains(keyboard::Mod::LCTRLMOD)
+                    || keymod.contains(keyboard::Mod::RCTRLMOD)
+                {
+                    if *keycode == Keycode::F1 {
+                        self.toggle_datassette_play(state);
+                    } else if *keycode == Keycode::F9 {
+                        self.reset(state);
+                    }
                 }
+                Ok(Transition::None)
             }
-            match state.state {
-                State::New => {
-                    self.set_state(state, State::Running);
+            Event::DropFile { filename, .. } => {
+                info!("Dropped file {}", filename);
+                match self.load_image(state, &Path::new(&filename)) {
+                    Ok(_) => (),
+                    Err(err) => error!("Failed to load image, error: {}", err),
                 }
-                State::Running => {
-                    let vsync = state.c64.run_frame();
-                    if vsync {
-                        self.process_vsync(state)?;
-                    } else {
-                        self.halt(state);
-                    }
+                Ok(Transition::None)
+            }
+            _ => Ok(Transition::None),
+        };
+        self.input_system.handle_event(&mut state.c64, &event);
+        transition
+    }
+
+    fn update(
+        &mut self,
+        _ctx: &mut App,
+        state: &mut AppState,
+    ) -> Result<Transition<AppState>, String> {
+        self.process_keyboard_events(state);
+        loop {
+            let debugging = state.state == RuntimeState::Halted;
+            let command_maybe = state.debug.poll(debugging);
+            if let Some(command) = command_maybe {
+                let result = state.debug.execute(&mut state.c64, &command);
+                match result {
+                    Ok(Some(new_state)) => self.set_state(state, new_state),
+                    _ => (),
                 }
-                State::Paused => {
-                    thread::sleep(Duration::from_millis(20));
-                }
-                State::Halted => {
-                    // self.handle_commands(true);
-                    self.process_vsync(state)?;
-                    thread::sleep(Duration::from_millis(20));
-                }
-                State::Stopped => {
-                    return Ok(Action::Exit);
-                }
+            } else {
+                break;
             }
         }
+        match state.state {
+            RuntimeState::Running => {
+                let vsync = state.c64.run_frame();
+                if vsync {
+                    // self.process_vsync(state)?;
+                } else {
+                    self.halt(state)?;
+                }
+                Ok(Transition::None)
+            }
+            RuntimeState::Paused => Ok(Transition::None),
+            RuntimeState::Halted => {
+                // self.handle_commands(true);
+                // self.process_vsync(state)?;
+                Ok(Transition::None)
+            }
+            RuntimeState::Stopped => Ok(Transition::Pop),
+        }
+    }
+
+    fn draw(
+        &mut self,
+        _ctx: &mut App,
+        state: &mut AppState,
+    ) -> Result<Transition<AppState>, String> {
+        if state.c64.get_vsync() {
+            self.video_renderer.render(&mut state.platform.window)?;
+            state.c64.reset_vsync();
+        } else {
+            if !state.options.warp_mode {
+                // std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+        Ok(Transition::None)
     }
 }

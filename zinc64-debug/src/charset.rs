@@ -7,7 +7,7 @@
 pub fn pet_to_ascii(code: u8) -> u8 {
     match code {
         // Block 0, Low Control Codes
-        0...31 => 0,
+        0..=31 => 0,
         // Block 1, Numbers and Punctuation
         32 => 32, // sp
         33 => 33, // !
@@ -108,10 +108,10 @@ pub fn pet_to_ascii(code: u8) -> u8 {
         126 => 0,   // ▩
         127 => 0,   // ▧
         // Block 4, High Control Codes
-        128...159 => 0,
+        128..=159 => 0,
         // Block 5, Common Graphics (Primary)
         160 => 32, // SP
-        161...191 => 0,
+        161..=191 => 0,
         // Block 6, Uppercase Letters (Primary)
         192 => 0,   // ─
         193 => 65,  // A
@@ -146,15 +146,15 @@ pub fn pet_to_ascii(code: u8) -> u8 {
         222 => 0,   // ▩
         223 => 0,   // ▧
         // Block 7, Common Graphics (Alternate)
-        224...255 => 0,
+        224..=255 => 0,
     }
 }
 
 pub fn screen_code_to_ascii(code: u8) -> u8 {
     match code {
         0 => 64,
-        1...31 => 96 + code,
-        32...90 => code,
+        1..=31 => 96 + code,
+        32..=90 => code,
         _ => 0,
     }
 }

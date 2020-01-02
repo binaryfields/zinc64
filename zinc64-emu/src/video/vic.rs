@@ -309,15 +309,15 @@ impl Vic {
         match self.spec.first_x_coord {
             0x194 => {
                 match x {
-                    0x000...0x193 => x + 0x64, // 0x1f7 - 0x193
-                    0x194...0x1ff => x - 0x194,
+                    0x000..=0x193 => x + 0x64, // 0x1f7 - 0x193
+                    0x194..=0x1ff => x - 0x194,
                     _ => panic!("invalid sprite coords {}", x),
                 }
             }
             0x19c => {
                 match x {
-                    0x000...0x19b => x + 0x64, // 0x1ff - 0x19b
-                    0x19c...0x1ff => x - 0x19c,
+                    0x000..=0x19b => x + 0x64, // 0x1ff - 0x19b
+                    0x19c..=0x1ff => x - 0x19c,
                     _ => panic!("invalid sprite coords {}", x),
                 }
             }
@@ -654,7 +654,7 @@ impl Chip for Vic {
                 self.draw_border();
                 self.set_ba(false);
             }
-            12...13 => {
+            12..=13 => {
                 self.draw_border();
                 /*
                 Section: 3.7.2. VC and RC
@@ -713,7 +713,7 @@ impl Chip for Vic {
                 self.g_access();
                 self.c_access();
             }
-            18...54 => {
+            18..=54 => {
                 self.draw();
                 let is_bad_line = self.raster_unit.is_bad_line;
                 self.set_ba(is_bad_line);
@@ -761,7 +761,7 @@ impl Chip for Vic {
                 /*
                 Section: 3.8. Sprites
                 4. In the first phase of cycle 58, the MC of every sprite is loaded from
-                   its belonging MCBASE (MCBASE->MC) ...
+                   its belonging MCBASE (MCBASE->MC) ..=
                 */
                 self.raster_unit.mc[..8].clone_from_slice(&self.raster_unit.mc_base[..8]);
                 self.update_sprite_display();
@@ -993,11 +993,11 @@ impl Chip for Vic {
             // Reg::EC
             0x20 => self.border_unit.config.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
-            0x21...0x24 => self.gfx_seq.config.bg_color[(reg - 0x21) as usize] | 0xf0,
+            0x21..=0x24 => self.gfx_seq.config.bg_color[(reg - 0x21) as usize] | 0xf0,
             // Reg::MM0 - Reg::MM1
-            0x25...0x26 => self.sprite_units[0].config.multicolor[(reg - 0x25) as usize] | 0xf0,
+            0x25..=0x26 => self.sprite_units[0].config.multicolor[(reg - 0x25) as usize] | 0xf0,
             // Reg::M0C - Reg::M7C
-            0x27...0x2e => self.sprite_units[(reg - 0x27) as usize].config.color | 0xf0,
+            0x27..=0x2e => self.sprite_units[(reg - 0x27) as usize].config.color | 0xf0,
             _ => 0xff,
         };
         if log_enabled!(LogLevel::Trace) {
@@ -1134,15 +1134,15 @@ impl Chip for Vic {
             // Reg::EC
             0x20 => self.border_unit.config.border_color = value & 0x0f,
             // Reg::B0C - Reg::B3C
-            0x21...0x24 => self.gfx_seq.config.bg_color[reg as usize - 0x21] = value & 0x0f,
+            0x21..=0x24 => self.gfx_seq.config.bg_color[reg as usize - 0x21] = value & 0x0f,
             // Reg::MM0  - Reg::MM1
-            0x25...0x26 => {
+            0x25..=0x26 => {
                 for i in 0..8 as usize {
                     self.sprite_units[i].config.multicolor[reg as usize - 0x25] = value & 0x0f;
                 }
             }
             // Reg::M0C - Reg::M7C
-            0x27...0x2e => self.sprite_units[reg as usize - 0x27].config.color = value & 0x0f,
+            0x27..=0x2e => self.sprite_units[reg as usize - 0x27].config.color = value & 0x0f,
             _ => {}
         }
     }

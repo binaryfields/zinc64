@@ -4,12 +4,13 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use sdl2;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
+use zinc64_core::SoundOutput;
 
-use crate::sound_buffer::SoundBuffer;
+use crate::util::CircularBuffer;
 
 // TODO app: audio warp handling
 
@@ -27,7 +28,7 @@ pub struct AudioRenderer {
 }
 
 impl AudioRenderer {
-    pub fn new_device(
+    pub fn build_device(
         sdl_audio: &sdl2::AudioSubsystem,
         freq: i32,
         channels: u8,
@@ -68,11 +69,44 @@ impl AudioCallback for AudioRenderer {
 
     fn callback(&mut self, out: &mut [i16]) {
         if !self.mute {
-            self.buffer.copy(out, self.scaler, SCALER_SHIFT);
+            let mut input = self.buffer.buffer.lock().unwrap();
+            if input.len() < out.len() {
+                debug!(target: "app", "audio callback underflow {}/{}", out.len(), input.len());
+            }
+            for x in out.iter_mut() {
+                let sample = input.pop().unwrap_or(0);
+                *x = ((sample as i32 * self.scaler) >> (SCALER_SHIFT as i32)) as i16;
+            }
         } else {
             for x in out.iter_mut() {
                 *x = 0;
             }
+        }
+    }
+}
+
+pub struct SoundBuffer {
+    buffer: Mutex<CircularBuffer<i16>>,
+}
+
+impl SoundBuffer {
+    pub fn new(length: usize) -> Self {
+        SoundBuffer {
+            buffer: Mutex::new(CircularBuffer::new(length)),
+        }
+    }
+}
+
+impl SoundOutput for SoundBuffer {
+    fn reset(&self) {
+        let mut output = self.buffer.lock().unwrap();
+        output.reset();
+    }
+
+    fn write(&self, samples: &[i16]) {
+        let mut output = self.buffer.lock().unwrap();
+        for sample in samples {
+            output.push(*sample);
         }
     }
 }

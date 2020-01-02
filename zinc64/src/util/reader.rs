@@ -6,6 +6,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
+
 use zinc64_loader::{Reader, Result};
 
 pub struct FileReader(pub BufReader<File>);

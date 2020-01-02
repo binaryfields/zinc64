@@ -8,17 +8,20 @@ extern crate log;
 mod app;
 mod audio;
 mod cli;
-mod command;
+mod cmd;
 mod console;
 mod debug;
+mod gfx;
 mod input;
 mod palette;
-mod sound_buffer;
+mod platform;
+mod time;
 mod ui;
 mod util;
-mod video_buffer;
-mod video_renderer;
+mod video;
 
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 use std::process;
 use std::rc::Rc;
@@ -27,17 +30,15 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use zinc64_core::new_shared;
 use zinc64_emu::system::{C64Factory, C64};
-
-use crate::app::App;
-use crate::cli::Opt;
-use crate::console::ConsoleApp;
-use crate::palette::Palette;
-use crate::sound_buffer::SoundBuffer;
-use crate::util::{FileReader, Logger};
-use crate::video_buffer::VideoBuffer;
-use std::fs::File;
-use std::io::BufReader;
 use zinc64_loader::Loaders;
+
+use crate::app::{App, AppController};
+use crate::audio::SoundBuffer;
+use crate::cli::Opt;
+use crate::palette::Palette;
+use crate::time::Time;
+use crate::util::{FileReader, Logger};
+use crate::video::VideoBuffer;
 
 static NAME: &str = "zinc64";
 
@@ -86,12 +87,30 @@ fn run(opt: &Opt) -> Result<(), String> {
         load_image(&mut c64, Path::new(image_path))?;
     }
     if opt.console {
-        let mut app = ConsoleApp::new(c64);
-        app.run();
+        run_console(&mut c64);
     } else {
         let options = cli::build_app_options(opt)?;
-        let mut app = App::build(c64, sound_buffer.clone(), video_buffer.clone(), options)?;
-        app.run()?;
+        let mut app = App::new(Time::new(None));
+        app.run(|ctx| {
+            AppController::build(
+                ctx,
+                c64,
+                sound_buffer.clone(),
+                video_buffer.clone(),
+                options,
+            )
+        })?;
     }
     Ok(())
+}
+
+fn run_console(c64: &mut C64) {
+    loop {
+        c64.run_frame();
+        c64.reset_vsync();
+        if c64.is_cpu_jam() {
+            warn!(target: "main", "CPU JAM detected at 0x{:x}", c64.get_cpu().get_pc());
+            break;
+        }
+    }
 }

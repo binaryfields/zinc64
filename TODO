@@ -1,7 +1,21 @@
 # TODO
 
+- revise joy, remove index virtual
+- app port0(joystick(numpad) joystick(0))
+- input: fix gamepad support, JoyHatMotion
+- input: add joy sensetivity
+- input: add joy swap
+- constructor:
+  - cpu
+  - cia
+  - sid system_clock -> clock
+  - vic
+- system
+  - c64 remove config
+- cpu: move RTI to control flow
+- vid: switch vic to reg const
+- core: remove reset from snd and vid ouput, move it to app
 - upgrade deps
-- switch vic to reg const
 
 - console: add clear
 - cpu: fix nmi handling

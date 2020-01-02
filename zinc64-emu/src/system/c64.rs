@@ -76,8 +76,8 @@ impl C64 {
     pub fn build(
         config: Rc<Config>,
         factory: &dyn ChipFactory,
-        frame_buffer: Shared<VideoOutput>,
-        sound_buffer: Arc<SoundOutput>,
+        frame_buffer: Shared<dyn VideoOutput>,
+        sound_buffer: Arc<dyn SoundOutput>,
     ) -> C64 {
         info!(target: "c64", "Initializing system");
         // Buffers

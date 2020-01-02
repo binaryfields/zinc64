@@ -4,9 +4,7 @@ members = [
     "zinc64-core",
     "zinc64-emu",
     "zinc64-debug",
-    "zinc64-loader",
-    "zinc64-rpi",
-    "raspi3_boot"
+    "zinc64-loader"
 ]
 default-members = [
     "zinc64-core",

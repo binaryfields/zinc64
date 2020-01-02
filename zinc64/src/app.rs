@@ -3,35 +3,27 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use std::net::SocketAddr;
+use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-use sdl2::joystick::Joystick;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
-use sdl2::Sdl;
-use zinc64_core::{new_shared, Shared};
+use sdl2::event::Event;
+use zinc64_core::Shared;
 use zinc64_debug::{Command, Debugger};
+use zinc64_emu::device::joystick;
 use zinc64_emu::system::C64;
 
+use crate::audio::SoundBuffer;
+use crate::console::Console;
 use crate::debug::Debug;
-use crate::sound_buffer::SoundBuffer;
-use crate::ui::{Action, ConsoleScreen, MainScreen, Screen};
-use crate::util::Font;
-use crate::video_buffer::VideoBuffer;
-use sdl2::pixels::Color;
-use std::path::Path;
+use crate::gfx::Font;
+use crate::platform::Platform;
+use crate::time::Time;
+use crate::ui::{MainScreen, Screen2, Transition};
+use crate::video::VideoBuffer;
 
+const APP_NAME: &'static str = "zinc64";
 const CONSOLE_BUFFER: usize = 2048;
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum State {
-    New,
-    Running,
-    Paused,
-    Halted,
-    Stopped,
-}
 
 #[derive(Copy, Clone, Debug)]
 pub enum JamAction {
@@ -41,91 +33,122 @@ pub enum JamAction {
 }
 
 pub struct Options {
-    pub fullscreen: bool,
+    // Emulator
     pub jam_action: JamAction,
     pub speed: u8,
     pub warp_mode: bool,
+    // Window
+    pub fullscreen: bool,
     pub window_size: (u32, u32),
+    // Controllers
+    pub joydev_1: joystick::Mode,
+    pub joydev_2: joystick::Mode,
     // Debug
     pub debug: bool,
     pub dbg_address: SocketAddr,
     pub rap_address: SocketAddr,
 }
 
-pub struct AppState {
-    pub c64: C64,
-    pub debug: Debug,
-    pub state: State,
-    pub options: Options,
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum RuntimeState {
+    Running,
+    Paused,
+    Halted,
+    Stopped,
 }
 
-#[allow(unused)]
+pub struct AppState {
+    pub state: RuntimeState,
+    pub c64: C64,
+    pub console: Console,
+    pub console_history: Vec<String>,
+    pub debug: Debug,
+    pub platform: Platform,
+    pub options: Options,
+    pub sound_buffer: Arc<SoundBuffer>,
+    pub video_buffer: Shared<VideoBuffer>,
+}
+
+pub trait Controller {
+    fn handle_events(&mut self, ctx: &mut App) -> Result<(), String>;
+
+    fn update(&mut self, ctx: &mut App) -> Result<(), String>;
+
+    fn draw(&mut self, ctx: &mut App) -> Result<(), String>;
+}
+
 pub struct App {
-    // Resources
-    sdl_context: Sdl,
-    sdl_joystick1: Option<Joystick>,
-    sdl_joystick2: Option<Joystick>,
-    window: Shared<Canvas<Window>>,
-    // Screens
-    main_screen: Shared<dyn Screen<AppState>>,
-    console_screen: Shared<dyn Screen<AppState>>,
-    // State
-    state: AppState,
+    running: bool,
+    pub time: Time,
 }
 
 impl App {
+    pub fn new(time: Time) -> Self {
+        Self {
+            running: false,
+            time,
+        }
+    }
+
+    pub fn run<C, I>(&mut self, init: I) -> Result<(), String>
+    where
+        C: Controller,
+        I: FnOnce(&mut App) -> Result<C, String>,
+    {
+        let mut controller = init(self)?;
+        self.running = true;
+        while self.running {
+            if let Err(e) = self.tick(&mut controller) {
+                self.running = false;
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
+    fn tick<C>(&mut self, controller: &mut C) -> Result<(), String>
+    where
+        C: Controller,
+    {
+        self.time.tick();
+        controller.handle_events(self)?;
+        if self.time.has_timer_event() {
+            controller.update(self)?;
+        }
+        controller.draw(self)?;
+        std::thread::yield_now();
+        Ok(())
+    }
+}
+
+pub struct AppController {
+    state: AppState,
+    screens: Vec<Box<dyn Screen2<AppState>>>,
+}
+
+impl AppController {
     pub fn build(
+        ctx: &mut App,
         c64: C64,
         sound_buffer: Arc<SoundBuffer>,
         video_buffer: Shared<VideoBuffer>,
         options: Options,
-    ) -> Result<App, String> {
-        let sdl_context = sdl2::init()?;
-        // Initialize window
-        info!(
-            "Opening app window {}x{}",
-            options.window_size.0, options.window_size.1
-        );
-        let sdl_video = sdl_context.video()?;
-        let mut window_builder =
-            sdl_video.window("zinc64", options.window_size.0, options.window_size.1);
-        window_builder.opengl();
-        if options.fullscreen {
-            window_builder.fullscreen();
+    ) -> Result<AppController, String> {
+        let platform = Platform::build(APP_NAME, &options)?;
+        // Initialize fps
+        let fps = if !options.warp_mode {
+            Some(c64.get_config().model.refresh_rate as f64)
         } else {
-            window_builder.position_centered();
-            window_builder.resizable();
-        }
-        let window = window_builder
-            .build()
-            .map_err(|_| "failed to create window")?;
-        let window = new_shared(
-            window
-                .into_canvas()
-                .accelerated()
-                .present_vsync()
-                .build()
-                .map_err(|_| "failed to create window")?,
-        );
-        // Initialize resources
-        let sdl_joystick = sdl_context.joystick()?;
-        sdl_joystick.set_event_state(true);
-        let sdl_joystick1 = c64.get_joystick1().as_ref().and_then(|joystick| {
-            if !joystick.is_virtual() {
-                info!(target: "ui", "Opening joystick {}", joystick.get_index());
-                sdl_joystick.open(joystick.get_index() as u32).ok()
-            } else {
-                None
-            }
-        });
-        let sdl_joystick2 = c64.get_joystick2().as_ref().and_then(|joystick| {
-            if !joystick.is_virtual() {
-                info!(target: "ui", "Opening joystick {}", joystick.get_index());
-                sdl_joystick.open(joystick.get_index() as u32).ok()
-            } else {
-                None
-            }
-        });
+            None
+        };
+        ctx.time.set_fps(fps);
+        // Initiliaze console
+        let font = Font::load_psf(Path::new("res/font/font.psf"))?;
+        let cols = options.window_size.0 / font.get_width();
+        let rows = options.window_size.1 / font.get_height();
+        let mut console = Console::new(cols, rows, CONSOLE_BUFFER);
+        console.print("Type ? for the list of available commands\n".as_bytes());
+        console.save_pos();
         // Initialize debuggers
         let (debug_tx, debug_rx) = mpsc::channel::<Command>();
         if options.debug {
@@ -137,59 +160,90 @@ impl App {
                 debugger.start(address).expect("Failed to start debugger");
             });
         }
-        // Initialize screens
-        let main_screen = new_shared(MainScreen::build(
-            &sdl_context,
-            &c64,
-            window.clone(),
+        // Initialize state
+        let mut state = AppState {
+            state: RuntimeState::Running,
+            c64,
+            console,
+            console_history: Vec::new(),
+            debug: Debug::new(debug_rx),
+            platform,
+            options,
             sound_buffer,
             video_buffer,
-        )?);
-        let font = Font::load_psf(Path::new("res/font/font.psf"))?;
-        let console_palette = [Color::from((45, 45, 45)), Color::from((143, 135, 114))];
-        let console_screen = new_shared(ConsoleScreen::build(
-            options.window_size.0 / font.get_width(),
-            options.window_size.1 / font.get_height(),
-            CONSOLE_BUFFER,
-            font,
-            100,
-            console_palette,
-            window.clone(),
-        )?);
-        // Initialize state
-        let state = AppState {
-            c64,
-            state: State::New,
-            debug: Debug::new(debug_rx),
-            options,
         };
-        Ok(App {
-            sdl_context,
-            sdl_joystick1,
-            sdl_joystick2,
-            window,
-            main_screen,
-            console_screen,
-            state,
-        })
+        let main_screen = MainScreen::build(&mut state)?;
+        let mut screens: Vec<Box<dyn Screen2<AppState>>> = Vec::new();
+        screens.push(Box::new(main_screen));
+        Ok(AppController { state, screens })
     }
 
-    pub fn run(&mut self) -> Result<(), String> {
-        info!(target: "app", "Running main loop");
-        let mut events = self.sdl_context.event_pump().unwrap();
-        let mut screen = self.main_screen.clone();
-        'running: loop {
-            let action = screen.borrow_mut().run(&mut events, &mut self.state)?;
-            match action {
-                Action::Main => {
-                    screen = self.main_screen.clone();
+    fn process_transition(&mut self, transition: Transition<AppState>) {
+        match transition {
+            Transition::None => {}
+            Transition::Push(next) => {
+                self.screens.push(next);
+            }
+            Transition::Pop => {
+                self.screens.pop();
+            }
+        }
+    }
+}
+
+impl Controller for AppController {
+    fn handle_events(&mut self, ctx: &mut App) -> Result<(), String> {
+        match self.screens.last_mut() {
+            Some(screen) => {
+                let mut events = self.state.platform.sdl.event_pump().unwrap();
+                for event in events.poll_iter() {
+                    match event {
+                        Event::Quit { .. } => {
+                            ctx.running = false;
+                            break;
+                        }
+                        _ => {
+                            let transition = screen.handle_event(ctx, &mut self.state, event)?;
+                            match transition {
+                                Transition::None => {}
+                                other => {
+                                    self.process_transition(other);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
-                Action::Console => {
-                    screen = self.console_screen.clone();
-                }
-                Action::Exit => {
-                    break 'running;
-                }
+            }
+            None => {
+                ctx.running = false;
+            }
+        }
+        Ok(())
+    }
+
+    fn update(&mut self, ctx: &mut App) -> Result<(), String> {
+        match self.screens.last_mut() {
+            Some(screen) => {
+                let transition = screen.update(ctx, &mut self.state)?;
+                self.process_transition(transition);
+            }
+            None => {
+                ctx.running = false;
+            }
+        }
+        Ok(())
+    }
+
+    fn draw(&mut self, ctx: &mut App) -> Result<(), String> {
+        match self.screens.last_mut() {
+            Some(screen) => {
+                let transition = screen.draw(ctx, &mut self.state)?;
+                self.state.platform.window.present();
+                self.process_transition(transition);
+            }
+            None => {
+                ctx.running = false;
             }
         }
         Ok(())

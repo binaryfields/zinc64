@@ -5,26 +5,26 @@
 #![allow(unused)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
+use std::sync::mpsc;
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use std::sync::mpsc;
-use std::time::Duration;
 use zinc64_debug::{Command, Output, RegData, RegOp};
 use zinc64_emu::system::C64;
 
-use crate::app::State;
+use crate::app::RuntimeState;
 
 // DEFERRED debugger: impl io
 
-struct CmdResult(Output, Option<State>);
+struct CmdResult(Output, Option<RuntimeState>);
 
 impl CmdResult {
     pub fn ok(result: Output) -> Result<CmdResult, String> {
         Ok(CmdResult(result, None))
     }
 
-    pub fn ok_with_state(result: Output, state: State) -> Result<CmdResult, String> {
+    pub fn ok_with_state(result: Output, state: RuntimeState) -> Result<CmdResult, String> {
         Ok(CmdResult(result, Some(state)))
     }
 
@@ -46,7 +46,11 @@ impl Debug {
         }
     }
 
-    pub fn execute(&mut self, c64: &mut C64, command: &Command) -> Result<Option<State>, String> {
+    pub fn execute(
+        &mut self,
+        c64: &mut C64,
+        command: &Command,
+    ) -> Result<Option<RuntimeState>, String> {
         match self.execute_internal(c64, &command) {
             Ok(CmdResult(Output::Await, new_state)) => Ok(new_state),
             Ok(CmdResult(result, new_state)) => {
@@ -115,20 +119,20 @@ impl Debug {
 
     fn attach(&mut self, c64: &mut C64, debugger: &Sender<Output>) -> Result<CmdResult, String> {
         self.debugger = Some(debugger.clone());
-        CmdResult::ok_with_state(Output::Unit, State::Halted)
+        CmdResult::ok_with_state(Output::Unit, RuntimeState::Halted)
     }
 
     fn detach(&mut self, c64: &mut C64) -> Result<CmdResult, String> {
         self.debugger = None;
-        CmdResult::ok_with_state(Output::Unit, State::Running)
+        CmdResult::ok_with_state(Output::Unit, RuntimeState::Running)
     }
 
     fn continue_(&self, c64: &mut C64) -> Result<CmdResult, String> {
-        CmdResult::ok_with_state(Output::Await, State::Running)
+        CmdResult::ok_with_state(Output::Await, RuntimeState::Running)
     }
 
     fn quit(&self, c64: &mut C64) -> Result<CmdResult, String> {
-        CmdResult::ok_with_state(Output::Unit, State::Stopped)
+        CmdResult::ok_with_state(Output::Unit, RuntimeState::Stopped)
     }
 
     fn step(&self, c64: &mut C64) -> Result<CmdResult, String> {

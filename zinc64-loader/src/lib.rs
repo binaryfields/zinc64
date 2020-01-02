@@ -57,7 +57,7 @@ pub trait Loader {
 pub struct Loaders;
 
 impl Loaders {
-    pub fn from(kind: Format) -> Box<Loader> {
+    pub fn from(kind: Format) -> Box<dyn Loader> {
         match kind {
             Format::Bin => Box::new(bin::BinLoader::new(1024)),
             Format::Crt => Box::new(crt::CrtLoader::new()),
@@ -67,7 +67,7 @@ impl Loaders {
         }
     }
 
-    pub fn from_ext(ext: Option<&str>) -> Result<Box<Loader>> {
+    pub fn from_ext(ext: Option<&str>) -> Result<Box<dyn Loader>> {
         if let Some(kind) = Format::from_ext(ext) {
             Ok(Loaders::from(kind))
         } else {

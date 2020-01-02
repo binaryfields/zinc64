@@ -20,12 +20,12 @@ impl Mode {
         for (i, bank) in banks.iter_mut().enumerate().take(0x10) {
             *bank = match i {
                 0x00 => config[0],
-                0x01...0x07 => config[1],
-                0x08...0x09 => config[2],
-                0x0a...0x0b => config[3],
+                0x01..=0x07 => config[1],
+                0x08..=0x09 => config[2],
+                0x0a..=0x0b => config[3],
                 0x0c => config[4],
                 0x0d => config[5],
-                0x0e...0x0f => config[6],
+                0x0e..=0x0f => config[6],
                 _ => panic!("invalid bank {}", i),
             };
         }
@@ -46,7 +46,10 @@ impl Pla {
     pub fn new() -> Self {
         let map = MemoryMap::default();
         let configuration = map.get(0);
-        Pla { map, mode: configuration }
+        Pla {
+            map,
+            mode: configuration,
+        }
     }
 }
 
@@ -265,7 +268,7 @@ impl Default for MemoryMap {
 impl MemoryMap {
     pub fn get(&self, mode: u8) -> Mode {
         match mode {
-            0...31 => self.modes[mode as usize],
+            0..=31 => self.modes[mode as usize],
             _ => panic!("invalid mode {}", mode),
         }
     }

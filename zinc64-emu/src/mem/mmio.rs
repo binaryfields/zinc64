@@ -34,30 +34,30 @@ impl Mmio {
 
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            0xd000...0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
-            0xd400...0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
-            0xd800...0xdbff => self.color_ram.borrow().read(address - 0xd800),
-            0xdc00...0xdcff => self.cia_1.borrow_mut().read((address & 0x000f) as u8),
-            0xdd00...0xddff => self.cia_2.borrow_mut().read((address & 0x000f) as u8),
-            0xde00...0xdfff => self.expansion_port.borrow_mut().read(address).unwrap_or(0),
+            0xd000..=0xd3ff => self.vic.borrow_mut().read((address & 0x003f) as u8),
+            0xd400..=0xd7ff => self.sid.borrow_mut().read((address & 0x001f) as u8),
+            0xd800..=0xdbff => self.color_ram.borrow().read(address - 0xd800),
+            0xdc00..=0xdcff => self.cia_1.borrow_mut().read((address & 0x000f) as u8),
+            0xdd00..=0xddff => self.cia_2.borrow_mut().read((address & 0x000f) as u8),
+            0xde00..=0xdfff => self.expansion_port.borrow_mut().read(address).unwrap_or(0),
             _ => panic!("invalid address 0x{:x}", address),
         }
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0xd000...0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
-            0xd400...0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
-            0xd800...0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
-            0xdc00...0xdcff => self
+            0xd000..=0xd3ff => self.vic.borrow_mut().write((address & 0x003f) as u8, value),
+            0xd400..=0xd7ff => self.sid.borrow_mut().write((address & 0x001f) as u8, value),
+            0xd800..=0xdbff => self.color_ram.borrow_mut().write(address - 0xd800, value),
+            0xdc00..=0xdcff => self
                 .cia_1
                 .borrow_mut()
                 .write((address & 0x000f) as u8, value),
-            0xdd00...0xddff => self
+            0xdd00..=0xddff => self
                 .cia_2
                 .borrow_mut()
                 .write((address & 0x000f) as u8, value),
-            0xde00...0xdfff => self.expansion_port.borrow_mut().write(address, value),
+            0xde00..=0xdfff => self.expansion_port.borrow_mut().write(address, value),
             _ => panic!("invalid address 0x{:x}", address),
         }
     }

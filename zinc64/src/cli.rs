@@ -80,6 +80,7 @@ pub struct Opt {
     /// filename of the kernal ROM
     #[structopt(long, parse(from_os_str), group = "rom")]
     pub kernal: Option<PathBuf>,
+
     // -- Sound
     /// disable sound playback
     #[structopt(long = "nosound")]
@@ -127,11 +128,13 @@ pub struct Opt {
 
 pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
     Ok(app::Options {
-        fullscreen: opt.fullscreen,
         jam_action: opt.jam_action,
         speed: opt.speed.unwrap_or(100),
         warp_mode: opt.warp_mode,
+        fullscreen: opt.fullscreen,
         window_size: (opt.width, opt.height),
+        joydev_1: opt.joydev_1,
+        joydev_2: opt.joydev_2,
         debug: opt.debug,
         dbg_address: opt.dbg_address,
         rap_address: SocketAddr::from(([127, 0, 0, 1], 9999)), // opt.rap_address,
@@ -190,26 +193,26 @@ fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
     Ok(data)
 }
 
-fn parse_jam_action(s: &str) -> Result<JamAction, Box<Error>> {
+fn parse_jam_action(s: &str) -> Result<JamAction, Box<dyn Error>> {
     match s {
         "continue" => Ok(JamAction::Continue),
         "quit" => Ok(JamAction::Quit),
         "reset" => Ok(JamAction::Reset),
-        _ => Err(Box::<Error>::from("invalid jamaction".to_string())),
+        _ => Err(Box::<dyn Error>::from("invalid jamaction".to_string())),
     }
 }
 
-fn parse_joy_mode(mode: &str) -> Result<joystick::Mode, Box<Error>> {
+fn parse_joy_mode(mode: &str) -> Result<joystick::Mode, Box<dyn Error>> {
     match mode {
         "none" => Ok(joystick::Mode::None),
         "numpad" => Ok(joystick::Mode::Numpad),
         "joy0" => Ok(joystick::Mode::Joy0),
         "joy1" => Ok(joystick::Mode::Joy1),
-        _ => Err(Box::<Error>::from("invalid joystick".to_string())),
+        _ => Err(Box::<dyn Error>::from("invalid joystick".to_string())),
     }
 }
 
-fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<Error>>
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error>>
 where
     T: std::str::FromStr,
     T::Err: Error + 'static,
@@ -222,7 +225,7 @@ where
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-fn parse_socket_addr(s: &str) -> Result<SocketAddr, Box<Error>> {
+fn parse_socket_addr(s: &str) -> Result<SocketAddr, Box<dyn Error>> {
     s.parse::<SocketAddr>()
-        .map_err(|_| Box::<Error>::from("invalid address".to_string()))
+        .map_err(|_| Box::<dyn Error>::from("invalid address".to_string()))
 }

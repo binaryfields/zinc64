@@ -5,43 +5,27 @@
 mod console;
 mod main;
 
-use std::thread;
-use std::time::Duration;
+pub use main::MainScreen;
 
 use sdl2::event::Event;
-use sdl2::EventPump;
 
-pub use self::console::ConsoleScreen;
-pub use self::main::MainScreen;
+use crate::app::App;
 
-#[allow(unused)]
-pub enum Action {
-    Console,
-    Main,
-    Exit,
+pub enum Transition<T> {
+    None,
+    Push(Box<dyn Screen2<T>>),
+    Pop,
 }
 
-pub trait Screen<T> {
-    fn run(&mut self, events: &mut EventPump, state: &mut T) -> Result<Action, String>;
-}
+pub trait Screen2<T> {
+    fn handle_event(
+        &mut self,
+        ctx: &mut App,
+        state: &mut T,
+        event: Event,
+    ) -> Result<Transition<T>, String>;
 
-pub trait BaseScreen<T>: Screen<T> {
-    fn handle_event(&mut self, event: &Event, state: &mut T) -> Option<Action>;
+    fn update(&mut self, ctx: &mut App, state: &mut T) -> Result<Transition<T>, String>;
 
-    fn render(&mut self) -> Result<(), String>;
-
-    fn tick(&mut self);
-
-    fn run(&mut self, events: &mut EventPump, state: &mut T) -> Result<Action, String> {
-        'running: loop {
-            for event in events.poll_iter() {
-                if let Some(action) = self.handle_event(&event, state) {
-                    return Ok(action);
-                }
-            }
-            self.tick();
-            self.render()?;
-            thread::sleep(Duration::from_millis(20));
-        }
-    }
+    fn draw(&mut self, ctx: &mut App, state: &mut T) -> Result<Transition<T>, String>;
 }

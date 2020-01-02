@@ -2,6 +2,8 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+mod font;
+
 use std::result::Result;
 
 use bit_field::BitField;
@@ -10,7 +12,7 @@ use sdl2::rect::Point;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 
-use crate::util::Font;
+pub use self::font::Font;
 
 pub fn draw_char(
     canvas: &mut Canvas<Window>,
