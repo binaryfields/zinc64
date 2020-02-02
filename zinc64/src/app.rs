@@ -239,7 +239,6 @@ impl Controller for AppController {
         match self.screens.last_mut() {
             Some(screen) => {
                 let transition = screen.draw(ctx, &mut self.state)?;
-                self.state.platform.window.present();
                 self.process_transition(transition);
             }
             None => {

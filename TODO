@@ -1,10 +1,27 @@
 # TODO
 
-- revise joy, remove index virtual
-- app port0(joystick(numpad) joystick(0))
-- input: fix gamepad support, JoyHatMotion
-- input: add joy sensetivity
-- input: add joy swap
+
+x upgrade deps
+x revamp rendering
+  x glow
+- revamp audio
+  - cpal
+- revamp windowing
+  - winit
+- fix cpu usage
+- app: add screenshot support
+- app: add ui/menus
+- revamp controllers
+  - revise joy, remove index virtual
+  - app port0(joystick(numpad) joystick(0))
+  - input: fix gamepad support, JoyHatMotion
+  - input: add joy sensetivity
+  - input: add joy swap
+  - input: implement swap joystick
+  - device: add mouse support
+- device: add floppy support
+- rpi: add usb
+
 - constructor:
   - cpu
   - cia
@@ -15,21 +32,11 @@
 - cpu: move RTI to control flow
 - vid: switch vic to reg const
 - core: remove reset from snd and vid ouput, move it to app
-- upgrade deps
-
 - console: add clear
 - cpu: fix nmi handling
-- input: implement swap joystick
 - vic: fix sprite turn off logic
 - vic: implement invalidtext mode
-
 - refactor run_frame to result Option<Event> Halt|Vsync
 - core: add apply_config hardwareconfig
-- rpi: add usb
-- device: add mouse support
-- device: add floppy support
-- app: add screenshot support
-- app: add ui/menus
-
 - fix rambo
 - fix mario 0x0830

@@ -4,20 +4,19 @@
 
 use std::iter::Iterator;
 use std::path::Path;
+use std::rc::Rc;
 use std::result::Result;
 
-use sdl2::event::Event;
+use cgmath::num_traits::zero;
+use cgmath::{vec2, Vector2};
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::{Keycode, Mod};
-use sdl2::pixels::{Color, PixelFormatEnum};
-use sdl2::rect::{Point, Rect};
-use sdl2::render::{Canvas, Texture};
-use sdl2::video::Window;
 
 use crate::app::{App, AppState};
 use crate::cmd::Executor;
 use crate::console::Console;
-use crate::gfx::{self, Font};
-use crate::util::{circular_buffer, keymap};
+use crate::gfx::{gl, sprite, Color, Font, Rect, RectI};
+use crate::util::keymap;
 
 use super::{Screen2, Transition};
 
@@ -28,14 +27,15 @@ const PROMPT: &str = "> ";
 
 pub struct ConsoleScreen {
     // Configuration
-    bg_color: Color,
-    scale_pct: u32,
-    screen_dim: (u32, u32),
+    rows: u32,
+    cols: u32,
+    palette: [Color; 2],
     // Resources
-    cmd_handler: Executor,
-    renderer: Renderer,
-    screen_tex: Texture,
+    batch: sprite::Batch,
+    font: Font,
+    font_tex: Rc<gl::Texture>,
     // Runtime state
+    cmd_handler: Executor,
     cursor_timer: u32,
     cursor_visibility: bool,
     history_pos: isize,
@@ -44,47 +44,56 @@ pub struct ConsoleScreen {
 
 impl ConsoleScreen {
     pub fn build(ctx: &mut AppState) -> Result<ConsoleScreen, String> {
-        let font = Font::load_psf(Path::new("res/font/font.psf"))?;
         let cols = ctx.console.cols;
         let rows = ctx.console.rows;
-        let screen_dim = (cols * font.get_width(), rows * font.get_height());
-        let screen_tex = ctx
-            .platform
-            .window
-            .texture_creator()
-            .create_texture_target(PixelFormatEnum::RGBA8888, screen_dim.0, screen_dim.1)
-            .map_err(|_| "failed to create texture")?;
-        let palette = [Color::from((45, 45, 45)), Color::from((143, 135, 114))];
-        let renderer = Renderer::new(cols, rows, font, palette);
+        let palette = [
+            Color::from_rgb(0x28, 0x28, 0x28),
+            Color::from_rgb(0xeb, 0xdb, 0xb2),
+        ];
+
+        let gl = &mut ctx.platform.gl;
+
+        let font = Font::load_psf(Path::new("res/font/font.psf"))?;
+        let font_data = font.as_rgba();
+        let font_data_len = font_data.len() * core::mem::size_of::<u32>();
+        let font_ptr =
+            unsafe { core::slice::from_raw_parts(font_data.as_ptr() as *const u8, font_data_len) };
+        let font_tex_size = vec2(
+            font.get_glypth_count() * font.get_width(),
+            font.get_height(),
+        );
+        let font_tex = Rc::new(gl.create_texture(font_tex_size.cast::<i32>().unwrap())?);
+        gl.set_texture_data(&font_tex, font_ptr);
+
+        let screen_element_count = (cols * rows) as usize;
+        let screen_size = vec2(cols * font.get_width(), rows * font.get_height())
+            .cast::<f32>()
+            .unwrap();
+        let window_size = ctx.platform.window.size();
+
+        let mut batch = sprite::Batch::new(gl, screen_element_count)?;
+        batch.set_projection(gl, Rect::from_points(zero(), screen_size), true);
+        batch.set_viewport(
+            gl,
+            RectI::new(
+                zero(),
+                Vector2::new(window_size.0 as i32, window_size.1 as i32),
+            ),
+        );
+
         Ok(ConsoleScreen {
-            bg_color: palette[0],
-            scale_pct: 100,
-            screen_dim,
+            rows,
+            cols,
+            palette,
+            batch,
+            font,
+            font_tex,
             cmd_handler: Executor::new(),
-            renderer,
-            screen_tex,
             cursor_timer: CURSOR_BLINK_DUR,
             cursor_visibility: false,
             history_pos: -1,
             input_buffer: Vec::new(),
         })
-    }
-
-    fn blink_cursor(&mut self, console: &mut Console) {
-        self.cursor_timer -= 1;
-        if self.cursor_timer == 0 {
-            self.reset_cursor(!self.cursor_visibility);
-            self.print_input(console);
-        }
-    }
-
-    fn get_viewport_rect(&self, output_size: &(u32, u32)) -> Rect {
-        let center = Point::new(output_size.0 as i32 / 2, output_size.1 as i32 / 2);
-        Rect::from_center(
-            center,
-            self.screen_dim.0 * self.scale_pct / 100,
-            self.screen_dim.1 * self.scale_pct / 100,
-        )
     }
 
     fn handle_input(
@@ -177,6 +186,16 @@ impl ConsoleScreen {
         }
     }
 
+    // -- Cursor
+
+    fn blink_cursor(&mut self, console: &mut Console) {
+        self.cursor_timer -= 1;
+        if self.cursor_timer == 0 {
+            self.reset_cursor(!self.cursor_visibility);
+            self.print_input(console);
+        }
+    }
+
     fn reset_cursor(&mut self, visible: bool) {
         self.cursor_timer = CURSOR_BLINK_DUR;
         self.cursor_visibility = visible;
@@ -191,6 +210,14 @@ impl Screen2<AppState> for ConsoleScreen {
         event: Event,
     ) -> Result<Transition<AppState>, String> {
         match &event {
+            Event::Window {
+                win_event: WindowEvent::Resized(w, h),
+                ..
+            } => {
+                self.batch
+                    .set_viewport(&mut state.platform.gl, RectI::new(zero(), vec2(*w, *h)));
+                Ok(Transition::None)
+            }
             Event::KeyDown {
                 keycode: Some(keycode),
                 ..
@@ -236,75 +263,26 @@ impl Screen2<AppState> for ConsoleScreen {
         _ctx: &mut App,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
+        let font_size = self.font.get_size().cast::<f32>().unwrap();
         let mut screen_data = state.console.screen_data();
-        let renderer = &mut self.renderer;
-        state
-            .platform
-            .window
-            .with_texture_canvas(&mut self.screen_tex, |canvas| {
-                renderer
-                    .render(&mut screen_data, canvas)
-                    .expect("Failed to render console output");
-            })
-            .map_err(|e| e.to_string())?;
-        let window = &mut state.platform.window;
-        let output_size = window.output_size()?;
-        window.set_draw_color(self.bg_color);
-        window.clear();
-        window.copy(&self.screen_tex, None, self.get_viewport_rect(&output_size))?;
-        Ok(Transition::None)
-    }
-}
+        let gl = &mut state.platform.gl;
+        gl.clear(self.palette[0]);
 
-struct Renderer {
-    // Configuration
-    cols: u32,
-    rows: u32,
-    font: Font,
-    palette: [Color; 2],
-    // Runtime State
-    screen: Vec<u8>,
-}
-
-impl Renderer {
-    fn new(cols: u32, rows: u32, font: Font, palette: [Color; 2]) -> Self {
-        Renderer {
-            cols,
-            rows,
-            font,
-            palette,
-            screen: vec![0x7f; (cols * rows) as usize],
-        }
-    }
-
-    fn render(
-        &mut self,
-        buffer: &mut circular_buffer::Iter<u8>,
-        canvas: &mut Canvas<Window>,
-    ) -> Result<(), String> {
-        let mut screen_pos = 0;
-        let mut y = 0;
-        for _ in 0..self.rows {
+        self.batch.begin(gl, Some(self.font_tex.clone()));
+        for row in 0..self.rows {
+            let y = row * self.font.get_height();
             let mut x = 0;
-            for _ in 0..self.cols {
-                let ch = buffer.next().unwrap_or(&BLANK_CHAR);
-                if *ch != self.screen[screen_pos] {
-                    self.screen[screen_pos] = *ch;
-                    gfx::draw_char(
-                        canvas,
-                        &self.font,
-                        *ch,
-                        x,
-                        y,
-                        self.palette[1],
-                        self.palette[0],
-                    )?;
-                }
-                screen_pos += 1;
+            for _col in 0..self.cols {
+                let ch = screen_data.next().unwrap_or(&BLANK_CHAR);
+                let dst = Rect::new(vec2(x as f32, y as f32), font_size);
+                let uv = self.font.get_tex_coords(*ch as u32);
+                self.batch.push(gl, dst, uv, self.palette[1]);
                 x += self.font.get_width();
             }
-            y += self.font.get_height();
         }
-        Ok(())
+        self.batch.end(gl);
+
+        state.platform.window.gl_swap_window();
+        Ok(Transition::None)
     }
 }

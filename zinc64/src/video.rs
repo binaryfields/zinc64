@@ -4,16 +4,16 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::transmute_ptr_to_ptr))]
 
+use std::rc::Rc;
 use std::result::Result;
 
-use core::mem;
-use sdl2;
-use sdl2::pixels;
-use sdl2::rect::Rect;
-use sdl2::render::{self, Canvas};
-use sdl2::video::Window;
-use time;
+use cgmath;
+use cgmath::num_traits::zero;
+use cgmath::{vec2, Vector2};
 use zinc64_core::{Shared, VideoOutput};
+
+use crate::app::AppState;
+use crate::gfx::{gl, sprite, Color, Rect, RectI};
 
 pub struct VideoBuffer {
     dim: (usize, usize),
@@ -30,12 +30,11 @@ impl VideoBuffer {
         }
     }
 
-    pub fn get_pitch(&self) -> usize {
-        self.dim.0 * mem::size_of::<u32>()
-    }
-
     pub fn get_pixel_data(&self) -> &[u8] {
-        unsafe { mem::transmute::<&[u32], &[u8]>(self.pixels.as_ref()) }
+        unsafe {
+            let len = self.pixels.len() * core::mem::size_of::<u32>();
+            core::slice::from_raw_parts(self.pixels.as_ptr() as *const u8, len)
+        }
     }
 }
 
@@ -56,60 +55,67 @@ impl VideoOutput for VideoBuffer {
 }
 
 pub struct VideoRenderer {
-    // Configuration
-    viewport_rect: Rect,
-    // Resources
+    // Dependencies
     video_buffer: Shared<VideoBuffer>,
-    viewport_tex: render::Texture,
-    // Runtime state
-    frame_count: u32,
-    last_frame_ts: u64,
+    // Resources
+    batch: sprite::Batch,
+    texture: Rc<gl::Texture>,
 }
 
 impl VideoRenderer {
-    pub fn build(
-        window: &Canvas<Window>,
-        screen_size: (u32, u32),
-        viewport_offset: (u32, u32),
-        viewport_size: (u32, u32),
-        video_buffer: Shared<VideoBuffer>,
-    ) -> Result<VideoRenderer, String> {
-        let texture = window
-            .texture_creator()
-            .create_texture_streaming(
-                pixels::PixelFormatEnum::ARGB8888,
-                screen_size.0,
-                screen_size.1,
-            )
-            .map_err(|_| "failed to create texture")?;
-        let viewport_rect = Rect::new(
-            viewport_offset.0 as i32,
-            viewport_offset.1 as i32,
-            viewport_size.0,
-            viewport_size.1,
+    pub fn build(ctx: &mut AppState) -> Result<VideoRenderer, String> {
+        let screen_size = ctx.c64.get_config().model.frame_buffer_size;
+        let viewport_offset = ctx.c64.get_config().model.viewport_offset;
+        let viewport_size = ctx.c64.get_config().model.viewport_size;
+        let video_buffer = ctx.video_buffer.clone();
+        let viewport = Rect::new(
+            vec2(viewport_offset.0 as f32, viewport_offset.1 as f32),
+            vec2(viewport_size.0 as f32, viewport_size.1 as f32),
+        );
+        let window_size = ctx.platform.window.size();
+        info!("Renderer viewport {:?}", viewport);
+        let gl = &mut ctx.platform.gl;
+        let texture_size = vec2(screen_size.0, screen_size.1).cast::<i32>().unwrap();
+        let texture = Rc::new(gl.create_texture(texture_size)?);
+        let mut batch = sprite::Batch::new(gl, 1)?;
+        batch.set_projection(gl, viewport, false);
+        batch.set_viewport(
+            gl,
+            RectI::new(
+                zero(),
+                Vector2::new(window_size.0 as i32, window_size.1 as i32),
+            ),
         );
         let renderer = VideoRenderer {
-            viewport_rect,
             video_buffer,
-            viewport_tex: texture,
-            frame_count: 0,
-            last_frame_ts: 0,
+            batch,
+            texture,
         };
         Ok(renderer)
     }
 
-    pub fn render(&mut self, canvas: &mut render::WindowCanvas) -> Result<(), String> {
-        self.viewport_tex
-            .update(
-                None,
-                self.video_buffer.borrow().get_pixel_data(),
-                self.video_buffer.borrow().get_pitch(),
-            )
-            .map_err(|_| "failed to update texture")?;
-        canvas.clear();
-        canvas.copy(&self.viewport_tex, Some(self.viewport_rect), None)?;
-        self.frame_count = self.frame_count.wrapping_add(1);
-        self.last_frame_ts = time::precise_time_ns();
+    pub fn update_viewport(&mut self, ctx: &mut AppState, width: i32, height: i32) {
+        self.batch.set_viewport(
+            &mut ctx.platform.gl,
+            RectI::new(zero(), vec2(width, height)),
+        );
+    }
+
+    pub fn render(&mut self, ctx: &mut AppState) -> Result<(), String> {
+        let gl = &mut ctx.platform.gl;
+        let tex_size = self.texture.size.cast::<f32>().unwrap();
+        gl.set_texture_data(&self.texture, self.video_buffer.borrow().get_pixel_data());
+        gl.clear(Color::BLACK);
+
+        self.batch.begin(gl, Some(self.texture.clone()));
+        self.batch.push(
+            gl,
+            Rect::from_points(zero(), tex_size),
+            Rect::from_points(zero(), vec2(1.0, 1.0)),
+            Color::WHITE,
+        );
+        self.batch.end(gl);
+
         Ok(())
     }
 }

@@ -15,4 +15,4 @@ default = ["std"]
 std = []
 
 [dependencies]
-bit_field = "0.9"
+bit_field = "0.10"

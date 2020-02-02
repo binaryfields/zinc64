@@ -16,7 +16,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-bit_field = "0.9"
+bit_field = "0.10"
 log = { version = "0.3", default-features = false }
 resid-rs = { version = "1.0" }
 zinc64-core = { path = "../zinc64-core", version = "0.8" }

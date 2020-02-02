@@ -10,7 +10,7 @@ use std::result::Result;
 
 use sdl2;
 use sdl2::audio::AudioDevice;
-use sdl2::event::Event;
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::{self, Keycode};
 use sdl2::video;
 use zinc64_loader::Loaders;
@@ -29,8 +29,6 @@ pub struct MainScreen {
     input_system: InputSystem,
     video_renderer: VideoRenderer,
     // Runtime State
-    #[allow(unused)]
-    next_frame_ns: u64,
     next_keyboard_event: u64,
 }
 
@@ -47,20 +45,13 @@ impl MainScreen {
         )?;
         audio_device.resume();
         // Initialize video
-        let video_renderer = VideoRenderer::build(
-            &ctx.platform.window,
-            ctx.c64.get_config().model.frame_buffer_size,
-            ctx.c64.get_config().model.viewport_offset,
-            ctx.c64.get_config().model.viewport_size,
-            ctx.video_buffer.clone(),
-        )?;
+        let video_renderer = VideoRenderer::build(ctx)?;
         // Initialize input
         let input_system = InputSystem::build()?;
         Ok(MainScreen {
             audio_device,
             input_system,
             video_renderer,
-            next_frame_ns: 0,
             next_keyboard_event: 0,
         })
     }
@@ -119,24 +110,6 @@ impl MainScreen {
         }
     }
 
-    /*
-    fn sync_frame(&mut self, state: &mut AppState) {
-        let refresh_rate = state.c64.get_config().model.refresh_rate;
-        let frame_duration_ns = (1_000_000_000.0 / refresh_rate) as u32;
-        let frame_duration_scaled_ns = frame_duration_ns * 100 / state.options.speed as u32;
-        let time_ns = time::precise_time_ns();
-        let wait_ns = if self.next_frame_ns > time_ns {
-            (self.next_frame_ns - time_ns) as u32
-        } else {
-            0
-        };
-        if wait_ns > 0 && wait_ns <= frame_duration_scaled_ns {
-            thread::sleep(Duration::new(0, wait_ns));
-        }
-        self.next_frame_ns = time::precise_time_ns() + frame_duration_scaled_ns as u64;
-    }
-    */
-
     fn toggle_datassette_play(&mut self, state: &mut AppState) {
         let datassette = state.c64.get_datasette();
         if !datassette.borrow().is_playing() {
@@ -147,14 +120,20 @@ impl MainScreen {
     }
 
     fn toggle_fullscreen(&mut self, state: &mut AppState) {
-        let tmp = &mut state.platform.window;
-        let window = tmp.window_mut();
-        match window.fullscreen_state() {
+        match state.platform.window.fullscreen_state() {
             video::FullscreenType::Off => {
-                window.set_fullscreen(video::FullscreenType::True).unwrap();
+                state
+                    .platform
+                    .window
+                    .set_fullscreen(video::FullscreenType::True)
+                    .unwrap();
             }
             video::FullscreenType::True | video::FullscreenType::Desktop => {
-                window.set_fullscreen(video::FullscreenType::Off).unwrap();
+                state
+                    .platform
+                    .window
+                    .set_fullscreen(video::FullscreenType::Off)
+                    .unwrap();
             }
         }
     }
@@ -202,6 +181,13 @@ impl Screen2<AppState> for MainScreen {
         event: Event,
     ) -> Result<Transition<AppState>, String> {
         let transition = match &event {
+            Event::Window {
+                win_event: WindowEvent::Resized(w, h),
+                ..
+            } => {
+                self.video_renderer.update_viewport(state, *w, *h);
+                Ok(Transition::None)
+            }
             Event::Quit { .. } => Ok(Transition::Pop),
             Event::KeyDown {
                 keycode: Some(keycode),
@@ -279,19 +265,13 @@ impl Screen2<AppState> for MainScreen {
         match state.state {
             RuntimeState::Running => {
                 let vsync = state.c64.run_frame();
-                if vsync {
-                    // self.process_vsync(state)?;
-                } else {
+                if !vsync {
                     self.halt(state)?;
                 }
                 Ok(Transition::None)
             }
             RuntimeState::Paused => Ok(Transition::None),
-            RuntimeState::Halted => {
-                // self.handle_commands(true);
-                // self.process_vsync(state)?;
-                Ok(Transition::None)
-            }
+            RuntimeState::Halted => Ok(Transition::None),
             RuntimeState::Stopped => Ok(Transition::Pop),
         }
     }
@@ -302,12 +282,9 @@ impl Screen2<AppState> for MainScreen {
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
         if state.c64.get_vsync() {
-            self.video_renderer.render(&mut state.platform.window)?;
+            self.video_renderer.render(state)?;
             state.c64.reset_vsync();
-        } else {
-            if !state.options.warp_mode {
-                // std::thread::sleep(Duration::from_millis(1));
-            }
+            state.platform.window.gl_swap_window();
         }
         Ok(Transition::None)
     }
