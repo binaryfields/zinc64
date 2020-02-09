@@ -1,13 +1,13 @@
 // This file is part of zinc64.
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
-
+#![allow(unused)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
 use std::sync::{Arc, Mutex};
+use std::thread;
 
-use sdl2;
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
+use cpal::traits::{DeviceTrait, EventLoopTrait, HostTrait};
 use zinc64_core::SoundOutput;
 
 use crate::util::CircularBuffer;
@@ -18,68 +18,119 @@ const SCALER_MAX: i32 = 4096;
 const SCALER_SHIFT: usize = 12;
 const VOLUME_MAX: u8 = 100;
 
-pub struct AudioRenderer {
-    // Resources
-    buffer: Arc<SoundBuffer>,
-    // Runtime state
+struct AudioRendererState {
     mute: bool,
     scaler: i32,
     volume: u8,
 }
 
+pub struct AudioRenderer {
+    // Resources
+    device: cpal::Device,
+    event_loop: Arc<cpal::EventLoop>,
+    stream_id: cpal::StreamId,
+    // Runtime state
+    buffer: Arc<SoundBuffer>,
+    state: Arc<Mutex<AudioRendererState>>,
+}
+
 impl AudioRenderer {
-    pub fn build_device(
-        sdl_audio: &sdl2::AudioSubsystem,
+    pub fn build(
         freq: i32,
         channels: u8,
         samples: u16,
         buffer: Arc<SoundBuffer>,
-    ) -> Result<AudioDevice<AudioRenderer>, String> {
-        let audio_spec = AudioSpecDesired {
-            freq: Some(freq),
-            channels: Some(channels),
-            samples: Some(samples),
+    ) -> Result<AudioRenderer, anyhow::Error> {
+        let host = cpal::default_host();
+        let event_loop = host.event_loop();
+        let device = host
+            .default_output_device()
+            .expect("failed to find a default output device");
+        //let format = device.default_output_format()?;
+        let format = cpal::Format {
+            channels: 2,
+            sample_rate: cpal::SampleRate(freq as u32),
+            data_type: cpal::SampleFormat::I16,
         };
-        let audio_device = sdl_audio.open_playback(None, &audio_spec, |spec| {
-            info!(target: "audio", "{:?}", spec);
-            let mut renderer = AudioRenderer {
-                buffer,
-                mute: false,
-                scaler: SCALER_MAX,
-                volume: VOLUME_MAX,
-            };
-            renderer.set_volume(VOLUME_MAX);
-            renderer
-        })?;
-        Ok(audio_device)
+        let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
+        let state = Arc::new(
+            Mutex::new(
+                AudioRendererState {
+                    mute: false,
+                    scaler: SCALER_MAX,
+                    volume: VOLUME_MAX,
+                }
+            )
+        );
+        Ok(AudioRenderer {
+            device,
+            event_loop: Arc::new(event_loop),
+            stream_id,
+            buffer,
+            state,
+        })
+    }
+
+    pub fn start(&self) {
+        let input = self.buffer.clone();
+        let state = self.state.clone();
+        let event_loop = self.event_loop.clone();
+        thread::spawn(move || {
+            event_loop.run(move |id, result| {
+                let data = match result {
+                    Ok(data) => data,
+                    Err(err) => {
+                        eprintln!("an error occurred on stream {:?}: {}", id, err);
+                        return;
+                    }
+                };
+                match data {
+                    cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer) } => {
+                        write_data(state.clone(), input.clone(), &mut buffer, 2); // FIXME format.channels as usize
+                    }
+                    _ => (),
+                }
+            })
+        });
+    }
+
+    pub fn pause(&self) {
+        self.event_loop.pause_stream(self.stream_id.clone())
+            .expect("failed to pause stream");
+    }
+
+    pub fn play(&mut self) {
+        self.event_loop.play_stream(self.stream_id.clone())
+            .expect("failed to play stream");
     }
 
     pub fn set_volume(&mut self, volume: u8) {
-        self.scaler = (volume as i32 * SCALER_MAX) / VOLUME_MAX as i32;
-        self.volume = volume;
+        let mut state = self.state.lock().unwrap();
+        state.scaler = (volume as i32 * SCALER_MAX) / VOLUME_MAX as i32;
+        state.volume = volume;
     }
 
     pub fn toggle_mute(&mut self) {
-        self.mute = !self.mute;
+        let mut state = self.state.lock().unwrap();
+        state.mute = !state.mute;
     }
 }
 
-impl AudioCallback for AudioRenderer {
-    type Channel = i16;
-
-    fn callback(&mut self, out: &mut [i16]) {
-        if !self.mute {
-            let mut input = self.buffer.buffer.lock().unwrap();
-            if input.len() < out.len() {
-                debug!(target: "app", "audio callback underflow {}/{}", out.len(), input.len());
-            }
-            for x in out.iter_mut() {
-                let sample = input.pop().unwrap_or(0);
-                *x = ((sample as i32 * self.scaler) >> (SCALER_SHIFT as i32)) as i16;
-            }
-        } else {
-            for x in out.iter_mut() {
-                *x = 0;
+fn write_data(
+    state: Arc<Mutex<AudioRendererState>>,
+    input: Arc<SoundBuffer>,
+    output: &mut [i16],
+    channels: usize,
+) {
+    let state = state.lock().unwrap();
+    let mut input = input.buffer.lock().unwrap();
+    for frame in output.chunks_mut(channels) {
+        let value = input.pop().unwrap_or(0);
+        for sample in frame.iter_mut() {
+            if !state.mute {
+                *sample = ((value as i32 * state.scaler) >> (SCALER_SHIFT as i32)) as i16;
+            } else {
+                *sample = 0;
             }
         }
     }

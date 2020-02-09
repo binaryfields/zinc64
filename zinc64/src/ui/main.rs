@@ -9,7 +9,6 @@ use std::path::Path;
 use std::result::Result;
 
 use sdl2;
-use sdl2::audio::AudioDevice;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::{self, Keycode};
 use sdl2::video;
@@ -25,7 +24,7 @@ use crate::video::VideoRenderer;
 
 pub struct MainScreen {
     // Components
-    audio_device: AudioDevice<AudioRenderer>,
+    audio_device: AudioRenderer,
     input_system: InputSystem,
     video_renderer: VideoRenderer,
     // Runtime State
@@ -35,15 +34,14 @@ pub struct MainScreen {
 impl MainScreen {
     pub fn build(ctx: &mut AppState) -> Result<MainScreen, String> {
         // Initialize audio
-        let audio_sys = ctx.platform.sdl.audio()?;
-        let audio_device = AudioRenderer::build_device(
-            &audio_sys,
+        let audio_device = AudioRenderer::build(
+            //&audio_sys,
             ctx.c64.get_config().sound.sample_rate as i32,
             1,
             ctx.c64.get_config().sound.buffer_size as u16,
             ctx.sound_buffer.clone(),
-        )?;
-        audio_device.resume();
+        ).map_err(|err| format!("{}", err))?;
+        audio_device.start();
         // Initialize video
         let video_renderer = VideoRenderer::build(ctx)?;
         // Initialize input
@@ -139,7 +137,7 @@ impl MainScreen {
     }
 
     fn toggle_mute(&mut self) {
-        self.audio_device.lock().toggle_mute();
+        self.audio_device.toggle_mute();
     }
 
     fn toggle_pause(&mut self, state: &mut AppState) {
@@ -165,7 +163,7 @@ impl MainScreen {
     fn update_audio_state(&mut self, state: &mut AppState) {
         let emu_state = state.state;
         match emu_state {
-            RuntimeState::Running => self.audio_device.resume(),
+            RuntimeState::Running => self.audio_device.play(),
             RuntimeState::Paused => self.audio_device.pause(),
             RuntimeState::Halted => self.audio_device.pause(),
             RuntimeState::Stopped => self.audio_device.pause(),

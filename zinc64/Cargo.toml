@@ -11,9 +11,11 @@ keywords = ["c64", "commodore", "emulator"]
 categories = ["emulators"]
 
 [dependencies]
+anyhow = "1.0"
 bit_field = "0.10"
 byteorder = "1.3"
 cgmath = "0.17"
+cpal = "0.11"
 glow="0.4"
 log = "0.3"
 structopt = "0.3"
