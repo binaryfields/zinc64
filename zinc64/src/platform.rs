@@ -9,7 +9,6 @@ use sdl2::joystick::Joystick;
 use sdl2::video::{GLContext, SwapInterval, Window};
 use sdl2::Sdl;
 
-use crate::app::Options;
 use crate::gfx::gl::GlDevice;
 
 pub struct Platform {
@@ -21,23 +20,18 @@ pub struct Platform {
 }
 
 impl Platform {
-    pub fn build(title: &str, options: &Options) -> Result<Self, String> {
-        info!(
-            "Opening app window {}x{}",
-            options.window_size.0, options.window_size.1
-        );
+    pub fn build(title: &str, window_size: (u32, u32), fullscreen: bool) -> Result<Self, String> {
+        info!("Opening app window {}x{}", window_size.0, window_size.1);
         let sdl = sdl2::init()?;
         let video_sys = sdl.video()?;
-        let joystick_sys = sdl.joystick()?;
         // Initialize gl
         let gl_attr = video_sys.gl_attr();
         gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
         gl_attr.set_context_version(3, 3);
         // Initialize window
-        let mut window_builder =
-            video_sys.window(title, options.window_size.0, options.window_size.1);
+        let mut window_builder = video_sys.window(title, window_size.0, window_size.1);
         window_builder.opengl();
-        if options.fullscreen {
+        if fullscreen {
             window_builder.fullscreen();
         } else {
             window_builder.position_centered();
@@ -55,7 +49,9 @@ impl Platform {
             .gl_set_swap_interval(SwapInterval::VSync)
             .map_err(|_| "failed to set vsync")?;
         // Initialize joysticks
-        let mut joysticks = HashMap::new();
+        let joysticks = HashMap::new();
+        /* FIXME
+        let joystick_sys = sdl.joystick()?;
         joystick_sys.set_event_state(true);
         let joy_idx = [
             options.joydev_1.index() as u32,
@@ -72,6 +68,7 @@ impl Platform {
                 _ => {}
             }
         }
+        */
         Ok(Platform {
             sdl,
             _sdl_gl_context: sdl_gl_context,

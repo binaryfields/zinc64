@@ -131,8 +131,6 @@ pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
         jam_action: opt.jam_action,
         speed: opt.speed.unwrap_or(100),
         warp_mode: opt.warp_mode,
-        fullscreen: opt.fullscreen,
-        window_size: (opt.width, opt.height),
         joydev_1: opt.joydev_1,
         joydev_2: opt.joydev_2,
         debug: opt.debug,

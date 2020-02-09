@@ -13,6 +13,7 @@ use cgmath::{vec2, Vector2};
 use zinc64_core::{Shared, VideoOutput};
 
 use crate::app::AppState;
+use crate::framework::Context;
 use crate::gfx::{gl, sprite, Color, Rect, RectI};
 
 pub struct VideoBuffer {
@@ -63,11 +64,11 @@ pub struct VideoRenderer {
 }
 
 impl VideoRenderer {
-    pub fn build(ctx: &mut AppState) -> Result<VideoRenderer, String> {
-        let screen_size = ctx.c64.get_config().model.frame_buffer_size;
-        let viewport_offset = ctx.c64.get_config().model.viewport_offset;
-        let viewport_size = ctx.c64.get_config().model.viewport_size;
-        let video_buffer = ctx.video_buffer.clone();
+    pub fn build(ctx: &mut Context, state: &mut AppState) -> Result<VideoRenderer, String> {
+        let screen_size = state.c64.get_config().model.frame_buffer_size;
+        let viewport_offset = state.c64.get_config().model.viewport_offset;
+        let viewport_size = state.c64.get_config().model.viewport_size;
+        let video_buffer = state.video_buffer.clone();
         let viewport = Rect::new(
             vec2(viewport_offset.0 as f32, viewport_offset.1 as f32),
             vec2(viewport_size.0 as f32, viewport_size.1 as f32),
@@ -94,14 +95,14 @@ impl VideoRenderer {
         Ok(renderer)
     }
 
-    pub fn update_viewport(&mut self, ctx: &mut AppState, width: i32, height: i32) {
+    pub fn update_viewport(&mut self, ctx: &mut Context, width: i32, height: i32) {
         self.batch.set_viewport(
             &mut ctx.platform.gl,
             RectI::new(zero(), vec2(width, height)),
         );
     }
 
-    pub fn render(&mut self, ctx: &mut AppState) -> Result<(), String> {
+    pub fn render(&mut self, ctx: &mut Context) -> Result<(), String> {
         let gl = &mut ctx.platform.gl;
         let tex_size = self.texture.size.cast::<f32>().unwrap();
         gl.set_texture_data(&self.texture, self.video_buffer.borrow().get_pixel_data());

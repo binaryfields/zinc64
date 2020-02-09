@@ -14,11 +14,12 @@ use sdl2::keyboard::{self, Keycode};
 use sdl2::video;
 use zinc64_loader::Loaders;
 
-use crate::app::{App, AppState, JamAction, RuntimeState};
+use crate::app::{AppState, JamAction, RuntimeState};
 use crate::audio::AudioRenderer;
+use crate::framework::Context;
 use crate::input::InputSystem;
 use crate::ui::console::ConsoleScreen;
-use crate::ui::{Screen2, Transition};
+use crate::ui::{Screen, Transition};
 use crate::util::FileReader;
 use crate::video::VideoRenderer;
 
@@ -32,18 +33,19 @@ pub struct MainScreen {
 }
 
 impl MainScreen {
-    pub fn build(ctx: &mut AppState) -> Result<MainScreen, String> {
+    pub fn build(ctx: &mut Context, state: &mut AppState) -> Result<MainScreen, String> {
         // Initialize audio
         let audio_device = AudioRenderer::build(
             //&audio_sys,
-            ctx.c64.get_config().sound.sample_rate as i32,
+            state.c64.get_config().sound.sample_rate as i32,
             1,
-            ctx.c64.get_config().sound.buffer_size as u16,
-            ctx.sound_buffer.clone(),
-        ).map_err(|err| format!("{}", err))?;
+            state.c64.get_config().sound.buffer_size as u16,
+            state.sound_buffer.clone(),
+        )
+        .map_err(|err| format!("{}", err))?;
         audio_device.start();
         // Initialize video
-        let video_renderer = VideoRenderer::build(ctx)?;
+        let video_renderer = VideoRenderer::build(ctx, state)?;
         // Initialize input
         let input_system = InputSystem::build()?;
         Ok(MainScreen {
@@ -117,18 +119,16 @@ impl MainScreen {
         }
     }
 
-    fn toggle_fullscreen(&mut self, state: &mut AppState) {
-        match state.platform.window.fullscreen_state() {
+    fn toggle_fullscreen(&mut self, ctx: &mut Context) {
+        match ctx.platform.window.fullscreen_state() {
             video::FullscreenType::Off => {
-                state
-                    .platform
+                ctx.platform
                     .window
                     .set_fullscreen(video::FullscreenType::True)
                     .unwrap();
             }
             video::FullscreenType::True | video::FullscreenType::Desktop => {
-                state
-                    .platform
+                ctx.platform
                     .window
                     .set_fullscreen(video::FullscreenType::Off)
                     .unwrap();
@@ -149,7 +149,7 @@ impl MainScreen {
         };
     }
 
-    fn toggle_warp(&mut self, ctx: &mut App, state: &mut AppState) {
+    fn toggle_warp(&mut self, ctx: &mut Context, state: &mut AppState) {
         let value = state.options.warp_mode;
         state.options.warp_mode = !value;
         let fps = if !state.options.warp_mode {
@@ -171,10 +171,10 @@ impl MainScreen {
     }
 }
 
-impl Screen2<AppState> for MainScreen {
+impl Screen<AppState> for MainScreen {
     fn handle_event(
         &mut self,
-        ctx: &mut App,
+        ctx: &mut Context,
         state: &mut AppState,
         event: Event,
     ) -> Result<Transition<AppState>, String> {
@@ -183,7 +183,7 @@ impl Screen2<AppState> for MainScreen {
                 win_event: WindowEvent::Resized(w, h),
                 ..
             } => {
-                self.video_renderer.update_viewport(state, *w, *h);
+                self.video_renderer.update_viewport(ctx, *w, *h);
                 Ok(Transition::None)
             }
             Event::Quit { .. } => Ok(Transition::Pop),
@@ -191,7 +191,7 @@ impl Screen2<AppState> for MainScreen {
                 keycode: Some(keycode),
                 ..
             } if *keycode == Keycode::Escape => {
-                let screen = ConsoleScreen::build(state)?;
+                let screen = ConsoleScreen::build(ctx, state)?;
                 Ok(Transition::Push(Box::new(screen)))
             }
             Event::KeyDown {
@@ -214,7 +214,7 @@ impl Screen2<AppState> for MainScreen {
                     } else if *keycode == Keycode::W {
                         self.toggle_warp(ctx, state);
                     } else if *keycode == Keycode::Return {
-                        self.toggle_fullscreen(state);
+                        self.toggle_fullscreen(ctx);
                     }
                 } else if keymod.contains(keyboard::Mod::LCTRLMOD)
                     || keymod.contains(keyboard::Mod::RCTRLMOD)
@@ -243,7 +243,7 @@ impl Screen2<AppState> for MainScreen {
 
     fn update(
         &mut self,
-        _ctx: &mut App,
+        _ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
         self.process_keyboard_events(state);
@@ -276,13 +276,13 @@ impl Screen2<AppState> for MainScreen {
 
     fn draw(
         &mut self,
-        _ctx: &mut App,
+        ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
         if state.c64.get_vsync() {
-            self.video_renderer.render(state)?;
+            self.video_renderer.render(ctx)?;
             state.c64.reset_vsync();
-            state.platform.window.gl_swap_window();
+            ctx.platform.window.gl_swap_window();
         }
         Ok(Transition::None)
     }

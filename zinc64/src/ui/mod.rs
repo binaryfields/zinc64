@@ -9,23 +9,23 @@ pub use main::MainScreen;
 
 use sdl2::event::Event;
 
-use crate::app::App;
+use crate::framework::Context;
 
 pub enum Transition<T> {
     None,
-    Push(Box<dyn Screen2<T>>),
+    Push(Box<dyn Screen<T>>),
     Pop,
 }
 
-pub trait Screen2<T> {
+pub trait Screen<T> {
     fn handle_event(
         &mut self,
-        ctx: &mut App,
+        ctx: &mut Context,
         state: &mut T,
         event: Event,
     ) -> Result<Transition<T>, String>;
 
-    fn update(&mut self, ctx: &mut App, state: &mut T) -> Result<Transition<T>, String>;
+    fn update(&mut self, ctx: &mut Context, state: &mut T) -> Result<Transition<T>, String>;
 
-    fn draw(&mut self, ctx: &mut App, state: &mut T) -> Result<Transition<T>, String>;
+    fn draw(&mut self, ctx: &mut Context, state: &mut T) -> Result<Transition<T>, String>;
 }

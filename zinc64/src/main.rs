@@ -11,6 +11,7 @@ mod cli;
 mod cmd;
 mod console;
 mod debug;
+mod framework;
 mod gfx;
 mod input;
 mod palette;
@@ -32,11 +33,10 @@ use zinc64_core::new_shared;
 use zinc64_emu::system::{C64Factory, C64};
 use zinc64_loader::Loaders;
 
-use crate::app::{App, AppController};
+use crate::app::App;
 use crate::audio::SoundBuffer;
 use crate::cli::Opt;
 use crate::palette::Palette;
-use crate::time::Time;
 use crate::util::{FileReader, Logger};
 use crate::video::VideoBuffer;
 
@@ -89,15 +89,19 @@ fn run(opt: &Opt) -> Result<(), String> {
     if opt.console {
         run_console(&mut c64);
     } else {
-        let options = cli::build_app_options(opt)?;
-        let mut app = App::new(Time::new(None));
-        app.run(|ctx| {
-            AppController::build(
+        let app_options = cli::build_app_options(opt)?;
+        let fx_options = framework::Options {
+            title: NAME.to_owned(),
+            window_size: (opt.width, opt.height),
+            fullscreen: opt.fullscreen,
+        };
+        framework::run(fx_options, |ctx| {
+            App::build(
                 ctx,
                 c64,
                 sound_buffer.clone(),
                 video_buffer.clone(),
-                options,
+                app_options,
             )
         })?;
     }

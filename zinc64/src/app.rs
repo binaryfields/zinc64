@@ -16,13 +16,11 @@ use zinc64_emu::system::C64;
 use crate::audio::SoundBuffer;
 use crate::console::Console;
 use crate::debug::Debug;
+use crate::framework::{Context, State};
 use crate::gfx::Font;
-use crate::platform::Platform;
-use crate::time::Time;
-use crate::ui::{MainScreen, Screen2, Transition};
+use crate::ui::{MainScreen, Screen, Transition};
 use crate::video::VideoBuffer;
 
-const APP_NAME: &'static str = "zinc64";
 const CONSOLE_BUFFER: usize = 2048;
 
 #[derive(Copy, Clone, Debug)]
@@ -37,9 +35,6 @@ pub struct Options {
     pub jam_action: JamAction,
     pub speed: u8,
     pub warp_mode: bool,
-    // Window
-    pub fullscreen: bool,
-    pub window_size: (u32, u32),
     // Controllers
     pub joydev_1: joystick::Mode,
     pub joydev_2: joystick::Mode,
@@ -63,78 +58,25 @@ pub struct AppState {
     pub console: Console,
     pub console_history: Vec<String>,
     pub debug: Debug,
-    pub platform: Platform,
     pub options: Options,
     pub sound_buffer: Arc<SoundBuffer>,
     pub video_buffer: Shared<VideoBuffer>,
 }
 
-pub trait Controller {
-    fn handle_events(&mut self, ctx: &mut App) -> Result<(), String>;
-
-    fn update(&mut self, ctx: &mut App) -> Result<(), String>;
-
-    fn draw(&mut self, ctx: &mut App) -> Result<(), String>;
-}
-
 pub struct App {
-    running: bool,
-    pub time: Time,
+    state: AppState,
+    screens: Vec<Box<dyn Screen<AppState>>>,
 }
 
 impl App {
-    pub fn new(time: Time) -> Self {
-        Self {
-            running: false,
-            time,
-        }
-    }
-
-    pub fn run<C, I>(&mut self, init: I) -> Result<(), String>
-    where
-        C: Controller,
-        I: FnOnce(&mut App) -> Result<C, String>,
-    {
-        let mut controller = init(self)?;
-        self.running = true;
-        while self.running {
-            if let Err(e) = self.tick(&mut controller) {
-                self.running = false;
-                return Err(e);
-            }
-        }
-        Ok(())
-    }
-
-    fn tick<C>(&mut self, controller: &mut C) -> Result<(), String>
-    where
-        C: Controller,
-    {
-        self.time.tick();
-        controller.handle_events(self)?;
-        if self.time.has_timer_event() {
-            controller.update(self)?;
-        }
-        controller.draw(self)?;
-        std::thread::yield_now();
-        Ok(())
-    }
-}
-
-pub struct AppController {
-    state: AppState,
-    screens: Vec<Box<dyn Screen2<AppState>>>,
-}
-
-impl AppController {
     pub fn build(
-        ctx: &mut App,
+        ctx: &mut Context,
         c64: C64,
         sound_buffer: Arc<SoundBuffer>,
         video_buffer: Shared<VideoBuffer>,
         options: Options,
-    ) -> Result<AppController, String> {
-        let platform = Platform::build(APP_NAME, &options)?;
+    ) -> Result<App, String> {
+        let window_size = ctx.platform.window.size();
         // Initialize fps
         let fps = if !options.warp_mode {
             Some(c64.get_config().model.refresh_rate as f64)
@@ -144,8 +86,8 @@ impl AppController {
         ctx.time.set_fps(fps);
         // Initiliaze console
         let font = Font::load_psf(Path::new("res/font/font.psf"))?;
-        let cols = options.window_size.0 / font.get_width();
-        let rows = options.window_size.1 / font.get_height();
+        let cols = window_size.0 / font.get_width();
+        let rows = window_size.1 / font.get_height();
         let mut console = Console::new(cols, rows, CONSOLE_BUFFER);
         console.print("Type ? for the list of available commands\n".as_bytes());
         console.save_pos();
@@ -167,15 +109,14 @@ impl AppController {
             console,
             console_history: Vec::new(),
             debug: Debug::new(debug_rx),
-            platform,
             options,
             sound_buffer,
             video_buffer,
         };
-        let main_screen = MainScreen::build(&mut state)?;
-        let mut screens: Vec<Box<dyn Screen2<AppState>>> = Vec::new();
+        let main_screen = MainScreen::build(ctx, &mut state)?;
+        let mut screens: Vec<Box<dyn Screen<AppState>>> = Vec::new();
         screens.push(Box::new(main_screen));
-        Ok(AppController { state, screens })
+        Ok(App { state, screens })
     }
 
     fn process_transition(&mut self, transition: Transition<AppState>) {
@@ -191,11 +132,11 @@ impl AppController {
     }
 }
 
-impl Controller for AppController {
-    fn handle_events(&mut self, ctx: &mut App) -> Result<(), String> {
+impl State for App {
+    fn handle_events(&mut self, ctx: &mut Context) -> Result<(), String> {
         match self.screens.last_mut() {
             Some(screen) => {
-                let mut events = self.state.platform.sdl.event_pump().unwrap();
+                let mut events = ctx.platform.sdl.event_pump().unwrap();
                 for event in events.poll_iter() {
                     match event {
                         Event::Quit { .. } => {
@@ -222,7 +163,7 @@ impl Controller for AppController {
         Ok(())
     }
 
-    fn update(&mut self, ctx: &mut App) -> Result<(), String> {
+    fn update(&mut self, ctx: &mut Context) -> Result<(), String> {
         match self.screens.last_mut() {
             Some(screen) => {
                 let transition = screen.update(ctx, &mut self.state)?;
@@ -235,7 +176,7 @@ impl Controller for AppController {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut App) -> Result<(), String> {
+    fn draw(&mut self, ctx: &mut Context) -> Result<(), String> {
         match self.screens.last_mut() {
             Some(screen) => {
                 let transition = screen.draw(ctx, &mut self.state)?;

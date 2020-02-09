@@ -12,13 +12,14 @@ use cgmath::{vec2, Vector2};
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::{Keycode, Mod};
 
-use crate::app::{App, AppState};
+use crate::app::AppState;
 use crate::cmd::Executor;
 use crate::console::Console;
+use crate::framework::Context;
 use crate::gfx::{gl, sprite, Color, Font, Rect, RectI};
 use crate::util::keymap;
 
-use super::{Screen2, Transition};
+use super::{Screen, Transition};
 
 const BLANK_CHAR: u8 = 32;
 const CURSOR_BLINK_DUR: u32 = 25;
@@ -43,9 +44,9 @@ pub struct ConsoleScreen {
 }
 
 impl ConsoleScreen {
-    pub fn build(ctx: &mut AppState) -> Result<ConsoleScreen, String> {
-        let cols = ctx.console.cols;
-        let rows = ctx.console.rows;
+    pub fn build(ctx: &mut Context, state: &mut AppState) -> Result<ConsoleScreen, String> {
+        let cols = state.console.cols;
+        let rows = state.console.rows;
         let palette = [
             Color::from_rgb(0x28, 0x28, 0x28),
             Color::from_rgb(0xeb, 0xdb, 0xb2),
@@ -202,10 +203,10 @@ impl ConsoleScreen {
     }
 }
 
-impl Screen2<AppState> for ConsoleScreen {
+impl Screen<AppState> for ConsoleScreen {
     fn handle_event(
         &mut self,
-        _ctx: &mut App,
+        ctx: &mut Context,
         state: &mut AppState,
         event: Event,
     ) -> Result<Transition<AppState>, String> {
@@ -215,7 +216,7 @@ impl Screen2<AppState> for ConsoleScreen {
                 ..
             } => {
                 self.batch
-                    .set_viewport(&mut state.platform.gl, RectI::new(zero(), vec2(*w, *h)));
+                    .set_viewport(&mut ctx.platform.gl, RectI::new(zero(), vec2(*w, *h)));
                 Ok(Transition::None)
             }
             Event::KeyDown {
@@ -251,7 +252,7 @@ impl Screen2<AppState> for ConsoleScreen {
 
     fn update(
         &mut self,
-        _ctx: &mut App,
+        _ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
         self.blink_cursor(&mut state.console);
@@ -260,12 +261,12 @@ impl Screen2<AppState> for ConsoleScreen {
 
     fn draw(
         &mut self,
-        _ctx: &mut App,
+        ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
         let font_size = self.font.get_size().cast::<f32>().unwrap();
         let mut screen_data = state.console.screen_data();
-        let gl = &mut state.platform.gl;
+        let gl = &mut ctx.platform.gl;
         gl.clear(self.palette[0]);
 
         self.batch.begin(gl, Some(self.font_tex.clone()));
@@ -282,7 +283,7 @@ impl Screen2<AppState> for ConsoleScreen {
         }
         self.batch.end(gl);
 
-        state.platform.window.gl_swap_window();
+        ctx.platform.window.gl_swap_window();
         Ok(Transition::None)
     }
 }

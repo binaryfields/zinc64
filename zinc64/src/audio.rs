@@ -53,15 +53,11 @@ impl AudioRenderer {
             data_type: cpal::SampleFormat::I16,
         };
         let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
-        let state = Arc::new(
-            Mutex::new(
-                AudioRendererState {
-                    mute: false,
-                    scaler: SCALER_MAX,
-                    volume: VOLUME_MAX,
-                }
-            )
-        );
+        let state = Arc::new(Mutex::new(AudioRendererState {
+            mute: false,
+            scaler: SCALER_MAX,
+            volume: VOLUME_MAX,
+        }));
         Ok(AudioRenderer {
             device,
             event_loop: Arc::new(event_loop),
@@ -85,8 +81,11 @@ impl AudioRenderer {
                     }
                 };
                 match data {
-                    cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer) } => {
-                        write_data(state.clone(), input.clone(), &mut buffer, 2); // FIXME format.channels as usize
+                    cpal::StreamData::Output {
+                        buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer),
+                    } => {
+                        write_data(state.clone(), input.clone(), &mut buffer, 2);
+                        // FIXME format.channels as usize
                     }
                     _ => (),
                 }
@@ -95,12 +94,14 @@ impl AudioRenderer {
     }
 
     pub fn pause(&self) {
-        self.event_loop.pause_stream(self.stream_id.clone())
+        self.event_loop
+            .pause_stream(self.stream_id.clone())
             .expect("failed to pause stream");
     }
 
     pub fn play(&mut self) {
-        self.event_loop.play_stream(self.stream_id.clone())
+        self.event_loop
+            .play_stream(self.stream_id.clone())
             .expect("failed to play stream");
     }
 
