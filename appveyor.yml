@@ -4,7 +4,6 @@ environment:
   global:
     RUST_VERSION: stable
     CRATE_NAME: zinc64
-    SDL_VERSION: 2.0.9
   matrix:
     - TARGET: x86_64-pc-windows-msvc
 
@@ -20,10 +19,6 @@ install:
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
   - rustc -Vv
   - cargo -V
-  - curl -sSf -o SDL2-devel.zip https://www.libsdl.org/release/SDL2-devel-%SDL_VERSION%-VC.zip
-  - 7z x -y SDL2-devel.zip
-  - copy SDL2-%SDL_VERSION%\lib\x64\* C:\Users\appveyor\.rustup\toolchains\%RUST_VERSION%-%TARGET%\lib\rustlib\%TARGET%\lib\
-  - copy SDL2-%SDL_VERSION%\lib\x64\SDL2.dll
 
 test_script:
   - if [%APPVEYOR_REPO_TAG%]==[false] (

@@ -13,7 +13,6 @@ $ZIP = "$SRC_DIR\$($Env:CRATE_NAME)-$($Env:APPVEYOR_REPO_TAG_NAME)-$($Env:TARGET
 Copy-Item "$SRC_DIR\target\$($Env:TARGET)\release\zinc64.exe" '.\'
 Copy-Item "$SRC_DIR\res" '.\' -Recurse
 Copy-Item "$SRC_DIR\logger.conf" '.\'
-Copy-Item "$SRC_DIR\SDL2.dll" '.\'
 
 7z a "$ZIP" *
 

@@ -27,7 +27,7 @@ to assemble various accessories required to get software onto it. Soon enough I
 had picked up a copy of C64 Programmer's Reference Guide and the rest is now
 history.
 
-2019 is bringing support for revised SDL port with console support and
+2020 is bringing support for revised OpenGL port with console support and
 bare-metal environments, more specifically a bare-metal Raspberry Pi 3 port.
 See zinc64-rpi for an early preview.
 
@@ -137,13 +137,14 @@ of chips to be decoupled from each other.
 | Format   | Prg           | Done
 | Format   | Tap           | Done
 | Format   | T64           | Not Started
-| Client   | SDL           | In Progress
+| Client   | OpenGl        | In Progress
 | Client   | Raspi3        | In Progress
 
 ## Roadmap
 
-- v0.9  - rpi port
-- v0.10  - floppy support
+- v0.9   - opengl client
+- v0.10  - rpi port
+- v0.11  - floppy support
 
 ## Getting Started
 
@@ -175,22 +176,6 @@ of chips to be decoupled from each other.
 ### Windows Considerations
 
 1. Install [Microsoft Visual C++ Build Tools 2017](https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2017). Select Visual C++ build tools workload.
-
-2. Install [SDL2 Development Libraries](http://www.libsdl.org/release/SDL2-devel-2.0.7-VC.zip).
-
-3. Copy all SDL2 lib files from
-
-		SDL2-devel-2.0.x-VC\SDL2-2.0.x\lib\x64\
-
-	to 
-
-		C:\Users\{Your Username}\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib
-
-4. Copy SDL2.dll from
-
-		SDL2-devel-2.0.x-VC\SDL2-2.0.x\lib\x64\
-
-	to zinc64 project directory
 
 ## Debugger
 

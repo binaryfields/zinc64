@@ -9,5 +9,4 @@ RUN apt-get update && \
     g++ \
     make \
     pkg-config \
-    libc6-dev \
-    libsdl2-dev
+    libc6-dev
