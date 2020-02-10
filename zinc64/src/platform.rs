@@ -36,12 +36,7 @@ impl Platform {
             .build_windowed(window_builder, &event_loop)
             .unwrap();
         let windowed_context = unsafe { windowed_context.make_current().unwrap() };
-        if cfg!(target_os = "linux") {
-            use glutin::platform::unix::WindowExtUnix;
-            windowed_context
-                .window()
-                .set_wayland_theme(theme::DarkTheme);
-        }
+        configure_theme(&windowed_context);
         let gl_ctx = glow::Context::from_loader_function(|s| {
             windowed_context.get_proc_address(s) as *const _
         });
@@ -72,6 +67,18 @@ impl Platform {
         };
         Ok((event_loop, platform))
     }
+}
+
+#[cfg(target_os = "linux")]
+fn configure_theme(windowed_context: &glutin::WindowedContext<glutin::PossiblyCurrent>) {
+    use glutin::platform::unix::WindowExtUnix;
+    windowed_context
+        .window()
+        .set_wayland_theme(theme::DarkTheme);
+}
+
+#[cfg(not(target_os = "linux"))]
+fn configure_theme(windowed_context: &glutin::WindowedContext<glutin::PossiblyCurrent>) {
 }
 
 #[cfg(target_os = "linux")]
