@@ -73,7 +73,7 @@ impl VideoRenderer {
             vec2(viewport_offset.0 as f32, viewport_offset.1 as f32),
             vec2(viewport_size.0 as f32, viewport_size.1 as f32),
         );
-        let window_size = ctx.platform.window.size();
+        let window_size = ctx.platform.windowed_context.window().inner_size();
         info!("Renderer viewport {:?}", viewport);
         let gl = &mut ctx.platform.gl;
         let texture_size = vec2(screen_size.0, screen_size.1).cast::<i32>().unwrap();
@@ -84,7 +84,7 @@ impl VideoRenderer {
             gl,
             RectI::new(
                 zero(),
-                Vector2::new(window_size.0 as i32, window_size.1 as i32),
+                Vector2::new(window_size.width as i32, window_size.height as i32),
             ),
         );
         let renderer = VideoRenderer {

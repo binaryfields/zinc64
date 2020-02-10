@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-use sdl2::event::Event;
+use glutin::event::Event;
 use zinc64_core::Shared;
 use zinc64_debug::{Command, Debugger};
 use zinc64_emu::device::joystick;
@@ -76,7 +76,7 @@ impl App {
         video_buffer: Shared<VideoBuffer>,
         options: Options,
     ) -> Result<App, String> {
-        let window_size = ctx.platform.window.size();
+        let window_size = ctx.platform.windowed_context.window().inner_size();
         // Initialize fps
         let fps = if !options.warp_mode {
             Some(c64.get_config().model.refresh_rate as f64)
@@ -86,8 +86,8 @@ impl App {
         ctx.time.set_fps(fps);
         // Initiliaze console
         let font = Font::load_psf(Path::new("res/font/font.psf"))?;
-        let cols = window_size.0 / font.get_width();
-        let rows = window_size.1 / font.get_height();
+        let cols = window_size.width / font.get_width();
+        let rows = window_size.height / font.get_height();
         let mut console = Console::new(cols, rows, CONSOLE_BUFFER);
         console.print("Type ? for the list of available commands\n".as_bytes());
         console.save_pos();
@@ -133,28 +133,11 @@ impl App {
 }
 
 impl State for App {
-    fn handle_events(&mut self, ctx: &mut Context) -> Result<(), String> {
+    fn handle_event(&mut self, ctx: &mut Context, event: Event<()>) -> Result<(), String> {
         match self.screens.last_mut() {
             Some(screen) => {
-                let mut events = ctx.platform.sdl.event_pump().unwrap();
-                for event in events.poll_iter() {
-                    match event {
-                        Event::Quit { .. } => {
-                            ctx.running = false;
-                            break;
-                        }
-                        _ => {
-                            let transition = screen.handle_event(ctx, &mut self.state, event)?;
-                            match transition {
-                                Transition::None => {}
-                                other => {
-                                    self.process_transition(other);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
+                let transition = screen.handle_event(ctx, &mut self.state, event)?;
+                self.process_transition(transition);
             }
             None => {
                 ctx.running = false;

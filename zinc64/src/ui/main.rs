@@ -8,10 +8,8 @@ use std::io::BufReader;
 use std::path::Path;
 use std::result::Result;
 
-use sdl2;
-use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::{self, Keycode};
-use sdl2::video;
+use glutin::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use glutin::window::Fullscreen;
 use zinc64_loader::Loaders;
 
 use crate::app::{AppState, JamAction, RuntimeState};
@@ -120,18 +118,16 @@ impl MainScreen {
     }
 
     fn toggle_fullscreen(&mut self, ctx: &mut Context) {
-        match ctx.platform.window.fullscreen_state() {
-            video::FullscreenType::Off => {
+        match ctx.platform.windowed_context.window().fullscreen() {
+            None => {
+                let monitor = ctx.platform.windowed_context.window().current_monitor();
                 ctx.platform
-                    .window
-                    .set_fullscreen(video::FullscreenType::True)
-                    .unwrap();
+                    .windowed_context
+                    .window()
+                    .set_fullscreen(Some(Fullscreen::Borderless(monitor)));
             }
-            video::FullscreenType::True | video::FullscreenType::Desktop => {
-                ctx.platform
-                    .window
-                    .set_fullscreen(video::FullscreenType::Off)
-                    .unwrap();
+            Some(_) => {
+                ctx.platform.windowed_context.window().set_fullscreen(None);
             }
         }
     }
@@ -176,68 +172,77 @@ impl Screen<AppState> for MainScreen {
         &mut self,
         ctx: &mut Context,
         state: &mut AppState,
-        event: Event,
+        event: Event<()>,
     ) -> Result<Transition<AppState>, String> {
+        let app_state = state;
         let transition = match &event {
-            Event::Window {
-                win_event: WindowEvent::Resized(w, h),
-                ..
-            } => {
-                self.video_renderer.update_viewport(ctx, *w, *h);
-                Ok(Transition::None)
-            }
-            Event::Quit { .. } => Ok(Transition::Pop),
-            Event::KeyDown {
-                keycode: Some(keycode),
-                ..
-            } if *keycode == Keycode::Escape => {
-                let screen = ConsoleScreen::build(ctx, state)?;
-                Ok(Transition::Push(Box::new(screen)))
-            }
-            Event::KeyDown {
-                keycode: Some(keycode),
-                keymod,
-                repeat: false,
-                ..
-            } => {
-                if keymod.contains(keyboard::Mod::LALTMOD)
-                    || keymod.contains(keyboard::Mod::RALTMOD)
-                {
-                    if *keycode == Keycode::H {
-                        self.halt(state)?;
-                    } else if *keycode == Keycode::M {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::Resized(size) => {
+                    self.video_renderer
+                        .update_viewport(ctx, size.width as i32, size.height as i32);
+                    Ok(Transition::None)
+                }
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(virtual_code),
+                            state,
+                            modifiers,
+                            ..
+                        },
+                    ..
+                } => match (virtual_code, state) {
+                    (VirtualKeyCode::Escape, ElementState::Pressed) => {
+                        let screen = ConsoleScreen::build(ctx, app_state)?;
+                        Ok(Transition::Push(Box::new(screen)))
+                    }
+                    (VirtualKeyCode::H, ElementState::Pressed) if modifiers.alt() => {
+                        self.halt(app_state)?;
+                        Ok(Transition::None)
+                    }
+                    (VirtualKeyCode::M, ElementState::Pressed) if modifiers.alt() => {
                         self.toggle_mute();
-                    } else if *keycode == Keycode::P {
-                        self.toggle_pause(state);
-                    } else if *keycode == Keycode::Q {
-                        self.set_state(state, RuntimeState::Stopped);
-                    } else if *keycode == Keycode::W {
-                        self.toggle_warp(ctx, state);
-                    } else if *keycode == Keycode::Return {
+                        Ok(Transition::None)
+                    }
+                    (VirtualKeyCode::P, ElementState::Pressed) if modifiers.alt() => {
+                        self.toggle_pause(app_state);
+                        Ok(Transition::None)
+                    }
+                    (VirtualKeyCode::Q, ElementState::Pressed) if modifiers.alt() => {
+                        self.set_state(app_state, RuntimeState::Stopped);
+                        Ok(Transition::None)
+                    }
+                    (VirtualKeyCode::W, ElementState::Pressed) if modifiers.alt() => {
+                        self.toggle_warp(ctx, app_state);
+                        Ok(Transition::None)
+                    }
+                    (VirtualKeyCode::Return, ElementState::Pressed) if modifiers.alt() => {
                         self.toggle_fullscreen(ctx);
+                        Ok(Transition::None)
                     }
-                } else if keymod.contains(keyboard::Mod::LCTRLMOD)
-                    || keymod.contains(keyboard::Mod::RCTRLMOD)
-                {
-                    if *keycode == Keycode::F1 {
-                        self.toggle_datassette_play(state);
-                    } else if *keycode == Keycode::F9 {
-                        self.reset(state);
+                    (VirtualKeyCode::F1, ElementState::Pressed) if modifiers.ctrl() => {
+                        self.toggle_datassette_play(app_state);
+                        Ok(Transition::None)
                     }
+                    (VirtualKeyCode::F9, ElementState::Pressed) if modifiers.ctrl() => {
+                        self.reset(app_state);
+                        Ok(Transition::None)
+                    }
+                    _ => Ok(Transition::None),
+                },
+                WindowEvent::DroppedFile(path) => {
+                    // info!("Dropped file {}", path);
+                    match self.load_image(app_state, &path) {
+                        Ok(_) => (),
+                        Err(err) => error!("Failed to load image, error: {}", err),
+                    }
+                    Ok(Transition::None)
                 }
-                Ok(Transition::None)
-            }
-            Event::DropFile { filename, .. } => {
-                info!("Dropped file {}", filename);
-                match self.load_image(state, &Path::new(&filename)) {
-                    Ok(_) => (),
-                    Err(err) => error!("Failed to load image, error: {}", err),
-                }
-                Ok(Transition::None)
-            }
+                _ => Ok(Transition::None),
+            },
             _ => Ok(Transition::None),
         };
-        self.input_system.handle_event(&mut state.c64, &event);
+        self.input_system.handle_event(&mut app_state.c64, &event);
         transition
     }
 
@@ -282,7 +287,10 @@ impl Screen<AppState> for MainScreen {
         if state.c64.get_vsync() {
             self.video_renderer.render(ctx)?;
             state.c64.reset_vsync();
-            ctx.platform.window.gl_swap_window();
+            ctx.platform
+                .windowed_context
+                .swap_buffers()
+                .map_err(|_| "failed to swap buffers")?;
         }
         Ok(Transition::None)
     }

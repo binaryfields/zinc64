@@ -1,12 +1,5 @@
 # TODO
 
-x upgrade deps
-x revamp rendering
-  x glow
-- revamp audio
-  - cpal
-- revamp windowing
-  - winit
 - fix cpu usage
 - app: add screenshot support
 - app: add ui/menus

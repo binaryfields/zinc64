@@ -24,8 +24,3 @@ zinc64-core = { path = "../zinc64-core", version = "0.8" }
 zinc64-emu = { path = "../zinc64-emu", version = "0.8" }
 zinc64-debug = { path = "../zinc64-debug", version = "0.8" }
 zinc64-loader = { path = "../zinc64-loader", version = "0.8" }
-
-[dependencies.sdl2]
-version = "0.32"
-default-features = false
-features = ["unsafe_textures"]

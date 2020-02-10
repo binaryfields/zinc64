@@ -7,7 +7,7 @@ mod main;
 
 pub use main::MainScreen;
 
-use sdl2::event::Event;
+use glutin::event::Event;
 
 use crate::framework::Context;
 
@@ -22,7 +22,7 @@ pub trait Screen<T> {
         &mut self,
         ctx: &mut Context,
         state: &mut T,
-        event: Event,
+        event: Event<()>,
     ) -> Result<Transition<T>, String>;
 
     fn update(&mut self, ctx: &mut Context, state: &mut T) -> Result<Transition<T>, String>;

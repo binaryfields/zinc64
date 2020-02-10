@@ -5,6 +5,12 @@
 use crate::platform::Platform;
 use crate::time::Time;
 
+use glutin::{
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    platform::desktop::EventLoopExtDesktop,
+};
+
 pub struct Context {
     pub platform: Platform,
     pub time: Time,
@@ -18,7 +24,7 @@ pub struct Options {
 }
 
 pub trait State {
-    fn handle_events(&mut self, ctx: &mut Context) -> Result<(), String>;
+    fn handle_event(&mut self, ctx: &mut Context, event: Event<()>) -> Result<(), String>;
 
     fn update(&mut self, ctx: &mut Context) -> Result<(), String>;
 
@@ -31,7 +37,7 @@ where
     I: FnOnce(&mut Context) -> Result<S, String>,
 {
     let time = Time::new(None);
-    let platform = Platform::build(
+    let (mut event_loop, platform) = Platform::build(
         options.title.as_str(),
         options.window_size,
         options.fullscreen,
@@ -44,7 +50,7 @@ where
     let mut state = init(&mut ctx)?;
     ctx.running = true;
     while ctx.running {
-        if let Err(e) = tick(&mut ctx, &mut state) {
+        if let Err(e) = tick(&mut event_loop, &mut ctx, &mut state) {
             ctx.running = false;
             return Err(e);
         }
@@ -52,12 +58,33 @@ where
     Ok(())
 }
 
-fn tick<C>(ctx: &mut Context, state: &mut C) -> Result<(), String>
+fn tick<C>(event_loop: &mut EventLoop<()>, ctx: &mut Context, state: &mut C) -> Result<(), String>
 where
     C: State,
 {
     ctx.time.tick();
-    state.handle_events(ctx)?;
+    event_loop.run_return(|event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                ctx.running = false;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                ctx.platform.windowed_context.resize(size);
+            }
+            Event::MainEventsCleared => {
+                *control_flow = ControlFlow::Exit;
+            }
+            _ => (),
+        }
+        state.handle_event(ctx, event).expect("FIXME");
+    });
     if ctx.time.has_timer_event() {
         state.update(ctx)?;
     }

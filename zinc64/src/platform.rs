@@ -2,56 +2,54 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 use glow;
-use sdl2::joystick::Joystick;
-use sdl2::video::{GLContext, SwapInterval, Window};
-use sdl2::Sdl;
 
 use crate::gfx::gl::GlDevice;
+use glutin::platform::unix::WindowExtUnix;
+use glutin::platform::unix::{ButtonState, Theme};
 
+const PRIMARY_BG_ACTIVE: [u8; 4] = [0xFF, 0x28, 0x28, 0x28];
+const PRIMARY_BG_INACTIVE: [u8; 4] = [0xFF, 0x35, 0x35, 0x35];
+const SECONDARY_ACTIVE: [u8; 4] = [0xFF, 0xc3, 0xc3, 0xc3];
+const BUTTON_HOVER: [u8; 4] = [0xFF, 0x50, 0x50, 0x50];
 pub struct Platform {
-    pub sdl: Sdl,
-    _sdl_gl_context: GLContext,
-    pub window: Window,
+    pub windowed_context: glutin::WindowedContext<glutin::PossiblyCurrent>,
     pub gl: GlDevice,
-    pub joysticks: HashMap<u32, Joystick>,
 }
 
+// FIXME add fullscreen support
+
 impl Platform {
-    pub fn build(title: &str, window_size: (u32, u32), fullscreen: bool) -> Result<Self, String> {
+    pub fn build(
+        title: &str,
+        window_size: (u32, u32),
+        _fullscreen: bool,
+    ) -> Result<(glutin::event_loop::EventLoop<()>, Platform), String> {
         info!("Opening app window {}x{}", window_size.0, window_size.1);
-        let sdl = sdl2::init()?;
-        let video_sys = sdl.video()?;
-        // Initialize gl
-        let gl_attr = video_sys.gl_attr();
-        gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-        gl_attr.set_context_version(3, 3);
-        // Initialize window
-        let mut window_builder = video_sys.window(title, window_size.0, window_size.1);
-        window_builder.opengl();
-        if fullscreen {
-            window_builder.fullscreen();
-        } else {
-            window_builder.position_centered();
-            window_builder.resizable();
-        }
-        let window = window_builder
-            .build()
-            .map_err(|_| "failed to create window")?;
-        let sdl_gl_context = window
-            .gl_create_context()
-            .map_err(|_| "failed to create gl context")?;
-        let gl_ctx =
-            glow::Context::from_loader_function(|s| video_sys.gl_get_proc_address(s) as *const _);
-        video_sys
-            .gl_set_swap_interval(SwapInterval::VSync)
-            .map_err(|_| "failed to set vsync")?;
+        let event_loop = glutin::event_loop::EventLoop::new();
+        let window_builder = glutin::window::WindowBuilder::new()
+            .with_title(title)
+            .with_decorations(true)
+            .with_resizable(true)
+            .with_inner_size(glutin::dpi::LogicalSize::new(
+                window_size.0 as f32,
+                window_size.1 as f32,
+            ));
+        let windowed_context = glutin::ContextBuilder::new()
+            .with_vsync(true)
+            .build_windowed(window_builder, &event_loop)
+            .unwrap();
+        let windowed_context = unsafe { windowed_context.make_current().unwrap() };
+        windowed_context.window().set_wayland_theme(DarkTheme);
+        let gl_ctx = glow::Context::from_loader_function(|s| {
+            windowed_context.get_proc_address(s) as *const _
+        });
         // Initialize joysticks
-        let joysticks = HashMap::new();
-        /* FIXME
-        let joystick_sys = sdl.joystick()?;
+        /*
+        FIXME
+        let mut joysticks = HashMap::new();
         joystick_sys.set_event_state(true);
         let joy_idx = [
             options.joydev_1.index() as u32,
@@ -69,12 +67,74 @@ impl Platform {
             }
         }
         */
-        Ok(Platform {
-            sdl,
-            _sdl_gl_context: sdl_gl_context,
-            window,
+        let platform = Platform {
+            windowed_context,
             gl: GlDevice::new(gl_ctx),
-            joysticks,
-        })
+        };
+        Ok((event_loop, platform))
+    }
+}
+
+struct DarkTheme;
+
+impl Theme for DarkTheme {
+    /// Primary color of the scheme.
+    fn primary_color(&self, window_active: bool) -> [u8; 4] {
+        if window_active {
+            PRIMARY_BG_ACTIVE
+        } else {
+            PRIMARY_BG_INACTIVE
+        }
+    }
+
+    /// Secondary color of the scheme.
+    fn secondary_color(&self, window_active: bool) -> [u8; 4] {
+        if window_active {
+            SECONDARY_ACTIVE
+        } else {
+            PRIMARY_BG_INACTIVE
+        }
+    }
+
+    /// Color for the close button.
+    fn close_button_color(&self, status: ButtonState) -> [u8; 4] {
+        match status {
+            ButtonState::Hovered => BUTTON_HOVER,
+            _ => PRIMARY_BG_ACTIVE,
+        }
+    }
+
+    /// Icon color for the close button, defaults to the secondary color.
+    #[allow(unused_variables)]
+    fn close_button_icon_color(&self, status: ButtonState) -> [u8; 4] {
+        self.secondary_color(true)
+    }
+
+    /// Background color for the maximize button.
+    fn maximize_button_color(&self, status: ButtonState) -> [u8; 4] {
+        match status {
+            ButtonState::Hovered => BUTTON_HOVER,
+            _ => PRIMARY_BG_ACTIVE,
+        }
+    }
+
+    /// Icon color for the maximize button, defaults to the secondary color.
+    #[allow(unused_variables)]
+    fn maximize_button_icon_color(&self, status: ButtonState) -> [u8; 4] {
+        self.secondary_color(true)
+    }
+
+    /// Background color for the minimize button.
+    fn minimize_button_color(&self, status: ButtonState) -> [u8; 4] {
+        match status {
+            ButtonState::Hovered => BUTTON_HOVER,
+            _ => PRIMARY_BG_ACTIVE,
+        }
+    }
+
+    /// Icon color for the minimize button, defaults to the secondary color.
+    #[allow(unused_variables)]
+    fn minimize_button_icon_color(&self, status: ButtonState) -> [u8; 4] {
+        self.secondary_color(true)
     }
 }

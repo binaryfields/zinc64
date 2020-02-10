@@ -9,8 +9,9 @@ use std::result::Result;
 
 use cgmath::num_traits::zero;
 use cgmath::{vec2, Vector2};
-use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::{Keycode, Mod};
+use glutin::event::{
+    ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
+};
 
 use crate::app::AppState;
 use crate::cmd::Executor;
@@ -70,7 +71,7 @@ impl ConsoleScreen {
         let screen_size = vec2(cols * font.get_width(), rows * font.get_height())
             .cast::<f32>()
             .unwrap();
-        let window_size = ctx.platform.window.size();
+        let window_size = ctx.platform.windowed_context.window().inner_size();
 
         let mut batch = sprite::Batch::new(gl, screen_element_count)?;
         batch.set_projection(gl, Rect::from_points(zero(), screen_size), true);
@@ -78,7 +79,7 @@ impl ConsoleScreen {
             gl,
             RectI::new(
                 zero(),
-                Vector2::new(window_size.0 as i32, window_size.1 as i32),
+                Vector2::new(window_size.width as i32, window_size.height as i32),
             ),
         );
 
@@ -100,11 +101,12 @@ impl ConsoleScreen {
     fn handle_input(
         &mut self,
         state: &mut AppState,
-        keycode: &Keycode,
-        keymod: &Mod,
+        virtual_code: VirtualKeyCode,
+        elmt_state: ElementState,
+        modifiers: ModifiersState,
     ) -> Option<String> {
-        match *keycode {
-            Keycode::Return => {
+        match (virtual_code, elmt_state) {
+            (VirtualKeyCode::Return, ElementState::Pressed) => {
                 state.console.restore_pos();
                 state.console.print(PROMPT.as_ref());
                 state.console.print(&self.input_buffer);
@@ -132,13 +134,13 @@ impl ConsoleScreen {
                     None
                 }
             }
-            Keycode::Backspace => {
+            (VirtualKeyCode::Back, ElementState::Pressed) => {
                 self.input_buffer.pop();
                 self.reset_cursor(true);
                 self.print_input(&mut state.console);
                 None
             }
-            Keycode::Up => {
+            (VirtualKeyCode::Up, ElementState::Pressed) => {
                 if self.history_pos < (state.console_history.len() - 1) as isize {
                     self.history_pos += 1;
                     let input = state.console_history[self.history_pos as usize].as_bytes();
@@ -149,7 +151,7 @@ impl ConsoleScreen {
                 }
                 None
             }
-            Keycode::Down => {
+            (VirtualKeyCode::Down, ElementState::Pressed) => {
                 if self.history_pos >= 0 {
                     self.history_pos -= 1;
                     if self.history_pos >= 0 {
@@ -164,8 +166,8 @@ impl ConsoleScreen {
                 }
                 None
             }
-            _ => {
-                let c = keymap::to_ascii(keycode, keymod);
+            (_, ElementState::Pressed) => {
+                let c = keymap::to_ascii2(virtual_code, modifiers);
                 if c != '\0' {
                     self.input_buffer.push(c as u8);
                     self.reset_cursor(true);
@@ -173,6 +175,7 @@ impl ConsoleScreen {
                 }
                 None
             }
+            _ => None,
         }
     }
 
@@ -208,44 +211,53 @@ impl Screen<AppState> for ConsoleScreen {
         &mut self,
         ctx: &mut Context,
         state: &mut AppState,
-        event: Event,
+        event: Event<()>,
     ) -> Result<Transition<AppState>, String> {
-        match &event {
-            Event::Window {
-                win_event: WindowEvent::Resized(w, h),
-                ..
-            } => {
-                self.batch
-                    .set_viewport(&mut ctx.platform.gl, RectI::new(zero(), vec2(*w, *h)));
-                Ok(Transition::None)
-            }
-            Event::KeyDown {
-                keycode: Some(keycode),
-                ..
-            } if *keycode == Keycode::Escape => Ok(Transition::Pop),
-            Event::KeyDown {
-                keycode: Some(keycode),
-                keymod,
-                repeat: false,
-                ..
-            } => {
-                if let Some(input) = self.handle_input(state, keycode, keymod) {
-                    state.console.restore_pos();
-                    match self
-                        .cmd_handler
-                        .execute(&input, &mut state.c64, &mut state.console)
-                    {
-                        Ok(_) => {}
-                        Err(error) => {
-                            state.console.print("ERROR: ".as_bytes());
-                            state.console.print(error.as_bytes());
-                            state.console.print(&['\n' as u8]);
-                        }
-                    }
-                    state.console.save_pos();
+        let app_state = state;
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::Resized(size) => {
+                    self.batch.set_viewport(
+                        &mut ctx.platform.gl,
+                        RectI::new(zero(), vec2(size.width as i32, size.height as i32)),
+                    );
+                    Ok(Transition::None)
                 }
-                Ok(Transition::None)
-            }
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(virtual_code),
+                            state,
+                            modifiers,
+                            ..
+                        },
+                    ..
+                } => match (virtual_code, state) {
+                    (VirtualKeyCode::Escape, ElementState::Pressed) => Ok(Transition::Pop),
+                    _ => {
+                        if let Some(input) =
+                            self.handle_input(app_state, virtual_code, state, modifiers)
+                        {
+                            app_state.console.restore_pos();
+                            match self.cmd_handler.execute(
+                                &input,
+                                &mut app_state.c64,
+                                &mut app_state.console,
+                            ) {
+                                Ok(_) => {}
+                                Err(error) => {
+                                    app_state.console.print("ERROR: ".as_bytes());
+                                    app_state.console.print(error.as_bytes());
+                                    app_state.console.print(&['\n' as u8]);
+                                }
+                            }
+                            app_state.console.save_pos();
+                        }
+                        Ok(Transition::None)
+                    }
+                },
+                _ => Ok(Transition::None),
+            },
             _ => Ok(Transition::None),
         }
     }
@@ -283,7 +295,10 @@ impl Screen<AppState> for ConsoleScreen {
         }
         self.batch.end(gl);
 
-        ctx.platform.window.gl_swap_window();
+        ctx.platform
+            .windowed_context
+            .swap_buffers()
+            .map_err(|_| "failed to swap buffers")?;
         Ok(Transition::None)
     }
 }

@@ -6,52 +6,57 @@
 
 use std::collections::HashSet;
 
-use sdl2;
-use sdl2::event::Event;
-use sdl2::keyboard::{Keycode, Mod};
+use glutin::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use zinc64_emu::device::joystick::Button;
 use zinc64_emu::system::C64;
 
 use crate::util::keymap::KeyMap;
 
 pub struct InputSystem {
-    pressed_joy_keys: HashSet<Keycode>,
-    pressed_joy_buttons: Vec<Button>,
+    _pressed_joy_keys: HashSet<VirtualKeyCode>,
+    _pressed_joy_buttons: Vec<Button>,
 }
 
 impl InputSystem {
     pub fn build() -> Result<InputSystem, String> {
         Ok(InputSystem {
-            pressed_joy_keys: HashSet::new(),
-            pressed_joy_buttons: Vec::new(),
+            _pressed_joy_keys: HashSet::new(),
+            _pressed_joy_buttons: Vec::new(),
         })
     }
 
-    pub fn handle_event(&mut self, c64: &mut C64, event: &Event) {
-        match *event {
-            Event::KeyDown {
-                keycode: Some(key),
-                keymod,
-                ..
-            } => {
-                if let Some(key_event) = KeyMap::map_key(key, keymod) {
-                    c64.get_keyboard().on_key_down(key_event);
-                }
-            }
-            Event::KeyUp {
-                keycode: Some(key),
-                keymod,
-                ..
-            } => {
-                if let Some(key_event) = KeyMap::map_key(key, keymod) {
-                    c64.get_keyboard().on_key_up(key_event);
-                }
-            }
-            _ => {}
+    pub fn handle_event(&mut self, c64: &mut C64, event: &Event<()>) {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(virtual_code),
+                            state,
+                            modifiers,
+                            ..
+                        },
+                    ..
+                } => match (virtual_code, state) {
+                    (_, ElementState::Pressed) => {
+                        if let Some(key_event) = KeyMap::map_key(*virtual_code, *modifiers) {
+                            c64.get_keyboard().on_key_down(key_event);
+                        }
+                    }
+                    (_, ElementState::Released) => {
+                        if let Some(key_event) = KeyMap::map_key(*virtual_code, *modifiers) {
+                            c64.get_keyboard().on_key_up(key_event);
+                        }
+                    }
+                },
+                _ => (),
+            },
+            _ => (),
         }
-        self.handle_joystick_event(c64, event);
+        // FIXME self.handle_joystick_event(c64, event);
     }
 
+    /*
     fn handle_joystick_button_down(&mut self, c64: &mut C64, button: Button) {
         self.pressed_joy_buttons.push(button);
         if let Some(ref mut joystick) = c64.get_joystick1_mut() {
@@ -178,4 +183,5 @@ impl InputSystem {
             _ => None,
         }
     }
+    */
 }
