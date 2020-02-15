@@ -156,7 +156,7 @@ fn write_data<T>(
     output: &mut [T],
     channels: usize,
 ) where
-    T: cpal::Sample + Copy,
+    T: cpal::Sample,
 {
     let state = state.lock().unwrap();
     let mut input = input.buffer.lock().unwrap();
