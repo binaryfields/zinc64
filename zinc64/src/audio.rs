@@ -17,6 +17,7 @@ use crate::util::CircularBuffer;
 const SCALER_MAX: i32 = 4096;
 const SCALER_SHIFT: usize = 12;
 const VOLUME_MAX: u8 = 100;
+const SAMPLE_FORMAT_PREFERENCE: [cpal::SampleFormat;3] = [cpal::SampleFormat::I16, cpal::SampleFormat::U16, cpal::SampleFormat::F32];
 
 struct AudioRendererState {
     mute: bool,
@@ -43,29 +44,42 @@ impl AudioRenderer {
     ) -> Result<AudioRenderer, anyhow::Error> {
         let host = cpal::default_host();
         let event_loop = host.event_loop();
+        let device = host.default_output_device().expect("failed to find a default output device");
 
-        let format = cpal::Format {
-            channels: 2,
-            sample_rate: cpal::SampleRate(freq as u32),
-            data_type: cpal::SampleFormat::I16,
-        };
+        let mut output_configs = device.supported_output_formats()?;
+        let all_output_configs: Vec<cpal::SupportedFormat> = output_configs.collect();
 
-        // brute force search until it cpal provides a better way, e.g.:
+        // scan for best matching sample format until cpal provides a better way, e.g.:
         // https://github.com/RustAudio/cpal/issues/368
-        let mut good_devices = host.devices()?.map(|dev| {
-            let s_id = event_loop.build_output_stream(&dev, &format);
-            match s_id {
-                Err(_) => {
-                    eprintln!("Couldn't build desired stream with device {}",
-                              dev.name().unwrap_or("<error retrieving device name>".into()));
-                    None
-                },
-                Ok(s_id) => { Some((dev, s_id)) }
+        let mut possible_formats = SAMPLE_FORMAT_PREFERENCE.iter().filter_map(|sample_format| {
+            let format = cpal::Format {
+                        channels: 2,
+                        sample_rate: cpal::SampleRate(freq as u32),
+                        data_type: *sample_format,
+                    };
+
+            let mut matches = all_output_configs.iter().filter(|supported| {
+                (supported.channels >= format.channels) &
+                    (supported.data_type == format.data_type) &
+                    (supported.max_sample_rate >= format.sample_rate) &
+                    (supported.min_sample_rate <= format.sample_rate)
+            });
+
+            match matches.next()
+            {
+                Some(_) => Some(format),
+                None => None,
             }
         });
 
-        let (device, stream_id) = good_devices.find(|x| x.is_some())
-            .expect(&format!("No suitable audio device for format: {:?}", format)).unwrap();
+        let format = possible_formats.next()
+            .expect(&format!("No suitable audio device for any sample format: {:?}",
+                             SAMPLE_FORMAT_PREFERENCE));
+
+        let stream_id = event_loop.build_output_stream(&device, &format)?;
+
+        info!("Audio Device {:?} with format {:?}", device.name()
+            .unwrap_or("<error retrieving device name>".into()), format);
 
         let state = Arc::new(Mutex::new(AudioRendererState {
             mute: false,
@@ -95,12 +109,17 @@ impl AudioRenderer {
                     }
                 };
                 match data {
+                    // FIXME format.channels as usize
                     cpal::StreamData::Output {
                         buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer),
-                    } => {
-                        write_data(state.clone(), input.clone(), &mut buffer, 2);
-                        // FIXME format.channels as usize
-                    }
+                    } => write_data(state.clone(), input.clone(), &mut buffer, 2),
+                    cpal::StreamData::Output {
+                        buffer: cpal::UnknownTypeOutputBuffer::U16(mut buffer),
+                    } => write_data(state.clone(), input.clone(), &mut buffer, 2),
+                    cpal::StreamData::Output {
+                        buffer: cpal::UnknownTypeOutputBuffer::F32(mut buffer),
+                    } => write_data(state.clone(), input.clone(), &mut buffer, 2),
+
                     _ => (),
                 }
             })
@@ -131,21 +150,25 @@ impl AudioRenderer {
     }
 }
 
-fn write_data(
+fn write_data<T>(
     state: Arc<Mutex<AudioRendererState>>,
     input: Arc<SoundBuffer>,
-    output: &mut [i16],
+    output: &mut [T],
     channels: usize,
-) {
+) where
+    T: cpal::Sample + Copy,
+{
     let state = state.lock().unwrap();
     let mut input = input.buffer.lock().unwrap();
     for frame in output.chunks_mut(channels) {
         let value = input.pop().unwrap_or(0);
         for sample in frame.iter_mut() {
             if !state.mute {
-                *sample = ((value as i32 * state.scaler) >> (SCALER_SHIFT as i32)) as i16;
+                let value = ((value as i32 * state.scaler) >> (SCALER_SHIFT as i32)) as i16;
+                let formatted_value = T::from::<i16>(&value);
+                *sample = formatted_value;
             } else {
-                *sample = 0;
+                *sample = T::from(&0i16);
             }
         }
     }
