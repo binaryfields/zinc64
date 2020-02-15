@@ -43,16 +43,30 @@ impl AudioRenderer {
     ) -> Result<AudioRenderer, anyhow::Error> {
         let host = cpal::default_host();
         let event_loop = host.event_loop();
-        let device = host
-            .default_output_device()
-            .expect("failed to find a default output device");
-        //let format = device.default_output_format()?;
+
         let format = cpal::Format {
             channels: 2,
             sample_rate: cpal::SampleRate(freq as u32),
             data_type: cpal::SampleFormat::I16,
         };
-        let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
+
+        // brute force search until it cpal provides a better way, e.g.:
+        // https://github.com/RustAudio/cpal/issues/368
+        let mut good_devices = host.devices()?.map(|dev| {
+            let s_id = event_loop.build_output_stream(&dev, &format);
+            match s_id {
+                Err(_) => {
+                    eprintln!("Couldn't build desired stream with device {}",
+                              dev.name().unwrap_or("<error retrieving device name>".into()));
+                    None
+                },
+                Ok(s_id) => { Some((dev, s_id)) }
+            }
+        });
+
+        let (device, stream_id) = good_devices.find(|x| x.is_some())
+            .expect(&format!("No suitable audio device for format: {:?}", format)).unwrap();
+
         let state = Arc::new(Mutex::new(AudioRendererState {
             mute: false,
             scaler: SCALER_MAX,
