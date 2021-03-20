@@ -480,6 +480,19 @@ impl Cpu6510 {
                 self.update_nz(result);
                 self.regs.a = result;
             }
+            Instruction::ANX(ref op) => {
+                let result = self.regs.a & op.get(self, tick_fn);
+                self.update_nz(result);
+                self.regs.a = result;
+                self.regs.x = result;
+            }
+            Instruction::ALR(ref op) => {
+                let value = self.regs.a & op.get(self, tick_fn);
+                self.set_flag(Flag::Carry, (value & 0x01) != 0);
+                let result = value >> 1;
+                self.update_nz(result);
+                self.regs.a = result;
+            }
             Instruction::AXS(ref op) => {
                 let result =
                     ((self.regs.a & self.regs.x) as u16).wrapping_sub(op.get(self, tick_fn) as u16);
@@ -493,6 +506,15 @@ impl Cpu6510 {
                 self.regs.a = value;
                 self.regs.x = value;
             }
+            Instruction::LSE(ref op) => {
+                let value = op.get(self, tick_fn);
+                self.set_flag(Flag::Carry, (value & 0x01) != 0);
+                let result = self.regs.a ^ (value >> 1);
+                self.update_nz(result);
+                self.regs.a = result;
+                tick_fn();
+                tick_fn();
+            }            
         };
     }
 

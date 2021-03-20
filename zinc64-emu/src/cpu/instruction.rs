@@ -81,8 +81,11 @@ pub enum Instruction {
     RTI,
     // Undocumented
     ANE(Operand),
+    ANX(Operand),
+    ALR(Operand),
     AXS(Operand),
     LAX(Operand),
+    LSE(Operand),
 }
 
 impl Instruction {
@@ -127,22 +130,39 @@ impl Instruction {
             0x3e => Instruction::ROL(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
             0x40 => Instruction::RTI,
             0x41 => Instruction::EOR(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
+            0x43 => Instruction::LSE(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
             0x45 => Instruction::EOR(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
             0x46 => Instruction::LSR(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
+            0x47 => Instruction::LSE(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
             0x48 => Instruction::PHA,
             0x49 => Instruction::EOR(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0x4a => Instruction::LSR(Operand::Accumulator),
+            0x4b => Instruction::ALR(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0x4c => Instruction::JMP(Operand::Absolute(cpu.fetch_word(tick_fn))),
             0x4d => Instruction::EOR(Operand::Absolute(cpu.fetch_word(tick_fn))),
             0x4e => Instruction::LSR(Operand::Absolute(cpu.fetch_word(tick_fn))),
+            0x4f => Instruction::LSE(Operand::Absolute(cpu.fetch_word(tick_fn))),
             0x50 => Instruction::BVC(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
             0x51 => Instruction::EOR(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
+            0x53 => {
+                tick_fn(); // FIXME
+                Instruction::LSE(Operand::IndirectY(cpu.fetch_byte(tick_fn)))
+            },
             0x55 => Instruction::EOR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
             0x56 => Instruction::LSR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
+            0x57 => Instruction::LSE(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
             0x58 => Instruction::CLI,
             0x59 => Instruction::EOR(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
+            0x5b => {
+                tick_fn(); // FIXME
+                Instruction::LSE(Operand::AbsoluteY(cpu.fetch_word(tick_fn)))
+            },
             0x5d => Instruction::EOR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
             0x5e => Instruction::LSR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
+            0x5f =>  {
+                tick_fn();
+                Instruction::LSE(Operand::AbsoluteX(cpu.fetch_word(tick_fn)))
+            },
             0x60 => Instruction::RTS,
             0x61 => Instruction::ADC(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
             0x65 => Instruction::ADC(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
@@ -189,6 +209,7 @@ impl Instruction {
             0xa0 => Instruction::LDY(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0xa1 => Instruction::LDA(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
             0xa2 => Instruction::LDX(Operand::Immediate(cpu.fetch_byte(tick_fn))),
+            0xa3 => Instruction::LAX(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
             0xa4 => Instruction::LDY(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
             0xa5 => Instruction::LDA(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
             0xa6 => Instruction::LDX(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
@@ -196,21 +217,25 @@ impl Instruction {
             0xa8 => Instruction::TAY,
             0xa9 => Instruction::LDA(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0xaa => Instruction::TAX,
+            0xab => Instruction::ANX(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0xac => Instruction::LDY(Operand::Absolute(cpu.fetch_word(tick_fn))),
             0xad => Instruction::LDA(Operand::Absolute(cpu.fetch_word(tick_fn))),
             0xae => Instruction::LDX(Operand::Absolute(cpu.fetch_word(tick_fn))),
+            0xaf => Instruction::LAX(Operand::Absolute(cpu.fetch_word(tick_fn))),
             0xb0 => Instruction::BCS(Operand::Relative(cpu.fetch_byte(tick_fn) as i8)),
             0xb1 => Instruction::LDA(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
             0xb3 => Instruction::LAX(Operand::IndirectY(cpu.fetch_byte(tick_fn))),
             0xb4 => Instruction::LDY(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
             0xb5 => Instruction::LDA(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
             0xb6 => Instruction::LDX(Operand::ZeroPageY(cpu.fetch_byte(tick_fn))),
+            0xb7 => Instruction::LAX(Operand::ZeroPageY(cpu.fetch_byte(tick_fn))),
             0xb8 => Instruction::CLV,
             0xb9 => Instruction::LDA(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
             0xba => Instruction::TSX,
             0xbc => Instruction::LDY(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
             0xbd => Instruction::LDA(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
             0xbe => Instruction::LDX(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
+            0xbf => Instruction::LAX(Operand::AbsoluteY(cpu.fetch_word(tick_fn))),
             0xc0 => Instruction::CPY(Operand::Immediate(cpu.fetch_byte(tick_fn))),
             0xc1 => Instruction::CMP(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
             0xc4 => Instruction::CPY(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
@@ -323,8 +348,11 @@ impl fmt::Display for Instruction {
             Instruction::RTI => write!(f, "rti"),
             // Undocumented
             Instruction::ANE(ref operand) => write!(f, "ane {}", operand),
+            Instruction::ANX(ref operand) => write!(f, "anx {}", operand),
+            Instruction::ALR(ref operand) => write!(f, "alr {}", operand),
             Instruction::AXS(ref operand) => write!(f, "axs {}", operand),
             Instruction::LAX(ref operand) => write!(f, "lax {}", operand),
+            Instruction::LSE(ref operand) => write!(f, "lse {}", operand),
         }
     }
 }

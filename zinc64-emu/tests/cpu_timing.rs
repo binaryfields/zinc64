@@ -107,35 +107,35 @@ const OPCODE_TIMING: [u8; 256] = [
     6, // 40 RTI
     6, // 41 EOR ($ab,X)
     0, // 42 HLT*
-    0, // 43 LSE* ($ab,X)
+    8, // 43 LSE* ($ab,X)
     0, // 44 SKB* $ab
     3, // 45 EOR $ab
     5, // 46 LSR $ab
-    0, // 47 LSE* $ab
+    5, // 47 LSE* $ab
     3, // 48 PHA
     2, // 49 EOR #$ab
     2, // 4A LSR A
-    0, // 4B ALR* #$ab
+    2, // 4B ALR* #$ab
     3, // 4C JMP $abcd
     4, // 4D EOR $abcd
     6, // 4E LSR $abcd
-    0, // 4F LSE* $abcd
+    6, // 4F LSE* $abcd
     2, // 50 BVC nearlabel
     5, // 51 EOR ($ab),Y
     0, // 52 HLT*
-    0, // 53 LSE* ($ab),Y
+    8, // 53 LSE* ($ab),Y
     0, // 54 SKB* $ab,X
     4, // 55 EOR $ab,X
     6, // 56 LSR $ab,X
-    0, // 57 LSE* $ab,X
+    6, // 57 LSE* $ab,X
     2, // 58 CLI
     4, // 59 EOR $abcd,Y
     0, // 5A NOP*
-    0, // 5B LSE* $abcd,Y
+    7, // 5B LSE* $abcd,Y
     0, // 5C SKW* $abcd,X
     4, // 5D EOR $abcd,X
     7, // 5E LSR $abcd,X
-    0, // 5F LSE* $abcd,X
+    7, // 5F LSE* $abcd,X
     6, // 60 RTS
     6, // 61 ADC ($ab,X)
     0, // 62 HLT*
@@ -203,7 +203,7 @@ const OPCODE_TIMING: [u8; 256] = [
     2, // A0 LDY #$ab
     6, // A1 LDA ($ab,X)
     2, // A2 LDX #$ab
-    0, // A3 LAX* ($ab,X)
+    6, // A3 LAX* ($ab,X)
     3, // A4 LDY $ab
     3, // A5 LDA $ab
     3, // A6 LDX $ab
@@ -211,11 +211,11 @@ const OPCODE_TIMING: [u8; 256] = [
     2, // A8 TAY
     2, // A9 LDA #$ab
     2, // AA TAX
-    0, // AB ANX* #$ab
+    2, // AB ANX* #$ab
     4, // AC LDY $abcd
     4, // AD LDA $abcd
     4, // AE LDX $abcd
-    0, // AF LAX* $abcd
+    4, // AF LAX* $abcd
     2, // B0 BCS nearlabel
     5, // B1 LDA ($ab),Y
     0, // B2 HLT*
@@ -223,7 +223,7 @@ const OPCODE_TIMING: [u8; 256] = [
     4, // B4 LDY $ab,X
     4, // B5 LDA $ab,X
     4, // B6 LDX $ab,Y
-    0, // B7 LAX* $ab,Y
+    4, // B7 LAX* $ab,Y
     2, // B8 CLV
     4, // B9 LDA $abcd,Y
     2, // BA TSX
@@ -231,7 +231,7 @@ const OPCODE_TIMING: [u8; 256] = [
     4, // BC LDY $abcd,X
     4, // BD LDA $abcd,X
     4, // BE LDX $abcd,Y
-    0, // BF LAX* $abcd,Y
+    4, // BF LAX* $abcd,Y
     2, // C0 CPY #$ab
     6, // C1 CMP ($ab,X)
     0, // C2 SKB* #$ab
