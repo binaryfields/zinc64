@@ -154,11 +154,11 @@ of chips to be decoupled from each other.
 
 2. Clone this repository.
 
-        git clone https://github.com/digitalstreamio/zinc64
+        git clone https://github.com/binaryfields/zinc64
 
 	or download as zip archive
 
-		https://github.com/digitalstreamio/zinc64/archive/master.zip
+		https://github.com/binaryfields/zinc64/archive/master.zip
 
 3. Build the emulator.
 
