@@ -8,7 +8,7 @@ use crate::time::Time;
 use glutin::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    platform::desktop::EventLoopExtDesktop,
+    platform::run_return::EventLoopExtRunReturn,
 };
 
 pub struct Context {

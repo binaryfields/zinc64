@@ -13,11 +13,11 @@ categories = ["emulators"]
 [dependencies]
 anyhow = "1.0"
 bit_field = "0.10"
-byteorder = "1.3"
-cgmath = "0.17"
-cpal = "0.11"
-glow="0.4"
-glutin = "0.23"
+byteorder = "1.5"
+cgmath = "0.18"
+cpal = "0.15.2"
+glow="0.13"
+glutin = "0.29"
 log = "0.3"
 structopt = "0.3"
 zinc64-core = { path = "../zinc64-core", version = "0.8" }

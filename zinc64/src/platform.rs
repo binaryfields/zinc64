@@ -36,10 +36,12 @@ impl Platform {
             .build_windowed(window_builder, &event_loop)
             .unwrap();
         let windowed_context = unsafe { windowed_context.make_current().unwrap() };
-        configure_theme(&windowed_context);
-        let gl_ctx = glow::Context::from_loader_function(|s| {
-            windowed_context.get_proc_address(s) as *const _
-        });
+        // configure_theme(&windowed_context);
+        let gl_ctx = unsafe { 
+            glow::Context::from_loader_function(|s| {
+                windowed_context.get_proc_address(s) as *const _
+            }) 
+        };
         // Initialize joysticks
         /*
         FIXME
@@ -69,6 +71,7 @@ impl Platform {
     }
 }
 
+/*
 #[cfg(target_os = "linux")]
 fn configure_theme(windowed_context: &glutin::WindowedContext<glutin::PossiblyCurrent>) {
     use glutin::platform::unix::WindowExtUnix;
@@ -154,3 +157,4 @@ mod theme {
         }
     }
 }
+*/

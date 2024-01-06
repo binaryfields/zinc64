@@ -242,7 +242,8 @@ impl GlDevice {
     ) {
         self.bind_texture(Some(texture), 0);
         unsafe {
-            self.gl.tex_sub_image_2d_u8_slice(
+            // self.gl.tex_sub_image_2d(target, level, x_offset, y_offset, width, height, format, ty, pixels)
+            self.gl.tex_sub_image_2d(
                 glow::TEXTURE_2D,
                 0,
                 x,
@@ -251,7 +252,7 @@ impl GlDevice {
                 height as i32,
                 glow::RGBA,
                 glow::UNSIGNED_BYTE,
-                Some(data),
+                glow::PixelUnpackData::Slice(data),
             )
         }
         self.bind_texture(None, 0)
@@ -261,11 +262,12 @@ impl GlDevice {
         unsafe {
             let location = uniform.location.clone();
             match data {
-                UniformData::Float(x) => self.gl.uniform_1_f32(location, *x),
-                UniformData::Int(x) => self.gl.uniform_1_i32(location, *x),
+                UniformData::Float(x) => self.gl.uniform_1_f32(location.as_ref(), *x),
+                UniformData::Int(x) => self.gl.uniform_1_i32(location.as_ref(), *x),
                 UniformData::Mat4(value) => {
+                    let value_ref: &[f32; 16] = value.as_ref();
                     self.gl
-                        .uniform_matrix_4_f32_slice(location, false, value.as_ref())
+                        .uniform_matrix_4_f32_slice(location.as_ref(), false, value_ref)
                 }
             }
         }

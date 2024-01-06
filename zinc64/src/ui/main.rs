@@ -33,7 +33,7 @@ pub struct MainScreen {
 impl MainScreen {
     pub fn build(ctx: &mut Context, state: &mut AppState) -> Result<MainScreen, String> {
         // Initialize audio
-        let audio_device = AudioRenderer::build(
+        let mut audio_device = AudioRenderer::build(
             //&audio_sys,
             state.c64.get_config().sound.sample_rate as i32,
             1,
