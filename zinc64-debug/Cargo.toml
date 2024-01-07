@@ -1,6 +1,6 @@
 [package]
 name = "zinc64-debug"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 edition = "2018"
 description = "Commodore 64 emulator debugger support"
@@ -14,4 +14,4 @@ categories = ["emulators"]
 bit_field = "0.10"
 byteorder = "1.5"
 log = "0.3"
-zinc64-emu = { path = "../zinc64-emu", version = "0.8" }
+zinc64-core = { path = "../zinc64-core", version = "0.9" }

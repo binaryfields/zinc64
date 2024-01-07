@@ -3,7 +3,7 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use glutin::event::{ModifiersState, VirtualKeyCode};
-use zinc64_emu::device::keyboard::{Key, KeyEvent};
+use zinc64_core::device::keyboard::{Key, KeyEvent};
 
 pub struct KeyMap;
 

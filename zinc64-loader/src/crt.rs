@@ -10,9 +10,9 @@ use alloc::prelude::*;
 use alloc::vec;
 use byteorder::BigEndian;
 use core::str;
-use zinc64_emu::device::cartridge;
-use zinc64_emu::system::autostart;
-use zinc64_emu::system::{Image, C64};
+use zinc64_core::device::cartridge;
+use zinc64_system::autostart;
+use zinc64_system::{Image, C64};
 
 use super::Loader;
 use crate::io::{self, ReadBytesExt, Reader};

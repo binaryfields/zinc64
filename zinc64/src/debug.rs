@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use zinc64_debug::{Command, Output, RegData, RegOp};
-use zinc64_emu::system::C64;
+use zinc64_system::C64;
 
 use crate::app::RuntimeState;
 

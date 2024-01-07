@@ -20,7 +20,7 @@ glow="0.13"
 glutin = "0.29"
 log = "0.3"
 structopt = "0.3"
-zinc64-core = { path = "../zinc64-core", version = "0.8" }
-zinc64-emu = { path = "../zinc64-emu", version = "0.8" }
-zinc64-debug = { path = "../zinc64-debug", version = "0.8" }
-zinc64-loader = { path = "../zinc64-loader", version = "0.8" }
+zinc64-core = { path = "../zinc64-core", version = "0.9" }
+zinc64-debug = { path = "../zinc64-debug", version = "0.9" }
+zinc64-loader = { path = "../zinc64-loader", version = "0.9" }
+zinc64-system = { path = "../zinc64-system", version = "0.9" }

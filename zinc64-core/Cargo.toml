@@ -1,8 +1,8 @@
 [package]
 name = "zinc64-core"
-version = "0.8.0"
-authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
+version = "0.9.0"
 edition = "2018"
+authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 description = "Commodore 64 emulator debugger support"
 license = "GPL-3.0+"
 repository = "https://github.com/binaryfields/zinc64"
@@ -16,3 +16,5 @@ std = []
 
 [dependencies]
 bit_field = "0.10"
+resid-rs = { version = "1.0" }
+log = { version = "0.3", default-features = false }

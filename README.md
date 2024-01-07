@@ -3,8 +3,6 @@
 [![Build Status](https://travis-ci.org/digitalstreamio/zinc64.svg?branch=master)](https://travis-ci.org/digitalstreamio/zinc64)
 [![Crates.io](https://img.shields.io/crates/v/zinc64.svg?maxAge=2592000)](https://crates.io/crates/zinc64)
 
-** **NOTE: zinc64 crate has been renamed to zinc64-emu** **
-
 ## Overview
 
 zinc64 is a Commodore 64 emulator toolkit "with batteries included but
@@ -35,11 +33,11 @@ See zinc64-rpi for an early preview.
 
 ### Feature `std`
 
-zinc64-emu crate works without the standard library, such as in bare-metal environments. To use zinc64-emu in a #[no_std] environment, use: 
+zinc64-system crate works without the standard library, such as in bare-metal environments. To use zinc64-system in a #[no_std] environment, use: 
 
 ```toml
 [dependencies]
-zinc64-emu = { version = "0.8.0", default-features = false }
+zinc64-system = { version = "0.9.0", default-features = false }
 ```
 
 ### Extensibility

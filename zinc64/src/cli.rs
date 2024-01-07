@@ -9,9 +9,9 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
-use zinc64_core::SystemModel;
-use zinc64_emu::device::joystick;
-use zinc64_emu::system::{Config, C64};
+use zinc64_core::factory::SystemModel;
+use zinc64_core::device::joystick;
+use zinc64_system::{Config, C64};
 
 use crate::app::{self, JamAction};
 

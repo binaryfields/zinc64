@@ -8,10 +8,10 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 use glutin::event::Event;
-use zinc64_core::Shared;
+use zinc64_core::util::Shared;
 use zinc64_debug::{Command, Debugger};
-use zinc64_emu::device::joystick;
-use zinc64_emu::system::C64;
+use zinc64_core::device::joystick;
+use zinc64_system::C64;
 
 use crate::audio::SoundBuffer;
 use crate::console::Console;

@@ -2,15 +2,15 @@
 members = [
     "zinc64",
     "zinc64-core",
-    "zinc64-emu",
     "zinc64-debug",
-    "zinc64-loader"
+    "zinc64-loader",
+    "zinc64-system"
 ]
 default-members = [
     "zinc64-core",
-    "zinc64-emu",
     "zinc64-debug",
     "zinc64-loader",
+    "zinc64-system",
     "zinc64"
 ]
 

@@ -7,8 +7,8 @@
 use std::collections::HashSet;
 
 use glutin::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use zinc64_emu::device::joystick::Button;
-use zinc64_emu::system::C64;
+use zinc64_core::device::joystick::Button;
+use zinc64_system::C64;
 
 use crate::util::keymap::KeyMap;
 

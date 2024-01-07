@@ -7,7 +7,7 @@ use alloc::rc::Rc;
 use alloc::sync::Arc;
 use core::result::Result;
 use zinc64_core::{new_shared, SystemModel};
-use zinc64_emu::system::{C64Factory, Config, C64};
+use zinc64_system::system::{C64Factory, Config, C64};
 use zinc64_loader::Loaders;
 use zorio::cursor::Cursor;
 

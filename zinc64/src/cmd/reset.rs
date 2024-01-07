@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::result::Result;
 
-use zinc64_emu::system::C64;
+use zinc64_system::C64;
 
 use super::Handler;
 

@@ -19,8 +19,8 @@ register = "0.3.2"
 zorio = "0.1.0"
 raspi3_boot = { path = "../raspi3_boot" }
 zinc64-core = { path = "../zinc64-core", default-features = false }
-zinc64-emu = { path = "../zinc64-emu", default-features = false }
 zinc64-loader = { path = "../zinc64-loader", default-features = false }
+zinc64-system = { path = "../zinc64-system", default-features = false }
 
 [profile.release]
 codegen-units = 1

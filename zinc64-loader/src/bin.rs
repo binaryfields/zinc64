@@ -4,7 +4,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
-use zinc64_emu::system::{AutostartMethod, Image, C64};
+use zinc64_system::{AutostartMethod, Image, C64};
 
 use super::Loader;
 use crate::io::{self, Reader};

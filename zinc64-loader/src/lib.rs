@@ -22,7 +22,7 @@ mod tap;
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
-use zinc64_emu::system::{AutostartMethod, Image};
+use zinc64_system::{AutostartMethod, Image};
 
 pub use crate::bin::BinLoader;
 pub use crate::io::{Reader, Result};

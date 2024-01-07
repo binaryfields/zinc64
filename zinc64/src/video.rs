@@ -10,7 +10,8 @@ use std::result::Result;
 use cgmath;
 use cgmath::num_traits::zero;
 use cgmath::{vec2, Vector2};
-use zinc64_core::{Shared, VideoOutput};
+use zinc64_core::factory::VideoOutput;
+use zinc64_core::util::Shared;
 
 use crate::app::AppState;
 use crate::framework::Context;

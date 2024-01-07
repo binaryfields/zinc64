@@ -4,7 +4,7 @@
 #![allow(unused)]
 
 use alloc::prelude::*;
-use zinc64_emu::system::C64;
+use zinc64_system::system::C64;
 
 pub fn dump_screen(c64: &C64) {
     let vm_base = sys_screen_ptr(c64);
