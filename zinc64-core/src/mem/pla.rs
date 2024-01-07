@@ -4,10 +4,10 @@
 
 // SPEC: https://www.c64-wiki.com/index.php/Bank_Switching
 
+use crate::factory::{Bank, Mmu};
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
 use log::LogLevel;
-use crate::factory::{Bank, Mmu};
 
 #[derive(Clone, Copy)]
 struct Mode {

@@ -4,10 +4,10 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
+use crate::factory::{make_noop, Addressable, Cpu, TickFn};
+use crate::util::{IoPort, IrqLine, Pin, Shared};
 use core::fmt;
 use log::LogLevel;
-use crate::factory::{Addressable, Cpu, TickFn, make_noop};
-use crate::util::{IoPort, IrqLine, Pin, Shared};
 
 use super::instruction::Instruction;
 
@@ -515,7 +515,7 @@ impl Cpu6510 {
                 self.regs.a = result;
                 tick_fn();
                 tick_fn();
-            }            
+            }
         };
     }
 

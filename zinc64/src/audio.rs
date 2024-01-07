@@ -7,8 +7,8 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use cpal::SampleFormat;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::SampleFormat;
 use zinc64_core::factory::SoundOutput;
 
 use crate::util::CircularBuffer;
@@ -19,9 +19,9 @@ const SCALER_MAX: i32 = 4096;
 const SCALER_SHIFT: usize = 12;
 const VOLUME_MAX: u8 = 100;
 const SAMPLE_FORMAT_PREFERENCE: [cpal::SampleFormat; 3] = [
-    cpal::SampleFormat::I16, 
-    cpal::SampleFormat::U16, 
-    cpal::SampleFormat::F32
+    cpal::SampleFormat::I16,
+    cpal::SampleFormat::U16,
+    cpal::SampleFormat::F32,
 ];
 
 struct AudioRendererState {
@@ -45,34 +45,38 @@ impl AudioRenderer {
         input: Arc<SoundBuffer>,
     ) -> Result<AudioRenderer, anyhow::Error> {
         let host = cpal::default_host();
-        let device = host.default_output_device().expect("failed to find a default output device");
+        let device = host
+            .default_output_device()
+            .expect("failed to find a default output device");
         let config = select_config(&device, freq)?;
-        let state = Arc::new(
-            Mutex::new(
-                AudioRendererState {
-                    mute: false,
-                    scaler: SCALER_MAX,
-                    volume: VOLUME_MAX,
-               }
-            )
+        let state = Arc::new(Mutex::new(AudioRendererState {
+            mute: false,
+            scaler: SCALER_MAX,
+            volume: VOLUME_MAX,
+        }));
+
+        info!(
+            "Audio Device {:?} with format {:?}",
+            device
+                .name()
+                .unwrap_or("<error retrieving device name>".into()),
+            config
         );
 
-        info!("Audio Device {:?} with format {:?}", device.name()
-            .unwrap_or("<error retrieving device name>".into()), config);
-
         let stream = match config.sample_format() {
-            cpal::SampleFormat::I16 => make_stream::<i16>(state.clone(), input.clone(), &device, &config.into())?,
-            cpal::SampleFormat::U16 => make_stream::<u16>(state.clone(), input.clone(), &device, &config.into())?,
-            cpal::SampleFormat::F32 => make_stream::<f32>(state.clone(), input.clone(), &device, &config.into())?,
+            cpal::SampleFormat::I16 => {
+                make_stream::<i16>(state.clone(), input.clone(), &device, &config.into())?
+            }
+            cpal::SampleFormat::U16 => {
+                make_stream::<u16>(state.clone(), input.clone(), &device, &config.into())?
+            }
+            cpal::SampleFormat::F32 => {
+                make_stream::<f32>(state.clone(), input.clone(), &device, &config.into())?
+            }
             sample_format => panic!("Unsupported sample format {}", sample_format),
         };
 
-        Ok(
-            AudioRenderer {
-                stream,
-                state,
-            }
-        )
+        Ok(AudioRenderer { stream, state })
     }
 
     pub fn start(&mut self) {
@@ -80,15 +84,11 @@ impl AudioRenderer {
     }
 
     pub fn pause(&self) {
-        self.stream
-            .pause()
-            .expect("failed to pause stream");
+        self.stream.pause().expect("failed to pause stream");
     }
 
     pub fn play(&mut self) {
-        self.stream
-            .play()
-            .expect("failed to play stream");
+        self.stream.play().expect("failed to play stream");
     }
 
     pub fn set_volume(&mut self, volume: u8) {
@@ -103,7 +103,10 @@ impl AudioRenderer {
     }
 }
 
-fn select_config(device: &cpal::Device, freq: i32) -> Result<cpal::SupportedStreamConfig, anyhow::Error> {
+fn select_config(
+    device: &cpal::Device,
+    freq: i32,
+) -> Result<cpal::SupportedStreamConfig, anyhow::Error> {
     let output_configs: cpal::SupportedOutputConfigs = device.supported_output_configs()?;
     let all_output_configs: Vec<cpal::SupportedStreamConfigRange> = output_configs.collect();
 
@@ -118,22 +121,22 @@ fn select_config(device: &cpal::Device, freq: i32) -> Result<cpal::SupportedStre
         );
 
         let mut matches = all_output_configs.iter().filter(|supported| {
-            (supported.channels() >= format.channels()) &
-                (supported.sample_format() == format.sample_format()) &
-                (supported.max_sample_rate() >= format.sample_rate()) &
-                (supported.min_sample_rate() <= format.sample_rate())
+            (supported.channels() >= format.channels())
+                & (supported.sample_format() == format.sample_format())
+                & (supported.max_sample_rate() >= format.sample_rate())
+                & (supported.min_sample_rate() <= format.sample_rate())
         });
 
-        match matches.next()
-        {
+        match matches.next() {
             Some(_) => Some(format),
             None => None,
         }
     });
 
-    let config = possible_configs.next()
-        .expect(&format!("No suitable audio device for any sample format: {:?}",
-                         SAMPLE_FORMAT_PREFERENCE));
+    let config = possible_configs.next().expect(&format!(
+        "No suitable audio device for any sample format: {:?}",
+        SAMPLE_FORMAT_PREFERENCE
+    ));
 
     Ok(config)
 }
@@ -141,8 +144,8 @@ fn select_config(device: &cpal::Device, freq: i32) -> Result<cpal::SupportedStre
 fn make_stream<T>(
     state: Arc<Mutex<AudioRendererState>>,
     input: Arc<SoundBuffer>,
-    device: &cpal::Device, 
-    config: &cpal::StreamConfig
+    device: &cpal::Device,
+    config: &cpal::StreamConfig,
 ) -> Result<cpal::Stream, anyhow::Error>
 where
     T: cpal::SizedSample + cpal::FromSample<i16>,

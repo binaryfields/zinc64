@@ -13,10 +13,10 @@ use std::rc::Rc;
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
-use log::LogLevel;
-use resid;
 use crate::factory::{Chip, SidModel, SoundOutput};
 use crate::util::Clock;
+use log::LogLevel;
+use resid;
 
 // TODO sound: add sid output sample rate test cases
 

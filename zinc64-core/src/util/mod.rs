@@ -18,4 +18,4 @@ pub use self::irq_line::IrqLine;
 pub use self::pin::Pin;
 pub use self::ram::Ram;
 pub use self::rom::Rom;
-pub use self::shared::{Shared, SharedCell, new_shared, new_shared_cell};
+pub use self::shared::{new_shared, new_shared_cell, Shared, SharedCell};

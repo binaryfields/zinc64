@@ -2,11 +2,11 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#[cfg(not(feature = "std"))]
-use alloc::prelude::*;
 use crate::factory::{Addressable, AddressableFaded, Bank, Mmu};
 use crate::mem::{BaseAddr, Mmio};
 use crate::util::{Ram, Rom, Shared};
+#[cfg(not(feature = "std"))]
+use alloc::prelude::*;
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
 // Design:

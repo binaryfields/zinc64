@@ -2,8 +2,8 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use core::fmt;
 use crate::factory::{Cpu, TickFn};
+use core::fmt;
 
 use super::operand::Operand;
 use super::Cpu6510;
@@ -147,7 +147,7 @@ impl Instruction {
             0x53 => {
                 tick_fn(); // FIXME
                 Instruction::LSE(Operand::IndirectY(cpu.fetch_byte(tick_fn)))
-            },
+            }
             0x55 => Instruction::EOR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
             0x56 => Instruction::LSR(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
             0x57 => Instruction::LSE(Operand::ZeroPageX(cpu.fetch_byte(tick_fn))),
@@ -156,13 +156,13 @@ impl Instruction {
             0x5b => {
                 tick_fn(); // FIXME
                 Instruction::LSE(Operand::AbsoluteY(cpu.fetch_word(tick_fn)))
-            },
+            }
             0x5d => Instruction::EOR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
             0x5e => Instruction::LSR(Operand::AbsoluteX(cpu.fetch_word(tick_fn))),
-            0x5f =>  {
+            0x5f => {
                 tick_fn();
                 Instruction::LSE(Operand::AbsoluteX(cpu.fetch_word(tick_fn)))
-            },
+            }
             0x60 => Instruction::RTS,
             0x61 => Instruction::ADC(Operand::IndirectX(cpu.fetch_byte(tick_fn))),
             0x65 => Instruction::ADC(Operand::ZeroPage(cpu.fetch_byte(tick_fn))),
@@ -364,7 +364,7 @@ impl fmt::Display for Instruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factory::{Addressable, make_noop};
+    use crate::factory::{make_noop, Addressable};
     use crate::util::{new_shared, IoPort, IrqLine, Pin, Ram};
 
     struct MockMemory {

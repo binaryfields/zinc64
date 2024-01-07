@@ -2,9 +2,9 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use bit_field::BitField;
 use crate::factory::AddressableFaded;
 use crate::util::{IoPort, Shared};
+use bit_field::BitField;
 
 use crate::device::cartridge::Cartridge;
 

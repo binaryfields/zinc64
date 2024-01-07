@@ -15,8 +15,8 @@ use std::rc::Rc;
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
-use crate::factory::types::*;
 use crate::factory::system_model::{SidModel, VicModel};
+use crate::factory::types::*;
 use crate::util::{Clock, IoPort, IrqLine, Pin, Ram, Rom, Shared, SharedCell};
 
 /// ChipFactory serves as the foundation of an extensible emulator architecture and

@@ -37,10 +37,10 @@ impl Platform {
             .unwrap();
         let windowed_context = unsafe { windowed_context.make_current().unwrap() };
         // configure_theme(&windowed_context);
-        let gl_ctx = unsafe { 
+        let gl_ctx = unsafe {
             glow::Context::from_loader_function(|s| {
                 windowed_context.get_proc_address(s) as *const _
-            }) 
+            })
         };
         // Initialize joysticks
         /*

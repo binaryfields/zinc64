@@ -4,8 +4,8 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use core::fmt;
 use crate::factory::{Cpu, TickFn};
+use core::fmt;
 
 use super::Cpu6510;
 
@@ -136,7 +136,7 @@ impl fmt::Display for Operand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factory::{Addressable, make_noop};
+    use crate::factory::{make_noop, Addressable};
     use crate::util::{new_shared, IoPort, IrqLine, Pin, Ram};
 
     struct MockMemory {

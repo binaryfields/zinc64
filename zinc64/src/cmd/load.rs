@@ -7,8 +7,8 @@ use std::io::{BufReader, Write};
 use std::path::Path;
 use std::result::Result;
 
-use zinc64_system::C64;
 use zinc64_loader::Loaders;
+use zinc64_system::C64;
 
 use super::Handler;
 use crate::util::FileReader;
