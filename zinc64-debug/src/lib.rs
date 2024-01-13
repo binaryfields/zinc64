@@ -8,6 +8,7 @@ extern crate log;
 mod charset;
 mod debugger;
 mod disassembler;
+mod instruction;
 mod rap_server;
 
 use std::sync::mpsc::Sender;

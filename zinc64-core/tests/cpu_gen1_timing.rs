@@ -5,7 +5,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use zinc64_core::cpu::Cpu6510;
+use zinc64_core::cpu_gen1::Cpu6510;
 use zinc64_core::factory::{Addressable, Cpu, TickFn};
 use zinc64_core::util::{IoPort, IrqLine, Pin, Ram};
 
@@ -57,7 +57,7 @@ const OPCODE_TIMING: [u8; 256] = [
     4, // 0D ORA $abcd
     6, // 0E ASL $abcd
     0, // 0F ASO* $abcd
-    3, // 10 BPL nearlabel
+    2, // 10 BPL nearlabel
     5, // 11 ORA ($ab),Y
     0, // 12 HLT*
     0, // 13 ASO* ($ab),Y
@@ -108,11 +108,11 @@ const OPCODE_TIMING: [u8; 256] = [
     6, // 40 RTI
     6, // 41 EOR ($ab,X)
     0, // 42 HLT*
-    0, // FIXME 8, // 43 LSE* ($ab,X)
+    8, // 43 LSE* ($ab,X)
     0, // 44 SKB* $ab
     3, // 45 EOR $ab
     5, // 46 LSR $ab
-    0, // FIXME 5, // 47 LSE* $ab
+    5, // 47 LSE* $ab
     3, // 48 PHA
     2, // 49 EOR #$ab
     2, // 4A LSR A
@@ -120,23 +120,23 @@ const OPCODE_TIMING: [u8; 256] = [
     3, // 4C JMP $abcd
     4, // 4D EOR $abcd
     6, // 4E LSR $abcd
-    0, // FIXME 6, // 4F LSE* $abcd
-    3, // 50 BVC nearlabel
+    6, // 4F LSE* $abcd
+    2, // 50 BVC nearlabel
     5, // 51 EOR ($ab),Y
     0, // 52 HLT*
-    0, // FIXME 8, // 53 LSE* ($ab),Y
+    8, // 53 LSE* ($ab),Y
     0, // 54 SKB* $ab,X
     4, // 55 EOR $ab,X
     6, // 56 LSR $ab,X
-    0, // FIXME 6, // 57 LSE* $ab,X
+    6, // 57 LSE* $ab,X
     2, // 58 CLI
     4, // 59 EOR $abcd,Y
     0, // 5A NOP*
-    0, // FIXME 7, // 5B LSE* $abcd,Y
+    7, // 5B LSE* $abcd,Y
     0, // 5C SKW* $abcd,X
     4, // 5D EOR $abcd,X
     7, // 5E LSR $abcd,X
-    0, // FIXME 7, // 5F LSE* $abcd,X
+    7, // 5F LSE* $abcd,X
     6, // 60 RTS
     6, // 61 ADC ($ab,X)
     0, // 62 HLT*
@@ -169,7 +169,7 @@ const OPCODE_TIMING: [u8; 256] = [
     4, // 7D ADC $abcd,X
     7, // 7E ROR $abcd,X
     0, // 7F RRA* $abcd,X
-    0, // FIXME 3, // FIXME 80 SKB* #$ab
+    3, // FIXME 80 SKB* #$ab
     6, // 81 STA ($ab,X)
     0, // 82 SKB* #$ab
     0, // 83 SAX* ($ab,X)
@@ -185,7 +185,7 @@ const OPCODE_TIMING: [u8; 256] = [
     4, // 8D STA $abcd
     4, // 8E STX $abcd
     0, // 8F SAX* $abcd
-    3, // 90 BCC nearlabel
+    2, // 90 BCC nearlabel
     6, // 91 STA ($ab),Y
     0, // 92 HLT*
     0, // 93 SHA* ($ab),Y
@@ -249,7 +249,7 @@ const OPCODE_TIMING: [u8; 256] = [
     4, // CD CMP $abcd
     6, // CE DEC $abcd
     0, // CF DCM* $abcd
-    3, // D0 BNE nearlabel
+    2, // D0 BNE nearlabel
     5, // D1 CMP ($ab),Y
     0, // D2 HLT*
     0, // D3 DCM* ($ab),Y
@@ -302,38 +302,18 @@ const OPCODE_TIMING: [u8; 256] = [
 #[test]
 fn opcode_timing() {
     let mut cpu = setup_cpu();
-    for opcode in 1..=255u8 {
-        //let opcode = 0x60 as u8;
-        let cycles = OPCODE_TIMING[opcode as usize];
+    for opcode in 0..256 {
+        let cycles = OPCODE_TIMING[opcode];
         if cycles > 0 {
             let clock = Rc::new(Cell::new(0u8));
             let clock_clone = clock.clone();
             let tick_fn: TickFn = Rc::new(move || {
                 clock_clone.set(clock_clone.get().wrapping_add(1));
             });
-            cpu.reset();
-            cpu.write_mem(0x1000, opcode as u8);
-            cpu.write_mem(0x1001, 0x00);
-            cpu.write_mem(0x2000, 0x00);
-            cpu.write_mem(0x2001, 0x10);
-            cpu.write_mem(0x2100, 0x00);
-            cpu.write_mem(0x2101, 0x10);
-            if opcode != 0x20 {
-                cpu.write_mem(0x1002, 0x20);
-            } else {
-                cpu.write_mem(0x1002, 0x21);
-            }
-            if opcode == 0x60 {
-                cpu.write_mem(0x0101, 0x00);
-                cpu.write_mem(0x0102, 0x10);
-            }
-            if opcode == 0x40 {
-                cpu.write_mem(0x0101, 0x00);
-                cpu.write_mem(0x0102, 0x01);
-                cpu.write_mem(0x0103, 0x10);
-            }   
+            cpu.write(0x1000, opcode as u8);
+            cpu.write(0x1001, 0x00);
+            cpu.write(0x1002, 0x10);
             cpu.set_pc(0x1000);
-            cpu.clock();
             cpu.step(&tick_fn);
             assert_eq!(
                 cycles,

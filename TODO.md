@@ -1,5 +1,6 @@
 # TODO
 
+- http://oxyron.de/html/opcodes02.html
 - fix cpu usage
 - app: add screenshot support
 - app: add ui/menus

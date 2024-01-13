@@ -4,7 +4,7 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use crate::factory::{make_noop, Addressable, Cpu, TickFn};
+use crate::factory::{make_noop, Addressable, Cpu, Register, TickFn};
 use crate::util::{IoPort, IrqLine, Pin, Shared};
 use core::fmt;
 use log::LogLevel;
@@ -51,13 +51,13 @@ impl Interrupt {
     }
 }
 
-struct Registers {
-    a: u8,
-    x: u8,
-    y: u8,
-    sp: u8,
-    pc: u16,
-    p: u8,
+pub struct Registers {
+    pub a: u8,
+    pub x: u8,
+    pub y: u8,
+    pub sp: u8,
+    pub pc: u16,
+    pub p: u8,
 }
 
 impl Registers {
@@ -86,8 +86,9 @@ pub struct Cpu6510 {
     // Dependencies
     mem: Shared<dyn Addressable>,
     // Runtime State
-    regs: Registers,
+    pub regs: Registers,
     last_nmi: bool,
+    last_pc: u16,
     // I/O
     ba_line: Shared<Pin>,
     io_port: Shared<IoPort>,
@@ -107,6 +108,7 @@ impl Cpu6510 {
             mem,
             regs: Registers::new(),
             last_nmi: false,
+            last_pc: 0,
             ba_line,
             io_port,
             irq_line,
@@ -622,66 +624,59 @@ impl Cpu6510 {
 }
 
 impl Cpu for Cpu6510 {
-    fn get_a(&self) -> u8 {
-        self.regs.a
+
+    fn get_register(&self, reg: Register) -> u8 {
+        match reg {
+            Register::A => self.regs.a,
+            Register::X => self.regs.x,
+            Register::Y => self.regs.y,
+            Register::SP => self.regs.sp,
+            Register::PCL => self.regs.pc as u8,
+            Register::PCH => (self.regs.pc >> 8) as u8,
+            Register::P => self.regs.p,
+        }
     }
 
-    fn get_p(&self) -> u8 {
-        self.regs.p
+    fn set_register(&mut self, reg: Register, value: u8) {
+        match reg {
+            Register::A => {
+                self.regs.a = value;
+            }
+            Register::X => {
+                self.regs.x = value;
+            }
+            Register::Y => {
+                self.regs.y = value;
+            }
+            Register::SP => {
+                self.regs.sp = value;
+            }
+            Register::PCL => {
+                self.regs.pc = (self.regs.pc & 0xff00) | u16::from(value);
+            }
+            Register::PCH => {
+                self.regs.pc = (u16::from(value) << 8) | (self.regs.pc & 0xff);
+            }
+            Register::P => {
+                self.regs.p = value;
+            }
+        }
     }
 
     fn get_pc(&self) -> u16 {
         self.regs.pc
     }
 
-    fn get_sp(&self) -> u8 {
-        self.regs.sp
-    }
-
-    fn get_x(&self) -> u8 {
-        self.regs.x
-    }
-
-    fn get_y(&self) -> u8 {
-        self.regs.y
-    }
-
-    fn set_a(&mut self, value: u8) {
-        self.regs.a = value;
-    }
-
-    fn set_p(&mut self, value: u8) {
-        self.regs.p = value;
-    }
-
     fn set_pc(&mut self, value: u16) {
         self.regs.pc = value;
     }
 
-    fn set_sp(&mut self, value: u8) {
-        self.regs.sp = value;
-    }
-
-    fn set_x(&mut self, value: u8) {
-        self.regs.x = value;
-    }
-
-    fn set_y(&mut self, value: u8) {
-        self.regs.y = value;
-    }
-
-    fn reset(&mut self) {
-        self.regs.reset();
-        self.last_nmi = false;
-        self.io_port.borrow_mut().set_value(0xff);
-        self.irq_line.borrow_mut().reset();
-        self.nmi_line.borrow_mut().reset();
-        self.write(0x0000, 0b_0010_1111);
-        self.write(0x0001, 0b_0001_1111);
-        self.interrupt(&Interrupt::Reset, &make_noop());
+    fn is_cpu_jam(&self) -> bool {
+        self.last_pc == self.get_pc()
     }
 
     fn step(&mut self, tick_fn: &TickFn) {
+        self.last_pc = self.get_pc();
         while self.ba_line.borrow().is_low() {
             tick_fn();
         }
@@ -699,6 +694,18 @@ impl Cpu for Cpu6510 {
         }
         self.execute(&instr, tick_fn);
         self.last_nmi = self.nmi_line.borrow().is_low();
+    }
+
+    fn reset(&mut self) {
+        self.regs.reset();
+        self.last_nmi = false;
+        self.last_pc = 0;
+        self.io_port.borrow_mut().set_value(0xff);
+        self.irq_line.borrow_mut().reset();
+        self.nmi_line.borrow_mut().reset();
+        self.write(0x0000, 0b_0010_1111);
+        self.write(0x0001, 0b_0001_1111);
+        self.interrupt(&Interrupt::Reset, &make_noop());
     }
 
     // -- I/O
@@ -798,10 +805,10 @@ mod tests {
     #[test]
     fn adc_80_16() {
         let mut cpu = setup_cpu();
-        cpu.set_a(80);
+        cpu.set_register(Register::A, 80);
         cpu.set_flag(Flag::Carry, false);
         cpu.execute(&Instruction::ADC(Operand::Immediate(16)), &make_noop());
-        assert_eq!(96, cpu.get_a());
+        assert_eq!(96, cpu.get_register(Register::A));
         assert_eq!(false, cpu.test_flag(Flag::Carry));
         assert_eq!(false, cpu.test_flag(Flag::Negative));
         assert_eq!(false, cpu.test_flag(Flag::Overflow));
@@ -810,9 +817,9 @@ mod tests {
     #[test]
     fn inc_with_overflow() {
         let mut cpu = setup_cpu();
-        cpu.set_a(0xff);
+        cpu.set_register(Register::A, 0xff);
         cpu.execute(&Instruction::INC(Operand::Accumulator), &make_noop());
-        assert_eq!(0x00, cpu.get_a());
+        assert_eq!(0x00, cpu.get_register(Register::A));
         assert_eq!(false, cpu.test_flag(Flag::Negative));
         assert_eq!(true, cpu.test_flag(Flag::Zero));
     }

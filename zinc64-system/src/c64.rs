@@ -69,7 +69,6 @@ pub struct C64 {
     breakpoints: BreakpointManager,
     clock: Rc<Clock>,
     frame_count: u32,
-    last_pc: u16,
     tick_fn: TickFn,
     vsync_flag: SharedCell<bool>,
 }
@@ -246,7 +245,6 @@ impl C64 {
             breakpoints: BreakpointManager::default(),
             clock,
             frame_count: 0,
-            last_pc: 0,
             tick_fn,
             vsync_flag,
         }
@@ -329,7 +327,7 @@ impl C64 {
     }
 
     pub fn is_cpu_jam(&self) -> bool {
-        self.last_pc == self.cpu.get_pc()
+        self.cpu.is_cpu_jam()
     }
 
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
@@ -386,7 +384,6 @@ impl C64 {
         self.sound_buffer.reset();
         // Runtime State
         self.frame_count = 0;
-        self.last_pc = 0;
         self.vsync_flag.set(false);
     }
 
@@ -421,9 +418,8 @@ impl C64 {
 
     #[inline]
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
-        self.last_pc = self.cpu.get_pc();
         self.cpu.step(&tick_fn);
-        if self.autostart.is_some() && self.cpu.get_pc() == BaseAddr::BootComplete.addr() {
+        if self.autostart.is_some() && self.cpu.get_pc() == (BaseAddr::BootComplete.addr()) {
             if let Some(mut autostart) = self.autostart.take() {
                 autostart.execute(self);
             }

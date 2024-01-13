@@ -4,7 +4,7 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use zinc64_core::cpu::{Instruction, Operand};
+use crate::instruction::{Instruction, Operand};
 
 pub struct Disassembler {
     data: Vec<u8>,

@@ -10,6 +10,7 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 
 use byteorder::{BigEndian, WriteBytesExt};
+use zinc64_core::factory::Register;
 use zinc64_debug::{Command, Output, RegData, RegOp};
 use zinc64_system::C64;
 
@@ -242,11 +243,11 @@ impl Debug {
         let clock = c64.get_clock().get();
         let cpu = c64.get_cpu();
         let regs = RegData {
-            a: cpu.get_a(),
-            x: cpu.get_x(),
-            y: cpu.get_y(),
-            p: cpu.get_p(),
-            sp: cpu.get_sp(),
+            a: cpu.get_register(Register::A),
+            x: cpu.get_register(Register::X),
+            y: cpu.get_register(Register::Y),
+            p: cpu.get_register(Register::P),
+            sp: cpu.get_register(Register::SP),
             pc: cpu.get_pc(),
             port_00: cpu.read(0x00),
             port_01: cpu.read(0x01),
@@ -259,11 +260,11 @@ impl Debug {
         let cpu = c64.get_cpu_mut();
         for op in ops {
             match *op {
-                RegOp::SetA(value) => cpu.set_a(value),
-                RegOp::SetX(value) => cpu.set_x(value),
-                RegOp::SetY(value) => cpu.set_y(value),
-                RegOp::SetP(value) => cpu.set_p(value),
-                RegOp::SetSP(value) => cpu.set_sp(value),
+                RegOp::SetA(value) => cpu.set_register(Register::A, value),
+                RegOp::SetX(value) => cpu.set_register(Register::X, value),
+                RegOp::SetY(value) => cpu.set_register(Register::Y, value),
+                RegOp::SetP(value) => cpu.set_register(Register::P, value),
+                RegOp::SetSP(value) => cpu.set_register(Register::SP, value),
                 RegOp::SetPC(value) => cpu.set_pc(value),
             }
         }

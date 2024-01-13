@@ -227,7 +227,7 @@ I've included a number of examples from Kick Assembler that I've used to test va
 
 The cpu validation was performed with the help of [Klaus2m5 functional tests](https://github.com/Klaus2m5/6502_65C02_functional_tests) for the 6502 processor 
 
-        ./target/release/zinc64 --binary bin/6502_functional_test.bin --offset=1024 --console --loglevel trace
+        ./target/release/zinc64 --console --loglevel trace bin/6502_functional_test.bin 
 
 ## Keyboard Shortcuts
 

@@ -61,24 +61,30 @@ pub trait Chip {
     fn write(&mut self, reg: u8, value: u8);
 }
 
+#[derive(Copy, Clone)]
+pub enum Register {
+    A,
+    X,
+    Y,
+    SP,
+    PCL,
+    PCH,
+    P
+}
+
 /// CPU is responsible for decoding and executing instructions.
 pub trait Cpu {
-    fn get_a(&self) -> u8;
-    fn get_p(&self) -> u8;
+    // -- Getters/Setters
+    fn get_register(&self, reg: Register) -> u8;
+    fn set_register(&mut self, reg: Register, value: u8);
     fn get_pc(&self) -> u16;
-    fn get_sp(&self) -> u8;
-    fn get_x(&self) -> u8;
-    fn get_y(&self) -> u8;
-    fn set_a(&mut self, value: u8);
-    fn set_p(&mut self, value: u8);
     fn set_pc(&mut self, value: u16);
-    fn set_sp(&mut self, value: u8);
-    fn set_x(&mut self, value: u8);
-    fn set_y(&mut self, value: u8);
-    fn reset(&mut self);
+    fn is_cpu_jam(&self) -> bool;
     /// The core method of the cpu, decodes and executes one instruction. Tick callback is invoked
     /// for each elapsed clock cycle.
     fn step(&mut self, tick_fn: &TickFn);
+    /// Reset chip.
+    fn reset(&mut self);
     // I/O
     /// Read byte from the specified address.
     fn read(&self, address: u16) -> u8;

@@ -4,7 +4,7 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
 
-use crate::factory::{Cpu, TickFn};
+use crate::factory::{Cpu, TickFn, Register};
 use core::fmt;
 
 use super::Cpu6510;
@@ -41,27 +41,27 @@ impl Operand {
                     // FIXME cpu: rmw
                     tick_fn();
                 }
-                address.wrapping_add(cpu.get_x()) as u16
+                address.wrapping_add(cpu.regs.x) as u16
             }
             Operand::ZeroPageY(address) => {
                 tick_fn();
-                address.wrapping_add(cpu.get_y()) as u16
+                address.wrapping_add(cpu.regs.y) as u16
             }
             Operand::Absolute(address) => address,
             Operand::AbsoluteX(address) => {
                 if rmw {
                     tick_fn();
                 }
-                address.wrapping_add(cpu.get_x() as u16)
+                address.wrapping_add(cpu.regs.x as u16)
             }
             Operand::AbsoluteY(address) => {
                 if rmw {
                     tick_fn();
                 }
-                address.wrapping_add(cpu.get_y() as u16)
+                address.wrapping_add(cpu.regs.y as u16)
             }
             Operand::IndirectX(address) => {
-                let calc_address = address.wrapping_add(cpu.get_x()) as u16;
+                let calc_address = address.wrapping_add(cpu.regs.x) as u16;
                 tick_fn();
                 cpu.read_internal_u16(calc_address, tick_fn)
             }
@@ -70,7 +70,7 @@ impl Operand {
                     tick_fn();
                 }
                 cpu.read_internal_u16(address as u16, tick_fn)
-                    .wrapping_add(cpu.get_y() as u16)
+                    .wrapping_add(cpu.regs.y as u16)
             }
             Operand::Indirect(address) => cpu.read_internal_u16(address, tick_fn),
             Operand::Relative(offset) => {
@@ -89,7 +89,7 @@ impl Operand {
 
     pub fn get(&self, cpu: &Cpu6510, tick_fn: &TickFn) -> u8 {
         match *self {
-            Operand::Accumulator => cpu.get_a(),
+            Operand::Accumulator => cpu.get_register(Register::A),
             Operand::Immediate(value) => value,
             Operand::Indirect(_) => panic!("illegal op for addressing mode {}", "indirect"),
             Operand::Relative(_) => panic!("illegal op for addressing mode {}", "relative"),
@@ -102,7 +102,7 @@ impl Operand {
 
     pub fn set(&self, cpu: &mut Cpu6510, value: u8, rmw: bool, tick_fn: &TickFn) {
         match *self {
-            Operand::Accumulator => cpu.set_a(value),
+            Operand::Accumulator => cpu.set_register(Register::A, value),
             Operand::Immediate(_) => panic!("illegal op for addressing mode {}", "immediate"),
             Operand::Indirect(_) => panic!("illegal op for addressing mode {}", "indirect"),
             Operand::Relative(_) => panic!("illegal op for addressing mode {}", "relative"),
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn ea_zeropage_x() {
         let mut cpu = setup_cpu();
-        cpu.set_x(0x01);
+        cpu.set_register(Register::X, 0x01);
         let op = Operand::ZeroPageX(0x10);
         assert_eq!(0x0011, op.ea(&cpu, false, &make_noop()));
     }
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn ea_zeropage_x_wrapping() {
         let mut cpu = setup_cpu();
-        cpu.set_x(0x03);
+        cpu.set_register(Register::X, 0x03);
         let op = Operand::ZeroPageX(0xff);
         assert_eq!(0x0002, op.ea(&cpu, false, &make_noop()));
     }
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn ea_zeropage_y() {
         let mut cpu = setup_cpu();
-        cpu.set_y(0x01);
+        cpu.set_register(Register::Y, 0x01);
         let op = Operand::ZeroPageY(0x10);
         assert_eq!(0x0011, op.ea(&cpu, false, &make_noop()));
     }
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn ea_zeropage_y_wrapping() {
         let mut cpu = setup_cpu();
-        cpu.set_y(0x03);
+        cpu.set_register(Register::Y, 0x03);
         let op = Operand::ZeroPageY(0xff);
         assert_eq!(0x0002, op.ea(&cpu, false, &make_noop()));
     }
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn ea_absolute_x() {
         let mut cpu = setup_cpu();
-        cpu.set_x(0x01);
+        cpu.set_register(Register::X, 0x01);
         let op = Operand::AbsoluteX(0x0100);
         assert_eq!(0x0101, op.ea(&cpu, false, &make_noop()));
     }
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn ea_absolute_x_wrapping() {
         let mut cpu = setup_cpu();
-        cpu.set_x(0x03);
+        cpu.set_register(Register::X, 0x03);
         let op = Operand::AbsoluteX(0xffff);
         assert_eq!(0x0002, op.ea(&cpu, false, &make_noop()));
     }
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn ea_absolute_y() {
         let mut cpu = setup_cpu();
-        cpu.set_y(0x01);
+        cpu.set_register(Register::Y, 0x01);
         let op = Operand::AbsoluteY(0x0100);
         assert_eq!(0x0101, op.ea(&cpu, false, &make_noop()));
     }
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn ea_absolute_y_wrapping() {
         let mut cpu = setup_cpu();
-        cpu.set_y(0x03);
+        cpu.set_register(Register::Y, 0x03);
         let op = Operand::AbsoluteY(0xffff);
         assert_eq!(0x0002, op.ea(&cpu, false, &make_noop()));
     }
@@ -251,7 +251,7 @@ mod tests {
         let mut cpu = setup_cpu();
         cpu.write_internal(0x0006, 0x00, &make_noop());
         cpu.write_internal(0x0007, 0x16, &make_noop());
-        cpu.set_x(0x05);
+        cpu.set_register(Register::X, 0x05);
         let op = Operand::IndirectX(0x01);
         assert_eq!(0x1600, op.ea(&cpu, false, &make_noop()));
     }
@@ -261,7 +261,7 @@ mod tests {
         let mut cpu = setup_cpu();
         cpu.write_internal(0x0006, 0x00, &make_noop());
         cpu.write_internal(0x0007, 0x16, &make_noop());
-        cpu.set_x(0x07);
+        cpu.set_register(Register::X, 0x07);
         let op = Operand::IndirectX(0xff);
         assert_eq!(0x1600, op.ea(&cpu, false, &make_noop()));
     }
@@ -271,7 +271,7 @@ mod tests {
         let mut cpu = setup_cpu();
         cpu.write_internal(0x0006, 0x00, &make_noop());
         cpu.write_internal(0x0007, 0x16, &make_noop());
-        cpu.set_y(0x05);
+        cpu.set_register(Register::Y, 0x05);
         let op = Operand::IndirectY(0x06);
         assert_eq!(0x1605, op.ea(&cpu, false, &make_noop()));
     }
@@ -281,7 +281,7 @@ mod tests {
         let mut cpu = setup_cpu();
         cpu.write_internal(0x0006, 0xff, &make_noop());
         cpu.write_internal(0x0007, 0xff, &make_noop());
-        cpu.set_y(0x06);
+        cpu.set_register(Register::Y, 0x06);
         let op = Operand::IndirectY(0x06);
         assert_eq!(0x0005, op.ea(&cpu, false, &make_noop()));
     }
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn get_accumulator() {
         let mut cpu = setup_cpu();
-        cpu.set_a(0xab);
+        cpu.set_register(Register::A, 0xab);
         let op = Operand::Accumulator;
         assert_eq!(0xab, op.get(&cpu, &make_noop()));
     }

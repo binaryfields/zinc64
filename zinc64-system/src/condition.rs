@@ -9,7 +9,7 @@ use alloc::prelude::*;
 use core::fmt;
 use core::iter::Peekable;
 use core::str::Chars;
-use zinc64_core::factory::Cpu;
+use zinc64_core::factory::{Cpu, Register};
 
 enum Operator {
     Equal,
@@ -103,11 +103,11 @@ impl Condition {
 
     fn eval_reg(&self, reg: &Reg, cpu: &dyn Cpu) -> u16 {
         match *reg {
-            Reg::A => cpu.get_a() as u16,
-            Reg::X => cpu.get_x() as u16,
-            Reg::Y => cpu.get_y() as u16,
-            Reg::P => cpu.get_p() as u16,
-            Reg::SP => cpu.get_sp() as u16,
+            Reg::A => cpu.get_register(Register::A) as u16,
+            Reg::X => cpu.get_register(Register::X) as u16,
+            Reg::Y => cpu.get_register(Register::Y) as u16,
+            Reg::P => cpu.get_register(Register::P) as u16,
+            Reg::SP => cpu.get_register(Register::SP) as u16,
             Reg::PC => cpu.get_pc(),
         }
     }
