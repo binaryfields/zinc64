@@ -41,7 +41,7 @@ impl BreakpointManager {
             let bp_pos = self.breakpoints.iter_mut().position(|bp| {
                 if bp.address == pc && bp.enabled {
                     if bp.ignore == 0 {
-                        bp.condition.as_ref().map_or(true, |cond| cond.eval(cpu))
+                        bp.condition.as_ref().is_none_or(|cond| cond.eval(cpu))
                     } else {
                         bp.ignore -= 1;
                         false

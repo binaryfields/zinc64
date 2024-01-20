@@ -40,9 +40,9 @@ impl Console {
     pub fn print(&mut self, text: &[u8]) {
         let mut col = self.buffer.remaining(self.screen_pos) as u32 % self.cols;
         for ch in text {
-            if *ch == '\n' as u8 {
+            if *ch == b'\n' {
                 while col < self.cols {
-                    self.buffer.push(' ' as u8);
+                    self.buffer.push(b' ');
                     col += 1;
                 }
             } else {
@@ -66,7 +66,7 @@ impl Console {
         self.screen_pos_snapshot = self.screen_pos;
     }
 
-    pub fn screen_data(&self) -> circular_buffer::Iter<u8> {
+    pub fn screen_data(&self) -> circular_buffer::Iter<'_, u8> {
         self.buffer.iter_from(self.screen_pos)
     }
 }

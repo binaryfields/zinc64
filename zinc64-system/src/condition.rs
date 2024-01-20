@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
@@ -233,8 +233,5 @@ where
 }
 
 fn is_symbol(c: char) -> bool {
-    match c {
-        '<' | '=' | '>' | '!' => true,
-        _ => false,
-    }
+    matches!(c, '<' | '=' | '>' | '!')
 }

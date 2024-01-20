@@ -312,7 +312,7 @@ fn opcode_timing() {
                 clock_clone.set(clock_clone.get().wrapping_add(1));
             });
             cpu.reset();
-            cpu.write_mem(0x1000, opcode as u8);
+            cpu.write_mem(0x1000, opcode);
             cpu.write_mem(0x1001, 0x00);
             cpu.write_mem(0x2000, 0x00);
             cpu.write_mem(0x2001, 0x10);
@@ -331,16 +331,13 @@ fn opcode_timing() {
                 cpu.write_mem(0x0101, 0x00);
                 cpu.write_mem(0x0102, 0x01);
                 cpu.write_mem(0x0103, 0x10);
-            }   
+            }
             cpu.set_pc(0x1000);
             cpu.clock();
             cpu.step(&tick_fn);
-            assert_eq!(
-                cycles,
-                clock.get(),
-                "opcode {:02x} timing failed",
-                opcode as u8
-            );
+            assert_eq!(cycles, clock.get(), "opcode {:02x} timing failed", {
+                opcode
+            });
         }
     }
 }

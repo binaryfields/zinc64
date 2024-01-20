@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
@@ -418,7 +418,7 @@ impl C64 {
 
     #[inline]
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
-        self.cpu.step(&tick_fn);
+        self.cpu.step(tick_fn);
         if self.autostart.is_some() && self.cpu.get_pc() == (BaseAddr::BootComplete.addr()) {
             if let Some(mut autostart) = self.autostart.take() {
                 autostart.execute(self);

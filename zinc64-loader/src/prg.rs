@@ -25,10 +25,11 @@ impl Image for PrgImage {
     fn unmount(&mut self, _c64: &mut C64) {}
 }
 
+#[derive(Default)]
 pub struct PrgLoader;
 
 impl PrgLoader {
-    pub fn new() -> impl Loader {
+    pub fn new() -> Self {
         Self {}
     }
 }

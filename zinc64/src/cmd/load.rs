@@ -36,7 +36,7 @@ impl<'a> Handler for LoadCommand<'a> {
         let file = File::open(path).map_err(|err| format!("{}", err))?;
         let mut reader = FileReader(BufReader::new(file));
         let mut autostart = loader.autostart(&mut reader)?;
-        autostart.execute(&mut self.c64);
+        autostart.execute(self.c64);
         out.write("Loaded image.\n".as_bytes())
             .map_err(|err| format!("{}", err))?;
         Ok(())

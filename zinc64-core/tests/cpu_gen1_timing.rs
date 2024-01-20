@@ -302,8 +302,7 @@ const OPCODE_TIMING: [u8; 256] = [
 #[test]
 fn opcode_timing() {
     let mut cpu = setup_cpu();
-    for opcode in 0..256 {
-        let cycles = OPCODE_TIMING[opcode];
+    for (opcode, &cycles) in OPCODE_TIMING.iter().enumerate() {
         if cycles > 0 {
             let clock = Rc::new(Cell::new(0u8));
             let clock_clone = clock.clone();

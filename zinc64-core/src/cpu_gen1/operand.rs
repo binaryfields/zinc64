@@ -2,9 +2,9 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
-use crate::factory::{Cpu, TickFn, Register};
+use crate::factory::{Cpu, Register, TickFn};
 use core::fmt;
 
 use super::Cpu6510;
@@ -75,7 +75,7 @@ impl Operand {
             Operand::Indirect(address) => cpu.read_internal_u16(address, tick_fn),
             Operand::Relative(offset) => {
                 let ea = if offset < 0 {
-                    cpu.get_pc().wrapping_sub((offset as i16).abs() as u16)
+                    cpu.get_pc().wrapping_sub((offset as i16).unsigned_abs())
                 } else {
                     cpu.get_pc().wrapping_add(offset as u16)
                 };

@@ -51,10 +51,7 @@ impl Color {
             .0
             .mul_element_wise(Vector4::new(255.0, 255.0, 255.0, 255.0));
         let color = tmp.cast::<u8>().unwrap();
-        return (color.x as u32)
-            | (color.y as u32) << 8
-            | (color.z as u32) << 16
-            | (color.w as u32) << 24;
+        (color.x as u32) | (color.y as u32) << 8 | (color.z as u32) << 16 | (color.w as u32) << 24
     }
 
     pub const TRANSPARENT: Color = Color::new(0.0, 0.0, 0.0, 0.0);

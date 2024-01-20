@@ -378,9 +378,9 @@ mod tests {
         let matrix = new_shared([0; 16]);
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
-        assert_eq!(false, keyboard.has_events());
+        assert!(!keyboard.has_events());
         keyboard.enqueue("S");
-        assert_eq!(true, keyboard.has_events());
+        assert!(keyboard.has_events());
     }
 
     #[test]
@@ -389,10 +389,10 @@ mod tests {
         let mut keyboard = Keyboard::new(matrix);
         keyboard.reset();
         keyboard.enqueue("S");
-        assert_eq!(true, keyboard.has_events());
+        assert!(keyboard.has_events());
         keyboard.drain_event();
         keyboard.drain_event();
-        assert_eq!(false, keyboard.has_events());
+        assert!(!keyboard.has_events());
     }
 
     #[test]

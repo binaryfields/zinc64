@@ -219,7 +219,7 @@ impl GlDevice {
 
     fn set_buffer_sub_data<T: Sized>(&mut self, buffer: &Buffer, target: BufferTarget, data: &[T]) {
         unsafe {
-            let len = data.len() * core::mem::size_of::<T>();
+            let len = std::mem::size_of_val(data);
             let bytes = core::slice::from_raw_parts(data.as_ptr() as *const u8, len);
             self.gl.bind_buffer(target.into(), Some(buffer.id));
             self.gl.buffer_sub_data_u8_slice(target.into(), 0, bytes);
@@ -248,8 +248,8 @@ impl GlDevice {
                 0,
                 x,
                 y,
-                width as i32,
-                height as i32,
+                width,
+                height,
                 glow::RGBA,
                 glow::UNSIGNED_BYTE,
                 glow::PixelUnpackData::Slice(data),
@@ -260,7 +260,7 @@ impl GlDevice {
 
     fn set_uniform(&mut self, uniform: &Uniform, data: &UniformData) {
         unsafe {
-            let location = uniform.location.clone();
+            let location = uniform.location;
             match data {
                 UniformData::Float(x) => self.gl.uniform_1_f32(location.as_ref(), *x),
                 UniformData::Int(x) => self.gl.uniform_1_i32(location.as_ref(), *x),
@@ -336,7 +336,7 @@ impl GlDevice {
         self.use_shader(render_state.shader);
         self.bind_vertex_array(Some(render_state.vertex_array));
         for (uniform, data) in render_state.uniforms {
-            self.set_uniform(*uniform, data);
+            self.set_uniform(uniform, data);
         }
         for (unit, texture) in render_state.textures.iter().enumerate() {
             self.bind_texture(Some(*texture), unit as u32);
@@ -399,9 +399,9 @@ pub enum BufferTarget {
     Index,
 }
 
-impl Into<u32> for BufferTarget {
-    fn into(self) -> u32 {
-        match self {
+impl From<BufferTarget> for u32 {
+    fn from(val: BufferTarget) -> Self {
+        match val {
             BufferTarget::Vertex => glow::ARRAY_BUFFER,
             BufferTarget::Index => glow::ELEMENT_ARRAY_BUFFER,
         }
@@ -432,9 +432,9 @@ impl BufferType {
     }
 }
 
-impl Into<u32> for BufferType {
-    fn into(self) -> u32 {
-        match self {
+impl From<BufferType> for u32 {
+    fn from(val: BufferType) -> Self {
+        match val {
             BufferType::Byte => glow::BYTE,
             BufferType::Short => glow::SHORT,
             BufferType::UByte => glow::UNSIGNED_BYTE,
@@ -451,9 +451,9 @@ pub enum BufferUsage {
     Static,
 }
 
-impl Into<u32> for BufferUsage {
-    fn into(self) -> u32 {
-        match self {
+impl From<BufferUsage> for u32 {
+    fn from(val: BufferUsage) -> Self {
+        match val {
             BufferUsage::Dynamic => glow::DYNAMIC_DRAW,
             BufferUsage::Static => glow::STATIC_DRAW,
         }
@@ -466,9 +466,9 @@ pub enum FrontFace {
     CounterClockwise,
 }
 
-impl Into<u32> for FrontFace {
-    fn into(self) -> u32 {
-        match self {
+impl From<FrontFace> for u32 {
+    fn from(val: FrontFace) -> Self {
+        match val {
             FrontFace::Clockwise => glow::CW,
             FrontFace::CounterClockwise => glow::CCW,
         }
@@ -500,6 +500,7 @@ pub enum RenderTarget<'a> {
 
 #[derive(Copy, Clone)]
 pub struct VertexAttrDescriptor {
+    #[allow(dead_code)]
     pub ty: BufferType,
     pub size: usize,
     pub stride: usize,
@@ -524,6 +525,7 @@ pub enum UniformData {
 pub struct Buffer {
     gl: Rc<glow::Context>,
     id: <glow::Context as HasContext>::Buffer,
+    #[allow(dead_code)]
     pub ty: BufferType,
 }
 
@@ -544,6 +546,7 @@ impl PartialEq for Buffer {
 pub struct Framebuffer {
     gl: Rc<glow::Context>,
     id: <glow::Context as HasContext>::Framebuffer,
+    #[allow(dead_code)]
     pub texture: Rc<Texture>,
 }
 

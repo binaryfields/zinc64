@@ -3,7 +3,7 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 #![allow(unused)]
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
@@ -52,7 +52,7 @@ impl Debug {
         c64: &mut C64,
         command: &Command,
     ) -> Result<Option<RuntimeState>, String> {
-        match self.execute_internal(c64, &command) {
+        match self.execute_internal(c64, command) {
             Ok(CmdResult(Output::Await, new_state)) => Ok(new_state),
             Ok(CmdResult(result, new_state)) => {
                 self.send_result(result);

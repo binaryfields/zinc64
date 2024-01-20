@@ -20,6 +20,7 @@ pub enum Operand {
     Relative(i8),
 }
 
+#[allow(clippy::upper_case_acronyms)]
 pub enum Instruction {
     // Data Movement (16)
     LDA(Operand),

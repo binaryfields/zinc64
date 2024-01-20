@@ -62,10 +62,10 @@ impl HwType {
     }
 
     pub fn is_mirrowed(&self) -> bool {
-        match *self {
-            HwType::OceanType1 | HwType::MagicDesk | HwType::Normal => true,
-            _ => false,
-        }
+        matches!(
+            *self,
+            HwType::OceanType1 | HwType::MagicDesk | HwType::Normal
+        )
     }
 }
 
@@ -83,6 +83,14 @@ impl IoConfig {
     }
 }
 
+impl Default for IoConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+type IoObserver = Box<dyn Fn(&IoConfig)>;
+
 #[allow(unused)]
 pub struct Cartridge {
     version: u16,
@@ -90,7 +98,7 @@ pub struct Cartridge {
     exrom: bool,
     game: bool,
     banks: [Option<Chip>; 64],
-    io_observer: Option<Box<dyn Fn(&IoConfig)>>,
+    io_observer: Option<IoObserver>,
     is_mirrowed: bool,
     // Runtime state
     bank_lo: Option<usize>,
@@ -122,7 +130,7 @@ impl Cartridge {
         }
     }
 
-    pub fn set_io_observer(&mut self, observer: Option<Box<dyn Fn(&IoConfig)>>) {
+    pub fn set_io_observer(&mut self, observer: Option<IoObserver>) {
         self.io_observer = observer;
     }
 
@@ -182,14 +190,10 @@ impl Cartridge {
     // -- Device I/O
 
     fn read_io(&mut self, address: u16) -> u8 {
-        match self.hw_type {
-            HwType::GameSystem => match address {
-                0xde00..=0xdeff => {
-                    self.switch_bank((address & 0x3f) as u8);
-                }
-                _ => {}
-            },
-            _ => {}
+        if self.hw_type == HwType::GameSystem {
+            if let 0xde00..=0xdeff = address {
+                self.switch_bank((address & 0x3f) as u8);
+            }
         }
         self.reg_value
     }
@@ -209,7 +213,7 @@ impl Cartridge {
             }
             HwType::MagicDesk => {
                 if address == 0xde00 {
-                    if value.get_bit(7) == false {
+                    if !value.get_bit(7) {
                         self.switch_bank(value & 0x3f);
                         self.io_config.exrom = self.exrom;
                         self.io_config.game = self.game;
@@ -228,18 +232,16 @@ impl Cartridge {
             }
             HwType::OceanType1 => {
                 if address == 0xde00 {
-                    if value.get_bit(7) == true {
+                    if value.get_bit(7) {
                         self.switch_bank(value & 0x3f);
                     } else {
                         panic!("should not be here");
                     }
                 }
             }
-            HwType::SimonsBasic => {
-                if address == 0xde00 {
-                    self.io_config.game = value == 0x01;
-                    self.notify_io_changed();
-                }
+            HwType::SimonsBasic if address == 0xde00 => {
+                self.io_config.game = value == 0x01;
+                self.notify_io_changed();
             }
             _ => {}
         }

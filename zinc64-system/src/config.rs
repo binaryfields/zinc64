@@ -47,8 +47,8 @@ pub struct JoystickConfig {
     pub joystick_2: joystick::Mode,
 }
 
-impl JoystickConfig {
-    pub fn default() -> JoystickConfig {
+impl Default for JoystickConfig {
+    fn default() -> JoystickConfig {
         JoystickConfig {
             axis_motion_threshold: 3200,
             joystick_1: joystick::Mode::Numpad,
@@ -64,19 +64,21 @@ pub struct RomData {
 }
 
 impl RomData {
-    pub fn default() -> Self {
-        RomData {
-            basic: vec![0x00; 0x2000],
-            charset: vec![0x00; 0x1000],
-            kernal: vec![0x00; 0x2000],
-        }
-    }
-
     pub fn new(basic: &[u8], charset: &[u8], kernal: &[u8]) -> Self {
         RomData {
             basic: basic.to_vec(),
             charset: charset.to_vec(),
             kernal: kernal.to_vec(),
+        }
+    }
+}
+
+impl Default for RomData {
+    fn default() -> Self {
+        RomData {
+            basic: vec![0x00; 0x2000],
+            charset: vec![0x00; 0x1000],
+            kernal: vec![0x00; 0x2000],
         }
     }
 }
@@ -88,8 +90,8 @@ pub struct SoundConfig {
     pub sid_filters: bool,
 }
 
-impl SoundConfig {
-    pub fn default() -> SoundConfig {
+impl Default for SoundConfig {
+    fn default() -> SoundConfig {
         SoundConfig {
             enable: true,
             buffer_size: 4096,

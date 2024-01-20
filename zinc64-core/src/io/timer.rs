@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 use bit_field::BitField;
 
@@ -315,7 +315,7 @@ mod tests {
         let cnt_pin = new_shared(Pin::new_high());
         let mut timer = Timer::new(Mode::TimerA, cnt_pin);
         timer.set_config(0b_0010_1001);
-        assert_eq!(true, timer.enabled);
+        assert!(timer.enabled);
         //assert_eq!(RunMode::OneShot, timer.run_mode);
         //assert_eq!(InputMode::External, timer.input_mode);
     }
@@ -372,22 +372,22 @@ mod tests {
         timer.clock(); // Count0|Count1
         timer.clock(); // Count2
         assert_eq!(timer.get_counter(), 0x02);
-        assert_eq!(timer.get_pb_output(), false);
+        assert!(!timer.get_pb_output());
         timer.clock(); // Count3
         assert_eq!(timer.get_counter(), 0x01);
-        assert_eq!(timer.get_pb_output(), false);
+        assert!(!timer.get_pb_output());
         timer.clock(); // Count3|Underflow|Load1
         assert_eq!(timer.get_counter(), 0x02);
-        assert_eq!(timer.get_pb_output(), true);
+        assert!(timer.get_pb_output());
         timer.clock(); // Count2
         assert_eq!(timer.get_counter(), 0x02);
-        assert_eq!(timer.get_pb_output(), false);
+        assert!(!timer.get_pb_output());
         timer.clock(); // Count3
         assert_eq!(timer.get_counter(), 0x01);
-        assert_eq!(timer.get_pb_output(), false);
+        assert!(!timer.get_pb_output());
         timer.clock(); // Count3|Underflow|Load1
         assert_eq!(timer.get_counter(), 0x02);
-        assert_eq!(timer.get_pb_output(), true);
+        assert!(timer.get_pb_output());
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
         timer.clock(); // Count3
         assert_eq!(timer.get_counter(), 0x01);
         let output = timer.clock(); // Count3|Underflow|Load1
-        assert_eq!(output, true);
+        assert!(output);
         assert_eq!(timer.get_counter(), 0x02);
     }
 

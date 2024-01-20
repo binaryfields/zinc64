@@ -57,7 +57,7 @@ impl Font {
 
     pub fn get_glyph(&self, ch: u32) -> &[u8] {
         let offset = self.offset + ch as usize * self.bytes_per_glyph;
-        &self.glyphs[offset..(offset + self.bytes_per_glyph as usize)]
+        &self.glyphs[offset..(offset + self.bytes_per_glyph)]
     }
 
     pub fn get_glypth_count(&self) -> u32 {
@@ -97,7 +97,7 @@ impl Font {
                 for x in 0..self.size.x {
                     let pixel = glyph[0].get_bit(pos);
                     pos += 1;
-                    if pos % 8 == 0 {
+                    if pos.is_multiple_of(8) {
                         glyph = &glyph[1..];
                         pos = 0;
                     }
@@ -105,6 +105,6 @@ impl Font {
                 }
             }
         }
-        return buffer;
+        buffer
     }
 }

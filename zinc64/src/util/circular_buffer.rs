@@ -30,7 +30,7 @@ impl<T: Copy + Default> CircularBuffer<T> {
         self.buffer.capacity()
     }
 
-    pub fn iter_from(&self, pos: usize) -> Iter<T> {
+    pub fn iter_from(&self, pos: usize) -> Iter<'_, T> {
         Iter::new(self, pos)
     }
 

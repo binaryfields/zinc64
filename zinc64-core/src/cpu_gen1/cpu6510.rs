@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 use crate::factory::{make_noop, Addressable, Cpu, Register, TickFn};
 use crate::util::{IoPort, IrqLine, Pin, Shared};
@@ -504,7 +504,7 @@ impl Cpu6510 {
                 self.regs.x = (result & 0xff) as u8;
             }
             Instruction::LAX(ref op) => {
-                let value = op.get(&self, tick_fn);
+                let value = op.get(self, tick_fn);
                 self.update_nz(value);
                 self.regs.a = value;
                 self.regs.x = value;
@@ -624,7 +624,6 @@ impl Cpu6510 {
 }
 
 impl Cpu for Cpu6510 {
-
     fn get_register(&self, reg: Register) -> u8 {
         match reg {
             Register::A => self.regs.a,
@@ -809,9 +808,9 @@ mod tests {
         cpu.set_flag(Flag::Carry, false);
         cpu.execute(&Instruction::ADC(Operand::Immediate(16)), &make_noop());
         assert_eq!(96, cpu.get_register(Register::A));
-        assert_eq!(false, cpu.test_flag(Flag::Carry));
-        assert_eq!(false, cpu.test_flag(Flag::Negative));
-        assert_eq!(false, cpu.test_flag(Flag::Overflow));
+        assert!(!cpu.test_flag(Flag::Carry));
+        assert!(!cpu.test_flag(Flag::Negative));
+        assert!(!cpu.test_flag(Flag::Overflow));
     }
 
     #[test]
@@ -820,7 +819,7 @@ mod tests {
         cpu.set_register(Register::A, 0xff);
         cpu.execute(&Instruction::INC(Operand::Accumulator), &make_noop());
         assert_eq!(0x00, cpu.get_register(Register::A));
-        assert_eq!(false, cpu.test_flag(Flag::Negative));
-        assert_eq!(true, cpu.test_flag(Flag::Zero));
+        assert!(!cpu.test_flag(Flag::Negative));
+        assert!(cpu.test_flag(Flag::Zero));
     }
 }

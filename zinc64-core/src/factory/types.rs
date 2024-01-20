@@ -69,7 +69,7 @@ pub enum Register {
     SP,
     PCL,
     PCH,
-    P
+    P,
 }
 
 /// CPU is responsible for decoding and executing instructions.

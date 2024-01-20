@@ -25,9 +25,13 @@ ICR 00 01 01 01 01 01 01 01 03 83 83 83
 
 static CIA1TAB_PRG: &[u8] = include_bytes!("data/cia1tab.prg");
 
-static CIA1TAB_TA: [u8; 12] = [01, 02, 02, 01, 02, 02, 01, 02, 02, 01, 02, 02];
+static CIA1TAB_TA: [u8; 12] = [
+    0x01, 0x02, 0x02, 0x01, 0x02, 0x02, 0x01, 0x02, 0x02, 0x01, 0x02, 0x02,
+];
 
-static CIA1TAB_TB: [u8; 12] = [02, 02, 02, 01, 01, 01, 00, 00, 02, 02, 02, 02];
+static CIA1TAB_TB: [u8; 12] = [
+    0x02, 0x02, 0x02, 0x01, 0x01, 0x01, 0x00, 0x00, 0x02, 0x02, 0x02, 0x02,
+];
 
 static CIA1TAB_PB: [u8; 12] = [
     0x80, 0xC0, 0x80, 0x80, 0xC0, 0x80, 0x80, 0xC0, 0x00, 0x00, 0x40, 0x00,
@@ -77,7 +81,7 @@ fn program_cia1tab() {
             test_cycle_clone.set(test_cycle_clone.get() + 1);
         }
     });
-    c64.load(&CIA1TAB_PRG.to_vec()[2..].to_vec(), 0x4000);
+    c64.load(&CIA1TAB_PRG.to_vec()[2..], 0x4000);
     c64.get_cpu_mut().set_pc(0x4000);
     while test_cycle.get() < 13 {
         c64.step_internal(&tick_fn);
@@ -111,7 +115,7 @@ fn exec_keyboard_read() {
     let video_output = new_shared(NullVideo {});
     let sound_output = Arc::new(NullSound {});
     let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
-    c64.load(&code.to_vec(), 0xc000);
+    c64.load(code.as_ref(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.set_matrix((1, 5), true);
     c64.get_cpu_mut().write(0x0001, 0x06);

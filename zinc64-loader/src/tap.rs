@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
@@ -19,7 +19,7 @@ use crate::io::{self, ReadBytesExt, Reader};
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
 
-static HEADER_SIG: &'static str = "C64-TAPE-RAW";
+static HEADER_SIG: &str = "C64-TAPE-RAW";
 
 struct Header {
     signature: [u8; 12],
@@ -44,10 +44,11 @@ impl Image for TapImage {
     }
 }
 
+#[derive(Default)]
 pub struct TapLoader;
 
 impl TapLoader {
-    pub fn new() -> impl Loader {
+    pub fn new() -> Self {
         Self {}
     }
 

@@ -400,21 +400,19 @@ mod tests {
     fn decode_brk() {
         //let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
-        let valid = match Instruction::decode(&mut cpu, 0x00, &make_noop()) {
-            Instruction::BRK => true,
-            _ => false,
-        };
-        assert_eq!(true, valid);
+        assert!(matches!(
+            Instruction::decode(&mut cpu, 0x00, &make_noop()),
+            Instruction::BRK
+        ));
     }
 
     #[test]
     fn decode_lda_absolute() {
         //let tick_fn: TickFn = Rc::new(move || {});
         let mut cpu = setup_cpu();
-        let valid = match Instruction::decode(&mut cpu, 0xad, &make_noop()) {
-            Instruction::LDA(Operand::Absolute(_)) => true,
-            _ => false,
-        };
-        assert_eq!(true, valid);
+        assert!(matches!(
+            Instruction::decode(&mut cpu, 0xad, &make_noop()),
+            Instruction::LDA(Operand::Absolute(_))
+        ));
     }
 }

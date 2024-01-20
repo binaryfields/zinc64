@@ -53,6 +53,12 @@ impl Pla {
     }
 }
 
+impl Default for Pla {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Mmu for Pla {
     fn map(&self, address: u16) -> Bank {
         let zone = address >> 12;

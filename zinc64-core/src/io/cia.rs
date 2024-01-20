@@ -76,7 +76,7 @@ pub struct Cia {
 }
 
 impl Cia {
-    #![cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
+    #![allow(clippy::too_many_arguments)]
     pub fn new(
         mode: Mode,
         joystick_1: Option<SharedCell<u8>>,
@@ -163,8 +163,8 @@ impl Cia {
     fn scan_keyboard_active_cols(&self, active_columns: u8) -> u8 {
         if let Some(matrix) = self.keyboard_matrix.as_ref() {
             let mut result = 0xff;
-            for col in 0..8 as usize {
-                if active_columns.get_bit(col) == false {
+            for col in 0..8_usize {
+                if !active_columns.get_bit(col) {
                     result &= matrix.borrow()[8 + col];
                 }
             }
@@ -177,8 +177,8 @@ impl Cia {
     fn scan_keyboard_active_rows(&self, active_rows: u8) -> u8 {
         if let Some(matrix) = self.keyboard_matrix.as_ref() {
             let mut result = 0xff;
-            for row in 0..8 as usize {
-                if active_rows.get_bit(row) == false {
+            for row in 0..8_usize {
+                if !active_rows.get_bit(row) {
                     result &= matrix.borrow()[row];
                 }
             }
@@ -190,7 +190,7 @@ impl Cia {
 }
 
 impl Chip for Cia {
-    #![cfg_attr(feature = "cargo-clippy", allow(clippy::useless_let_if_seq))]
+    #![allow(clippy::useless_let_if_seq)]
     fn clock(&mut self) {
         // Process timers
         self.timer_a.feed_source(false);
@@ -508,23 +508,23 @@ mod tests {
         {
             cia.clock(); // COUNT0|COUNT1
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(false, cpu_irq.is_low());
+            assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT2
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(false, cpu_irq.is_low());
+            assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT3|INT0
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(false, cpu_irq.is_low());
+            assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // INT1
             assert_eq!(1, cia.timer_a.get_counter());
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(true, cpu_irq.is_low());
+            assert!(cpu_irq.is_low());
         }
     }
 
@@ -542,23 +542,23 @@ mod tests {
         {
             cia.clock(); // COUNT0|COUNT1
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(false, cpu_irq.is_low());
+            assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT2
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(false, cpu_irq.is_low());
+            assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT3|INT0
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(false, cpu_irq.is_low());
+            assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // INT1
             assert_eq!(1, cia.timer_b.get_counter());
             let cpu_irq = cia.irq_line.borrow();
-            assert_eq!(true, cpu_irq.is_low());
+            assert!(cpu_irq.is_low());
         }
     }
 

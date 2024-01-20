@@ -25,7 +25,7 @@ impl LsCommand {
 
 impl Handler for LsCommand {
     fn run(&mut self, out: &mut dyn Write) -> Result<(), String> {
-        let path = self.path.as_ref().map(|s| s.as_str()).unwrap_or("./");
+        let path = self.path.as_deref().unwrap_or("./");
         let dir = Path::new(path);
         if dir.is_dir() {
             let entries = fs::read_dir(dir).map_err(|err| format!("{}", err))?;

@@ -2,12 +2,11 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::transmute_ptr_to_ptr))]
+#![allow(clippy::transmute_ptr_to_ptr)]
 
 use std::rc::Rc;
 use std::result::Result;
 
-use cgmath;
 use cgmath::num_traits::zero;
 use cgmath::{vec2, Vector2};
 use zinc64_core::factory::VideoOutput;

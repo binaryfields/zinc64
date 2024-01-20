@@ -103,7 +103,7 @@ impl Cpu6510 {
     pub fn clock(&mut self) {
         if self.ba_line.borrow().is_low() {
             return;
-        } 
+        }
         let pair = self.uops[self.cycle as usize];
         self.execute(pair.0);
         if let Some(op1) = pair.1 {
@@ -271,7 +271,7 @@ impl Cpu6510 {
     }
 
     fn read_data_or_fix_adh(&mut self) {
-        if self.page_cross == true {
+        if self.page_cross {
             self.address_hi = self.address_hi.wrapping_add(1);
         } else {
             let address = make_address(self.address_hi, self.address_lo);
@@ -729,7 +729,7 @@ impl Cpu6510 {
                 if cond {
                     let offset = self.data as i8;
                     let ea = if offset < 0 {
-                        self.regs.pc.wrapping_sub((offset as i16).abs() as u16)
+                        self.regs.pc.wrapping_sub((offset as i16).unsigned_abs())
                     } else {
                         self.regs.pc.wrapping_add(offset as u16)
                     };
@@ -958,7 +958,7 @@ impl Cpu for Cpu6510 {
     fn get_pc(&self) -> u16 {
         match self.cycle {
             1 => self.regs.pc.wrapping_sub(1),
-            _ => self.regs.pc
+            _ => self.regs.pc,
         }
     }
 

@@ -12,7 +12,7 @@ use zinc64_system::{Autostart, AutostartMethod, Image, C64};
 use super::Loader;
 use crate::io::{self, ReadBytesExt, Reader};
 
-static HEADER_SIG: &'static str = "C64File";
+static HEADER_SIG: &str = "C64File";
 
 struct Header {
     signature: [u8; 7],
@@ -40,10 +40,11 @@ impl Image for P00Image {
     fn unmount(&mut self, _c64: &mut C64) {}
 }
 
+#[derive(Default)]
 pub struct P00Loader;
 
 impl P00Loader {
-    pub fn new() -> impl Loader {
+    pub fn new() -> Self {
         Self {}
     }
 

@@ -32,15 +32,20 @@ pub enum JamAction {
 
 pub struct Options {
     // Emulator
+    #[allow(dead_code)]
     pub jam_action: JamAction,
+    #[allow(dead_code)]
     pub speed: u8,
     pub warp_mode: bool,
     // Controllers
+    #[allow(dead_code)]
     pub joydev_1: joystick::Mode,
+    #[allow(dead_code)]
     pub joydev_2: joystick::Mode,
     // Debug
     pub debug: bool,
     pub dbg_address: SocketAddr,
+    #[allow(dead_code)]
     pub rap_address: SocketAddr,
 }
 
@@ -114,8 +119,7 @@ impl App {
             video_buffer,
         };
         let main_screen = MainScreen::build(ctx, &mut state)?;
-        let mut screens: Vec<Box<dyn Screen<AppState>>> = Vec::new();
-        screens.push(Box::new(main_screen));
+        let screens: Vec<Box<dyn Screen<AppState>>> = vec![Box::new(main_screen)];
         Ok(App { state, screens })
     }
 

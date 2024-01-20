@@ -115,6 +115,7 @@ pub struct Opt {
         default_value = "127.0.0.1:9999",
         parse(try_from_str = parse_socket_addr)
     )]
+    #[allow(dead_code)]
     pub rap_address: SocketAddr,
 
     // -- Logging
@@ -147,24 +148,25 @@ pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
     let basic_path = Path::new(
         opt.basic
             .as_ref()
-            .map(|path| Path::new(path))
+            .map(Path::new)
             .unwrap_or(Path::new("res/rom/basic.rom")),
     );
     let charset_path = Path::new(
         opt.charset
             .as_ref()
-            .map(|path| Path::new(path))
+            .map(Path::new)
             .unwrap_or(Path::new("res/rom/characters.rom")),
     );
     let kernal_path = Path::new(
         opt.kernal
             .as_ref()
-            .map(|path| Path::new(path))
+            .map(Path::new)
             .unwrap_or(Path::new("res/rom/kernal.rom")),
     );
-    config.roms.basic = load_file(basic_path).map_err(|_| format!("Invalid rom: basic"))?;
-    config.roms.charset = load_file(charset_path).map_err(|_| format!("Invalid rom: charset"))?;
-    config.roms.kernal = load_file(kernal_path).map_err(|_| format!("Invalid rom: kernal"))?;
+    config.roms.basic = load_file(basic_path).map_err(|_| "Invalid rom: basic".to_string())?;
+    config.roms.charset =
+        load_file(charset_path).map_err(|_| "Invalid rom: charset".to_string())?;
+    config.roms.kernal = load_file(kernal_path).map_err(|_| "Invalid rom: kernal".to_string())?;
     config.sound.enable = !opt.no_sound;
     config.sound.buffer_size = opt.sound_samples as usize;
     config.sound.sample_rate = opt.sound_rate;

@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 #![allow(unused)]
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -127,16 +127,15 @@ fn select_config(
                 & (supported.min_sample_rate() <= format.sample_rate())
         });
 
-        match matches.next() {
-            Some(_) => Some(format),
-            None => None,
-        }
+        matches.next().map(|_| format)
     });
 
-    let config = possible_configs.next().expect(&format!(
-        "No suitable audio device for any sample format: {:?}",
-        SAMPLE_FORMAT_PREFERENCE
-    ));
+    let config = possible_configs.next().unwrap_or_else(|| {
+        panic!(
+            "No suitable audio device for any sample format: {:?}",
+            SAMPLE_FORMAT_PREFERENCE
+        )
+    });
 
     Ok(config)
 }

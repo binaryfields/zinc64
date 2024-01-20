@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
@@ -19,8 +19,8 @@ use crate::io::{self, ReadBytesExt, Reader};
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
-static HEADER_SIG: &'static str = "C64 CARTRIDGE   ";
-static CHIP_SIG: &'static str = "CHIP";
+static HEADER_SIG: &str = "C64 CARTRIDGE   ";
+static CHIP_SIG: &str = "CHIP";
 
 struct Header {
     signature: [u8; 16],
@@ -57,10 +57,11 @@ impl Image for CrtImage {
     }
 }
 
+#[derive(Default)]
 pub struct CrtLoader;
 
 impl CrtLoader {
-    pub fn new() -> impl Loader {
+    pub fn new() -> Self {
         Self {}
     }
 

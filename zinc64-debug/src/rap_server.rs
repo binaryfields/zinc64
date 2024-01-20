@@ -2,17 +2,15 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
+#![allow(clippy::cast_lossless)]
 
 use std::ffi::CStr;
 use std::io;
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
+use std::io::{BufReader, BufWriter, Error, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::str;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
-use std::u16;
-use std::u8;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
@@ -83,14 +81,14 @@ impl RapServer {
 
     pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
         let listener = TcpListener::bind(addr)?;
-        for stream in listener.incoming() {
-            if let Ok(stream) = stream {
-                let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
-                match conn.handle() {
-                    Ok(_) => info!(target: "debugger", "Connection closed"),
-                    Err(error) => {
-                        error!(target: "debugger", "Connection failed, error - {}", error)
-                    }
+        for stream in listener.incoming().flatten() {
+            let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
+            match conn.handle() {
+                Ok(_) => {
+                    info!(target: "debugger", "Connection closed");
+                }
+                Err(error) => {
+                    error!(target: "debugger", "Connection failed, error - {}", error);
                 }
             }
         }
@@ -132,7 +130,7 @@ impl Connection {
     pub fn handle(&mut self) -> io::Result<()> {
         while self.running {
             let opcode = self.reader.read_u8()?;
-            let op = RapOp::from(opcode).map_err(|e| Error::new(ErrorKind::Other, e))?;
+            let op = RapOp::from(opcode).map_err(Error::other)?;
             match op {
                 RapOp::Open => self.handle_open(),
                 RapOp::Read => self.handle_read(),
@@ -151,8 +149,7 @@ impl Connection {
         let mut data = vec![0; len as usize];
         self.reader.read_exact(&mut data)?;
         let c_str = CStr::from_bytes_with_nul(&data).unwrap();
-        let input = str::from_utf8(c_str.to_bytes())
-            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
+        let input = str::from_utf8(c_str.to_bytes()).map_err(|e| Error::other(e.to_string()))?;
         let input = input.to_string();
         info!(target: "rap", "Cmd '{}'", input);
         let result = match self.command_parser.parse(&input) {
@@ -165,7 +162,7 @@ impl Connection {
         self.writer
             .write_u32::<BigEndian>((result.len() + 1) as u32)?;
         if !result.is_empty() {
-            self.writer.write_all(&result.as_bytes())?;
+            self.writer.write_all(result.as_bytes())?;
             self.writer.write_u8(0)?;
         }
         self.writer.flush()
@@ -256,7 +253,7 @@ impl Connection {
     }
 
     fn invalid_response(&self, _result: &Output) -> Error {
-        Error::new(ErrorKind::Other, "Invalid debugger result")
+        Error::other("Invalid debugger result")
     }
 
     // -- Commands
@@ -293,9 +290,9 @@ impl Connection {
     fn execute_emu(&mut self, command: Command) -> io::Result<Output> {
         self.command_tx.send(command).unwrap();
         match self.response_rx.recv() {
-            Ok(Output::Error(error)) => Err(Error::new(ErrorKind::Other, error)),
+            Ok(Output::Error(error)) => Err(Error::other(error)),
             Ok(result) => Ok(result),
-            Err(error) => Err(Error::new(ErrorKind::Other, error)),
+            Err(error) => Err(Error::other(error)),
         }
     }
 }
