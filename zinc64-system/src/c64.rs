@@ -69,6 +69,7 @@ pub struct C64 {
     breakpoints: BreakpointManager,
     clock: Rc<Clock>,
     frame_count: u32,
+    stopwatch_start: u64,
     tick_fn: TickFn,
     vsync_flag: SharedCell<bool>,
 }
@@ -245,6 +246,7 @@ impl C64 {
             breakpoints: BreakpointManager::default(),
             clock,
             frame_count: 0,
+            stopwatch_start: 0,
             tick_fn,
             vsync_flag,
         }
@@ -338,6 +340,14 @@ impl C64 {
         self.vsync_flag.set(false)
     }
 
+    pub fn stopwatch(&self) -> u64 {
+        self.clock.get() - self.stopwatch_start
+    }
+
+    pub fn reset_stopwatch(&mut self) {
+        self.stopwatch_start = self.clock.get();
+    }
+
     pub fn check_breakpoints(&mut self) -> bool {
         self.breakpoints.check(&*self.cpu).is_some()
     }
@@ -384,6 +394,7 @@ impl C64 {
         self.sound_buffer.reset();
         // Runtime State
         self.frame_count = 0;
+        self.stopwatch_start = 0;
         self.vsync_flag.set(false);
     }
 

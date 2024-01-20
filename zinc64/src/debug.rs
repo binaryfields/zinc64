@@ -240,7 +240,7 @@ impl Debug {
     }
 
     fn reg_read(&self, c64: &mut C64) -> Result<CmdResult, String> {
-        let clock = c64.get_clock().get();
+        let clock = c64.get_cycles();
         let cpu = c64.get_cpu();
         let regs = RegData {
             a: cpu.get_register(Register::A),
@@ -286,13 +286,12 @@ impl Debug {
     }
 
     fn sys_stopwatch(&self, c64: &mut C64, reset: bool) -> Result<CmdResult, String> {
-        let clock = c64.get_clock();
         if reset {
-            clock.reset();
+            c64.reset_stopwatch();
         }
         let mut buffer = Vec::new();
         buffer
-            .write_u64::<BigEndian>(clock.get())
+            .write_u64::<BigEndian>(c64.stopwatch())
             .map_err(|_| "Op failed")?;
         CmdResult::ok(Output::Buffer(buffer))
     }
