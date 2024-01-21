@@ -13,7 +13,6 @@ extern crate core;
 extern crate log;
 
 pub mod cpu;
-pub mod cpu_gen1;
 pub mod device;
 pub mod factory;
 pub mod io;
