@@ -5,10 +5,10 @@
 use std::io::Write;
 use std::result::Result;
 
+use super::Handler;
 use super::load::LoadCommand;
 use super::ls::LsCommand;
 use super::reset::ResetCommand;
-use super::Handler;
 
 pub struct HelpCommand {
     command: Option<String>,

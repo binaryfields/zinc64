@@ -17,11 +17,11 @@ use zinc64_core::util::*;
 
 use super::Config;
 use zinc64_core::cpu::Cpu6510;
-use zinc64_core::io::cia;
 use zinc64_core::io::Cia;
+use zinc64_core::io::cia;
 use zinc64_core::mem::{Memory, Mmio};
-use zinc64_core::sound::sid::SamplingMethod;
 use zinc64_core::sound::Sid;
+use zinc64_core::sound::sid::SamplingMethod;
 use zinc64_core::video::{Vic, VicMemory};
 
 pub struct C64Factory {

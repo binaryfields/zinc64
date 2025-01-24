@@ -8,7 +8,7 @@ use log::LogLevel;
 use crate::factory::{Addressable, Cpu, Register, TickFn};
 use crate::util::{IoPort, IrqLine, Pin, Shared};
 
-use super::uops::{decode_opcode, load_program, MicroOp, MicroOpPair, ProgramId};
+use super::uops::{MicroOp, MicroOpPair, ProgramId, decode_opcode, load_program};
 
 pub enum Flag {
     Carry = 1,
@@ -891,12 +891,11 @@ impl Cpu6510 {
     // -- Memory Ops
 
     pub fn read_mem(&self, address: u16) -> u8 {
-        let value = match address {
+        match address {
             0x0000 => self.io_port.borrow().get_direction(),
             0x0001 => self.io_port.borrow().get_value() & 0x3f,
             _ => self.mem.borrow().read(address),
-        };
-        value
+        }
     }
 
     pub fn write_mem(&mut self, address: u16, value: u8) {

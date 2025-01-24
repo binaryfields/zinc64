@@ -190,10 +190,10 @@ impl Cartridge {
     // -- Device I/O
 
     fn read_io(&mut self, address: u16) -> u8 {
-        if self.hw_type == HwType::GameSystem {
-            if let 0xde00..=0xdeff = address {
-                self.switch_bank((address & 0x3f) as u8);
-            }
+        if self.hw_type == HwType::GameSystem
+            && let 0xde00..=0xdeff = address
+        {
+            self.switch_bank((address & 0x3f) as u8);
         }
         self.reg_value
     }

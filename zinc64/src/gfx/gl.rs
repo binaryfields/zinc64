@@ -7,8 +7,8 @@ use std::rc::Rc;
 use cgmath::{Matrix4, Vector2};
 use glow::{self, HasContext};
 
-use crate::gfx::rect::RectI;
 use crate::gfx::Color;
+use crate::gfx::rect::RectI;
 
 // Design:
 //      Thin ergonomic wrapper around GL with resource lifecycle and cleanup managed by rust.

@@ -31,7 +31,7 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use zinc64_core::util::new_shared;
 use zinc64_loader::Loaders;
-use zinc64_system::{C64Factory, C64};
+use zinc64_system::{C64, C64Factory};
 
 use crate::app::App;
 use crate::audio::SoundBuffer;

@@ -7,7 +7,7 @@ use std::ptr;
 
 use bit_field::BitField;
 use cgmath::prelude::*;
-use cgmath::{vec2, Vector2};
+use cgmath::{Vector2, vec2};
 
 use crate::gfx::{Color, Rect};
 use crate::util::reader;

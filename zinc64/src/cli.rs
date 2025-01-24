@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use zinc64_core::device::joystick;
 use zinc64_core::factory::SystemModel;
-use zinc64_system::{Config, C64};
+use zinc64_system::{C64, Config};
 
 use crate::app::{self, JamAction};
 

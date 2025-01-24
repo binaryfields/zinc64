@@ -6,7 +6,7 @@ use bit_field::BitField;
 use log::LogLevel;
 
 use crate::factory::Chip;
-use crate::util::{new_shared, IoPort, IrqControl, IrqLine, Pin, Shared, SharedCell};
+use crate::util::{IoPort, IrqControl, IrqLine, Pin, Shared, SharedCell, new_shared};
 
 use super::cycle_counter::CycleCounter;
 use super::rtc::Rtc;

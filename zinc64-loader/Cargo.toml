@@ -1,7 +1,7 @@
 [package]
 name = "zinc64-loader"
 version = "0.9.0"
-edition = "2018"
+edition = "2024"
 authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
 description = "Commodore 64 emulator loader support"
 license = "GPL-3.0+"

@@ -7,8 +7,8 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use zinc64_core::factory::SoundOutput;
 
 use crate::util::CircularBuffer;

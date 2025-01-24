@@ -12,7 +12,7 @@ use byteorder::LittleEndian;
 use core::str;
 use zinc64_core::factory::Tape;
 use zinc64_system::autostart;
-use zinc64_system::{Autostart, AutostartMethod, Image, C64};
+use zinc64_system::{Autostart, AutostartMethod, C64, Image};
 
 use super::Loader;
 use crate::io::{self, ReadBytesExt, Reader};

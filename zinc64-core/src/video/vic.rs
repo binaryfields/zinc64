@@ -10,12 +10,12 @@ use crate::util::*;
 use bit_field::BitField;
 use log::LogLevel;
 
+use super::VicMemory;
 use super::border_unit::BorderUnit;
 use super::gfx_sequencer::{GfxSequencer, Mode};
 use super::mux_unit::MuxUnit;
 use super::spec::Spec;
 use super::sprite_sequencer::{Mode as SpriteMode, SpriteSequencer};
-use super::VicMemory;
 
 // SPEC: The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64
 

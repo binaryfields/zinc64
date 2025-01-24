@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3"
 members = [
     "zinc64",
     "zinc64-core",
@@ -13,5 +14,3 @@ default-members = [
     "zinc64-system",
     "zinc64"
 ]
-
-

@@ -50,10 +50,10 @@ impl BreakpointManager {
                     false
                 }
             });
-            if let Some(pos) = bp_pos {
-                if self.breakpoints[pos].autodelete {
-                    self.breakpoints.remove(pos);
-                }
+            if let Some(pos) = bp_pos
+                && self.breakpoints[pos].autodelete
+            {
+                self.breakpoints.remove(pos);
             }
             bp_pos
         }

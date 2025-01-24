@@ -430,10 +430,11 @@ impl C64 {
     #[inline]
     pub fn step_internal(&mut self, tick_fn: &TickFn) {
         self.cpu.step(tick_fn);
-        if self.autostart.is_some() && self.cpu.get_pc() == (BaseAddr::BootComplete.addr()) {
-            if let Some(mut autostart) = self.autostart.take() {
-                autostart.execute(self);
-            }
+        if self.autostart.is_some()
+            && self.cpu.get_pc() == (BaseAddr::BootComplete.addr())
+            && let Some(mut autostart) = self.autostart.take()
+        {
+            autostart.execute(self);
         }
     }
 

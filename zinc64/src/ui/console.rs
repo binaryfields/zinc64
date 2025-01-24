@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::result::Result;
 
 use cgmath::num_traits::zero;
-use cgmath::{vec2, Vector2};
+use cgmath::{Vector2, vec2};
 use glutin::event::{
     ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
 };
@@ -17,7 +17,7 @@ use crate::app::AppState;
 use crate::cmd::Executor;
 use crate::console::Console;
 use crate::framework::Context;
-use crate::gfx::{gl, sprite, Color, Font, Rect, RectI};
+use crate::gfx::{Color, Font, Rect, RectI, gl, sprite};
 use crate::util::keymap;
 
 use super::{Screen, Transition};

@@ -8,13 +8,13 @@ use std::rc::Rc;
 use std::result::Result;
 
 use cgmath::num_traits::zero;
-use cgmath::{vec2, Vector2};
+use cgmath::{Vector2, vec2};
 use zinc64_core::factory::VideoOutput;
 use zinc64_core::util::Shared;
 
 use crate::app::AppState;
 use crate::framework::Context;
-use crate::gfx::{gl, sprite, Color, Rect, RectI};
+use crate::gfx::{Color, Rect, RectI, gl, sprite};
 
 pub struct VideoBuffer {
     dim: (usize, usize),

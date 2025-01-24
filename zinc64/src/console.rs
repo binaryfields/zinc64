@@ -4,7 +4,7 @@
 
 use std::io::{Error, Write};
 
-use crate::util::{circular_buffer, CircularBuffer};
+use crate::util::{CircularBuffer, circular_buffer};
 
 pub struct Console {
     // Configuration
