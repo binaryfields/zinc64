@@ -8,6 +8,10 @@ use cgmath::{ElementWise, Vector4};
 pub struct Color(pub Vector4<f32>);
 
 impl Color {
+    pub const TRANSPARENT: Color = Color::new(0.0, 0.0, 0.0, 0.0);
+    pub const BLACK: Color = Color::new(0.0, 0.0, 0.0, 1.0);
+    pub const WHITE: Color = Color::new(1.0, 1.0, 1.0, 1.0);
+
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Color(Vector4::new(r, g, b, a))
     }
@@ -53,8 +57,4 @@ impl Color {
         let color = tmp.cast::<u8>().unwrap();
         (color.x as u32) | (color.y as u32) << 8 | (color.z as u32) << 16 | (color.w as u32) << 24
     }
-
-    pub const TRANSPARENT: Color = Color::new(0.0, 0.0, 0.0, 0.0);
-    pub const BLACK: Color = Color::new(0.0, 0.0, 0.0, 1.0);
-    pub const WHITE: Color = Color::new(1.0, 1.0, 1.0, 1.0);
 }

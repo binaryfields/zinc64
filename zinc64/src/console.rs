@@ -29,12 +29,8 @@ impl Console {
         }
     }
 
-    pub fn advance(&mut self) {
-        if self.buffer.remaining(self.screen_pos) > ((self.rows - 1) * self.cols) as usize {
-            for _ in 0..self.cols {
-                self.screen_pos = self.buffer.advance(self.screen_pos);
-            }
-        }
+    pub fn screen_data(&self) -> circular_buffer::Iter<'_, u8> {
+        self.buffer.iter_from(self.screen_pos)
     }
 
     pub fn print(&mut self, text: &[u8]) {
@@ -56,9 +52,12 @@ impl Console {
         }
     }
 
-    pub fn restore_pos(&mut self) {
-        self.buffer.restore_pos(self.buffer_pos_snapshot);
-        self.screen_pos = self.screen_pos_snapshot;
+    pub fn advance(&mut self) {
+        if self.buffer.remaining(self.screen_pos) > ((self.rows - 1) * self.cols) as usize {
+            for _ in 0..self.cols {
+                self.screen_pos = self.buffer.advance(self.screen_pos);
+            }
+        }
     }
 
     pub fn save_pos(&mut self) {
@@ -66,8 +65,9 @@ impl Console {
         self.screen_pos_snapshot = self.screen_pos;
     }
 
-    pub fn screen_data(&self) -> circular_buffer::Iter<'_, u8> {
-        self.buffer.iter_from(self.screen_pos)
+    pub fn restore_pos(&mut self) {
+        self.buffer.restore_pos(self.buffer_pos_snapshot);
+        self.screen_pos = self.screen_pos_snapshot;
     }
 }
 

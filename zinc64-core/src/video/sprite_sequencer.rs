@@ -6,52 +6,6 @@
 
 use bit_field::BitField;
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum Mode {
-    Standard = 0,
-    Multicolor = 1,
-}
-
-pub struct Config {
-    pub mode: Mode,
-    pub color: u8,
-    pub enabled: bool,
-    pub expand_x: bool,
-    pub expand_y: bool,
-    pub multicolor: [u8; 2],
-    pub x: u16,
-    pub x_screen: u16,
-    pub y: u8,
-}
-
-impl Config {
-    pub fn new() -> Self {
-        Config {
-            mode: Mode::Standard,
-            color: 0,
-            enabled: false,
-            expand_x: false,
-            expand_y: false,
-            multicolor: [0; 2],
-            x: 0,
-            x_screen: 0,
-            y: 0,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.mode = Mode::Standard;
-        self.color = 0;
-        self.enabled = false;
-        self.expand_x = false;
-        self.expand_y = false;
-        self.multicolor = [0; 2];
-        self.x = 0;
-        self.x_screen = 0;
-        self.y = 0;
-    }
-}
-
 pub struct SpriteSequencer {
     // Configuration
     pub config: Config,
@@ -77,6 +31,22 @@ impl SpriteSequencer {
             expansion_flop: true,
             output: None,
         }
+    }
+
+    pub fn output(&self) -> Option<u8> {
+        self.output
+    }
+
+    pub fn reset(&mut self) {
+        // Configuration
+        self.config.reset();
+        // Runtime State
+        self.counter = 0;
+        self.data = 0;
+        self.delay_cycles = 0;
+        self.display = false;
+        self.expansion_flop = true;
+        self.output = None;
     }
 
     pub fn set_data(&mut self, byte: usize, value: u8) {
@@ -127,22 +97,6 @@ impl SpriteSequencer {
         }
     }
 
-    pub fn output(&self) -> Option<u8> {
-        self.output
-    }
-
-    pub fn reset(&mut self) {
-        // Configuration
-        self.config.reset();
-        // Runtime State
-        self.counter = 0;
-        self.data = 0;
-        self.delay_cycles = 0;
-        self.display = false;
-        self.expansion_flop = true;
-        self.output = None;
-    }
-
     fn output_pixel(&self) -> Option<u8> {
         if self.data.get_bit(31) {
             Some(self.config.color)
@@ -159,5 +113,51 @@ impl SpriteSequencer {
             3 => Some(self.config.multicolor[1]),
             _ => panic!("invalid sprite color source {}", self.data >> 30),
         }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum Mode {
+    Standard = 0,
+    Multicolor = 1,
+}
+
+pub struct Config {
+    pub mode: Mode,
+    pub color: u8,
+    pub enabled: bool,
+    pub expand_x: bool,
+    pub expand_y: bool,
+    pub multicolor: [u8; 2],
+    pub x: u16,
+    pub x_screen: u16,
+    pub y: u8,
+}
+
+impl Config {
+    pub fn new() -> Self {
+        Config {
+            mode: Mode::Standard,
+            color: 0,
+            enabled: false,
+            expand_x: false,
+            expand_y: false,
+            multicolor: [0; 2],
+            x: 0,
+            x_screen: 0,
+            y: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.mode = Mode::Standard;
+        self.color = 0;
+        self.enabled = false;
+        self.expand_x = false;
+        self.expand_y = false;
+        self.multicolor = [0; 2];
+        self.x = 0;
+        self.x_screen = 0;
+        self.y = 0;
     }
 }

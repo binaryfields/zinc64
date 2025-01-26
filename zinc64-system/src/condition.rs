@@ -9,6 +9,7 @@ use alloc::prelude::*;
 use core::fmt;
 use core::iter::Peekable;
 use core::str::Chars;
+
 use zinc64_core::factory::{Cpu, Register};
 
 enum Operator {
@@ -76,12 +77,6 @@ pub struct Condition {
     val: Value,
 }
 
-impl fmt::Display for Condition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {} {}", self.reg, self.op, self.val)
-    }
-}
-
 impl Condition {
     pub fn parse(expr: &str, radix: Option<u32>) -> Result<Condition, String> {
         let parser = Parser::new(radix.unwrap_or(16));
@@ -120,6 +115,12 @@ impl Condition {
     }
 }
 
+impl fmt::Display for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {} {}", self.reg, self.op, self.val)
+    }
+}
+
 struct Parser {
     radix: u32,
 }
@@ -147,8 +148,16 @@ impl Parser {
         Ok(condition)
     }
 
-    fn parse_num(&self, num: &str) -> Result<u16, String> {
-        u16::from_str_radix(num, self.radix).map_err(|_| format!("Invalid number {}", num))
+    fn parse_reg(&self, reg: &str) -> Result<Reg, String> {
+        match reg {
+            "a" | "A" => Ok(Reg::A),
+            "x" | "X" => Ok(Reg::X),
+            "y" | "Y" => Ok(Reg::Y),
+            "p" | "P" => Ok(Reg::P),
+            "sp" | "SP" => Ok(Reg::SP),
+            "pc" | "PC" => Ok(Reg::PC),
+            _ => Err(format!("Invalid register {}", reg)),
+        }
     }
 
     fn parse_op(&self, op: &str) -> Result<Operator, String> {
@@ -163,23 +172,15 @@ impl Parser {
         }
     }
 
-    fn parse_reg(&self, reg: &str) -> Result<Reg, String> {
-        match reg {
-            "a" | "A" => Ok(Reg::A),
-            "x" | "X" => Ok(Reg::X),
-            "y" | "Y" => Ok(Reg::Y),
-            "p" | "P" => Ok(Reg::P),
-            "sp" | "SP" => Ok(Reg::SP),
-            "pc" | "PC" => Ok(Reg::PC),
-            _ => Err(format!("Invalid register {}", reg)),
-        }
-    }
-
     fn parse_val(&self, val: &str) -> Result<Value, String> {
         match self.parse_reg(val) {
             Ok(reg) => Ok(Value::Register(reg)),
             Err(_) => self.parse_num(val).map(Value::Constant),
         }
+    }
+
+    fn parse_num(&self, num: &str) -> Result<u16, String> {
+        u16::from_str_radix(num, self.radix).map_err(|_| format!("Invalid number {}", num))
     }
 }
 

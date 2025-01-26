@@ -13,6 +13,7 @@ use glutin::event::{
     ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
 };
 
+use super::{Screen, Transition};
 use crate::app::AppState;
 use crate::cmd::Executor;
 use crate::console::Console;
@@ -20,12 +21,10 @@ use crate::framework::Context;
 use crate::gfx::{Color, Font, Rect, RectI, gl, sprite};
 use crate::util::keymap;
 
-use super::{Screen, Transition};
-
-const BLANK_CHAR: u8 = 32;
 const CURSOR_BLINK_DUR: u32 = 25;
-const CURSOR_CHAR: u8 = 8;
 const PROMPT: &str = "> ";
+const CURSOR_CHAR: u8 = 8;
+const BLANK_CHAR: u8 = 32;
 
 pub struct ConsoleScreen {
     // Configuration
@@ -179,19 +178,6 @@ impl ConsoleScreen {
         }
     }
 
-    fn print_input(&mut self, console: &mut Console) {
-        console.restore_pos();
-        console.print(PROMPT.as_ref());
-        if !self.input_buffer.is_empty() {
-            console.print(&self.input_buffer);
-        }
-        if self.cursor_visibility {
-            console.print(&[CURSOR_CHAR]);
-        }
-    }
-
-    // -- Cursor
-
     fn blink_cursor(&mut self, console: &mut Console) {
         self.cursor_timer -= 1;
         if self.cursor_timer == 0 {
@@ -203,6 +189,17 @@ impl ConsoleScreen {
     fn reset_cursor(&mut self, visible: bool) {
         self.cursor_timer = CURSOR_BLINK_DUR;
         self.cursor_visibility = visible;
+    }
+
+    fn print_input(&mut self, console: &mut Console) {
+        console.restore_pos();
+        console.print(PROMPT.as_ref());
+        if !self.input_buffer.is_empty() {
+            console.print(&self.input_buffer);
+        }
+        if self.cursor_visibility {
+            console.print(&[CURSOR_CHAR]);
+        }
     }
 }
 

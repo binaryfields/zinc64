@@ -7,11 +7,6 @@ use alloc::prelude::*;
 
 use super::C64;
 
-pub trait Image {
-    fn mount(&mut self, c64: &mut C64);
-    fn unmount(&mut self, c64: &mut C64);
-}
-
 pub enum Mode {
     Run,
 }
@@ -38,6 +33,11 @@ impl Autostart {
             Mode::Run => "RUN",
         }
     }
+}
+
+pub trait Image {
+    fn mount(&mut self, c64: &mut C64);
+    fn unmount(&mut self, c64: &mut C64);
 }
 
 pub enum AutostartMethod {

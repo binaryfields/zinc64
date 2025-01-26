@@ -23,6 +23,106 @@ impl GlDevice {
         GlDevice { gl: Rc::new(gl) }
     }
 
+    // ---- resources ----
+
+    pub fn create_texture(&mut self, size: Vector2<i32>) -> Result<Texture, String> {
+        unsafe {
+            let id = self
+                .gl
+                .create_texture()
+                .map_err(|_| "failed to create texture".to_owned())?;
+            self.gl.bind_texture(glow::TEXTURE_2D, Some(id));
+            self.gl.tex_image_2d(
+                glow::TEXTURE_2D,
+                0,
+                glow::RGBA as i32,
+                size.x,
+                size.y,
+                0,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                None,
+            );
+            // Apply parameters
+            self.gl
+                .tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, glow::REPEAT as i32);
+            self.gl
+                .tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, glow::REPEAT as i32);
+            self.gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MIN_FILTER,
+                glow::LINEAR as i32,
+            );
+            self.gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MAG_FILTER,
+                glow::LINEAR as i32,
+            );
+            self.gl.bind_texture(glow::TEXTURE_2D, None);
+            Ok(Texture {
+                gl: self.gl.clone(),
+                id,
+                size,
+            })
+        }
+    }
+
+    pub fn create_shader(
+        &mut self,
+        vertex_shader_source: &str,
+        fragment_shader_source: &str,
+    ) -> Result<Shader, String> {
+        unsafe {
+            let program_id = self
+                .gl
+                .create_program()
+                .map_err(|_| "failed to create program".to_owned())?;
+            let shader_sources = [
+                (glow::VERTEX_SHADER, vertex_shader_source),
+                (glow::FRAGMENT_SHADER, fragment_shader_source),
+            ];
+            let mut shaders = Vec::with_capacity(shader_sources.len());
+            for (shader_type, shader_source) in &shader_sources {
+                let shader_id = self
+                    .gl
+                    .create_shader(*shader_type)
+                    .map_err(|_| "failed to create shader".to_owned())?;
+                self.gl.shader_source(shader_id, shader_source);
+                self.gl.compile_shader(shader_id);
+                if !self.gl.get_shader_compile_status(shader_id) {
+                    return Err(self.gl.get_shader_info_log(shader_id));
+                }
+                self.gl.attach_shader(program_id, shader_id);
+                shaders.push(shader_id);
+            }
+            self.gl.link_program(program_id);
+            if !self.gl.get_program_link_status(program_id) {
+                return Err(self.gl.get_program_info_log(program_id));
+            }
+            for shader_id in shaders {
+                self.gl.detach_shader(program_id, shader_id);
+                self.gl.delete_shader(shader_id);
+            }
+            Ok(Shader {
+                gl: self.gl.clone(),
+                id: program_id,
+            })
+        }
+    }
+
+    pub fn create_vertex_array(&mut self) -> Result<VertexArray, String> {
+        unsafe {
+            let id = self
+                .gl
+                .create_vertex_array()
+                .map_err(|_| "failed to create vertex array")?;
+            Ok(VertexArray {
+                gl: self.gl.clone(),
+                id,
+            })
+        }
+    }
+
     pub fn create_buffer(
         &mut self,
         ty: BufferType,
@@ -74,103 +174,7 @@ impl GlDevice {
         }
     }
 
-    pub fn create_shader(
-        &mut self,
-        vertex_shader_source: &str,
-        fragment_shader_source: &str,
-    ) -> Result<Shader, String> {
-        unsafe {
-            let program_id = self
-                .gl
-                .create_program()
-                .map_err(|_| "failed to create program".to_owned())?;
-            let shader_sources = [
-                (glow::VERTEX_SHADER, vertex_shader_source),
-                (glow::FRAGMENT_SHADER, fragment_shader_source),
-            ];
-            let mut shaders = Vec::with_capacity(shader_sources.len());
-            for (shader_type, shader_source) in &shader_sources {
-                let shader_id = self
-                    .gl
-                    .create_shader(*shader_type)
-                    .map_err(|_| "failed to create shader".to_owned())?;
-                self.gl.shader_source(shader_id, shader_source);
-                self.gl.compile_shader(shader_id);
-                if !self.gl.get_shader_compile_status(shader_id) {
-                    return Err(self.gl.get_shader_info_log(shader_id));
-                }
-                self.gl.attach_shader(program_id, shader_id);
-                shaders.push(shader_id);
-            }
-            self.gl.link_program(program_id);
-            if !self.gl.get_program_link_status(program_id) {
-                return Err(self.gl.get_program_info_log(program_id));
-            }
-            for shader_id in shaders {
-                self.gl.detach_shader(program_id, shader_id);
-                self.gl.delete_shader(shader_id);
-            }
-            Ok(Shader {
-                gl: self.gl.clone(),
-                id: program_id,
-            })
-        }
-    }
-
-    pub fn create_texture(&mut self, size: Vector2<i32>) -> Result<Texture, String> {
-        unsafe {
-            let id = self
-                .gl
-                .create_texture()
-                .map_err(|_| "failed to create texture".to_owned())?;
-            self.gl.bind_texture(glow::TEXTURE_2D, Some(id));
-            self.gl.tex_image_2d(
-                glow::TEXTURE_2D,
-                0,
-                glow::RGBA as i32,
-                size.x,
-                size.y,
-                0,
-                glow::RGBA,
-                glow::UNSIGNED_BYTE,
-                None,
-            );
-            // Apply parameters
-            self.gl
-                .tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, glow::REPEAT as i32);
-            self.gl
-                .tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, glow::REPEAT as i32);
-            self.gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MIN_FILTER,
-                glow::LINEAR as i32,
-            );
-            self.gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MAG_FILTER,
-                glow::LINEAR as i32,
-            );
-            self.gl.bind_texture(glow::TEXTURE_2D, None);
-            Ok(Texture {
-                gl: self.gl.clone(),
-                id,
-                size,
-            })
-        }
-    }
-
-    pub fn create_vertex_array(&mut self) -> Result<VertexArray, String> {
-        unsafe {
-            let id = self
-                .gl
-                .create_vertex_array()
-                .map_err(|_| "failed to create vertex array")?;
-            Ok(VertexArray {
-                gl: self.gl.clone(),
-                id,
-            })
-        }
-    }
+    // ---- vertex layout ----
 
     pub fn bind_buffer(
         &mut self,
@@ -185,33 +189,29 @@ impl GlDevice {
         self.bind_vertex_array(None);
     }
 
-    fn bind_framebuffer(&mut self, framebuffer: Option<&Framebuffer>) {
+    pub fn set_vertex_attr(
+        &mut self,
+        vertex_array: &VertexArray,
+        location: u32,
+        descriptor: &VertexAttrDescriptor,
+    ) {
+        self.bind_vertex_array(Some(vertex_array));
         unsafe {
-            self.gl
-                .bind_framebuffer(glow::FRAMEBUFFER, framebuffer.map(|v| v.id));
+            let element_size = descriptor.ty.element_size();
+            self.gl.vertex_attrib_pointer_f32(
+                location,
+                descriptor.size as i32,
+                descriptor.ty.into(),
+                false,
+                (descriptor.stride * element_size) as i32,
+                (descriptor.offset * element_size) as i32,
+            );
+            self.gl.enable_vertex_attrib_array(location);
         }
+        self.bind_vertex_array(None);
     }
 
-    fn bind_texture(&mut self, texture: Option<&Texture>, unit: u32) {
-        unsafe {
-            self.gl.active_texture(glow::TEXTURE0 + unit);
-            self.gl
-                .bind_texture(glow::TEXTURE_2D, texture.map(|v| v.id));
-        }
-    }
-
-    fn bind_vertex_array(&mut self, vertex_array: Option<&VertexArray>) {
-        unsafe {
-            self.gl.bind_vertex_array(vertex_array.map(|v| v.id));
-        }
-    }
-
-    pub fn get_uniform(&self, shader: &Shader, name: &str) -> Uniform {
-        unsafe {
-            let location = self.gl.get_uniform_location(shader.id, name);
-            Uniform { location }
-        }
-    }
+    // ---- data upload ----
 
     pub fn set_buffer_data<T: Sized>(&mut self, buffer: &Buffer, target: BufferTarget, data: &[T]) {
         self.set_buffer_sub_data(buffer, target, data)
@@ -258,50 +258,16 @@ impl GlDevice {
         self.bind_texture(None, 0)
     }
 
-    fn set_uniform(&mut self, uniform: &Uniform, data: &UniformData) {
+    // ---- uniforms ----
+
+    pub fn get_uniform(&self, shader: &Shader, name: &str) -> Uniform {
         unsafe {
-            let location = uniform.location;
-            match data {
-                UniformData::Float(x) => self.gl.uniform_1_f32(location.as_ref(), *x),
-                UniformData::Int(x) => self.gl.uniform_1_i32(location.as_ref(), *x),
-                UniformData::Mat4(value) => {
-                    let value_ref: &[f32; 16] = value.as_ref();
-                    self.gl
-                        .uniform_matrix_4_f32_slice(location.as_ref(), false, value_ref)
-                }
-            }
+            let location = self.gl.get_uniform_location(shader.id, name);
+            Uniform { location }
         }
     }
 
-    pub fn set_vertex_attr(
-        &mut self,
-        vertex_array: &VertexArray,
-        location: u32,
-        descriptor: &VertexAttrDescriptor,
-    ) {
-        self.bind_vertex_array(Some(vertex_array));
-        unsafe {
-            let element_size = descriptor.ty.element_size();
-            self.gl.vertex_attrib_pointer_f32(
-                location,
-                descriptor.size as i32,
-                descriptor.ty.into(),
-                false,
-                (descriptor.stride * element_size) as i32,
-                (descriptor.offset * element_size) as i32,
-            );
-            self.gl.enable_vertex_attrib_array(location);
-        }
-        self.bind_vertex_array(None);
-    }
-
-    fn use_shader(&mut self, shader: &Shader) {
-        unsafe {
-            self.gl.use_program(Some(shader.id));
-        }
-    }
-
-    // -- Drawing Ops
+    // ---- drawing ----
 
     pub fn clear(&mut self, color: Color) {
         unsafe {
@@ -368,6 +334,34 @@ impl GlDevice {
         }
     }
 
+    fn bind_framebuffer(&mut self, framebuffer: Option<&Framebuffer>) {
+        unsafe {
+            self.gl
+                .bind_framebuffer(glow::FRAMEBUFFER, framebuffer.map(|v| v.id));
+        }
+    }
+
+    fn use_shader(&mut self, shader: &Shader) {
+        unsafe {
+            self.gl.use_program(Some(shader.id));
+        }
+    }
+
+    fn set_uniform(&mut self, uniform: &Uniform, data: &UniformData) {
+        unsafe {
+            let location = uniform.location;
+            match data {
+                UniformData::Float(x) => self.gl.uniform_1_f32(location.as_ref(), *x),
+                UniformData::Int(x) => self.gl.uniform_1_i32(location.as_ref(), *x),
+                UniformData::Mat4(value) => {
+                    let value_ref: &[f32; 16] = value.as_ref();
+                    self.gl
+                        .uniform_matrix_4_f32_slice(location.as_ref(), false, value_ref)
+                }
+            }
+        }
+    }
+
     fn reset_render_state(&mut self, render_state: &RenderState) {
         // FIXME reset rendertarget
         unsafe {
@@ -384,6 +378,22 @@ impl GlDevice {
             if render_state.options.front_face.is_some() {
                 self.gl.disable(glow::CULL_FACE);
             }
+        }
+    }
+
+    // ---- shared ----
+
+    fn bind_vertex_array(&mut self, vertex_array: Option<&VertexArray>) {
+        unsafe {
+            self.gl.bind_vertex_array(vertex_array.map(|v| v.id));
+        }
+    }
+
+    fn bind_texture(&mut self, texture: Option<&Texture>, unit: u32) {
+        unsafe {
+            self.gl.active_texture(glow::TEXTURE0 + unit);
+            self.gl
+                .bind_texture(glow::TEXTURE_2D, texture.map(|v| v.id));
         }
     }
 }
@@ -519,8 +529,6 @@ pub enum UniformData {
     Int(i32),
     Mat4(Matrix4<f32>),
 }
-
-// -- Resources
 
 pub struct Buffer {
     gl: Rc<glow::Context>,

@@ -39,6 +39,32 @@ gpr	sp	.8	4	0
 gpr	pc	.16	5	0
 ";
 
+pub struct RapServer {
+    command_tx: Sender<Command>,
+}
+
+impl RapServer {
+    pub fn new(command_tx: Sender<Command>) -> Self {
+        Self { command_tx }
+    }
+
+    pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
+        let listener = TcpListener::bind(addr)?;
+        for stream in listener.incoming().flatten() {
+            let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
+            match conn.handle() {
+                Ok(_) => {
+                    info!(target: "debugger", "Connection closed");
+                }
+                Err(error) => {
+                    error!(target: "debugger", "Connection failed, error - {}", error);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy)]
 enum RapCmd {
     Registers,
@@ -67,32 +93,6 @@ impl RapOp {
             7 => Ok(RapOp::Cmd),
             _ => Err(format!("Invalid op {}", op)),
         }
-    }
-}
-
-pub struct RapServer {
-    command_tx: Sender<Command>,
-}
-
-impl RapServer {
-    pub fn new(command_tx: Sender<Command>) -> Self {
-        Self { command_tx }
-    }
-
-    pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
-        let listener = TcpListener::bind(addr)?;
-        for stream in listener.incoming().flatten() {
-            let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
-            match conn.handle() {
-                Ok(_) => {
-                    info!(target: "debugger", "Connection closed");
-                }
-                Err(error) => {
-                    error!(target: "debugger", "Connection failed, error - {}", error);
-                }
-            }
-        }
-        Ok(())
     }
 }
 
@@ -127,6 +127,8 @@ impl Connection {
         Ok(conn)
     }
 
+    // ---- session ----
+
     pub fn handle(&mut self) -> io::Result<()> {
         while self.running {
             let opcode = self.reader.read_u8()?;
@@ -142,43 +144,6 @@ impl Connection {
             }?;
         }
         Ok(())
-    }
-
-    fn handle_cmd(&mut self) -> io::Result<()> {
-        let len = self.reader.read_u32::<BigEndian>()?;
-        let mut data = vec![0; len as usize];
-        self.reader.read_exact(&mut data)?;
-        let c_str = CStr::from_bytes_with_nul(&data).unwrap();
-        let input = str::from_utf8(c_str.to_bytes()).map_err(|e| Error::other(e.to_string()))?;
-        let input = input.to_string();
-        info!(target: "rap", "Cmd '{}'", input);
-        let result = match self.command_parser.parse(&input) {
-            Ok(command) => self.execute_cmd(command),
-            Err(error) => Ok(error),
-        }?;
-        info!(target: "rap", "Cmd result len {}", result.len());
-        self.writer
-            .write_u8(RapOp::Cmd as u8 | RapOp::Reply as u8)?;
-        self.writer
-            .write_u32::<BigEndian>((result.len() + 1) as u32)?;
-        if !result.is_empty() {
-            self.writer.write_all(result.as_bytes())?;
-            self.writer.write_u8(0)?;
-        }
-        self.writer.flush()
-    }
-
-    fn handle_close(&mut self) -> io::Result<()> {
-        let _fd = self.reader.read_u32::<BigEndian>()?;
-        match self.execute_emu(Command::Detach)? {
-            Output::Unit => Ok(()),
-            result => Err(self.invalid_response(&result)),
-        }?;
-        self.running = false;
-        self.writer
-            .write_u8(RapOp::Close as u8 | RapOp::Reply as u8)?;
-        self.writer.write_u32::<BigEndian>(0)?;
-        self.writer.flush()
     }
 
     fn handle_open(&mut self) -> io::Result<()> {
@@ -217,22 +182,6 @@ impl Connection {
         self.writer.flush()
     }
 
-    fn handle_seek(&mut self) -> io::Result<()> {
-        let whence = self.reader.read_u8()?;
-        let offset = self.reader.read_u64::<BigEndian>()? as u16;
-        info!(target: "rap", "Seek {} 0x{:04x}", whence, offset);
-        self.offset = match whence {
-            0 => offset,
-            1 => self.offset.wrapping_add(offset),
-            2 => (0xffff_u16).wrapping_add(offset),
-            _ => self.offset,
-        };
-        self.writer
-            .write_u8(RapOp::Seek as u8 | RapOp::Reply as u8)?;
-        self.writer.write_u64::<BigEndian>(self.offset as u64)?;
-        self.writer.flush()
-    }
-
     fn handle_write(&mut self) -> io::Result<()> {
         let mut len = self.reader.read_u32::<BigEndian>()?;
         if len > RAP_RMT_MAX {
@@ -252,11 +201,67 @@ impl Connection {
         self.writer.flush()
     }
 
-    fn invalid_response(&self, _result: &Output) -> Error {
-        Error::other("Invalid debugger result")
+    fn handle_seek(&mut self) -> io::Result<()> {
+        let whence = self.reader.read_u8()?;
+        let offset = self.reader.read_u64::<BigEndian>()? as u16;
+        info!(target: "rap", "Seek {} 0x{:04x}", whence, offset);
+        self.offset = match whence {
+            0 => offset,
+            1 => self.offset.wrapping_add(offset),
+            2 => (0xffff_u16).wrapping_add(offset),
+            _ => self.offset,
+        };
+        self.writer
+            .write_u8(RapOp::Seek as u8 | RapOp::Reply as u8)?;
+        self.writer.write_u64::<BigEndian>(self.offset as u64)?;
+        self.writer.flush()
     }
 
-    // -- Commands
+    fn handle_close(&mut self) -> io::Result<()> {
+        let _fd = self.reader.read_u32::<BigEndian>()?;
+        match self.execute_emu(Command::Detach)? {
+            Output::Unit => Ok(()),
+            result => Err(self.invalid_response(&result)),
+        }?;
+        self.running = false;
+        self.writer
+            .write_u8(RapOp::Close as u8 | RapOp::Reply as u8)?;
+        self.writer.write_u32::<BigEndian>(0)?;
+        self.writer.flush()
+    }
+
+    fn handle_cmd(&mut self) -> io::Result<()> {
+        let len = self.reader.read_u32::<BigEndian>()?;
+        let mut data = vec![0; len as usize];
+        self.reader.read_exact(&mut data)?;
+        let c_str = CStr::from_bytes_with_nul(&data).unwrap();
+        let input = str::from_utf8(c_str.to_bytes()).map_err(|e| Error::other(e.to_string()))?;
+        let input = input.to_string();
+        info!(target: "rap", "Cmd '{}'", input);
+        let result = match self.command_parser.parse(&input) {
+            Ok(command) => self.execute_cmd(command),
+            Err(error) => Ok(error),
+        }?;
+        info!(target: "rap", "Cmd result len {}", result.len());
+        self.writer
+            .write_u8(RapOp::Cmd as u8 | RapOp::Reply as u8)?;
+        self.writer
+            .write_u32::<BigEndian>((result.len() + 1) as u32)?;
+        if !result.is_empty() {
+            self.writer.write_all(result.as_bytes())?;
+            self.writer.write_u8(0)?;
+        }
+        self.writer.flush()
+    }
+
+    // ---- commands ----
+
+    fn execute_cmd(&mut self, command: RapCmd) -> io::Result<String> {
+        match command {
+            RapCmd::Registers => self.cmd_registers(),
+            RapCmd::RegisterProfile => self.cmd_register_profile(),
+        }
+    }
 
     fn cmd_registers(&mut self) -> io::Result<String> {
         match self.execute_emu(Command::RegRead)? {
@@ -278,14 +283,7 @@ impl Connection {
         Ok(REG_PROFILE.to_string())
     }
 
-    // -- Execution
-
-    fn execute_cmd(&mut self, command: RapCmd) -> io::Result<String> {
-        match command {
-            RapCmd::Registers => self.cmd_registers(),
-            RapCmd::RegisterProfile => self.cmd_register_profile(),
-        }
-    }
+    // ---- shared ----
 
     fn execute_emu(&mut self, command: Command) -> io::Result<Output> {
         self.command_tx.send(command).unwrap();
@@ -294,6 +292,10 @@ impl Connection {
             Ok(result) => Ok(result),
             Err(error) => Err(Error::other(error)),
         }
+    }
+
+    fn invalid_response(&self, _result: &Output) -> Error {
+        Error::other("Invalid debugger result")
     }
 }
 
@@ -331,8 +333,6 @@ impl CommandParser {
         self.ensure_eos(tokens)?;
         Ok(RapCmd::RegisterProfile)
     }
-
-    // Helpers
 
     fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
         match tokens.next() {

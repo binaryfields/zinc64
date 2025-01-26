@@ -28,16 +28,16 @@ impl Pin {
         }
     }
 
-    pub fn is_falling(&self) -> bool {
-        self.last == State::High && self.state == State::Low
-    }
-
     pub fn is_high(&self) -> bool {
         self.state == State::High
     }
 
     pub fn is_low(&self) -> bool {
         self.state == State::Low
+    }
+
+    pub fn is_falling(&self) -> bool {
+        self.last == State::High && self.state == State::Low
     }
 
     pub fn is_rising(&self) -> bool {

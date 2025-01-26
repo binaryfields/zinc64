@@ -6,40 +6,9 @@
 use alloc::prelude::*;
 #[cfg(not(feature = "std"))]
 use alloc::vec;
+
 use zinc64_core::device::joystick;
 use zinc64_core::factory::SystemModel;
-
-pub struct Config {
-    pub model: SystemModel,
-    pub joystick: JoystickConfig,
-    pub sound: SoundConfig,
-    pub roms: RomData,
-}
-
-impl Config {
-    pub fn new(model: SystemModel) -> Config {
-        Config {
-            model,
-            joystick: JoystickConfig::default(),
-            sound: SoundConfig::default(),
-            roms: RomData::default(),
-        }
-    }
-
-    pub fn new_with_roms(
-        model: SystemModel,
-        basic: &[u8],
-        charset: &[u8],
-        kernal: &[u8],
-    ) -> Config {
-        Config {
-            model,
-            joystick: JoystickConfig::default(),
-            sound: SoundConfig::default(),
-            roms: RomData::new(basic, charset, kernal),
-        }
-    }
-}
 
 pub struct JoystickConfig {
     pub axis_motion_threshold: i16,
@@ -97,6 +66,38 @@ impl Default for SoundConfig {
             buffer_size: 4096,
             sample_rate: 44100,
             sid_filters: true,
+        }
+    }
+}
+
+pub struct Config {
+    pub model: SystemModel,
+    pub joystick: JoystickConfig,
+    pub sound: SoundConfig,
+    pub roms: RomData,
+}
+
+impl Config {
+    pub fn new(model: SystemModel) -> Config {
+        Config {
+            model,
+            joystick: JoystickConfig::default(),
+            sound: SoundConfig::default(),
+            roms: RomData::default(),
+        }
+    }
+
+    pub fn new_with_roms(
+        model: SystemModel,
+        basic: &[u8],
+        charset: &[u8],
+        kernal: &[u8],
+    ) -> Config {
+        Config {
+            model,
+            joystick: JoystickConfig::default(),
+            sound: SoundConfig::default(),
+            roms: RomData::new(basic, charset, kernal),
         }
     }
 }

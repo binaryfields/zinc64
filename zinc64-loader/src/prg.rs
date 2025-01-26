@@ -4,26 +4,13 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
+
 use byteorder::LittleEndian;
 use zinc64_system::autostart;
 use zinc64_system::{Autostart, AutostartMethod, C64, Image};
 
 use super::Loader;
 use crate::io::{self, ReadBytesExt, Reader};
-
-struct PrgImage {
-    data: Vec<u8>,
-    offset: u16,
-}
-
-impl Image for PrgImage {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting PRG image");
-        c64.load(&self.data, self.offset);
-    }
-
-    fn unmount(&mut self, _c64: &mut C64) {}
-}
 
 #[derive(Default)]
 pub struct PrgLoader;
@@ -49,4 +36,18 @@ impl Loader for PrgLoader {
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
         Ok(Box::new(PrgImage { data, offset }))
     }
+}
+
+struct PrgImage {
+    data: Vec<u8>,
+    offset: u16,
+}
+
+impl Image for PrgImage {
+    fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting PRG image");
+        c64.load(&self.data, self.offset);
+    }
+
+    fn unmount(&mut self, _c64: &mut C64) {}
 }

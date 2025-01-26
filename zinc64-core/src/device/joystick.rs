@@ -6,23 +6,6 @@ use bit_field::BitField;
 
 use crate::util::SharedCell;
 
-// DEFERRED device: joystick test cases
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum Button {
-    Up = 0,
-    Down = 1,
-    Left = 2,
-    Right = 3,
-    Fire = 4,
-}
-
-impl Button {
-    pub fn bit(self) -> usize {
-        self as usize
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     None = 0xff,
@@ -46,6 +29,23 @@ impl Mode {
         self as u8
     }
 }
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Button {
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3,
+    Fire = 4,
+}
+
+impl Button {
+    pub fn bit(self) -> usize {
+        self as usize
+    }
+}
+
+// DEFERRED device: joystick test cases
 
 pub struct Joystick {
     // Configuration
@@ -75,14 +75,6 @@ impl Joystick {
     pub fn reset(&mut self) {
         self.state.set(0);
     }
-
-    fn set_state(&mut self, bit: usize, value: bool) {
-        let mut new_state = self.state.get();
-        new_state.set_bit(bit, value);
-        self.state.set(new_state);
-    }
-
-    // -- Event Handlers
 
     pub fn on_axis_motion(&mut self, axis_idx: u8, value: i16) {
         match axis_idx {
@@ -128,5 +120,11 @@ impl Joystick {
 
     pub fn on_key_up(&mut self, keycode: Button) {
         self.set_state(keycode.bit(), false);
+    }
+
+    fn set_state(&mut self, bit: usize, value: bool) {
+        let mut new_state = self.state.get();
+        new_state.set_bit(bit, value);
+        self.state.set(new_state);
     }
 }

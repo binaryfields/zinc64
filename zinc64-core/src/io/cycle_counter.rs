@@ -20,8 +20,29 @@ impl CycleCounter {
     }
 
     #[inline(always)]
+    pub fn reset(&mut self) {
+        self.cycles = 0;
+        self.feed = 0;
+    }
+
+    #[inline(always)]
+    pub fn feed(&mut self, mask: u16) {
+        self.cycles |= mask;
+    }
+
+    #[inline(always)]
     pub fn has_cycle(&self, mask: u16) -> bool {
         self.cycles & mask != 0
+    }
+
+    #[inline(always)]
+    pub fn remove(&mut self, mask: u16) {
+        self.cycles &= !mask;
+    }
+
+    #[inline(always)]
+    pub fn clock(&mut self) {
+        self.cycles = ((self.cycles << 1) & self.mask) | self.feed;
     }
 
     #[inline(always)]
@@ -31,26 +52,5 @@ impl CycleCounter {
         } else {
             self.feed &= !mask;
         }
-    }
-
-    #[inline(always)]
-    pub fn clock(&mut self) {
-        self.cycles = ((self.cycles << 1) & self.mask) | self.feed;
-    }
-
-    #[inline(always)]
-    pub fn feed(&mut self, mask: u16) {
-        self.cycles |= mask;
-    }
-
-    #[inline(always)]
-    pub fn remove(&mut self, mask: u16) {
-        self.cycles &= !mask;
-    }
-
-    #[inline(always)]
-    pub fn reset(&mut self) {
-        self.cycles = 0;
-        self.feed = 0;
     }
 }

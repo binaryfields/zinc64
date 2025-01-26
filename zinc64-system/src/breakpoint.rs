@@ -5,6 +5,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
 use core::slice::Iter;
+
 use zinc64_core::factory::Cpu;
 
 use super::Condition;
@@ -23,85 +24,9 @@ pub struct BreakpointManager {
     bp_index: u16,
 }
 
-impl Default for BreakpointManager {
-    fn default() -> Self {
-        Self {
-            breakpoints: Vec::new(),
-            bp_index: 1,
-        }
-    }
-}
-
 impl BreakpointManager {
-    pub fn check(&mut self, cpu: &dyn Cpu) -> Option<usize> {
-        if self.breakpoints.is_empty() {
-            None
-        } else {
-            let pc = cpu.get_pc();
-            let bp_pos = self.breakpoints.iter_mut().position(|bp| {
-                if bp.address == pc && bp.enabled {
-                    if bp.ignore == 0 {
-                        bp.condition.as_ref().is_none_or(|cond| cond.eval(cpu))
-                    } else {
-                        bp.ignore -= 1;
-                        false
-                    }
-                } else {
-                    false
-                }
-            });
-            if let Some(pos) = bp_pos
-                && self.breakpoints[pos].autodelete
-            {
-                self.breakpoints.remove(pos);
-            }
-            bp_pos
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.breakpoints.clear();
-    }
-
-    pub fn enable_all(&mut self, enabled: bool) {
-        for bp in self.breakpoints.iter_mut() {
-            bp.enabled = enabled;
-        }
-    }
-
-    pub fn get(&mut self, index: u16) -> Result<&Breakpoint, String> {
-        match self.breakpoints.iter().position(|bp| bp.index == index) {
-            Some(pos) => Ok(&self.breakpoints[pos]),
-            None => Err(format!("Invalid index {}", index)),
-        }
-    }
-
-    pub fn is_bp_present(&self) -> bool {
-        self.breakpoints.iter().any(|bp| bp.enabled)
-    }
-
-    pub fn ignore(&mut self, index: u16, count: u16) -> Result<(), String> {
-        match self.find_mut(index) {
-            Some(bp) => {
-                bp.ignore = count;
-                Ok(())
-            }
-            None => Err(format!("Invalid index {}", index)),
-        }
-    }
-
     pub fn list(&self) -> Iter<'_, Breakpoint> {
         self.breakpoints.iter()
-    }
-
-    pub fn remove(&mut self, index: u16) -> Result<(), String> {
-        match self.breakpoints.iter().position(|bp| bp.index == index) {
-            Some(pos) => {
-                self.breakpoints.remove(pos);
-                Ok(())
-            }
-            None => Err(format!("Invalid index {}", index)),
-        }
     }
 
     pub fn set(&mut self, address: u16, autodelete: bool) -> u16 {
@@ -145,10 +70,86 @@ impl BreakpointManager {
         }
     }
 
+    pub fn enable_all(&mut self, enabled: bool) {
+        for bp in self.breakpoints.iter_mut() {
+            bp.enabled = enabled;
+        }
+    }
+
+    pub fn ignore(&mut self, index: u16, count: u16) -> Result<(), String> {
+        match self.find_mut(index) {
+            Some(bp) => {
+                bp.ignore = count;
+                Ok(())
+            }
+            None => Err(format!("Invalid index {}", index)),
+        }
+    }
+
+    pub fn get(&mut self, index: u16) -> Result<&Breakpoint, String> {
+        match self.breakpoints.iter().position(|bp| bp.index == index) {
+            Some(pos) => Ok(&self.breakpoints[pos]),
+            None => Err(format!("Invalid index {}", index)),
+        }
+    }
+
+    pub fn remove(&mut self, index: u16) -> Result<(), String> {
+        match self.breakpoints.iter().position(|bp| bp.index == index) {
+            Some(pos) => {
+                self.breakpoints.remove(pos);
+                Ok(())
+            }
+            None => Err(format!("Invalid index {}", index)),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.breakpoints.clear();
+    }
+
     fn find_mut(&mut self, index: u16) -> Option<&mut Breakpoint> {
         match self.breakpoints.iter().position(|bp| bp.index == index) {
             Some(pos) => Some(&mut self.breakpoints[pos]),
             None => None,
+        }
+    }
+
+    pub fn is_bp_present(&self) -> bool {
+        self.breakpoints.iter().any(|bp| bp.enabled)
+    }
+
+    pub fn check(&mut self, cpu: &dyn Cpu) -> Option<usize> {
+        if self.breakpoints.is_empty() {
+            None
+        } else {
+            let pc = cpu.get_pc();
+            let bp_pos = self.breakpoints.iter_mut().position(|bp| {
+                if bp.address == pc && bp.enabled {
+                    if bp.ignore == 0 {
+                        bp.condition.as_ref().is_none_or(|cond| cond.eval(cpu))
+                    } else {
+                        bp.ignore -= 1;
+                        false
+                    }
+                } else {
+                    false
+                }
+            });
+            if let Some(pos) = bp_pos
+                && self.breakpoints[pos].autodelete
+            {
+                self.breakpoints.remove(pos);
+            }
+            bp_pos
+        }
+    }
+}
+
+impl Default for BreakpointManager {
+    fn default() -> Self {
+        Self {
+            breakpoints: Vec::new(),
+            bp_index: 1,
         }
     }
 }

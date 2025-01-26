@@ -16,6 +16,8 @@ impl Disassembler {
         Self { data, offset }
     }
 
+    // ---- decode ----
+
     pub fn disassemble(&self, address: u16) -> (Instruction, usize) {
         let opcode = self.read_byte(address);
         match opcode {
@@ -551,6 +553,8 @@ impl Disassembler {
             _ => panic!("invalid opcode 0x{:x} at 0x{:x}", opcode, address),
         }
     }
+
+    // ---- memory ----
 
     pub fn read_byte(&self, address: u16) -> u8 {
         self.data[(address - self.offset) as usize]

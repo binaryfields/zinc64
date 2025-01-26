@@ -12,19 +12,6 @@ use cgmath::{Vector2, vec2};
 use crate::gfx::{Color, Rect};
 use crate::util::reader;
 
-#[repr(C, packed)]
-struct PcfHeader {
-    pub magic: u32,
-    pub version: u32,
-    pub header_size: u32,
-    pub flags: u32,
-    pub num_glyph: u32,
-    pub bytes_per_glyph: u32,
-    pub height: u32,
-    pub width: u32,
-    pub glyphs: u8,
-}
-
 pub struct Font {
     size: Vector2<u32>,
     num_glyph: u32,
@@ -55,15 +42,6 @@ impl Font {
         })
     }
 
-    pub fn get_glyph(&self, ch: u32) -> &[u8] {
-        let offset = self.offset + ch as usize * self.bytes_per_glyph;
-        &self.glyphs[offset..(offset + self.bytes_per_glyph)]
-    }
-
-    pub fn get_glypth_count(&self) -> u32 {
-        self.num_glyph
-    }
-
     pub fn get_size(&self) -> Vector2<u32> {
         self.size
     }
@@ -74,6 +52,15 @@ impl Font {
 
     pub fn get_width(&self) -> u32 {
         self.size.x
+    }
+
+    pub fn get_glypth_count(&self) -> u32 {
+        self.num_glyph
+    }
+
+    pub fn get_glyph(&self, ch: u32) -> &[u8] {
+        let offset = self.offset + ch as usize * self.bytes_per_glyph;
+        &self.glyphs[offset..(offset + self.bytes_per_glyph)]
     }
 
     pub fn get_tex_coords(&self, ch: u32) -> Rect {
@@ -107,4 +94,17 @@ impl Font {
         }
         buffer
     }
+}
+
+#[repr(C, packed)]
+struct PcfHeader {
+    pub magic: u32,
+    pub version: u32,
+    pub header_size: u32,
+    pub flags: u32,
+    pub num_glyph: u32,
+    pub bytes_per_glyph: u32,
+    pub height: u32,
+    pub width: u32,
+    pub glyphs: u8,
 }

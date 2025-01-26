@@ -6,6 +6,14 @@
 #![cfg_attr(not(feature = "std"), feature(alloc))]
 
 #[cfg(not(feature = "std"))]
+use alloc::prelude::*;
+
+use zinc64_system::{AutostartMethod, Image};
+
+pub use crate::bin::BinLoader;
+pub use crate::io::{Reader, Result};
+
+#[cfg(not(feature = "std"))]
 #[macro_use]
 extern crate alloc;
 #[cfg(feature = "std")]
@@ -20,12 +28,10 @@ mod p00;
 mod prg;
 mod tap;
 
-#[cfg(not(feature = "std"))]
-use alloc::prelude::*;
-use zinc64_system::{AutostartMethod, Image};
-
-pub use crate::bin::BinLoader;
-pub use crate::io::{Reader, Result};
+pub trait Loader {
+    fn autostart(&self, path: &mut dyn Reader) -> io::Result<AutostartMethod>;
+    fn load(&self, path: &mut dyn Reader) -> io::Result<Box<dyn Image>>;
+}
 
 pub enum Format {
     Bin,
@@ -49,14 +55,17 @@ impl Format {
     }
 }
 
-pub trait Loader {
-    fn autostart(&self, path: &mut dyn Reader) -> io::Result<AutostartMethod>;
-    fn load(&self, path: &mut dyn Reader) -> io::Result<Box<dyn Image>>;
-}
-
 pub struct Loaders;
 
 impl Loaders {
+    pub fn from_ext(ext: Option<&str>) -> Result<Box<dyn Loader>> {
+        if let Some(kind) = Format::from_ext(ext) {
+            Ok(Loaders::from(kind))
+        } else {
+            Err(format!("Unknown image extension {}", ext.unwrap_or("")))
+        }
+    }
+
     pub fn from(kind: Format) -> Box<dyn Loader> {
         match kind {
             Format::Bin => Box::new(bin::BinLoader::new(1024)),
@@ -64,14 +73,6 @@ impl Loaders {
             Format::P00 => Box::new(p00::P00Loader::new()),
             Format::Prg => Box::new(prg::PrgLoader::new()),
             Format::Tap => Box::new(tap::TapLoader::new()),
-        }
-    }
-
-    pub fn from_ext(ext: Option<&str>) -> Result<Box<dyn Loader>> {
-        if let Some(kind) = Format::from_ext(ext) {
-            Ok(Loaders::from(kind))
-        } else {
-            Err(format!("Unknown image extension {}", ext.unwrap_or("")))
         }
     }
 }

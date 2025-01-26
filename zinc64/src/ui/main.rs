@@ -54,10 +54,69 @@ impl MainScreen {
         })
     }
 
+    // ---- runtime state ----
+
     fn halt(&mut self, state: &mut AppState) -> Result<(), String> {
         self.set_state(state, RuntimeState::Halted);
         state.debug.halt()
     }
+
+    fn toggle_pause(&mut self, state: &mut AppState) {
+        let emu_state = state.state;
+        match emu_state {
+            RuntimeState::Running => self.set_state(state, RuntimeState::Paused),
+            RuntimeState::Paused => self.set_state(state, RuntimeState::Running),
+            _ => (),
+        };
+    }
+
+    fn reset(&mut self, state: &mut AppState) {
+        state.c64.reset(false);
+        self.next_keyboard_event = 0;
+    }
+
+    // ---- hotkey toggles ----
+
+    fn toggle_mute(&mut self) {
+        self.audio_device.toggle_mute();
+    }
+
+    fn toggle_warp(&mut self, ctx: &mut Context, state: &mut AppState) {
+        let value = state.options.warp_mode;
+        state.options.warp_mode = !value;
+        let fps = if !state.options.warp_mode {
+            Some(state.c64.get_config().model.refresh_rate as f64)
+        } else {
+            None
+        };
+        ctx.time.set_fps(fps);
+    }
+
+    fn toggle_fullscreen(&mut self, ctx: &mut Context) {
+        match ctx.platform.windowed_context.window().fullscreen() {
+            None => {
+                let monitor = ctx.platform.windowed_context.window().current_monitor();
+                ctx.platform
+                    .windowed_context
+                    .window()
+                    .set_fullscreen(Some(Fullscreen::Borderless(monitor)));
+            }
+            Some(_) => {
+                ctx.platform.windowed_context.window().set_fullscreen(None);
+            }
+        }
+    }
+
+    fn toggle_datassette_play(&mut self, state: &mut AppState) {
+        let datassette = state.c64.get_datasette();
+        if !datassette.borrow().is_playing() {
+            datassette.borrow_mut().play();
+        } else {
+            datassette.borrow_mut().stop();
+        }
+    }
+
+    // ---- image loading ----
 
     fn load_image(&mut self, state: &mut AppState, path: &Path) -> Result<(), String> {
         let ext = path.extension().map(|s| s.to_str().unwrap());
@@ -67,6 +126,17 @@ impl MainScreen {
         let mut autostart = loader.autostart(&mut reader)?;
         autostart.execute(&mut state.c64);
         Ok(())
+    }
+
+    // ---- frame processing ----
+
+    fn process_keyboard_events(&mut self, state: &mut AppState) {
+        if state.c64.get_keyboard().has_events()
+            && state.c64.get_cycles() >= self.next_keyboard_event
+        {
+            state.c64.get_keyboard().drain_event();
+            self.next_keyboard_event = state.c64.get_cycles().wrapping_add(20000);
+        }
     }
 
     #[allow(dead_code)]
@@ -87,73 +157,13 @@ impl MainScreen {
         }
     }
 
-    fn process_keyboard_events(&mut self, state: &mut AppState) {
-        if state.c64.get_keyboard().has_events()
-            && state.c64.get_cycles() >= self.next_keyboard_event
-        {
-            state.c64.get_keyboard().drain_event();
-            self.next_keyboard_event = state.c64.get_cycles().wrapping_add(20000);
-        }
-    }
-
-    fn reset(&mut self, state: &mut AppState) {
-        state.c64.reset(false);
-        self.next_keyboard_event = 0;
-    }
+    // ---- shared ----
 
     fn set_state(&mut self, state: &mut AppState, new_state: RuntimeState) {
         if state.state != new_state {
             state.state = new_state;
             self.update_audio_state(state);
         }
-    }
-
-    fn toggle_datassette_play(&mut self, state: &mut AppState) {
-        let datassette = state.c64.get_datasette();
-        if !datassette.borrow().is_playing() {
-            datassette.borrow_mut().play();
-        } else {
-            datassette.borrow_mut().stop();
-        }
-    }
-
-    fn toggle_fullscreen(&mut self, ctx: &mut Context) {
-        match ctx.platform.windowed_context.window().fullscreen() {
-            None => {
-                let monitor = ctx.platform.windowed_context.window().current_monitor();
-                ctx.platform
-                    .windowed_context
-                    .window()
-                    .set_fullscreen(Some(Fullscreen::Borderless(monitor)));
-            }
-            Some(_) => {
-                ctx.platform.windowed_context.window().set_fullscreen(None);
-            }
-        }
-    }
-
-    fn toggle_mute(&mut self) {
-        self.audio_device.toggle_mute();
-    }
-
-    fn toggle_pause(&mut self, state: &mut AppState) {
-        let emu_state = state.state;
-        match emu_state {
-            RuntimeState::Running => self.set_state(state, RuntimeState::Paused),
-            RuntimeState::Paused => self.set_state(state, RuntimeState::Running),
-            _ => (),
-        };
-    }
-
-    fn toggle_warp(&mut self, ctx: &mut Context, state: &mut AppState) {
-        let value = state.options.warp_mode;
-        state.options.warp_mode = !value;
-        let fps = if !state.options.warp_mode {
-            Some(state.c64.get_config().model.refresh_rate as f64)
-        } else {
-            None
-        };
-        ctx.time.set_fps(fps);
     }
 
     fn update_audio_state(&mut self, state: &mut AppState) {

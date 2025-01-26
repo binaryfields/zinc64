@@ -4,6 +4,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
+
 use bit_field::BitField;
 
 use crate::factory::Tape;
@@ -11,32 +12,7 @@ use crate::util::{IoPort, Pin, Shared};
 
 // DEFERRED device: datassette test cases
 
-/*
-  +---------+---+------------+--------------------------------------------+
-  |  NAME   |BIT| DIRECTION  |                 DESCRIPTION                |
-  +---------+---+------------+--------------------------------------------+
-  |  LORAM  | 0 |   OUTPUT   | Control for RAM/ROM at $A000-$BFFF         |
-  |  HIRAM  | 1 |   OUTPUT   | Control for RAM/ROM at $E000-$FFFF         |
-  |  CHAREN | 2 |   OUTPUT   | Control for I/O/ROM at $D000-$DFFF         |
-  |         | 3 |   OUTPUT   | Cassette write line                        |
-  |         | 4 |   INPUT    | Cassette switch sense (0=play button down) |
-  |         | 5 |   OUTPUT   | Cassette motor control (0=motor spins)     |
-  +---------+---+------------+--------------------------------------------+
-*/
-
 const DUTY_CYCLE: u32 = 50;
-
-#[derive(Copy, Clone)]
-enum ControlPort {
-    CassetteSwitch = 4,
-    CassetteMotor = 5,
-}
-
-impl ControlPort {
-    pub fn value(self) -> usize {
-        self as usize
-    }
-}
 
 pub struct Pulse {
     low_cycles: u32,
@@ -66,6 +42,19 @@ impl Pulse {
     }
 }
 
+/*
+  +---------+---+------------+--------------------------------------------+
+  |  NAME   |BIT| DIRECTION  |                 DESCRIPTION                |
+  +---------+---+------------+--------------------------------------------+
+  |  LORAM  | 0 |   OUTPUT   | Control for RAM/ROM at $A000-$BFFF         |
+  |  HIRAM  | 1 |   OUTPUT   | Control for RAM/ROM at $E000-$FFFF         |
+  |  CHAREN | 2 |   OUTPUT   | Control for I/O/ROM at $D000-$DFFF         |
+  |         | 3 |   OUTPUT   | Cassette write line                        |
+  |         | 4 |   INPUT    | Cassette switch sense (0=play button down) |
+  |         | 5 |   OUTPUT   | Cassette motor control (0=motor spins)     |
+  +---------+---+------------+--------------------------------------------+
+*/
+
 pub struct Datassette {
     // Dependencies
     cia_flag_pin: Shared<Pin>,
@@ -87,8 +76,15 @@ impl Datassette {
         }
     }
 
-    pub fn attach(&mut self, tape: Box<dyn Tape>) {
-        self.tape = Some(tape);
+    pub fn reset(&mut self) {
+        self.cpu_io_port
+            .borrow_mut()
+            .set_input_bit(ControlPort::CassetteSwitch.value(), true);
+        self.playing = false;
+        self.current_pulse = Pulse::new(0, DUTY_CYCLE);
+        if let Some(ref mut tape) = self.tape {
+            tape.seek(0);
+        }
     }
 
     pub fn clock(&mut self) {
@@ -111,6 +107,10 @@ impl Datassette {
                     .set_active(self.current_pulse.advance());
             }
         }
+    }
+
+    pub fn attach(&mut self, tape: Box<dyn Tape>) {
+        self.tape = Some(tape);
     }
 
     pub fn detach(&mut self) {
@@ -138,22 +138,23 @@ impl Datassette {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.cpu_io_port
-            .borrow_mut()
-            .set_input_bit(ControlPort::CassetteSwitch.value(), true);
-        self.playing = false;
-        self.current_pulse = Pulse::new(0, DUTY_CYCLE);
-        if let Some(ref mut tape) = self.tape {
-            tape.seek(0);
-        }
-    }
-
     pub fn stop(&mut self) {
         info!(target: "device", "Stopping datassette");
         self.cpu_io_port
             .borrow_mut()
             .set_input_bit(ControlPort::CassetteSwitch.value(), true);
         self.playing = false;
+    }
+}
+
+#[derive(Copy, Clone)]
+enum ControlPort {
+    CassetteSwitch = 4,
+    CassetteMotor = 5,
+}
+
+impl ControlPort {
+    pub fn value(self) -> usize {
+        self as usize
     }
 }

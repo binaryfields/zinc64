@@ -4,6 +4,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
+
 use bit_field::BitField;
 
 pub type Observer = Box<dyn Fn(u8)>;
@@ -31,6 +32,17 @@ impl IoPort {
         self.direction
     }
 
+    pub fn set_observer(&mut self, observer: Observer) {
+        self.observer = Some(observer);
+    }
+
+    pub fn reset(&mut self) {
+        self.direction = 0x00;
+        self.input = 0xff;
+        self.output = 0x00;
+        self.notify_observer();
+    }
+
     pub fn get_value(&self) -> u8 {
         (self.output & self.direction) | (self.input & !self.direction)
     }
@@ -54,19 +66,8 @@ impl IoPort {
         self.notify_observer();
     }
 
-    pub fn set_observer(&mut self, observer: Observer) {
-        self.observer = Some(observer);
-    }
-
     pub fn set_value(&mut self, value: u8) {
         self.output = value;
-        self.notify_observer();
-    }
-
-    pub fn reset(&mut self) {
-        self.direction = 0x00;
-        self.input = 0xff;
-        self.output = 0x00;
         self.notify_observer();
     }
 

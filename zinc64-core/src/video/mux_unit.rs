@@ -49,28 +49,18 @@ impl MuxUnit {
         }
     }
 
-    pub fn compute_collisions(&mut self, sprite_output: &[Option<u8>; 8]) {
-        let fg_graphics = self.output_priority == PRIO_FG_GRAPHICS;
-        let mut mb_collision = self.mb_collision;
-        let mut mm_collision = self.mm_collision;
-        let mut mm_count = 0u8;
-        for (i, output) in sprite_output.iter().enumerate() {
-            if output.is_some() {
-                if fg_graphics {
-                    mb_collision.set_bit(i, true);
-                }
-                mm_collision.set_bit(i, true);
-                mm_count += 1;
-            }
-        }
-        if mm_count != 0 {
-            self.mb_interrupt = self.mb_collision == 0 && mb_collision != 0;
-            self.mb_collision |= mb_collision;
-            if mm_count >= 2 {
-                self.mm_interrupt = self.mm_collision == 0 && mm_collision != 0;
-                self.mm_collision |= mm_collision;
-            }
-        }
+    pub fn output(&self) -> u8 {
+        self.output
+    }
+
+    pub fn reset(&mut self) {
+        self.config.reset();
+        self.mb_collision = 0;
+        self.mb_interrupt = false;
+        self.mm_collision = 0;
+        self.mm_interrupt = false;
+        self.output = 0;
+        self.output_priority = 0;
     }
 
     pub fn feed_border(&mut self, border_output: u8) {
@@ -99,20 +89,6 @@ impl MuxUnit {
         }
     }
 
-    pub fn output(&self) -> u8 {
-        self.output
-    }
-
-    pub fn reset(&mut self) {
-        self.config.reset();
-        self.mb_collision = 0;
-        self.mb_interrupt = false;
-        self.mm_collision = 0;
-        self.mm_interrupt = false;
-        self.output = 0;
-        self.output_priority = 0;
-    }
-
     fn output_pixel(&mut self, pixel: u8, priority: u8) {
         self.output = pixel;
         self.output_priority = priority;
@@ -122,6 +98,30 @@ impl MuxUnit {
         if priority < self.output_priority {
             self.output = pixel;
             self.output_priority = priority;
+        }
+    }
+
+    pub fn compute_collisions(&mut self, sprite_output: &[Option<u8>; 8]) {
+        let fg_graphics = self.output_priority == PRIO_FG_GRAPHICS;
+        let mut mb_collision = self.mb_collision;
+        let mut mm_collision = self.mm_collision;
+        let mut mm_count = 0u8;
+        for (i, output) in sprite_output.iter().enumerate() {
+            if output.is_some() {
+                if fg_graphics {
+                    mb_collision.set_bit(i, true);
+                }
+                mm_collision.set_bit(i, true);
+                mm_count += 1;
+            }
+        }
+        if mm_count != 0 {
+            self.mb_interrupt = self.mb_collision == 0 && mb_collision != 0;
+            self.mb_collision |= mb_collision;
+            if mm_count >= 2 {
+                self.mm_interrupt = self.mm_collision == 0 && mm_collision != 0;
+                self.mm_collision |= mm_collision;
+            }
         }
     }
 }

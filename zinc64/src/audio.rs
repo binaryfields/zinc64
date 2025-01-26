@@ -30,6 +30,32 @@ struct AudioRendererState {
     volume: u8,
 }
 
+pub struct SoundBuffer {
+    buffer: Mutex<CircularBuffer<i16>>,
+}
+
+impl SoundBuffer {
+    pub fn new(length: usize) -> Self {
+        SoundBuffer {
+            buffer: Mutex::new(CircularBuffer::new(length)),
+        }
+    }
+}
+
+impl SoundOutput for SoundBuffer {
+    fn reset(&self) {
+        let mut output = self.buffer.lock().unwrap();
+        output.reset();
+    }
+
+    fn write(&self, samples: &[i16]) {
+        let mut output = self.buffer.lock().unwrap();
+        for sample in samples {
+            output.push(*sample);
+        }
+    }
+}
+
 pub struct AudioRenderer {
     // Resources
     stream: cpal::Stream,
@@ -83,12 +109,12 @@ impl AudioRenderer {
         self.play();
     }
 
-    pub fn pause(&self) {
-        self.stream.pause().expect("failed to pause stream");
-    }
-
     pub fn play(&mut self) {
         self.stream.play().expect("failed to play stream");
+    }
+
+    pub fn pause(&self) {
+        self.stream.pause().expect("failed to pause stream");
     }
 
     pub fn set_volume(&mut self, volume: u8) {
@@ -186,32 +212,6 @@ fn write_data<T>(
             } else {
                 *sample = T::from_sample(0i16);
             }
-        }
-    }
-}
-
-pub struct SoundBuffer {
-    buffer: Mutex<CircularBuffer<i16>>,
-}
-
-impl SoundBuffer {
-    pub fn new(length: usize) -> Self {
-        SoundBuffer {
-            buffer: Mutex::new(CircularBuffer::new(length)),
-        }
-    }
-}
-
-impl SoundOutput for SoundBuffer {
-    fn reset(&self) {
-        let mut output = self.buffer.lock().unwrap();
-        output.reset();
-    }
-
-    fn write(&self, samples: &[i16]) {
-        let mut output = self.buffer.lock().unwrap();
-        for sample in samples {
-            output.push(*sample);
         }
     }
 }

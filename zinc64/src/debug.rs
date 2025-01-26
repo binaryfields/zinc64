@@ -16,8 +16,6 @@ use zinc64_system::C64;
 
 use crate::app::RuntimeState;
 
-// DEFERRED debugger: impl io
-
 struct CmdResult(Output, Option<RuntimeState>);
 
 impl CmdResult {
@@ -34,6 +32,8 @@ impl CmdResult {
     }
 }
 
+// DEFERRED debugger: impl io
+
 pub struct Debug {
     debug_rx: mpsc::Receiver<Command>,
     debugger: Option<Sender<Output>>,
@@ -46,6 +46,18 @@ impl Debug {
             debugger: None,
         }
     }
+
+    // ---- command polling ----
+
+    pub fn poll(&mut self, debugging: bool) -> Option<Command> {
+        if debugging {
+            self.debug_rx.recv_timeout(Duration::from_millis(1)).ok()
+        } else {
+            self.debug_rx.try_recv().ok()
+        }
+    }
+
+    // ---- command execution ----
 
     pub fn execute(
         &mut self,
@@ -62,18 +74,6 @@ impl Debug {
                 self.send_result(Output::Error(error.clone()));
                 Err(error)
             }
-        }
-    }
-
-    pub fn halt(&mut self) -> Result<(), String> {
-        self.send_result(Output::Unit)
-    }
-
-    pub fn poll(&mut self, debugging: bool) -> Option<Command> {
-        if debugging {
-            self.debug_rx.recv_timeout(Duration::from_millis(1)).ok()
-        } else {
-            self.debug_rx.try_recv().ok()
         }
     }
 
@@ -105,18 +105,6 @@ impl Debug {
             Command::SysStopwatch(reset) => self.sys_stopwatch(c64, reset),
         }
     }
-
-    fn send_result(&self, result: Output) -> Result<(), String> {
-        if let Some(ref debugger) = self.debugger {
-            debugger
-                .send(result)
-                .map_err(|_| "Failed to send result".to_string())
-        } else {
-            Ok(())
-        }
-    }
-
-    // -- Commands
 
     fn attach(&mut self, c64: &mut C64, debugger: &Sender<Output>) -> Result<CmdResult, String> {
         self.debugger = Some(debugger.clone());
@@ -294,5 +282,23 @@ impl Debug {
             .write_u64::<BigEndian>(c64.stopwatch())
             .map_err(|_| "Op failed")?;
         CmdResult::ok(Output::Buffer(buffer))
+    }
+
+    // ---- halt notification ----
+
+    pub fn halt(&mut self) -> Result<(), String> {
+        self.send_result(Output::Unit)
+    }
+
+    // ---- shared ----
+
+    fn send_result(&self, result: Output) -> Result<(), String> {
+        if let Some(ref debugger) = self.debugger {
+            debugger
+                .send(result)
+                .map_err(|_| "Failed to send result".to_string())
+        } else {
+            Ok(())
+        }
     }
 }

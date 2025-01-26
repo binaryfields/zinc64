@@ -5,21 +5,6 @@
 
 use core::fmt;
 
-pub enum Operand {
-    Accumulator,
-    Immediate(u8),
-    ZeroPage(u8),
-    ZeroPageX(u8),
-    ZeroPageY(u8),
-    Absolute(u16),
-    AbsoluteX(u16),
-    AbsoluteY(u16),
-    IndirectX(u8),
-    IndirectY(u8),
-    Indirect(u16),
-    Relative(i8),
-}
-
 #[allow(clippy::upper_case_acronyms)]
 pub enum Instruction {
     // Data Movement (16)
@@ -91,25 +76,6 @@ pub enum Instruction {
     AXS(Operand),
     LAX(Operand),
     LSE(Operand),
-}
-
-impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Operand::Accumulator => write!(f, "acc"),
-            Operand::Immediate(value) => write!(f, "#{:02x}", value),
-            Operand::ZeroPage(address) => write!(f, "${:02x}", address),
-            Operand::ZeroPageX(address) => write!(f, "${:02x},x", address),
-            Operand::ZeroPageY(address) => write!(f, "${:02x},y", address),
-            Operand::Absolute(address) => write!(f, "${:04x}", address),
-            Operand::AbsoluteX(address) => write!(f, "${:04x},x", address),
-            Operand::AbsoluteY(address) => write!(f, "${:04x},y", address),
-            Operand::IndirectX(address) => write!(f, "$({:02x},x)", address),
-            Operand::IndirectY(address) => write!(f, "$({:02x},y)", address),
-            Operand::Indirect(address) => write!(f, "$({:04x})", address),
-            Operand::Relative(offset) => write!(f, "${:02x}", offset),
-        }
-    }
 }
 
 impl fmt::Display for Instruction {
@@ -184,6 +150,40 @@ impl fmt::Display for Instruction {
             Instruction::AXS(ref operand) => write!(f, "axs {}", operand),
             Instruction::LAX(ref operand) => write!(f, "lax {}", operand),
             Instruction::LSE(ref operand) => write!(f, "lse {}", operand),
+        }
+    }
+}
+
+pub enum Operand {
+    Accumulator,
+    Immediate(u8),
+    ZeroPage(u8),
+    ZeroPageX(u8),
+    ZeroPageY(u8),
+    Absolute(u16),
+    AbsoluteX(u16),
+    AbsoluteY(u16),
+    IndirectX(u8),
+    IndirectY(u8),
+    Indirect(u16),
+    Relative(i8),
+}
+
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Operand::Accumulator => write!(f, "acc"),
+            Operand::Immediate(value) => write!(f, "#{:02x}", value),
+            Operand::ZeroPage(address) => write!(f, "${:02x}", address),
+            Operand::ZeroPageX(address) => write!(f, "${:02x},x", address),
+            Operand::ZeroPageY(address) => write!(f, "${:02x},y", address),
+            Operand::Absolute(address) => write!(f, "${:04x}", address),
+            Operand::AbsoluteX(address) => write!(f, "${:04x},x", address),
+            Operand::AbsoluteY(address) => write!(f, "${:04x},y", address),
+            Operand::IndirectX(address) => write!(f, "$({:02x},x)", address),
+            Operand::IndirectY(address) => write!(f, "$({:02x},y)", address),
+            Operand::Indirect(address) => write!(f, "$({:04x})", address),
+            Operand::Relative(offset) => write!(f, "${:02x}", offset),
         }
     }
 }

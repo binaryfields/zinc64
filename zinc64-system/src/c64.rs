@@ -14,34 +14,20 @@ use alloc::sync::Arc;
 use std::rc::Rc;
 #[cfg(feature = "std")]
 use std::sync::Arc;
+
+use zinc64_core::device::joystick;
+use zinc64_core::device::{Cartridge, Datassette, Joystick, Keyboard};
+use zinc64_core::factory::Tape;
 use zinc64_core::factory::*;
+use zinc64_core::mem::{ExpansionPort, Pla};
 use zinc64_core::util::*;
 
 use super::breakpoint::BreakpointManager;
 use super::{Autostart, Config};
-use zinc64_core::device::joystick;
-use zinc64_core::device::{Cartridge, Datassette, Joystick, Keyboard};
-use zinc64_core::factory::Tape;
-use zinc64_core::mem::{ExpansionPort, Pla};
 
 // Design:
 //   C64 represents the machine itself and all of its components. Connections between different
 //   components are managed as component dependencies.
-
-#[allow(dead_code)]
-#[derive(Copy, Clone)]
-enum BaseAddr {
-    Basic = 0xa000,
-    BootComplete = 0xa65c,
-    Charset = 0xd000,
-    Kernal = 0xe000,
-}
-
-impl BaseAddr {
-    pub fn addr(self) -> u16 {
-        self as u16
-    }
-}
 
 pub struct C64 {
     // Dependencies
@@ -252,18 +238,6 @@ impl C64 {
         }
     }
 
-    pub fn get_bpm(&self) -> &BreakpointManager {
-        &self.breakpoints
-    }
-
-    pub fn get_bpm_mut(&mut self) -> &mut BreakpointManager {
-        &mut self.breakpoints
-    }
-
-    pub fn get_clock(&self) -> Rc<Clock> {
-        self.clock.clone()
-    }
-
     pub fn get_config(&self) -> &Config {
         &self.config
     }
@@ -276,8 +250,8 @@ impl C64 {
         &mut *self.cpu
     }
 
-    pub fn get_cycles(&self) -> u64 {
-        self.clock.get()
+    pub fn is_cpu_jam(&self) -> bool {
+        self.cpu.is_cpu_jam()
     }
 
     pub fn get_cia_1(&self) -> Shared<dyn Chip> {
@@ -288,12 +262,16 @@ impl C64 {
         self.cia_2.clone()
     }
 
-    pub fn get_datasette(&self) -> Shared<Datassette> {
-        self.datassette.clone()
+    pub fn get_sid(&self) -> Shared<dyn Chip> {
+        self.sid.clone()
     }
 
-    pub fn get_frame_count(&self) -> u32 {
-        self.frame_count
+    pub fn get_vic(&self) -> Shared<dyn Chip> {
+        self.vic.clone()
+    }
+
+    pub fn get_datasette(&self) -> Shared<Datassette> {
+        self.datassette.clone()
     }
 
     pub fn get_joystick1(&self) -> &Option<Joystick> {
@@ -316,51 +294,35 @@ impl C64 {
         &mut self.keyboard
     }
 
-    pub fn get_sid(&self) -> Shared<dyn Chip> {
-        self.sid.clone()
+    pub fn get_bpm(&self) -> &BreakpointManager {
+        &self.breakpoints
     }
 
-    pub fn get_vic(&self) -> Shared<dyn Chip> {
-        self.vic.clone()
+    pub fn get_bpm_mut(&mut self) -> &mut BreakpointManager {
+        &mut self.breakpoints
+    }
+
+    pub fn get_clock(&self) -> Rc<Clock> {
+        self.clock.clone()
+    }
+
+    pub fn get_cycles(&self) -> u64 {
+        self.clock.get()
+    }
+
+    pub fn get_frame_count(&self) -> u32 {
+        self.frame_count
     }
 
     pub fn get_vsync(&self) -> bool {
         self.vsync_flag.get()
     }
 
-    pub fn is_cpu_jam(&self) -> bool {
-        self.cpu.is_cpu_jam()
-    }
-
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
         self.autostart = autostart;
     }
 
-    pub fn reset_vsync(&self) {
-        self.vsync_flag.set(false)
-    }
-
-    pub fn stopwatch(&self) -> u64 {
-        self.clock.get() - self.stopwatch_start
-    }
-
-    pub fn reset_stopwatch(&mut self) {
-        self.stopwatch_start = self.clock.get();
-    }
-
-    pub fn check_breakpoints(&mut self) -> bool {
-        self.breakpoints.check(&*self.cpu).is_some()
-    }
-
-    pub fn load(&mut self, data: &[u8], offset: u16) {
-        let mut mem = self.ram.borrow_mut();
-        let mut address = offset;
-        for byte in data {
-            mem.write(address, *byte);
-            address = address.wrapping_add(1);
-        }
-    }
-
+    // ---- reset ----
     pub fn reset(&mut self, hard: bool) {
         info!(target: "c64", "Resetting system");
         self.clock.reset();
@@ -398,6 +360,43 @@ impl C64 {
         self.vsync_flag.set(false);
     }
 
+    // ---- stopwatch ----
+    pub fn stopwatch(&self) -> u64 {
+        self.clock.get() - self.stopwatch_start
+    }
+
+    pub fn reset_stopwatch(&mut self) {
+        self.stopwatch_start = self.clock.get();
+    }
+
+    // ---- media ----
+    pub fn load(&mut self, data: &[u8], offset: u16) {
+        let mut mem = self.ram.borrow_mut();
+        let mut address = offset;
+        for byte in data {
+            mem.write(address, *byte);
+            address = address.wrapping_add(1);
+        }
+    }
+
+    pub fn attach_cartridge(&mut self, cartridge: Cartridge) {
+        self.expansion_port.borrow_mut().attach(cartridge);
+    }
+
+    pub fn attach_tape(&mut self, tape: Box<dyn Tape>) {
+        self.datassette.borrow_mut().attach(tape);
+    }
+
+    pub fn detach_cartridge(&mut self) {
+        self.expansion_port.borrow_mut().detach();
+        self.reset(false);
+    }
+
+    pub fn detach_tape(&mut self) {
+        self.datassette.borrow_mut().detach();
+    }
+
+    // ---- execution ----
     pub fn run_frame(&mut self) -> bool {
         let tick_fn = self.tick_fn.clone();
         let bp_present = self.breakpoints.is_bp_present();
@@ -416,6 +415,10 @@ impl C64 {
         self.vsync_flag.get()
     }
 
+    pub fn reset_vsync(&self) {
+        self.vsync_flag.set(false)
+    }
+
     pub fn step(&mut self) {
         let tick_fn = self.tick_fn.clone();
         self.step_internal(&tick_fn);
@@ -425,6 +428,10 @@ impl C64 {
             self.cia_2.borrow_mut().process_vsync();
             self.frame_count = self.frame_count.wrapping_add(1);
         }
+    }
+
+    pub fn check_breakpoints(&mut self) -> bool {
+        self.breakpoints.check(&*self.cpu).is_some()
     }
 
     #[inline]
@@ -437,24 +444,20 @@ impl C64 {
             autostart.execute(self);
         }
     }
+}
 
-    // -- Peripherals Ops
+#[allow(dead_code)]
+#[derive(Copy, Clone)]
+enum BaseAddr {
+    Basic = 0xa000,
+    BootComplete = 0xa65c,
+    Charset = 0xd000,
+    Kernal = 0xe000,
+}
 
-    pub fn attach_cartridge(&mut self, cartridge: Cartridge) {
-        self.expansion_port.borrow_mut().attach(cartridge);
-    }
-
-    pub fn attach_tape(&mut self, tape: Box<dyn Tape>) {
-        self.datassette.borrow_mut().attach(tape);
-    }
-
-    pub fn detach_cartridge(&mut self) {
-        self.expansion_port.borrow_mut().detach();
-        self.reset(false);
-    }
-
-    pub fn detach_tape(&mut self) {
-        self.datassette.borrow_mut().detach();
+impl BaseAddr {
+    pub fn addr(self) -> u16 {
+        self as u16
     }
 }
 
@@ -467,6 +470,21 @@ mod tests {
     static RES_BASIC_ROM: &[u8] = include_bytes!("../../res/rom/basic.rom");
     static RES_CHARSET_ROM: &[u8] = include_bytes!("../../res/rom/characters.rom");
     static RES_KERNAL_ROM: &[u8] = include_bytes!("../../res/rom/kernal.rom");
+
+    struct NullSound;
+    impl SoundOutput for NullSound {
+        fn reset(&self) {}
+        fn write(&self, _samples: &[i16]) {}
+    }
+
+    struct NullVideo;
+    impl VideoOutput for NullVideo {
+        fn get_dimension(&self) -> (usize, usize) {
+            (0, 0)
+        }
+        fn reset(&mut self) {}
+        fn write(&mut self, _index: usize, _color: u8) {}
+    }
 
     #[test]
     fn verify_mem_layout() {
@@ -483,20 +501,5 @@ mod tests {
         c64.reset(false);
         let cpu = c64.get_cpu();
         assert_eq!(0x94, cpu.read(0xa000));
-    }
-
-    struct NullSound;
-    impl SoundOutput for NullSound {
-        fn reset(&self) {}
-        fn write(&self, _samples: &[i16]) {}
-    }
-
-    struct NullVideo;
-    impl VideoOutput for NullVideo {
-        fn get_dimension(&self) -> (usize, usize) {
-            (0, 0)
-        }
-        fn reset(&mut self) {}
-        fn write(&mut self, _index: usize, _color: u8) {}
     }
 }

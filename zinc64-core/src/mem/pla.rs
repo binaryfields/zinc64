@@ -4,10 +4,12 @@
 
 // SPEC: https://www.c64-wiki.com/index.php/Bank_Switching
 
-use crate::factory::{Bank, Mmu};
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
+
 use log::LogLevel;
+
+use crate::factory::{Bank, Mmu};
 
 #[derive(Clone, Copy)]
 struct Mode {
@@ -75,6 +77,15 @@ impl Mmu for Pla {
 
 struct MemoryMap {
     modes: [Mode; 32],
+}
+
+impl MemoryMap {
+    pub fn get(&self, mode: u8) -> Mode {
+        match mode {
+            0..=31 => self.modes[mode as usize],
+            _ => panic!("invalid mode {}", mode),
+        }
+    }
 }
 
 impl Default for MemoryMap {
@@ -267,15 +278,6 @@ impl Default for MemoryMap {
                 Mode::new(m30_14),
                 Mode::new(m31),
             ],
-        }
-    }
-}
-
-impl MemoryMap {
-    pub fn get(&self, mode: u8) -> Mode {
-        match mode {
-            0..=31 => self.modes[mode as usize],
-            _ => panic!("invalid mode {}", mode),
         }
     }
 }

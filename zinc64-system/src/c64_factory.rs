@@ -12,17 +12,18 @@ use alloc::sync::Arc;
 use std::rc::Rc;
 #[cfg(feature = "std")]
 use std::sync::Arc;
-use zinc64_core::factory::*;
-use zinc64_core::util::*;
 
-use super::Config;
 use zinc64_core::cpu::Cpu6510;
+use zinc64_core::factory::*;
 use zinc64_core::io::Cia;
 use zinc64_core::io::cia;
 use zinc64_core::mem::{Memory, Mmio};
 use zinc64_core::sound::Sid;
 use zinc64_core::sound::sid::SamplingMethod;
+use zinc64_core::util::*;
 use zinc64_core::video::{Vic, VicMemory};
+
+use super::Config;
 
 pub struct C64Factory {
     config: Rc<Config>,
@@ -45,8 +46,6 @@ impl ChipFactory for C64Factory {
     ) -> Box<dyn Cpu> {
         Box::new(Cpu6510::new(mem, io_port, ba_line, irq_line, nmi_line))
     }
-
-    // -- Chipset
 
     fn new_cia_1(
         &self,
@@ -128,8 +127,6 @@ impl ChipFactory for C64Factory {
             irq_line,
         ))
     }
-
-    // -- Memory
 
     fn new_memory(
         &self,

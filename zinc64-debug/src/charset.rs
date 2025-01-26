@@ -4,6 +4,8 @@
 
 // SPEC: https://sites.google.com/site/h2obsession/CBM/petscii
 
+// ---- ascii conversion ----
+
 pub fn pet_to_ascii(code: u8) -> u8 {
     match code {
         // Block 0, Low Control Codes

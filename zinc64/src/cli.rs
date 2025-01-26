@@ -127,18 +127,46 @@ pub struct Opt {
     pub log_target_level: Vec<(String, String)>,
 }
 
-pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
-    Ok(app::Options {
-        jam_action: opt.jam_action,
-        speed: opt.speed.unwrap_or(100),
-        warp_mode: opt.warp_mode,
-        joydev_1: opt.joydev_1,
-        joydev_2: opt.joydev_2,
-        debug: opt.debug,
-        dbg_address: opt.dbg_address,
-        rap_address: SocketAddr::from(([127, 0, 0, 1], 9999)), // opt.rap_address,
-    })
+// ---- argument parsing ----
+
+fn parse_jam_action(s: &str) -> Result<JamAction, Box<dyn Error>> {
+    match s {
+        "continue" => Ok(JamAction::Continue),
+        "quit" => Ok(JamAction::Quit),
+        "reset" => Ok(JamAction::Reset),
+        _ => Err(Box::<dyn Error>::from("invalid jamaction".to_string())),
+    }
 }
+
+fn parse_joy_mode(mode: &str) -> Result<joystick::Mode, Box<dyn Error>> {
+    match mode {
+        "none" => Ok(joystick::Mode::None),
+        "numpad" => Ok(joystick::Mode::Numpad),
+        "joy0" => Ok(joystick::Mode::Joy0),
+        "joy1" => Ok(joystick::Mode::Joy1),
+        _ => Err(Box::<dyn Error>::from("invalid joystick".to_string())),
+    }
+}
+
+fn parse_socket_addr(s: &str) -> Result<SocketAddr, Box<dyn Error>> {
+    s.parse::<SocketAddr>()
+        .map_err(|_| Box::<dyn Error>::from("invalid address".to_string()))
+}
+
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error>>
+where
+    T: std::str::FromStr,
+    T::Err: Error + 'static,
+    U: std::str::FromStr,
+    U::Err: Error + 'static,
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
+}
+
+// ---- emulator config ----
 
 pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
     let model = SystemModel::from(opt.model.as_str());
@@ -174,6 +202,15 @@ pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
     Ok(config)
 }
 
+fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
+    let mut data = Vec::new();
+    let mut file = File::open(path)?;
+    file.read_to_end(&mut data)?;
+    Ok(data)
+}
+
+// ---- c64 options ----
+
 pub fn set_c64_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
     set_c64_debug_options(c64, opt)?;
     Ok(())
@@ -186,46 +223,17 @@ fn set_c64_debug_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
     Ok(())
 }
 
-fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
-    let mut data = Vec::new();
-    let mut file = File::open(path)?;
-    file.read_to_end(&mut data)?;
-    Ok(data)
-}
+// ---- app options ----
 
-fn parse_jam_action(s: &str) -> Result<JamAction, Box<dyn Error>> {
-    match s {
-        "continue" => Ok(JamAction::Continue),
-        "quit" => Ok(JamAction::Quit),
-        "reset" => Ok(JamAction::Reset),
-        _ => Err(Box::<dyn Error>::from("invalid jamaction".to_string())),
-    }
-}
-
-fn parse_joy_mode(mode: &str) -> Result<joystick::Mode, Box<dyn Error>> {
-    match mode {
-        "none" => Ok(joystick::Mode::None),
-        "numpad" => Ok(joystick::Mode::Numpad),
-        "joy0" => Ok(joystick::Mode::Joy0),
-        "joy1" => Ok(joystick::Mode::Joy1),
-        _ => Err(Box::<dyn Error>::from("invalid joystick".to_string())),
-    }
-}
-
-fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error>>
-where
-    T: std::str::FromStr,
-    T::Err: Error + 'static,
-    U: std::str::FromStr,
-    U::Err: Error + 'static,
-{
-    let pos = s
-        .find('=')
-        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
-    Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
-}
-
-fn parse_socket_addr(s: &str) -> Result<SocketAddr, Box<dyn Error>> {
-    s.parse::<SocketAddr>()
-        .map_err(|_| Box::<dyn Error>::from("invalid address".to_string()))
+pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
+    Ok(app::Options {
+        jam_action: opt.jam_action,
+        speed: opt.speed.unwrap_or(100),
+        warp_mode: opt.warp_mode,
+        joydev_1: opt.joydev_1,
+        joydev_2: opt.joydev_2,
+        debug: opt.debug,
+        dbg_address: opt.dbg_address,
+        rap_address: SocketAddr::from(([127, 0, 0, 1], 9999)), // opt.rap_address,
+    })
 }

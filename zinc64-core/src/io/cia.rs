@@ -5,34 +5,16 @@
 use bit_field::BitField;
 use log::LogLevel;
 
-use crate::factory::Chip;
-use crate::util::{IoPort, IrqControl, IrqLine, Pin, Shared, SharedCell, new_shared};
-
 use super::cycle_counter::CycleCounter;
 use super::rtc::Rtc;
 use super::timer;
 use super::timer::Timer;
+use crate::factory::Chip;
+use crate::util::{IoPort, IrqControl, IrqLine, Pin, Shared, SharedCell, new_shared};
 
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
 // Spec: https://www.c64-wiki.com/index.php/CIA
 // http://www.unusedino.de/ec64/technical/project64/mapping_c64.html
-
-enum IntDelay {
-    Interrupt0 = 1,
-    Interrupt1 = 1 << 1,
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum Mode {
-    Cia1 = 0,
-    Cia2 = 1,
-}
-
-impl Mode {
-    pub fn irq_source(self) -> usize {
-        self as usize
-    }
-}
 
 pub mod reg {
     pub const PRA: u8 = 0x00;
@@ -51,6 +33,18 @@ pub mod reg {
     pub const ICR: u8 = 0x0d;
     pub const CRA: u8 = 0x0e;
     pub const CRB: u8 = 0x0f;
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum Mode {
+    Cia1 = 0,
+    Cia2 = 1,
+}
+
+impl Mode {
+    pub fn irq_source(self) -> usize {
+        self as usize
+    }
 }
 
 pub struct Cia {
@@ -136,30 +130,6 @@ impl Cia {
         result & joystick_state
     }
 
-    fn read_cia2_port_a(&self) -> u8 {
-        // iec inputs
-        self.port_a.borrow().get_value()
-    }
-
-    fn read_cia2_port_b(&self) -> u8 {
-        let mut result = self.port_b.borrow().get_value();
-        if self.timer_a.is_pb_on() {
-            result.set_bit(6, self.timer_a.get_pb_output());
-        }
-        if self.timer_b.is_pb_on() {
-            result.set_bit(7, self.timer_b.get_pb_output());
-        }
-        result
-    }
-
-    fn scan_joystick(&self, joystick: &Option<SharedCell<u8>>) -> u8 {
-        if let Some(ref state) = *joystick {
-            !state.get()
-        } else {
-            0xff
-        }
-    }
-
     fn scan_keyboard_active_cols(&self, active_columns: u8) -> u8 {
         if let Some(matrix) = self.keyboard_matrix.as_ref() {
             let mut result = 0xff;
@@ -169,6 +139,14 @@ impl Cia {
                 }
             }
             result
+        } else {
+            0xff
+        }
+    }
+
+    fn scan_joystick(&self, joystick: &Option<SharedCell<u8>>) -> u8 {
+        if let Some(ref state) = *joystick {
+            !state.get()
         } else {
             0xff
         }
@@ -186,6 +164,22 @@ impl Cia {
         } else {
             0xff
         }
+    }
+
+    fn read_cia2_port_a(&self) -> u8 {
+        // iec inputs
+        self.port_a.borrow().get_value()
+    }
+
+    fn read_cia2_port_b(&self) -> u8 {
+        let mut result = self.port_b.borrow().get_value();
+        if self.timer_a.is_pb_on() {
+            result.set_bit(6, self.timer_a.get_pb_output());
+        }
+        if self.timer_b.is_pb_on() {
+            result.set_bit(7, self.timer_b.get_pb_output());
+        }
+        result
     }
 }
 
@@ -422,12 +416,17 @@ impl Chip for Cia {
     }
 }
 
-fn from_bcd(decimal: u8) -> u8 {
-    (decimal >> 4) * 10 + (decimal & 0x0f)
+enum IntDelay {
+    Interrupt0 = 1,
+    Interrupt1 = 1 << 1,
 }
 
 fn to_bcd(num: u8) -> u8 {
     ((num / 10) << 4) | (num % 10)
+}
+
+fn from_bcd(decimal: u8) -> u8 {
+    (decimal >> 4) * 10 + (decimal & 0x0f)
 }
 
 #[cfg(test)]
@@ -473,27 +472,6 @@ mod tests {
         );
         cia.reset();
         cia
-    }
-
-    #[test]
-    fn read_regs() {
-        let mut cia = setup_cia();
-        assert_eq!(0xff, cia.read(reg::PRA));
-        assert_eq!(0xff, cia.read(reg::PRB));
-        assert_eq!(0x00, cia.read(reg::DDRA));
-        assert_eq!(0x00, cia.read(reg::DDRB));
-        assert_eq!(0x00, cia.read(reg::TALO));
-        assert_eq!(0x00, cia.read(reg::TAHI));
-        assert_eq!(0x00, cia.read(reg::TBLO));
-        assert_eq!(0x00, cia.read(reg::TBHI));
-        assert_eq!(0x00, cia.read(reg::TODTS));
-        assert_eq!(0x00, cia.read(reg::TODSEC));
-        assert_eq!(0x00, cia.read(reg::TODMIN));
-        assert_eq!(0x00, cia.read(reg::TODHR));
-        assert_eq!(0x00, cia.read(reg::SDR));
-        assert_eq!(0x00, cia.read(reg::ICR));
-        assert_eq!(0x08, cia.read(reg::CRA));
-        assert_eq!(0x08, cia.read(reg::CRB));
     }
 
     #[test]
@@ -560,6 +538,27 @@ mod tests {
             let cpu_irq = cia.irq_line.borrow();
             assert!(cpu_irq.is_low());
         }
+    }
+
+    #[test]
+    fn read_regs() {
+        let mut cia = setup_cia();
+        assert_eq!(0xff, cia.read(reg::PRA));
+        assert_eq!(0xff, cia.read(reg::PRB));
+        assert_eq!(0x00, cia.read(reg::DDRA));
+        assert_eq!(0x00, cia.read(reg::DDRB));
+        assert_eq!(0x00, cia.read(reg::TALO));
+        assert_eq!(0x00, cia.read(reg::TAHI));
+        assert_eq!(0x00, cia.read(reg::TBLO));
+        assert_eq!(0x00, cia.read(reg::TBHI));
+        assert_eq!(0x00, cia.read(reg::TODTS));
+        assert_eq!(0x00, cia.read(reg::TODSEC));
+        assert_eq!(0x00, cia.read(reg::TODMIN));
+        assert_eq!(0x00, cia.read(reg::TODHR));
+        assert_eq!(0x00, cia.read(reg::SDR));
+        assert_eq!(0x00, cia.read(reg::ICR));
+        assert_eq!(0x08, cia.read(reg::CRA));
+        assert_eq!(0x08, cia.read(reg::CRB));
     }
 
     #[test]

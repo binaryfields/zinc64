@@ -2,25 +2,6 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-#[macro_use]
-extern crate log;
-
-mod app;
-mod audio;
-mod cli;
-mod cmd;
-mod console;
-mod debug;
-mod framework;
-mod gfx;
-mod input;
-mod palette;
-mod platform;
-mod time;
-mod ui;
-mod util;
-mod video;
-
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -40,6 +21,25 @@ use crate::palette::Palette;
 use crate::util::{FileReader, Logger};
 use crate::video::VideoBuffer;
 
+#[macro_use]
+extern crate log;
+
+mod app;
+mod audio;
+mod cli;
+mod cmd;
+mod console;
+mod debug;
+mod framework;
+mod gfx;
+mod input;
+mod palette;
+mod platform;
+mod time;
+mod ui;
+mod util;
+mod video;
+
 static NAME: &str = "zinc64";
 
 fn main() {
@@ -51,16 +51,6 @@ fn main() {
             process::exit(1)
         }
     };
-}
-
-fn load_image(c64: &mut C64, path: &Path) -> Result<(), String> {
-    let ext = path.extension().map(|s| s.to_str().unwrap());
-    let loader = Loaders::from_ext(ext)?;
-    let file = File::open(path).map_err(|err| format!("{}", err))?;
-    let mut reader = FileReader(BufReader::new(file));
-    let mut autostart = loader.autostart(&mut reader)?;
-    autostart.execute(c64);
-    Ok(())
 }
 
 fn run(opt: &Opt) -> Result<(), String> {
@@ -105,6 +95,16 @@ fn run(opt: &Opt) -> Result<(), String> {
             )
         })?;
     }
+    Ok(())
+}
+
+fn load_image(c64: &mut C64, path: &Path) -> Result<(), String> {
+    let ext = path.extension().map(|s| s.to_str().unwrap());
+    let loader = Loaders::from_ext(ext)?;
+    let file = File::open(path).map_err(|err| format!("{}", err))?;
+    let mut reader = FileReader(BufReader::new(file));
+    let mut autostart = loader.autostart(&mut reader)?;
+    autostart.execute(c64);
     Ok(())
 }
 

@@ -3,87 +3,6 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 #![allow(unused)]
 
-pub struct CircularBuffer<T: Copy + Default> {
-    buffer: Vec<T>,
-    head: usize,
-    tail: usize,
-}
-
-impl<T: Copy + Default> CircularBuffer<T> {
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            buffer: vec![T::default(); capacity],
-            head: 0,
-            tail: 0,
-        }
-    }
-
-    pub fn advance(&self, pos: usize) -> usize {
-        if pos + 1 == self.capacity() {
-            0
-        } else {
-            pos + 1
-        }
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.buffer.capacity()
-    }
-
-    pub fn iter_from(&self, pos: usize) -> Iter<'_, T> {
-        Iter::new(self, pos)
-    }
-
-    pub fn len(&self) -> usize {
-        self.remaining(self.head)
-    }
-
-    pub fn pop(&mut self) -> Option<T> {
-        if self.head == self.tail {
-            None
-        } else {
-            let value = Some(self.buffer[self.head]);
-            self.head = self.advance(self.head);
-            value
-        }
-    }
-
-    pub fn push(&mut self, value: T) {
-        self.buffer[self.tail] = value;
-        self.tail = self.advance(self.tail);
-        if self.tail == self.head {
-            self.head = self.advance(self.head);
-        }
-    }
-
-    pub fn remaining(&self, pos: usize) -> usize {
-        if self.tail == self.head {
-            0
-        } else if self.tail > pos {
-            self.tail - pos
-        } else {
-            self.capacity() - pos + self.tail
-        }
-    }
-
-    pub fn reset(&mut self) {
-        for value in self.buffer.iter_mut() {
-            *value = T::default();
-        }
-        self.head = 0;
-        self.tail = 0;
-    }
-
-    pub fn restore_pos(&mut self, pos: (usize, usize)) {
-        self.head = pos.0;
-        self.tail = pos.1;
-    }
-
-    pub fn snapshot_pos(&self) -> (usize, usize) {
-        (self.head, self.tail)
-    }
-}
-
 pub struct Iter<'a, T: 'a + Copy + Default> {
     buffer: &'a CircularBuffer<T>,
     pos: usize,
@@ -106,5 +25,86 @@ impl<'a, T: 'a + Copy + Default> Iterator for Iter<'a, T> {
         } else {
             None
         }
+    }
+}
+
+pub struct CircularBuffer<T: Copy + Default> {
+    buffer: Vec<T>,
+    head: usize,
+    tail: usize,
+}
+
+impl<T: Copy + Default> CircularBuffer<T> {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            buffer: vec![T::default(); capacity],
+            head: 0,
+            tail: 0,
+        }
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.buffer.capacity()
+    }
+
+    pub fn snapshot_pos(&self) -> (usize, usize) {
+        (self.head, self.tail)
+    }
+
+    pub fn restore_pos(&mut self, pos: (usize, usize)) {
+        self.head = pos.0;
+        self.tail = pos.1;
+    }
+
+    pub fn reset(&mut self) {
+        for value in self.buffer.iter_mut() {
+            *value = T::default();
+        }
+        self.head = 0;
+        self.tail = 0;
+    }
+
+    pub fn push(&mut self, value: T) {
+        self.buffer[self.tail] = value;
+        self.tail = self.advance(self.tail);
+        if self.tail == self.head {
+            self.head = self.advance(self.head);
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        if self.head == self.tail {
+            None
+        } else {
+            let value = Some(self.buffer[self.head]);
+            self.head = self.advance(self.head);
+            value
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.remaining(self.head)
+    }
+
+    pub fn remaining(&self, pos: usize) -> usize {
+        if self.tail == self.head {
+            0
+        } else if self.tail > pos {
+            self.tail - pos
+        } else {
+            self.capacity() - pos + self.tail
+        }
+    }
+
+    pub fn advance(&self, pos: usize) -> usize {
+        if pos + 1 == self.capacity() {
+            0
+        } else {
+            pos + 1
+        }
+    }
+
+    pub fn iter_from(&self, pos: usize) -> Iter<'_, T> {
+        Iter::new(self, pos)
     }
 }

@@ -8,8 +8,9 @@
 use alloc::prelude::*;
 #[cfg(not(feature = "std"))]
 use alloc::vec;
-use byteorder::BigEndian;
 use core::str;
+
+use byteorder::BigEndian;
 use zinc64_core::device::cartridge;
 use zinc64_system::autostart;
 use zinc64_system::{C64, Image};
@@ -43,70 +44,12 @@ struct ChipHeader {
     image_size: u16,
 }
 
-struct CrtImage {
-    cartridge: Option<cartridge::Cartridge>,
-}
-
-impl Image for CrtImage {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting CRT image");
-        c64.attach_cartridge(self.cartridge.take().unwrap());
-    }
-    fn unmount(&mut self, c64: &mut C64) {
-        c64.detach_cartridge();
-    }
-}
-
 #[derive(Default)]
 pub struct CrtLoader;
 
 impl CrtLoader {
     pub fn new() -> Self {
         Self {}
-    }
-
-    fn build_cartridge(&self, header: &Header) -> cartridge::Cartridge {
-        cartridge::Cartridge::new(
-            header.version,
-            cartridge::HwType::from(header.hw_type as u8),
-            header.exrom_line != 0,
-            header.game_line != 0,
-        )
-    }
-
-    fn build_chip(&self, header: &ChipHeader, data: Vec<u8>) -> cartridge::Chip {
-        cartridge::Chip {
-            chip_type: cartridge::ChipType::from(header.chip_type),
-            bank_number: header.bank_number as u8,
-            offset: header.load_address,
-            size: header.image_size,
-            data,
-        }
-    }
-
-    fn read_chip_header(&self, rdr: &mut dyn Reader) -> io::Result<Option<ChipHeader>> {
-        let mut signature = [0u8; 4];
-        match rdr.read(&mut signature)? {
-            0 => Ok(None),
-            4 => {
-                let header = ChipHeader {
-                    signature,
-                    length: rdr.read_u32::<BigEndian>()?,
-                    chip_type: rdr.read_u16::<BigEndian>()?,
-                    bank_number: rdr.read_u16::<BigEndian>()?,
-                    load_address: rdr.read_u16::<BigEndian>()?,
-                    image_size: rdr.read_u16::<BigEndian>()?,
-                };
-                Ok(Some(header))
-            }
-            size => Err(format!("chip header error, expected {} got {}", 4, size)),
-        }
-    }
-
-    fn read_data(&self, rdr: &mut dyn Reader, length: usize) -> io::Result<Vec<u8>> {
-        let mut data = vec![0; length];
-        rdr.read_exact(&mut data)?;
-        Ok(data)
     }
 
     fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
@@ -135,6 +78,44 @@ impl CrtLoader {
         Ok(header)
     }
 
+    fn validate_header(&self, header: &Header) -> io::Result<()> {
+        let sig = str::from_utf8(&header.signature)
+            .map_err(|_| "invalid cartridge signature".to_owned())?;
+        if sig == HEADER_SIG {
+            Ok(())
+        } else {
+            Err("invalid cartridge signature".to_owned())
+        }
+    }
+
+    fn build_cartridge(&self, header: &Header) -> cartridge::Cartridge {
+        cartridge::Cartridge::new(
+            header.version,
+            cartridge::HwType::from(header.hw_type as u8),
+            header.exrom_line != 0,
+            header.game_line != 0,
+        )
+    }
+
+    fn read_chip_header(&self, rdr: &mut dyn Reader) -> io::Result<Option<ChipHeader>> {
+        let mut signature = [0u8; 4];
+        match rdr.read(&mut signature)? {
+            0 => Ok(None),
+            4 => {
+                let header = ChipHeader {
+                    signature,
+                    length: rdr.read_u32::<BigEndian>()?,
+                    chip_type: rdr.read_u16::<BigEndian>()?,
+                    bank_number: rdr.read_u16::<BigEndian>()?,
+                    load_address: rdr.read_u16::<BigEndian>()?,
+                    image_size: rdr.read_u16::<BigEndian>()?,
+                };
+                Ok(Some(header))
+            }
+            size => Err(format!("chip header error, expected {} got {}", 4, size)),
+        }
+    }
+
     fn validate_chip_header(&self, header: &ChipHeader) -> io::Result<()> {
         let sig =
             str::from_utf8(&header.signature).map_err(|_| "invalid chip signature".to_owned())?;
@@ -145,13 +126,19 @@ impl CrtLoader {
         }
     }
 
-    fn validate_header(&self, header: &Header) -> io::Result<()> {
-        let sig = str::from_utf8(&header.signature)
-            .map_err(|_| "invalid cartridge signature".to_owned())?;
-        if sig == HEADER_SIG {
-            Ok(())
-        } else {
-            Err("invalid cartridge signature".to_owned())
+    fn read_data(&self, rdr: &mut dyn Reader, length: usize) -> io::Result<Vec<u8>> {
+        let mut data = vec![0; length];
+        rdr.read_exact(&mut data)?;
+        Ok(data)
+    }
+
+    fn build_chip(&self, header: &ChipHeader, data: Vec<u8>) -> cartridge::Chip {
+        cartridge::Chip {
+            chip_type: cartridge::ChipType::from(header.chip_type),
+            bank_number: header.bank_number as u8,
+            offset: header.load_address,
+            size: header.image_size,
+            data,
         }
     }
 }
@@ -200,5 +187,19 @@ impl Loader for CrtLoader {
         Ok(Box::new(CrtImage {
             cartridge: Some(cartridge),
         }))
+    }
+}
+
+struct CrtImage {
+    cartridge: Option<cartridge::Cartridge>,
+}
+
+impl Image for CrtImage {
+    fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting CRT image");
+        c64.attach_cartridge(self.cartridge.take().unwrap());
+    }
+    fn unmount(&mut self, c64: &mut C64) {
+        c64.detach_cartridge();
     }
 }

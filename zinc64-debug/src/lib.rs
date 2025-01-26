@@ -2,6 +2,11 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+use std::sync::mpsc::Sender;
+
+pub use self::debugger::Debugger;
+pub use self::rap_server::RapServer;
+
 #[macro_use]
 extern crate log;
 
@@ -10,36 +15,6 @@ mod debugger;
 mod disassembler;
 mod instruction;
 mod rap_server;
-
-use std::sync::mpsc::Sender;
-
-pub use self::debugger::Debugger;
-pub use self::rap_server::RapServer;
-
-pub enum Command {
-    Attach(Sender<Output>),
-    Detach,
-    Continue,
-    Step,
-    BpClear,
-    BpCondition(u16, String, u32),
-    BpDisable(u16),
-    BpDisableAll,
-    BpEnable(u16),
-    BpEnableAll,
-    BpIgnore(u16, u16),
-    BpList,
-    BpRemove(u16),
-    BpSet(u16, bool),
-    MemRead(u16, u16),
-    MemWrite(u16, Vec<u8>),
-    RegRead,
-    RegWrite(Vec<RegOp>),
-    SysQuit,
-    SysReset(bool),
-    SysScreen,
-    SysStopwatch(bool),
-}
 
 pub enum Output {
     Await,
@@ -71,4 +46,29 @@ pub enum RegOp {
     SetP(u8),
     SetSP(u8),
     SetPC(u16),
+}
+
+pub enum Command {
+    Attach(Sender<Output>),
+    Detach,
+    Continue,
+    Step,
+    BpClear,
+    BpCondition(u16, String, u32),
+    BpDisable(u16),
+    BpDisableAll,
+    BpEnable(u16),
+    BpEnableAll,
+    BpIgnore(u16, u16),
+    BpList,
+    BpRemove(u16),
+    BpSet(u16, bool),
+    MemRead(u16, u16),
+    MemWrite(u16, Vec<u8>),
+    RegRead,
+    RegWrite(Vec<RegOp>),
+    SysQuit,
+    SysReset(bool),
+    SysScreen,
+    SysStopwatch(bool),
 }

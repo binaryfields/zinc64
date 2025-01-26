@@ -25,7 +25,6 @@ impl Config {
         self.rsel = true;
     }
 }
-
 pub struct BorderUnit {
     pub config: Config,
     main_flop: bool,
@@ -39,10 +38,6 @@ impl BorderUnit {
             main_flop: false,
             vertical_flop: false,
         }
-    }
-
-    pub fn is_enabled(&self) -> bool {
-        self.main_flop || self.vertical_flop
     }
 
     pub fn output(&self) -> u8 {
@@ -99,6 +94,10 @@ impl BorderUnit {
                 self.main_flop = true;
             }
         }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.main_flop || self.vertical_flop
     }
 
     pub fn update_vertical_flop(&mut self, y: u16, den: bool) {

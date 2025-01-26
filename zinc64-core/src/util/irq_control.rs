@@ -11,31 +11,17 @@ pub struct IrqControl {
 }
 
 impl IrqControl {
-    pub fn clear(&mut self) {
-        self.data = 0;
-    }
-
-    pub fn clear_events(&mut self, events: u8) {
-        self.data &= !events;
-    }
-
-    pub fn get_data(&self) -> u8 {
-        let mut data = self.data;
-        data.set_bit(7, self.is_triggered());
-        data
+    #[allow(dead_code)]
+    pub fn get_raw_data(&self) -> u8 {
+        self.data
     }
 
     pub fn get_mask(&self) -> u8 {
         self.mask
     }
 
-    #[allow(dead_code)]
-    pub fn get_raw_data(&self) -> u8 {
-        self.data
-    }
-
-    pub fn is_triggered(&self) -> bool {
-        (self.mask & self.data) != 0
+    pub fn set_mask(&mut self, mask: u8) {
+        self.mask = mask;
     }
 
     pub fn reset(&mut self) {
@@ -47,8 +33,22 @@ impl IrqControl {
         self.data.set_bit(bit, true);
     }
 
-    pub fn set_mask(&mut self, mask: u8) {
-        self.mask = mask;
+    pub fn is_triggered(&self) -> bool {
+        (self.mask & self.data) != 0
+    }
+
+    pub fn get_data(&self) -> u8 {
+        let mut data = self.data;
+        data.set_bit(7, self.is_triggered());
+        data
+    }
+
+    pub fn clear(&mut self) {
+        self.data = 0;
+    }
+
+    pub fn clear_events(&mut self, events: u8) {
+        self.data &= !events;
     }
 
     pub fn update_mask(&mut self, mask: u8) {

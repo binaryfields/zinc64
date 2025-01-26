@@ -2,25 +2,13 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use crate::factory::AddressableFaded;
-use crate::util::{IoPort, Shared};
 use bit_field::BitField;
 
 use crate::device::cartridge::Cartridge;
+use crate::factory::AddressableFaded;
+use crate::util::{IoPort, Shared};
 
 // DEFERRED device: expansion port test cases
-
-#[derive(Copy, Clone)]
-enum IoLine {
-    Game = 3,
-    Exrom = 4,
-}
-
-impl IoLine {
-    pub fn value(self) -> usize {
-        self as usize
-    }
-}
 
 pub struct ExpansionPort {
     cartridge: Option<Cartridge>,
@@ -33,6 +21,17 @@ impl ExpansionPort {
         Self {
             cartridge: None,
             io_line,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        if let Some(ref mut cartridge) = self.cartridge {
+            cartridge.reset();
+        } else {
+            let mut io_value = 0u8;
+            io_value.set_bit(IoLine::Game.value(), true);
+            io_value.set_bit(IoLine::Exrom.value(), true);
+            self.io_line.borrow_mut().set_value(io_value);
         }
     }
 
@@ -53,17 +52,6 @@ impl ExpansionPort {
             cartridge.set_io_observer(None);
         }
     }
-
-    pub fn reset(&mut self) {
-        if let Some(ref mut cartridge) = self.cartridge {
-            cartridge.reset();
-        } else {
-            let mut io_value = 0u8;
-            io_value.set_bit(IoLine::Game.value(), true);
-            io_value.set_bit(IoLine::Exrom.value(), true);
-            self.io_line.borrow_mut().set_value(io_value);
-        }
-    }
 }
 
 impl AddressableFaded for ExpansionPort {
@@ -75,5 +63,17 @@ impl AddressableFaded for ExpansionPort {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.write(address, value)
         }
+    }
+}
+
+#[derive(Copy, Clone)]
+enum IoLine {
+    Game = 3,
+    Exrom = 4,
+}
+
+impl IoLine {
+    pub fn value(self) -> usize {
+        self as usize
     }
 }

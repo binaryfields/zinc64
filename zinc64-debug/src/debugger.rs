@@ -12,11 +12,10 @@ use std::sync::mpsc;
 use bit_field::BitField;
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::instruction::Instruction;
-
 use super::charset;
 use super::disassembler::Disassembler;
 use super::{Command, Output, RegData, RegOp};
+use crate::instruction::Instruction;
 
 // SPEC: Vice -> Alt-H -> help -> [Enter]
 
@@ -25,6 +24,32 @@ const OPCODE_RTI: u8 = 0x40;
 const OPCODE_RTS: u8 = 0x60;
 
 // TODO debugger: print triggered breakpoint
+
+pub struct Debugger {
+    command_tx: mpsc::Sender<Command>,
+}
+
+impl Debugger {
+    pub fn new(command_tx: mpsc::Sender<Command>) -> Self {
+        Self { command_tx }
+    }
+
+    pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
+        let listener = TcpListener::bind(addr)?;
+        for stream in listener.incoming().flatten() {
+            let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
+            match conn.handle() {
+                Ok(_) => {
+                    info!(target: "debugger", "Connection closed");
+                }
+                Err(error) => {
+                    error!(target: "debugger", "Connection failed, error - {}", error);
+                }
+            }
+        }
+        Ok(())
+    }
+}
 
 pub enum Cmd {
     // Breakpoint
@@ -63,32 +88,6 @@ pub enum Cmd {
     Radix(Option<u16>),
 }
 
-pub struct Debugger {
-    command_tx: mpsc::Sender<Command>,
-}
-
-impl Debugger {
-    pub fn new(command_tx: mpsc::Sender<Command>) -> Self {
-        Self { command_tx }
-    }
-
-    pub fn start(&self, addr: SocketAddr) -> io::Result<()> {
-        let listener = TcpListener::bind(addr)?;
-        for stream in listener.incoming().flatten() {
-            let mut conn = Connection::build(self.command_tx.clone(), &stream).unwrap();
-            match conn.handle() {
-                Ok(_) => {
-                    info!(target: "debugger", "Connection closed");
-                }
-                Err(error) => {
-                    error!(target: "debugger", "Connection failed, error - {}", error);
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
 struct Connection {
     // Dependencies
     command_parser: CommandParser,
@@ -121,6 +120,8 @@ impl Connection {
         Ok(conn)
     }
 
+    // ---- session ----
+
     pub fn handle(&mut self) -> io::Result<()> {
         let tx = self.response_tx.clone();
         self.execute_unit_cmd(Command::Attach(tx))?;
@@ -134,6 +135,19 @@ impl Connection {
         self.command_tx.send(Command::Detach).unwrap();
         self.writer.flush()?;
         Ok(())
+    }
+
+    fn write_prompt(&mut self) -> io::Result<()> {
+        let pc = self.regs.as_ref().map_or(0, |r| r.pc);
+        write!(self.writer, "${:04x}> ", pc)?;
+        self.writer.flush()
+    }
+
+    fn handle_request(&mut self, input: &str) -> io::Result<()> {
+        match self.command_parser.parse(input) {
+            Ok(command) => self.handle_command(command),
+            Err(error) => self.writer.write_all(format!("{}\n", error).as_bytes()),
+        }
     }
 
     fn handle_command(&mut self, command: Cmd) -> io::Result<()> {
@@ -177,38 +191,7 @@ impl Connection {
         self.writer.write_all(output.as_bytes())
     }
 
-    fn handle_request(&mut self, input: &str) -> io::Result<()> {
-        match self.command_parser.parse(input) {
-            Ok(command) => self.handle_command(command),
-            Err(error) => self.writer.write_all(format!("{}\n", error).as_bytes()),
-        }
-    }
-
-    fn read_mem(&mut self, start: u16, end: u16) -> io::Result<Vec<u8>> {
-        match self.execute_emu(Command::MemRead(start, end))? {
-            Output::Buffer(data) => Ok(data),
-            Output::Error(error) => Err(Error::other(error)),
-            _ => Err(Error::other("Invalid debugger result")),
-        }
-    }
-
-    fn read_regs(&mut self) -> io::Result<RegData> {
-        match self.execute_emu(Command::RegRead)? {
-            Output::Registers(regs) => Ok(regs),
-            Output::Error(error) => Err(Error::other(error)),
-            _ => Err(Error::other("Invalid debugger result")),
-        }
-    }
-
-    fn write_prompt(&mut self) -> io::Result<()> {
-        let pc = self.regs.as_ref().map_or(0, |r| r.pc);
-        write!(self.writer, "${:04x}> ", pc)?;
-        self.writer.flush()
-    }
-
-    // -- Commands
-
-    // -- Breakpoint
+    // ---- breakpoint ----
 
     fn cmd_bp_condition(&mut self, index: u16, condition: String) -> io::Result<String> {
         let command = Command::BpCondition(index, condition, self.command_parser.get_radix());
@@ -268,7 +251,15 @@ impl Connection {
         Ok(self.format_instr(&regs, &instr, &mem[0..instr_len]))
     }
 
-    // -- Debugger
+    fn execute_text_cmd(&mut self, command: Command) -> io::Result<String> {
+        match self.execute_emu(command)? {
+            Output::Text(text) => Ok(text),
+            Output::Error(error) => Err(Error::other(error)),
+            _ => Err(Error::other("Invalid debugger result")),
+        }
+    }
+
+    // ---- execution ----
 
     fn cmd_goto(&mut self, address: Option<u16>) -> io::Result<String> {
         if let Some(address) = address {
@@ -385,7 +376,61 @@ impl Connection {
         Ok(buffer)
     }
 
-    // -- Memory
+    fn format_regs(&self, regs: RegData) -> String {
+        let mut buffer = String::new();
+        buffer.push_str("PC   A  X  Y  SP 00 01 NV-BDIZC\n");
+        buffer.push_str(
+            format!(
+                "{:04x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {}{}1{}{}{}{}{}\n",
+                regs.pc,
+                regs.a,
+                regs.x,
+                regs.y,
+                regs.sp,
+                regs.port_00,
+                regs.port_01,
+                if (regs.p & CpuFlag::Negative as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Overflow as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Break as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Decimal as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::IntDisable as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Zero as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                },
+                if (regs.p & CpuFlag::Carry as u8) != 0 {
+                    "1"
+                } else {
+                    "0"
+                }
+            )
+            .as_str(),
+        );
+        buffer
+    }
+
+    // ---- memory ----
 
     fn cmd_compare(&mut self, start: u16, end: u16, target: u16) -> io::Result<String> {
         let source_data = self.read_mem(start, end)?;
@@ -527,12 +572,7 @@ impl Connection {
         Ok(buffer)
     }
 
-    // -- System
-
-    fn cmd_quit(&mut self) -> io::Result<String> {
-        self.running = false;
-        self.execute_unit_cmd(Command::SysQuit)
-    }
+    // ---- system ----
 
     fn cmd_reset(&mut self, hard: bool) -> io::Result<String> {
         self.execute_unit_cmd(Command::SysReset(hard))
@@ -568,11 +608,24 @@ impl Connection {
         Ok(format!("Clock: {}", clock))
     }
 
-    // -- Monitor
+    fn execute_buffer_cmd(&mut self, command: Command) -> io::Result<Vec<u8>> {
+        match self.execute_emu(command)? {
+            Output::Buffer(buffer) => Ok(buffer),
+            Output::Error(error) => Err(Error::other(error)),
+            _ => Err(Error::other("Invalid debugger result")),
+        }
+    }
+
+    // ---- monitor ----
 
     fn cmd_exit(&mut self) -> io::Result<String> {
         self.running = false;
         Ok(String::new())
+    }
+
+    fn cmd_quit(&mut self) -> io::Result<String> {
+        self.running = false;
+        self.execute_unit_cmd(Command::SysQuit)
     }
 
     fn cmd_radix(&mut self, radix: Option<u16>) -> io::Result<String> {
@@ -583,40 +636,32 @@ impl Connection {
         Ok(result)
     }
 
-    // -- Helpers
+    // ---- shared ----
+
+    fn execute_unit_cmd(&mut self, command: Command) -> io::Result<String> {
+        match self.execute_emu(command)? {
+            Output::Unit => Ok(String::new()),
+            Output::Error(error) => Err(Error::other(error)),
+            _ => Err(Error::other("Invalid debugger result")),
+        }
+    }
 
     fn execute_emu(&mut self, command: Command) -> io::Result<Output> {
         self.command_tx.send(command).unwrap();
         self.response_rx.recv().map_err(Error::other)
     }
 
-    fn execute_buffer_cmd(&mut self, command: Command) -> io::Result<Vec<u8>> {
-        match self.execute_emu(command)? {
-            Output::Buffer(buffer) => Ok(buffer),
+    fn read_regs(&mut self) -> io::Result<RegData> {
+        match self.execute_emu(Command::RegRead)? {
+            Output::Registers(regs) => Ok(regs),
             Output::Error(error) => Err(Error::other(error)),
             _ => Err(Error::other("Invalid debugger result")),
         }
     }
 
-    fn execute_num_cmd(&mut self, command: Command) -> io::Result<u16> {
-        match self.execute_emu(command)? {
-            Output::Number(num) => Ok(num),
-            Output::Error(error) => Err(Error::other(error)),
-            _ => Err(Error::other("Invalid debugger result")),
-        }
-    }
-
-    fn execute_text_cmd(&mut self, command: Command) -> io::Result<String> {
-        match self.execute_emu(command)? {
-            Output::Text(text) => Ok(text),
-            Output::Error(error) => Err(Error::other(error)),
-            _ => Err(Error::other("Invalid debugger result")),
-        }
-    }
-
-    fn execute_unit_cmd(&mut self, command: Command) -> io::Result<String> {
-        match self.execute_emu(command)? {
-            Output::Unit => Ok(String::new()),
+    fn read_mem(&mut self, start: u16, end: u16) -> io::Result<Vec<u8>> {
+        match self.execute_emu(Command::MemRead(start, end))? {
+            Output::Buffer(data) => Ok(data),
             Output::Error(error) => Err(Error::other(error)),
             _ => Err(Error::other("Invalid debugger result")),
         }
@@ -680,58 +725,12 @@ impl Connection {
         buffer
     }
 
-    fn format_regs(&self, regs: RegData) -> String {
-        let mut buffer = String::new();
-        buffer.push_str("PC   A  X  Y  SP 00 01 NV-BDIZC\n");
-        buffer.push_str(
-            format!(
-                "{:04x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {}{}1{}{}{}{}{}\n",
-                regs.pc,
-                regs.a,
-                regs.x,
-                regs.y,
-                regs.sp,
-                regs.port_00,
-                regs.port_01,
-                if (regs.p & CpuFlag::Negative as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                },
-                if (regs.p & CpuFlag::Overflow as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                },
-                if (regs.p & CpuFlag::Break as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                },
-                if (regs.p & CpuFlag::Decimal as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                },
-                if (regs.p & CpuFlag::IntDisable as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                },
-                if (regs.p & CpuFlag::Zero as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                },
-                if (regs.p & CpuFlag::Carry as u8) != 0 {
-                    "1"
-                } else {
-                    "0"
-                }
-            )
-            .as_str(),
-        );
-        buffer
+    fn execute_num_cmd(&mut self, command: Command) -> io::Result<u16> {
+        match self.execute_emu(command)? {
+            Output::Number(num) => Ok(num),
+            Output::Error(error) => Err(Error::other(error)),
+            _ => Err(Error::other("Invalid debugger result")),
+        }
     }
 }
 
@@ -751,6 +750,8 @@ impl CommandParser {
     pub fn set_radix(&mut self, radix: u32) {
         self.radix = radix;
     }
+
+    // ---- parsing ----
 
     pub fn parse(&self, input: &str) -> Result<Cmd, String> {
         let mut tokens = input.split_whitespace();
@@ -795,7 +796,7 @@ impl CommandParser {
         }
     }
 
-    // -- Breakpoint
+    // ---- breakpoint ----
 
     fn parse_break(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
@@ -818,6 +819,12 @@ impl CommandParser {
         }
     }
 
+    fn parse_enable(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
+        let index = self.parse_num_maybe(tokens.next())?;
+        self.ensure_eos(tokens)?;
+        Ok(Cmd::BpEnable(index))
+    }
+
     fn parse_delete(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
@@ -828,12 +835,6 @@ impl CommandParser {
         let index = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::BpDisable(index))
-    }
-
-    fn parse_enable(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
-        let index = self.parse_num_maybe(tokens.next())?;
-        self.ensure_eos(tokens)?;
-        Ok(Cmd::BpEnable(index))
     }
 
     fn parse_ignore(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
@@ -852,7 +853,18 @@ impl CommandParser {
         }
     }
 
-    // -- Debugger
+    fn ensure_keyword(
+        &self,
+        keyword: &str,
+        tokens: &mut dyn Iterator<Item = &str>,
+    ) -> Result<(), String> {
+        match tokens.next() {
+            Some(token) if token.to_string().to_lowercase() == keyword => Ok(()),
+            _ => Err(format!("Missing keyword {}", keyword)),
+        }
+    }
+
+    // ---- execution ----
 
     fn parse_goto(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let address = self.parse_num_maybe(tokens.next())?;
@@ -881,6 +893,17 @@ impl CommandParser {
         }
     }
 
+    fn parse_return(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
+        self.ensure_eos(tokens)?;
+        Ok(Cmd::Return)
+    }
+
+    fn parse_step(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
+        let count = self.parse_num_maybe(tokens.next())?;
+        self.ensure_eos(tokens)?;
+        Ok(Cmd::Step(count.unwrap_or(1)))
+    }
+
     fn parse_reg_op(
         &self,
         tokens: &mut dyn Iterator<Item = &str>,
@@ -906,6 +929,10 @@ impl CommandParser {
         }
     }
 
+    fn parse_word(&self, value: &str) -> Result<u16, String> {
+        u16::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
+    }
+
     fn parse_reg_sep(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<bool, String> {
         if let Some(sep) = tokens.next() {
             match sep.trim() {
@@ -917,18 +944,7 @@ impl CommandParser {
         }
     }
 
-    fn parse_return(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
-        self.ensure_eos(tokens)?;
-        Ok(Cmd::Return)
-    }
-
-    fn parse_step(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
-        let count = self.parse_num_maybe(tokens.next())?;
-        self.ensure_eos(tokens)?;
-        Ok(Cmd::Step(count.unwrap_or(1)))
-    }
-
-    // -- Memory
+    // ---- memory ----
 
     fn parse_compare(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let start = self.parse_num(tokens.next())?;
@@ -1013,7 +1029,7 @@ impl CommandParser {
         Ok(Cmd::Petscii(start, end))
     }
 
-    // -- System
+    // ---- system ----
 
     fn parse_reset(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let mode = self.parse_num_maybe(tokens.next())?;
@@ -1035,17 +1051,17 @@ impl CommandParser {
         Ok(Cmd::Stopwatch(reset))
     }
 
-    // -- Monitor
+    // ---- monitor ----
+
+    fn parse_exit(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
+        self.ensure_eos(tokens)?;
+        Ok(Cmd::Exit)
+    }
 
     fn parse_help(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let command = tokens.next().map(|s| s.to_string());
         self.ensure_eos(tokens)?;
         Ok(Cmd::Help(command))
-    }
-
-    fn parse_exit(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
-        self.ensure_eos(tokens)?;
-        Ok(Cmd::Exit)
     }
 
     fn parse_quit(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
@@ -1059,37 +1075,7 @@ impl CommandParser {
         Ok(Cmd::Radix(radix))
     }
 
-    // -- Helpers
-
-    fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
-        match tokens.next() {
-            Some(token) => Err(format!("Unexpected token {}", token)),
-            None => Ok(()),
-        }
-    }
-
-    fn ensure_keyword(
-        &self,
-        keyword: &str,
-        tokens: &mut dyn Iterator<Item = &str>,
-    ) -> Result<(), String> {
-        match tokens.next() {
-            Some(token) if token.to_string().to_lowercase() == keyword => Ok(()),
-            _ => Err(format!("Missing keyword {}", keyword)),
-        }
-    }
-
-    fn parse_byte(&self, value: &str) -> Result<u8, String> {
-        u8::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
-    }
-
-    fn parse_num(&self, input: Option<&str>) -> Result<u16, String> {
-        if let Some(value) = input {
-            u16::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
-        } else {
-            Err("missing argument".to_string())
-        }
-    }
+    // ---- shared ----
 
     fn parse_num_maybe(&self, input: Option<&str>) -> Result<Option<u16>, String> {
         if let Some(value) = input {
@@ -1101,8 +1087,23 @@ impl CommandParser {
         }
     }
 
-    fn parse_word(&self, value: &str) -> Result<u16, String> {
-        u16::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
+    fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
+        match tokens.next() {
+            Some(token) => Err(format!("Unexpected token {}", token)),
+            None => Ok(()),
+        }
+    }
+
+    fn parse_num(&self, input: Option<&str>) -> Result<u16, String> {
+        if let Some(value) = input {
+            u16::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
+        } else {
+            Err("missing argument".to_string())
+        }
+    }
+
+    fn parse_byte(&self, value: &str) -> Result<u8, String> {
+        u8::from_str_radix(value, self.radix).map_err(|_| format!("Invalid number {}", value))
     }
 }
 

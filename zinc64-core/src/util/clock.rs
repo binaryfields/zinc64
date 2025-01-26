@@ -10,10 +10,6 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn elapsed(&self, prev: u64) -> u64 {
-        self.counter.get() - prev
-    }
-
     pub fn get(&self) -> u64 {
         self.counter.get()
     }
@@ -30,5 +26,9 @@ impl Clock {
     pub fn tick_delta(&self, delta: u64) {
         let result = self.counter.get().wrapping_add(delta);
         self.counter.set(result);
+    }
+
+    pub fn elapsed(&self, prev: u64) -> u64 {
+        self.counter.get() - prev
     }
 }

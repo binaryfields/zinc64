@@ -8,8 +8,9 @@
 use alloc::prelude::*;
 #[cfg(not(feature = "std"))]
 use alloc::vec;
-use byteorder::LittleEndian;
 use core::str;
+
+use byteorder::LittleEndian;
 use zinc64_core::factory::Tape;
 use zinc64_system::autostart;
 use zinc64_system::{Autostart, AutostartMethod, C64, Image};
@@ -27,21 +28,6 @@ struct Header {
     #[allow(dead_code)]
     reserved: [u8; 3],
     size: u32,
-}
-
-struct TapImage {
-    tape: Option<Box<dyn Tape>>,
-}
-
-impl Image for TapImage {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting TAP image");
-        c64.attach_tape(self.tape.take().unwrap());
-    }
-
-    fn unmount(&mut self, c64: &mut C64) {
-        c64.detach_tape();
-    }
 }
 
 #[derive(Default)]
@@ -105,6 +91,21 @@ impl Loader for TapLoader {
         Ok(Box::new(TapImage {
             tape: Some(Box::new(tape)),
         }))
+    }
+}
+
+struct TapImage {
+    tape: Option<Box<dyn Tape>>,
+}
+
+impl Image for TapImage {
+    fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting TAP image");
+        c64.attach_tape(self.tape.take().unwrap());
+    }
+
+    fn unmount(&mut self, c64: &mut C64) {
+        c64.detach_tape();
     }
 }
 

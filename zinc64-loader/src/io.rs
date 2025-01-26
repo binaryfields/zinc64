@@ -4,10 +4,9 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
-use byteorder::ByteOrder;
 use core::result;
 
-pub type Result<T> = result::Result<T, String>;
+use byteorder::ByteOrder;
 
 pub trait Reader {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
@@ -15,6 +14,8 @@ pub trait Reader {
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<()>;
     fn consume(&mut self, amt: usize);
 }
+
+pub type Result<T> = result::Result<T, String>;
 
 pub trait ReadBytesExt: Reader {
     #[inline]

@@ -13,12 +13,11 @@ use std::rc::Rc;
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
-use crate::factory::{Chip, SidModel, SoundOutput};
-use crate::util::Clock;
 use log::LogLevel;
 use resid;
 
-// TODO sound: add sid output sample rate test cases
+use crate::factory::{Chip, SidModel, SoundOutput};
+use crate::util::Clock;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum SamplingMethod {
@@ -27,6 +26,8 @@ pub enum SamplingMethod {
     Resample,
     ResampleFast,
 }
+
+// TODO sound: add sid output sample rate test cases
 
 pub struct Sid {
     // Dependencies

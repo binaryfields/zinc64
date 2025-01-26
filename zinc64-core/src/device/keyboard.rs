@@ -4,84 +4,10 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
+
 use bit_field::BitField;
 
 use crate::util::Shared;
-
-// SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
-
-#[derive(Copy, Clone, Debug)]
-pub enum Key {
-    // Numerical
-    Num0,
-    Num1,
-    Num2,
-    Num3,
-    Num4,
-    Num5,
-    Num6,
-    Num7,
-    Num8,
-    Num9,
-    // Alpha
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-    I,
-    J,
-    K,
-    L,
-    M,
-    N,
-    O,
-    P,
-    Q,
-    R,
-    S,
-    T,
-    U,
-    V,
-    W,
-    X,
-    Y,
-    Z,
-    // Symbols
-    Asterisk,
-    At,
-    Backspace,
-    Caret,
-    Colon,
-    Comma,
-    Dollar,
-    Equals,
-    Minus,
-    Period,
-    Plus,
-    Return,
-    Semicolon,
-    Slash,
-    Space,
-    // Control
-    CrsrDown,
-    Ctrl,
-    Home,
-    Left,
-    LGui,
-    LShift,
-    RunStop,
-    CrsrRight,
-    RShift,
-    // Function
-    F1,
-    F3,
-    F5,
-    F7,
-}
 
 #[derive(Copy, Clone, Debug)]
 pub struct KeyEvent {
@@ -116,6 +42,8 @@ impl KeyEvent {
     }
 }
 
+// SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
+
 pub struct Keyboard {
     matrix: Shared<[u8; 16]>,
     queue: Vec<(KeyEvent, bool)>,
@@ -139,6 +67,30 @@ impl Keyboard {
         self.matrix.borrow()[row as usize]
     }
 
+    pub fn has_events(&self) -> bool {
+        !self.queue.is_empty()
+    }
+
+    // ---- reset ----
+
+    pub fn reset(&mut self) {
+        let mut matrix = self.matrix.borrow_mut();
+        for i in 0..16 {
+            matrix[i] = 0xff;
+        }
+        self.queue.clear();
+    }
+
+    // ---- typing queue ----
+
+    pub fn enqueue(&mut self, str: &str) {
+        for c in str.to_string().chars() {
+            let key_event = self.map_char(c);
+            self.queue.push((key_event, true));
+            self.queue.push((key_event, false));
+        }
+    }
+
     pub fn drain_event(&mut self) {
         if !self.queue.is_empty() {
             let (key_event, pressed) = self.queue.remove(0);
@@ -149,79 +101,6 @@ impl Keyboard {
             }
         }
     }
-
-    pub fn enqueue(&mut self, str: &str) {
-        for c in str.to_string().chars() {
-            let key_event = self.map_char(c);
-            self.queue.push((key_event, true));
-            self.queue.push((key_event, false));
-        }
-    }
-
-    pub fn has_events(&self) -> bool {
-        !self.queue.is_empty()
-    }
-
-    pub fn reset(&mut self) {
-        let mut matrix = self.matrix.borrow_mut();
-        for i in 0..16 {
-            matrix[i] = 0xff;
-        }
-        self.queue.clear();
-    }
-
-    pub fn set_key(&mut self, keycode: Key, enabled: bool) {
-        let mapping = self.map_keycode(keycode);
-        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
-        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
-    }
-
-    pub fn set_matrix(&mut self, mapping: (usize, usize), enabled: bool) {
-        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
-        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
-    }
-
-    fn is_pressed(&self, keycode: Key) -> bool {
-        let mapping = self.map_keycode(keycode);
-        !self.matrix.borrow()[mapping.0].get_bit(mapping.1)
-    }
-
-    // -- Event Handlers
-
-    pub fn on_key_down(&mut self, event: KeyEvent) {
-        self.set_key(event.keycode, true);
-        if let Some(modifier) = event.modifier {
-            self.set_key(modifier, true);
-        }
-        if event.disable_shift {
-            if self.is_pressed(Key::LShift) {
-                self.set_key(Key::LShift, false);
-                self.disabled_shift.set_bit(0, true);
-            }
-            if self.is_pressed(Key::RShift) {
-                self.set_key(Key::RShift, false);
-                self.disabled_shift.set_bit(1, true);
-            }
-        }
-    }
-
-    pub fn on_key_up(&mut self, event: KeyEvent) {
-        self.set_key(event.keycode, false);
-        if let Some(modifier) = event.modifier {
-            self.set_key(modifier, false);
-        }
-        if event.disable_shift {
-            if self.disabled_shift.get_bit(0) {
-                self.set_key(Key::LShift, true);
-            }
-            if self.disabled_shift.get_bit(1) {
-                self.set_key(Key::RShift, true);
-            }
-            self.disabled_shift = 0;
-        }
-    }
-
-    // -- Mapping Ops
 
     fn map_char(&self, c: char) -> KeyEvent {
         match c {
@@ -288,6 +167,57 @@ impl Keyboard {
             '^' => KeyEvent::new(Key::Caret),
             _ => panic!("unsupported char {}", c),
         }
+    }
+
+    // ---- key matrix ----
+
+    pub fn on_key_down(&mut self, event: KeyEvent) {
+        self.set_key(event.keycode, true);
+        if let Some(modifier) = event.modifier {
+            self.set_key(modifier, true);
+        }
+        if event.disable_shift {
+            if self.is_pressed(Key::LShift) {
+                self.set_key(Key::LShift, false);
+                self.disabled_shift.set_bit(0, true);
+            }
+            if self.is_pressed(Key::RShift) {
+                self.set_key(Key::RShift, false);
+                self.disabled_shift.set_bit(1, true);
+            }
+        }
+    }
+
+    pub fn on_key_up(&mut self, event: KeyEvent) {
+        self.set_key(event.keycode, false);
+        if let Some(modifier) = event.modifier {
+            self.set_key(modifier, false);
+        }
+        if event.disable_shift {
+            if self.disabled_shift.get_bit(0) {
+                self.set_key(Key::LShift, true);
+            }
+            if self.disabled_shift.get_bit(1) {
+                self.set_key(Key::RShift, true);
+            }
+            self.disabled_shift = 0;
+        }
+    }
+
+    pub fn set_key(&mut self, keycode: Key, enabled: bool) {
+        let mapping = self.map_keycode(keycode);
+        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
+        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
+    }
+
+    pub fn set_matrix(&mut self, mapping: (usize, usize), enabled: bool) {
+        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
+        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
+    }
+
+    fn is_pressed(&self, keycode: Key) -> bool {
+        let mapping = self.map_keycode(keycode);
+        !self.matrix.borrow()[mapping.0].get_bit(mapping.1)
     }
 
     fn map_keycode(&self, keycode: Key) -> (usize, usize) {
@@ -366,6 +296,79 @@ impl Keyboard {
             Key::RunStop => (7, 7),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Key {
+    // Numerical
+    Num0,
+    Num1,
+    Num2,
+    Num3,
+    Num4,
+    Num5,
+    Num6,
+    Num7,
+    Num8,
+    Num9,
+    // Alpha
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+    // Symbols
+    Asterisk,
+    At,
+    Backspace,
+    Caret,
+    Colon,
+    Comma,
+    Dollar,
+    Equals,
+    Minus,
+    Period,
+    Plus,
+    Return,
+    Semicolon,
+    Slash,
+    Space,
+    // Control
+    CrsrDown,
+    Ctrl,
+    Home,
+    Left,
+    LGui,
+    LShift,
+    RunStop,
+    CrsrRight,
+    RShift,
+    // Function
+    F1,
+    F3,
+    F5,
+    F7,
 }
 
 #[cfg(test)]

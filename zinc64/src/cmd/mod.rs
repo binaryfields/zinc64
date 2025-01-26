@@ -2,12 +2,6 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-mod help;
-mod load;
-mod ls;
-mod parser;
-mod reset;
-
 use std::io::Write;
 use std::result::Result;
 
@@ -19,16 +13,11 @@ use self::ls::LsCommand;
 use self::parser::Parser;
 use self::reset::ResetCommand;
 
-pub enum Cmd {
-    Help(Option<String>),
-    Load(String),
-    Ls(Option<String>),
-    Reset(bool),
-}
-
-trait Handler {
-    fn run(&mut self, out: &mut dyn Write) -> Result<(), String>;
-}
+mod help;
+mod load;
+mod ls;
+mod parser;
+mod reset;
 
 pub struct Executor {
     parser: Parser,
@@ -51,4 +40,15 @@ impl Executor {
         };
         handler.run(out)
     }
+}
+
+pub enum Cmd {
+    Help(Option<String>),
+    Load(String),
+    Ls(Option<String>),
+    Reset(bool),
+}
+
+trait Handler {
+    fn run(&mut self, out: &mut dyn Write) -> Result<(), String>;
 }

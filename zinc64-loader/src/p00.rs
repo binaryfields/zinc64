@@ -4,8 +4,9 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
-use byteorder::LittleEndian;
 use core::str;
+
+use byteorder::LittleEndian;
 use zinc64_system::autostart;
 use zinc64_system::{Autostart, AutostartMethod, C64, Image};
 
@@ -24,20 +25,6 @@ struct Header {
     reserved_2: u8,
     #[allow(dead_code)]
     reserved_3: u8,
-}
-
-struct P00Image {
-    data: Vec<u8>,
-    offset: u16,
-}
-
-impl Image for P00Image {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting P00 image");
-        c64.load(&self.data, self.offset);
-    }
-
-    fn unmount(&mut self, _c64: &mut C64) {}
 }
 
 #[derive(Default)]
@@ -97,4 +84,18 @@ impl Loader for P00Loader {
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
         Ok(Box::new(P00Image { data, offset }))
     }
+}
+
+struct P00Image {
+    data: Vec<u8>,
+    offset: u16,
+}
+
+impl Image for P00Image {
+    fn mount(&mut self, c64: &mut C64) {
+        info!(target: "loader", "Mounting P00 image");
+        c64.load(&self.data, self.offset);
+    }
+
+    fn unmount(&mut self, _c64: &mut C64) {}
 }

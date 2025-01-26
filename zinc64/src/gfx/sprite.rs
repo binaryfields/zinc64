@@ -4,12 +4,12 @@
 
 use std::rc::Rc;
 
+use cgmath::num_traits::zero;
 use cgmath::{Matrix4, SquareMatrix};
 
 use crate::gfx::gl::{self, FrontFace, GlDevice};
 use crate::gfx::rect::RectI;
 use crate::gfx::{Color, Rect};
-use cgmath::num_traits::zero;
 
 pub const DEFAULT_VERTEX_SHADER: &str = r#"
     #version 330 core
@@ -48,7 +48,6 @@ const VERTICES_PER_SPRITE: usize = 4;
 const VERTEX_SIZE: usize = 8;
 
 const SPRITE_INDICES: [u32; 6] = [0, 1, 2, 2, 3, 0];
-
 pub struct Batch {
     // Configuration
     max_sprites: usize,
@@ -157,52 +156,80 @@ impl Batch {
         gl.create_shader(DEFAULT_VERTEX_SHADER, DEFAULT_FRAGMENT_SHADER)
     }
 
+    // ---- render state ----
+
+    pub fn set_projection(&mut self, gl: &mut GlDevice, view: Rect, flip: bool) {
+        let projection = if !flip {
+            cgmath::ortho(view.p1.x, view.p2.x, view.p1.y, view.p2.y, -1.0, 1.0)
+        } else {
+            cgmath::ortho(view.p1.x, view.p2.x, view.p2.y, view.p1.y, -1.0, 1.0)
+        };
+        let dirty = projection != self.projection;
+        if dirty {
+            self.flush(gl);
+            self.projection = projection;
+            self.render_options.front_face = if !flip {
+                Some(FrontFace::CounterClockwise)
+            } else {
+                Some(FrontFace::Clockwise)
+            };
+        }
+    }
+
+    pub fn set_viewport(&mut self, gl: &mut GlDevice, viewport: RectI) {
+        let dirty = viewport != self.viewport;
+        if dirty {
+            self.flush(gl);
+            self.viewport = viewport;
+        }
+    }
+
+    #[allow(unused)]
+    pub fn set_shader(&mut self, gl: &mut GlDevice, shader: Rc<gl::Shader>) {
+        let dirty = shader.as_ref() != self.shader.as_ref();
+        if dirty {
+            self.flush(gl);
+            self.shader = shader;
+        }
+    }
+
+    #[allow(unused)]
+    pub fn set_target(&mut self, gl: &mut GlDevice, target: Rc<gl::Framebuffer>) {
+        let dirty = match self.target.as_ref() {
+            Some(fb) => target != *fb,
+            None => true,
+        };
+        if dirty {
+            self.flush(gl);
+            self.target = Some(target);
+        }
+    }
+
+    #[allow(unused)]
+    pub fn reset_target(&mut self, gl: &mut GlDevice) {
+        if self.target.is_some() {
+            self.flush(gl);
+            self.target = None;
+        }
+    }
+
+    #[allow(unused)]
+    pub fn set_texture(&mut self, gl: &mut GlDevice, texture: Rc<gl::Texture>) {
+        let dirty = match self.texture.as_ref() {
+            Some(tex_ref) => texture != *tex_ref,
+            None => true,
+        };
+        if dirty {
+            self.flush(gl);
+            self.texture = Some(texture);
+        }
+    }
+
+    // ---- drawing ----
+
     pub fn begin(&mut self, _gl: &mut GlDevice, texture: Option<Rc<gl::Texture>>) {
         self.count = 0;
         self.texture = texture;
-    }
-
-    pub fn end(&mut self, gl: &mut GlDevice) {
-        self.flush(gl);
-    }
-
-    pub fn flush(&mut self, gl: &mut GlDevice) {
-        if self.count > 0 {
-            gl.set_buffer_data(
-                &self.vertex_buffer,
-                gl::BufferTarget::Vertex,
-                &self.vertices,
-            );
-            let target = self
-                .target
-                .as_ref()
-                .map(|fb| gl::RenderTarget::Framebuffer(fb))
-                .unwrap_or(gl::RenderTarget::Default);
-            gl.draw_elements(
-                self.count * INDICES_PER_SPRITE,
-                0,
-                &gl::RenderState {
-                    target: &target,
-                    viewport: self.viewport,
-                    shader: &self.shader,
-                    vertex_array: &self.vertex_array,
-                    uniforms: &[
-                        (
-                            &gl.get_uniform(&self.shader, "u_projection"),
-                            gl::UniformData::Mat4(self.projection),
-                        ),
-                        (
-                            &gl.get_uniform(&self.shader, "u_texture"),
-                            gl::UniformData::Int(0),
-                        ),
-                    ],
-                    textures: &[self.texture.as_ref().unwrap().as_ref()],
-                    options: self.render_options,
-                },
-            );
-            self.vertices.clear();
-            self.count = 0;
-        }
     }
 
     pub fn push(&mut self, gl: &mut GlDevice, dst: Rect, src: Rect, color: Color) {
@@ -266,70 +293,46 @@ impl Batch {
         self.count += 1;
     }
 
-    #[allow(unused)]
-    pub fn reset_target(&mut self, gl: &mut GlDevice) {
-        if self.target.is_some() {
-            self.flush(gl);
-            self.target = None;
-        }
+    pub fn end(&mut self, gl: &mut GlDevice) {
+        self.flush(gl);
     }
 
-    pub fn set_projection(&mut self, gl: &mut GlDevice, view: Rect, flip: bool) {
-        let projection = if !flip {
-            cgmath::ortho(view.p1.x, view.p2.x, view.p1.y, view.p2.y, -1.0, 1.0)
-        } else {
-            cgmath::ortho(view.p1.x, view.p2.x, view.p2.y, view.p1.y, -1.0, 1.0)
-        };
-        let dirty = projection != self.projection;
-        if dirty {
-            self.flush(gl);
-            self.projection = projection;
-            self.render_options.front_face = if !flip {
-                Some(FrontFace::CounterClockwise)
-            } else {
-                Some(FrontFace::Clockwise)
-            };
-        }
-    }
-
-    #[allow(unused)]
-    pub fn set_shader(&mut self, gl: &mut GlDevice, shader: Rc<gl::Shader>) {
-        let dirty = shader.as_ref() != self.shader.as_ref();
-        if dirty {
-            self.flush(gl);
-            self.shader = shader;
-        }
-    }
-
-    #[allow(unused)]
-    pub fn set_target(&mut self, gl: &mut GlDevice, target: Rc<gl::Framebuffer>) {
-        let dirty = match self.target.as_ref() {
-            Some(fb) => target != *fb,
-            None => true,
-        };
-        if dirty {
-            self.flush(gl);
-            self.target = Some(target);
-        }
-    }
-
-    #[allow(unused)]
-    pub fn set_texture(&mut self, gl: &mut GlDevice, texture: Rc<gl::Texture>) {
-        let dirty = match self.texture.as_ref() {
-            Some(tex_ref) => texture != *tex_ref,
-            None => true,
-        };
-        if dirty {
-            self.flush(gl);
-            self.texture = Some(texture);
-        }
-    }
-
-    pub fn set_viewport(&mut self, gl: &mut GlDevice, viewport: RectI) {
-        let dirty = viewport != self.viewport;
-        if dirty {
-            self.flush(gl);
-            self.viewport = viewport;
+    pub fn flush(&mut self, gl: &mut GlDevice) {
+        if self.count > 0 {
+            gl.set_buffer_data(
+                &self.vertex_buffer,
+                gl::BufferTarget::Vertex,
+                &self.vertices,
+            );
+            let target = self
+                .target
+                .as_ref()
+                .map(|fb| gl::RenderTarget::Framebuffer(fb))
+                .unwrap_or(gl::RenderTarget::Default);
+            gl.draw_elements(
+                self.count * INDICES_PER_SPRITE,
+                0,
+                &gl::RenderState {
+                    target: &target,
+                    viewport: self.viewport,
+                    shader: &self.shader,
+                    vertex_array: &self.vertex_array,
+                    uniforms: &[
+                        (
+                            &gl.get_uniform(&self.shader, "u_projection"),
+                            gl::UniformData::Mat4(self.projection),
+                        ),
+                        (
+                            &gl.get_uniform(&self.shader, "u_texture"),
+                            gl::UniformData::Int(0),
+                        ),
+                    ],
+                    textures: &[self.texture.as_ref().unwrap().as_ref()],
+                    options: self.render_options,
+                },
+            );
+            self.vertices.clear();
+            self.count = 0;
         }
     }
 }

@@ -3,12 +3,12 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use core::fmt;
+
 use log::LogLevel;
 
+use super::uops::{MicroOp, MicroOpPair, ProgramId, decode_opcode, load_program};
 use crate::factory::{Addressable, Cpu, Register, TickFn};
 use crate::util::{IoPort, IrqLine, Pin, Shared};
-
-use super::uops::{MicroOp, MicroOpPair, ProgramId, decode_opcode, load_program};
 
 pub enum Flag {
     Carry = 1,
@@ -100,6 +100,7 @@ impl Cpu6510 {
         }
     }
 
+    // ---- clock ----
     pub fn clock(&mut self) {
         if self.ba_line.borrow().is_low() {
             return;
@@ -201,6 +202,12 @@ impl Cpu6510 {
         }
     }
 
+    #[inline]
+    fn clear_flag(&mut self, flag: Flag) {
+        self.regs.p &= !(flag as u8);
+    }
+
+    // ---- fetch and addressing ----
     fn load_next_program(&mut self) {
         if self.nmi_line.borrow().is_low() {
             if log_enabled!(LogLevel::Trace) {
@@ -216,15 +223,6 @@ impl Cpu6510 {
             self.fetch_opcode();
         }
         self.cycle = 0;
-    }
-
-    fn fetch_opcode(&mut self) {
-        self.opcode = self.read_mem(self.regs.pc);
-        self.uops = decode_opcode(self.opcode);
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cpu::ins", "0x{:04x}: {:02x}; {}", self.regs.pc, self.opcode, &self);
-        }
-        self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
     fn fetch_opcode_discard(&mut self) {
@@ -270,6 +268,11 @@ impl Cpu6510 {
         self.address_hi = self.read_mem(address);
     }
 
+    fn read_data(&mut self) {
+        let address = make_address(self.address_hi, self.address_lo);
+        self.data = self.read_mem(address);
+    }
+
     fn read_data_or_fix_adh(&mut self) {
         if self.page_cross {
             self.address_hi = self.address_hi.wrapping_add(1);
@@ -280,16 +283,21 @@ impl Cpu6510 {
         }
     }
 
-    fn read_data(&mut self) {
-        let address = make_address(self.address_hi, self.address_lo);
-        self.data = self.read_mem(address);
-    }
-
     fn write_data(&mut self) {
         let address = make_address(self.address_hi, self.address_lo);
         self.write_mem(address, self.data);
     }
 
+    fn fetch_opcode(&mut self) {
+        self.opcode = self.read_mem(self.regs.pc);
+        self.uops = decode_opcode(self.opcode);
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "cpu::ins", "0x{:04x}: {:02x}; {}", self.regs.pc, self.opcode, &self);
+        }
+        self.regs.pc = self.regs.pc.wrapping_add(1);
+    }
+
+    // ---- load, store, transfer ----
     fn lda(&mut self) {
         let data = self.data;
         self.regs.a = data;
@@ -356,6 +364,7 @@ impl Cpu6510 {
         // NOTE do not set nz
     }
 
+    // ---- stack ----
     fn pla(&mut self) {
         match self.cycle {
             2 => {
@@ -403,6 +412,7 @@ impl Cpu6510 {
         }
     }
 
+    // ---- logic and arithmetic ----
     fn and(&mut self) {
         let result = self.regs.a & self.data;
         self.regs.a = result;
@@ -503,6 +513,7 @@ impl Cpu6510 {
         self.set_nz((result & 0xff) as u8);
     }
 
+    // ---- increment and decrement ----
     fn dec(&mut self) {
         let result = self.data.wrapping_sub(1);
         self.data = result;
@@ -539,6 +550,7 @@ impl Cpu6510 {
         self.set_nz(result);
     }
 
+    // ---- shifts and rotates ----
     fn asl(&mut self) {
         let data = self.data;
         self.update_flag(Flag::Carry, (data & 0x80) != 0);
@@ -623,6 +635,7 @@ impl Cpu6510 {
         self.set_nz(result);
     }
 
+    // ---- control flow ----
     fn jmp(&mut self) {
         self.regs.pc = make_address(self.address_hi, self.address_lo);
     }
@@ -742,6 +755,7 @@ impl Cpu6510 {
         }
     }
 
+    // ---- undocumented ----
     fn nop(&mut self) {}
 
     fn ane(&mut self) {
@@ -789,8 +803,7 @@ impl Cpu6510 {
         // tick_fn();
     }
 
-    // -- Interrupts
-
+    // ---- interrupts ----
     fn irq(&mut self) {
         match self.cycle {
             2 => {
@@ -856,40 +869,7 @@ impl Cpu6510 {
         }
     }
 
-    // -- Flag Ops
-
-    #[inline]
-    fn clear_flag(&mut self, flag: Flag) {
-        self.regs.p &= !(flag as u8);
-    }
-
-    #[inline]
-    fn set_flag(&mut self, flag: Flag) {
-        self.regs.p |= flag as u8;
-    }
-
-    #[inline]
-    fn set_nz(&mut self, value: u8) {
-        self.update_flag(Flag::Negative, value & 0x80 != 0);
-        self.update_flag(Flag::Zero, value == 0);
-    }
-
-    #[inline]
-    fn update_flag(&mut self, flag: Flag, value: bool) {
-        if value {
-            self.regs.p |= flag as u8;
-        } else {
-            self.regs.p &= !(flag as u8);
-        }
-    }
-
-    #[inline]
-    fn test_flag(&self, flag: Flag) -> bool {
-        (self.regs.p & (flag as u8)) != 0
-    }
-
-    // -- Memory Ops
-
+    // ---- memory ----
     pub fn read_mem(&self, address: u16) -> u8 {
         match address {
             0x0000 => self.io_port.borrow().get_direction(),
@@ -912,6 +892,32 @@ impl Cpu6510 {
         let address = make_address(0x01, self.regs.sp);
         self.write_mem(address, value);
         self.regs.sp = self.regs.sp.wrapping_sub(1);
+    }
+
+    // ---- shared ----
+    #[inline]
+    fn set_flag(&mut self, flag: Flag) {
+        self.regs.p |= flag as u8;
+    }
+
+    #[inline]
+    fn test_flag(&self, flag: Flag) -> bool {
+        (self.regs.p & (flag as u8)) != 0
+    }
+
+    #[inline]
+    fn set_nz(&mut self, value: u8) {
+        self.update_flag(Flag::Negative, value & 0x80 != 0);
+        self.update_flag(Flag::Zero, value == 0);
+    }
+
+    #[inline]
+    fn update_flag(&mut self, flag: Flag, value: bool) {
+        if value {
+            self.regs.p |= flag as u8;
+        } else {
+            self.regs.p &= !(flag as u8);
+        }
     }
 }
 
@@ -999,8 +1005,6 @@ impl Cpu for Cpu6510 {
         self.cycle = 0;
     }
 
-    // -- I/O
-
     fn read(&self, address: u16) -> u8 {
         self.read_mem(address)
     }
@@ -1064,11 +1068,11 @@ fn make_address(hi: u8, lo: u8) -> u16 {
 }
 
 #[inline]
-fn lo_byte(data: u16) -> u8 {
-    data as u8
+fn hi_byte(data: u16) -> u8 {
+    (data >> 8) as u8
 }
 
 #[inline]
-fn hi_byte(data: u16) -> u8 {
-    (data >> 8) as u8
+fn lo_byte(data: u16) -> u8 {
+    data as u8
 }

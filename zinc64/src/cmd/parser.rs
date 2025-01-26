@@ -41,19 +41,6 @@ impl Parser {
         }
     }
 
-    /*
-    fn parse_exit(&self, tokens: &mut dyn Iterator<Item=&str>) -> Result<Cmd, String> {
-        self.ensure_eos(tokens)?;
-        Ok(Cmd::Exit)
-    }
-    */
-
-    fn parse_help(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
-        let command = tokens.next().map(|s| s.to_string());
-        self.ensure_eos(tokens)?;
-        Ok(Cmd::Help(command))
-    }
-
     fn parse_load(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let path = match tokens.next() {
             Some(value) => Ok(String::from(value)),
@@ -68,18 +55,26 @@ impl Parser {
         Ok(Cmd::Ls(command))
     }
 
+    fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
+        match tokens.next() {
+            Some(token) => Err(format!("Unexpected token {}", token)),
+            None => Ok(()),
+        }
+    }
+
     fn parse_reset(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
         let mode = self.parse_num_maybe(tokens.next())?;
         self.ensure_eos(tokens)?;
         Ok(Cmd::Reset(mode.unwrap_or(0) == 1))
     }
 
-    // -- Helpers
-
-    fn ensure_eos(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<(), String> {
-        match tokens.next() {
-            Some(token) => Err(format!("Unexpected token {}", token)),
-            None => Ok(()),
+    fn parse_num_maybe(&self, input: Option<&str>) -> Result<Option<u16>, String> {
+        if let Some(value) = input {
+            let result = u16::from_str_radix(value, self.radix)
+                .map_err(|_| format!("Invalid number {}", value))?;
+            Ok(Some(result))
+        } else {
+            Ok(None)
         }
     }
 
@@ -92,13 +87,16 @@ impl Parser {
         }
     }
 
-    fn parse_num_maybe(&self, input: Option<&str>) -> Result<Option<u16>, String> {
-        if let Some(value) = input {
-            let result = u16::from_str_radix(value, self.radix)
-                .map_err(|_| format!("Invalid number {}", value))?;
-            Ok(Some(result))
-        } else {
-            Ok(None)
-        }
+    /*
+    fn parse_exit(&self, tokens: &mut dyn Iterator<Item=&str>) -> Result<Cmd, String> {
+        self.ensure_eos(tokens)?;
+        Ok(Cmd::Exit)
+    }
+    */
+
+    fn parse_help(&self, tokens: &mut dyn Iterator<Item = &str>) -> Result<Cmd, String> {
+        let command = tokens.next().map(|s| s.to_string());
+        self.ensure_eos(tokens)?;
+        Ok(Cmd::Help(command))
     }
 }

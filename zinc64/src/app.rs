@@ -23,11 +23,23 @@ use crate::video::VideoBuffer;
 
 const CONSOLE_BUFFER: usize = 2048;
 
-#[derive(Copy, Clone, Debug)]
-pub enum JamAction {
-    Continue,
-    Quit,
-    Reset,
+pub struct AppState {
+    pub state: RuntimeState,
+    pub c64: C64,
+    pub console: Console,
+    pub console_history: Vec<String>,
+    pub debug: Debug,
+    pub options: Options,
+    pub sound_buffer: Arc<SoundBuffer>,
+    pub video_buffer: Shared<VideoBuffer>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum RuntimeState {
+    Running,
+    Paused,
+    Halted,
+    Stopped,
 }
 
 pub struct Options {
@@ -49,23 +61,11 @@ pub struct Options {
     pub rap_address: SocketAddr,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum RuntimeState {
-    Running,
-    Paused,
-    Halted,
-    Stopped,
-}
-
-pub struct AppState {
-    pub state: RuntimeState,
-    pub c64: C64,
-    pub console: Console,
-    pub console_history: Vec<String>,
-    pub debug: Debug,
-    pub options: Options,
-    pub sound_buffer: Arc<SoundBuffer>,
-    pub video_buffer: Shared<VideoBuffer>,
+#[derive(Copy, Clone, Debug)]
+pub enum JamAction {
+    Continue,
+    Quit,
+    Reset,
 }
 
 pub struct App {

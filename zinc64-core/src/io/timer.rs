@@ -6,22 +6,10 @@
 
 use bit_field::BitField;
 
+use super::cycle_counter::CycleCounter;
 use crate::util::{Pin, Shared};
 
-use super::cycle_counter::CycleCounter;
-
 // SPEC: A Software Model of the CIA6526 by Wolfgang Lorenz
-
-enum Delay {
-    Count0 = 1,
-    Count1 = 1 << 1,
-    Count2 = 1 << 2,
-    Count3 = 1 << 3,
-    Load0 = 1 << 4,
-    Load1 = 1 << 5,
-    PbLow0 = 1 << 6,
-    PbLow1 = 1 << 7,
-}
 
 const CYCLE_DELAY_MASK: u16 = !(Delay::Load0 as u16 | Delay::PbLow0 as u16);
 
@@ -87,20 +75,8 @@ impl Timer {
         }
     }
 
-    pub fn get_config(&self) -> u8 {
-        let mut config = 0;
-        config
-            .set_bit(0, self.enabled)
-            .set_bit(1, self.pb_on)
-            .set_bit(2, self.output_mode == OutputMode::Toggle)
-            .set_bit(3, self.run_mode == RunMode::OneShot);
-        match self.input_mode {
-            InputMode::SystemClock => config.set_bit(5, false),
-            InputMode::External => config.set_bit(5, true),
-            InputMode::TimerA => config.set_bit(5, false).set_bit(6, true),
-            InputMode::TimerAWithCNT => config.set_bit(5, true).set_bit(6, true),
-        };
-        config
+    pub fn is_pb_on(&self) -> bool {
+        self.pb_on
     }
 
     #[allow(dead_code)]
@@ -108,84 +84,59 @@ impl Timer {
         self.counter
     }
 
-    pub fn get_counter_hi(&self) -> u8 {
-        (self.counter >> 8) as u8
-    }
-
-    pub fn get_counter_lo(&self) -> u8 {
-        (self.counter & 0xff) as u8
-    }
-
     #[allow(dead_code)]
     pub fn get_latch(&self) -> u16 {
         self.latch
-    }
-
-    pub fn is_pb_on(&self) -> bool {
-        self.pb_on
     }
 
     pub fn get_pb_output(&self) -> bool {
         self.pb_output
     }
 
-    pub fn set_config(&mut self, value: u8) {
-        let prev_enabled = self.enabled;
-        self.pb_on = value.get_bit(1);
-        self.output_mode = if value.get_bit(2) {
-            OutputMode::Toggle
-        } else {
-            OutputMode::Pulse
-        };
-        self.run_mode = if value.get_bit(3) {
-            RunMode::OneShot
-        } else {
-            RunMode::Continuous
-        };
-        if value.get_bit(4) {
-            self.delay.feed(Delay::Load0 as u16);
-        }
-        let input_mode = match self.mode {
-            Mode::TimerA => {
-                if value.get_bit(5) {
-                    1
-                } else {
-                    0
+    // ---- reset ----
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.input_mode = InputMode::SystemClock;
+        self.output_mode = OutputMode::Pulse;
+        self.pb_on = false;
+        self.run_mode = RunMode::OneShot;
+        self.counter = 0;
+        self.delay.reset();
+        self.latch = 0xffff;
+        self.pb_output = false;
+        self.pb_toggle = false;
+    }
+
+    // ---- counting ----
+    pub fn feed_source(&mut self, timer_a_output: bool) {
+        match self.input_mode {
+            InputMode::SystemClock => {
+                // Already fed through by Count0 in self.feed
+            }
+            InputMode::External => {
+                /*
+                In CNT mode, the input must be synchronized with ø2. When there
+                is a rising edge on the CNT line, the bit CountA0 in dwDelay
+                is set to 1. At each system clock, dwDelay is shift left by one
+                and the shift out bits are filled from dwFeed. Because dwFeed & CountA0
+                is always 0, a single 1 is shifted through the pipeline until it reaches
+                CountA3, which will then decrement the counter.
+                */
+                if self.cnt_pin.borrow().is_rising() {
+                    self.delay.feed(Delay::Count0 as u16);
                 }
             }
-            Mode::TimerB => (value & 0x60) >> 5,
-        };
-        self.input_mode = match input_mode {
-            0 => InputMode::SystemClock,
-            1 => InputMode::External,
-            2 => InputMode::TimerA,
-            3 => InputMode::TimerAWithCNT,
-            _ => panic!("invalid timer input"),
-        };
-        self.enable(value.get_bit(0));
-        // Update PB output
-        if self.enabled && !prev_enabled {
-            self.pb_toggle = true;
+            InputMode::TimerA => {
+                if timer_a_output {
+                    self.delay.feed(Delay::Count1 as u16);
+                }
+            }
+            InputMode::TimerAWithCNT => {
+                if timer_a_output && self.cnt_pin.borrow().is_rising() {
+                    self.delay.feed(Delay::Count0 as u16);
+                }
+            }
         }
-        if self.pb_on {
-            self.pb_output = match self.output_mode {
-                OutputMode::Pulse => self.delay.has_cycle(Delay::PbLow1 as u16),
-                OutputMode::Toggle => self.pb_toggle,
-            };
-        }
-    }
-
-    pub fn set_latch_hi(&mut self, value: u8) {
-        let result = ((value as u16) << 8) | (self.latch & 0x00ff);
-        self.latch = result;
-        if !self.enabled {
-            self.delay.feed(Delay::Load0 as u16);
-        }
-    }
-
-    pub fn set_latch_lo(&mut self, value: u8) {
-        let result = (self.latch & 0xff00) | (value as u16);
-        self.latch = result;
     }
 
     #[inline(always)]
@@ -243,50 +194,91 @@ impl Timer {
         underflow
     }
 
-    pub fn feed_source(&mut self, timer_a_output: bool) {
+    // ---- registers ----
+    pub fn get_counter_lo(&self) -> u8 {
+        (self.counter & 0xff) as u8
+    }
+
+    pub fn get_counter_hi(&self) -> u8 {
+        (self.counter >> 8) as u8
+    }
+
+    pub fn get_config(&self) -> u8 {
+        let mut config = 0;
+        config
+            .set_bit(0, self.enabled)
+            .set_bit(1, self.pb_on)
+            .set_bit(2, self.output_mode == OutputMode::Toggle)
+            .set_bit(3, self.run_mode == RunMode::OneShot);
         match self.input_mode {
-            InputMode::SystemClock => {
-                // Already fed through by Count0 in self.feed
-            }
-            InputMode::External => {
-                /*
-                In CNT mode, the input must be synchronized with ø2. When there
-                is a rising edge on the CNT line, the bit CountA0 in dwDelay
-                is set to 1. At each system clock, dwDelay is shift left by one
-                and the shift out bits are filled from dwFeed. Because dwFeed & CountA0
-                is always 0, a single 1 is shifted through the pipeline until it reaches
-                CountA3, which will then decrement the counter.
-                */
-                if self.cnt_pin.borrow().is_rising() {
-                    self.delay.feed(Delay::Count0 as u16);
-                }
-            }
-            InputMode::TimerA => {
-                if timer_a_output {
-                    self.delay.feed(Delay::Count1 as u16);
-                }
-            }
-            InputMode::TimerAWithCNT => {
-                if timer_a_output && self.cnt_pin.borrow().is_rising() {
-                    self.delay.feed(Delay::Count0 as u16);
-                }
-            }
+            InputMode::SystemClock => config.set_bit(5, false),
+            InputMode::External => config.set_bit(5, true),
+            InputMode::TimerA => config.set_bit(5, false).set_bit(6, true),
+            InputMode::TimerAWithCNT => config.set_bit(5, true).set_bit(6, true),
+        };
+        config
+    }
+
+    pub fn set_latch_lo(&mut self, value: u8) {
+        let result = (self.latch & 0xff00) | (value as u16);
+        self.latch = result;
+    }
+
+    pub fn set_latch_hi(&mut self, value: u8) {
+        let result = ((value as u16) << 8) | (self.latch & 0x00ff);
+        self.latch = result;
+        if !self.enabled {
+            self.delay.feed(Delay::Load0 as u16);
         }
     }
 
-    pub fn reset(&mut self) {
-        self.enabled = false;
-        self.input_mode = InputMode::SystemClock;
-        self.output_mode = OutputMode::Pulse;
-        self.pb_on = false;
-        self.run_mode = RunMode::OneShot;
-        self.counter = 0;
-        self.delay.reset();
-        self.latch = 0xffff;
-        self.pb_output = false;
-        self.pb_toggle = false;
+    pub fn set_config(&mut self, value: u8) {
+        let prev_enabled = self.enabled;
+        self.pb_on = value.get_bit(1);
+        self.output_mode = if value.get_bit(2) {
+            OutputMode::Toggle
+        } else {
+            OutputMode::Pulse
+        };
+        self.run_mode = if value.get_bit(3) {
+            RunMode::OneShot
+        } else {
+            RunMode::Continuous
+        };
+        if value.get_bit(4) {
+            self.delay.feed(Delay::Load0 as u16);
+        }
+        let input_mode = match self.mode {
+            Mode::TimerA => {
+                if value.get_bit(5) {
+                    1
+                } else {
+                    0
+                }
+            }
+            Mode::TimerB => (value & 0x60) >> 5,
+        };
+        self.input_mode = match input_mode {
+            0 => InputMode::SystemClock,
+            1 => InputMode::External,
+            2 => InputMode::TimerA,
+            3 => InputMode::TimerAWithCNT,
+            _ => panic!("invalid timer input"),
+        };
+        self.enable(value.get_bit(0));
+        // Update PB output
+        if self.enabled && !prev_enabled {
+            self.pb_toggle = true;
+        }
+        if self.pb_on {
+            self.pb_output = match self.output_mode {
+                OutputMode::Pulse => self.delay.has_cycle(Delay::PbLow1 as u16),
+                OutputMode::Toggle => self.pb_toggle,
+            };
+        }
     }
 
+    // ---- shared ----
     fn enable(&mut self, enabled: bool) {
         self.enabled = enabled;
         if enabled && self.input_mode == InputMode::SystemClock {
@@ -305,28 +297,21 @@ impl Timer {
     }
 }
 
+enum Delay {
+    Count0 = 1,
+    Count1 = 1 << 1,
+    Count2 = 1 << 2,
+    Count3 = 1 << 3,
+    Load0 = 1 << 4,
+    Load1 = 1 << 5,
+    PbLow0 = 1 << 6,
+    PbLow1 = 1 << 7,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::util::new_shared;
-
-    #[test]
-    fn set_config() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
-        timer.set_config(0b_0010_1001);
-        assert!(timer.enabled);
-        //assert_eq!(RunMode::OneShot, timer.run_mode);
-        //assert_eq!(InputMode::External, timer.input_mode);
-    }
-
-    #[test]
-    fn set_and_get_config() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
-        timer.set_config(0b_0010_1001);
-        assert_eq!(0b_0010_1001, timer.get_config());
-    }
 
     #[test]
     fn count_delay_2c() {
@@ -451,5 +436,23 @@ mod tests {
         assert_eq!(timer.get_counter(), 0x01);
         timer.clock(); // Count3|Underflow|Load1
         assert_eq!(timer.get_counter(), 0x02);
+    }
+
+    #[test]
+    fn set_config() {
+        let cnt_pin = new_shared(Pin::new_high());
+        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        timer.set_config(0b_0010_1001);
+        assert!(timer.enabled);
+        //assert_eq!(RunMode::OneShot, timer.run_mode);
+        //assert_eq!(InputMode::External, timer.input_mode);
+    }
+
+    #[test]
+    fn set_and_get_config() {
+        let cnt_pin = new_shared(Pin::new_high());
+        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        timer.set_config(0b_0010_1001);
+        assert_eq!(0b_0010_1001, timer.get_config());
     }
 }

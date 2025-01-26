@@ -2,25 +2,25 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use crate::platform::Platform;
-use crate::time::Time;
-
 use glutin::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     platform::run_return::EventLoopExtRunReturn,
 };
 
-pub struct Context {
-    pub platform: Platform,
-    pub time: Time,
-    pub running: bool,
-}
+use crate::platform::Platform;
+use crate::time::Time;
 
 pub struct Options {
     pub title: String,
     pub window_size: (u32, u32),
     pub fullscreen: bool,
+}
+
+pub struct Context {
+    pub platform: Platform,
+    pub time: Time,
+    pub running: bool,
 }
 
 pub trait State {

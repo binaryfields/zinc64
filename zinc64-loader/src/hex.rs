@@ -21,6 +21,36 @@ impl HexLoader {
         Self {}
     }
 
+    fn parse_word(&self, hex: &str) -> Option<u16> {
+        if hex.len() == 4 {
+            if let Some(hi_byte) = self.parse_byte(&hex[0..2]) {
+                if let Some(lo_byte) = self.parse_byte(&hex[2..4]) {
+                    Some(((hi_byte as u16) << 8) | (lo_byte as u16))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn parse_byte(&self, hex: &str) -> Option<u8> {
+        if hex.len() == 2 {
+            let hi_byte = self.map_hex(hex.chars().nth(0).unwrap());
+            let lo_byte = self.map_hex(hex.chars().nth(1).unwrap());
+            if hi_byte != 0xff && lo_byte != 0xff {
+                Some(hi_byte << 4 | lo_byte)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     fn map_hex(&self, hex: char) -> u8 {
         match hex {
             '0' => 0x00,
@@ -46,36 +76,6 @@ impl HexLoader {
             'E' => 0x0e,
             'F' => 0x0f,
             _ => 0xff,
-        }
-    }
-
-    fn parse_byte(&self, hex: &str) -> Option<u8> {
-        if hex.len() == 2 {
-            let hi_byte = self.map_hex(hex.chars().nth(0).unwrap());
-            let lo_byte = self.map_hex(hex.chars().nth(1).unwrap());
-            if hi_byte != 0xff && lo_byte != 0xff {
-                Some(hi_byte << 4 | lo_byte)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    fn parse_word(&self, hex: &str) -> Option<u16> {
-        if hex.len() == 4 {
-            if let Some(hi_byte) = self.parse_byte(&hex[0..2]) {
-                if let Some(lo_byte) = self.parse_byte(&hex[2..4]) {
-                    Some(((hi_byte as u16) << 8) | (lo_byte as u16))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
         }
     }
 }

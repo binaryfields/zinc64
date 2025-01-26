@@ -4,29 +4,13 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::prelude::*;
+
 use bit_field::BitField;
 use log::LogLevel;
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
 // DEFERRED device: cartridge test cases
-
-pub enum ChipType {
-    Rom,
-    Ram,
-    FlashRom,
-}
-
-impl ChipType {
-    pub fn from(chip_type: u16) -> ChipType {
-        match chip_type {
-            0x00 => ChipType::Rom,
-            0x01 => ChipType::Ram,
-            0x02 => ChipType::FlashRom,
-            _ => panic!("invalid chip type {}", chip_type),
-        }
-    }
-}
 
 pub struct Chip {
     pub chip_type: ChipType,
@@ -35,6 +19,8 @@ pub struct Chip {
     pub size: u16,
     pub data: Vec<u8>,
 }
+
+type IoObserver = Box<dyn Fn(&IoConfig)>;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum HwType {
@@ -89,7 +75,22 @@ impl Default for IoConfig {
     }
 }
 
-type IoObserver = Box<dyn Fn(&IoConfig)>;
+pub enum ChipType {
+    Rom,
+    Ram,
+    FlashRom,
+}
+
+impl ChipType {
+    pub fn from(chip_type: u16) -> ChipType {
+        match chip_type {
+            0x00 => ChipType::Rom,
+            0x01 => ChipType::Ram,
+            0x02 => ChipType::FlashRom,
+            _ => panic!("invalid chip type {}", chip_type),
+        }
+    }
+}
 
 #[allow(unused)]
 pub struct Cartridge {
@@ -152,42 +153,39 @@ impl Cartridge {
         self.notify_io_changed();
     }
 
-    fn notify_io_changed(&self) {
-        if let Some(ref observer) = self.io_observer {
-            observer(&self.io_config);
-        }
-    }
-
-    fn switch_bank(&mut self, bank_number: u8) {
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cart::banks", "Switching to bank {} game {} exrom {}", bank_number, self.io_config.game, self.io_config.exrom);
-        }
-        if let Some(ref bank) = self.banks[bank_number as usize] {
-            match bank.offset {
-                0x8000 => {
-                    self.bank_lo = Some(bank.bank_number as usize);
-                    if self.is_mirrowed {
-                        self.bank_hi = self.bank_lo;
-                    } else {
-                        self.bank_hi = None;
-                    }
+    pub fn read(&mut self, address: u16) -> Option<u8> {
+        match address {
+            0x8000..=0x9fff => {
+                if let Some(bank_num) = self.bank_lo {
+                    let bank = self.banks[bank_num].as_ref().unwrap();
+                    Some(bank.data[(address - 0x8000) as usize])
+                } else {
+                    None
                 }
-                0xa000 => {
-                    self.bank_hi = Some(bank.bank_number as usize);
-                    if self.is_mirrowed {
-                        self.bank_lo = self.bank_hi;
-                    } else {
-                        self.bank_lo = None;
-                    }
-                }
-                _ => panic!("invalid load address {:04x}", bank.bank_number),
             }
-        } else {
-            panic!("invalid bank number {}", bank_number);
+            0xa000..=0xbfff => {
+                if let Some(bank_num) = self.bank_hi {
+                    let bank = self.banks[bank_num].as_ref().unwrap();
+                    if bank.offset == 0x8000 {
+                        Some(bank.data[(address - 0x8000) as usize])
+                    } else {
+                        Some(bank.data[(address - 0xa000) as usize])
+                    }
+                } else {
+                    None
+                }
+            }
+            0xde00..=0xdfff => Some(self.read_io(address)),
+            _ => panic!("invalid address {:04x}", address),
         }
     }
 
-    // -- Device I/O
+    pub fn write(&mut self, address: u16, value: u8) {
+        match address {
+            0xde00..=0xdfff => self.write_io(address, value),
+            _ => panic!("writes to cartridge are not supported"),
+        }
+    }
 
     fn read_io(&mut self, address: u16) -> u8 {
         if self.hw_type == HwType::GameSystem
@@ -247,37 +245,38 @@ impl Cartridge {
         }
     }
 
-    pub fn read(&mut self, address: u16) -> Option<u8> {
-        match address {
-            0x8000..=0x9fff => {
-                if let Some(bank_num) = self.bank_lo {
-                    let bank = self.banks[bank_num].as_ref().unwrap();
-                    Some(bank.data[(address - 0x8000) as usize])
-                } else {
-                    None
-                }
-            }
-            0xa000..=0xbfff => {
-                if let Some(bank_num) = self.bank_hi {
-                    let bank = self.banks[bank_num].as_ref().unwrap();
-                    if bank.offset == 0x8000 {
-                        Some(bank.data[(address - 0x8000) as usize])
+    fn switch_bank(&mut self, bank_number: u8) {
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "cart::banks", "Switching to bank {} game {} exrom {}", bank_number, self.io_config.game, self.io_config.exrom);
+        }
+        if let Some(ref bank) = self.banks[bank_number as usize] {
+            match bank.offset {
+                0x8000 => {
+                    self.bank_lo = Some(bank.bank_number as usize);
+                    if self.is_mirrowed {
+                        self.bank_hi = self.bank_lo;
                     } else {
-                        Some(bank.data[(address - 0xa000) as usize])
+                        self.bank_hi = None;
                     }
-                } else {
-                    None
                 }
+                0xa000 => {
+                    self.bank_hi = Some(bank.bank_number as usize);
+                    if self.is_mirrowed {
+                        self.bank_lo = self.bank_hi;
+                    } else {
+                        self.bank_lo = None;
+                    }
+                }
+                _ => panic!("invalid load address {:04x}", bank.bank_number),
             }
-            0xde00..=0xdfff => Some(self.read_io(address)),
-            _ => panic!("invalid address {:04x}", address),
+        } else {
+            panic!("invalid bank number {}", bank_number);
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
-        match address {
-            0xde00..=0xdfff => self.write_io(address, value),
-            _ => panic!("writes to cartridge are not supported"),
+    fn notify_io_changed(&self) {
+        if let Some(ref observer) = self.io_observer {
+            observer(&self.io_config);
         }
     }
 }
