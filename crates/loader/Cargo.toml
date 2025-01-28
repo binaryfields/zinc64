@@ -1,0 +1,17 @@
+[package]
+name = "zinc64-loader"
+description = "Commodore 64 emulator loader support"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords = ["c64", "commodore", "emulator"]
+categories = ["emulators"]
+
+[dependencies]
+byteorder.workspace = true
+log.workspace = true
+zinc64-core.workspace = true
+zinc64-system.workspace = true

@@ -1,0 +1,27 @@
+[package]
+name = "zinc64"
+description = "Commodore 64 emulator app"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords = ["c64", "commodore", "emulator"]
+categories = ["emulators"]
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+bit_field.workspace = true
+byteorder.workspace = true
+cgmath = "0.18"
+cpal = "0.15.2"
+glow = "0.13"
+glutin = "0.29"
+log.workspace = true
+structopt = "0.3"
+zinc64-core.workspace = true
+zinc64-debug.workspace = true
+zinc64-loader.workspace = true
+zinc64-system.workspace = true

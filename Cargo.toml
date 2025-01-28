@@ -1,16 +1,38 @@
 [workspace]
-resolver = "3"
 members = [
-    "zinc64",
-    "zinc64-core",
-    "zinc64-debug",
-    "zinc64-loader",
-    "zinc64-system"
+    "crates/core",
+    "crates/debug",
+    "crates/loader",
+    "crates/system",
+    "crates/zinc64",
 ]
-default-members = [
-    "zinc64-core",
-    "zinc64-debug",
-    "zinc64-loader",
-    "zinc64-system",
-    "zinc64"
-]
+exclude = ["crates/raspi3-boot", "crates/rpi"]
+resolver = "3"
+
+[workspace.package]
+version = "0.9.0"
+authors = ["Sebastian Jastrzebski <sebby2k@gmail.com>"]
+edition = "2024"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/binaryfields/zinc64"
+readme = "README.md"
+
+[workspace.dependencies]
+bit_field = "0.10"
+byteorder = "1.5"
+log = "0.3"
+resid-rs = "1.0"
+zinc64-core = { path = "crates/core", version = "0.9.0" }
+zinc64-debug = { path = "crates/debug", version = "0.9.0" }
+zinc64-loader = { path = "crates/loader", version = "0.9.0" }
+zinc64-system = { path = "crates/system", version = "0.9.0" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = "thin"

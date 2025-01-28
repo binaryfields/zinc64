@@ -27,18 +27,9 @@ history.
 
 2020 is bringing support for revised OpenGL port with console support and
 bare-metal environments, more specifically a bare-metal Raspberry Pi 3 port.
-See zinc64-rpi for an early preview.
+See crates/rpi (zinc64-rpi) for an early preview.
 
 ## Design
-
-### Feature `std`
-
-zinc64-system crate works without the standard library, such as in bare-metal environments. To use zinc64-system in a #[no_std] environment, use: 
-
-```toml
-[dependencies]
-zinc64-system = { version = "0.9.0", default-features = false }
-```
 
 ### Extensibility
 

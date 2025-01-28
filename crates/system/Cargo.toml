@@ -1,0 +1,16 @@
+[package]
+name = "zinc64-system"
+description = "Commodore 64 emulator toolkit with batteries included but swappable"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords = ["c64", "commodore", "emulator"]
+categories = ["emulators"]
+include = ["src/**", "tests/**", "README.md"]
+
+[dependencies]
+log.workspace = true
+zinc64-core.workspace = true
