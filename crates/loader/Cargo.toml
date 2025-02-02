@@ -13,5 +13,4 @@ categories = ["emulators"]
 [dependencies]
 byteorder.workspace = true
 log.workspace = true
-zinc64-core.workspace = true
-zinc64-system.workspace = true
+zinc64-engine.workspace = true

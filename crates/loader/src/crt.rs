@@ -4,15 +4,14 @@
 
 #![allow(clippy::cast_lossless)]
 
-use core::str;
+use std::io::{self, Read};
+use std::str;
 
-use byteorder::BigEndian;
-use zinc64_core::device::cartridge;
-use zinc64_system::autostart;
-use zinc64_system::{C64, Image};
+use byteorder::{BigEndian, ReadBytesExt};
+use zinc64_engine::peripheral::cartridge;
+use zinc64_engine::{AutostartMethod, Media};
 
-use super::Loader;
-use crate::io::{self, ReadBytesExt, Reader};
+use crate::{Loader, invalid_data};
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/CRT.TXT
 
@@ -48,7 +47,7 @@ impl CrtLoader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
         let mut signature = [0u8; 16];
         let mut reserved = [0u8; 6];
         let mut name = [0u8; 32];
@@ -76,11 +75,11 @@ impl CrtLoader {
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
         let sig = str::from_utf8(&header.signature)
-            .map_err(|_| "invalid cartridge signature".to_owned())?;
+            .map_err(|_| invalid_data("invalid cartridge signature"))?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err("invalid cartridge signature".to_owned())
+            Err(invalid_data("invalid cartridge signature"))
         }
     }
 
@@ -93,7 +92,7 @@ impl CrtLoader {
         )
     }
 
-    fn read_chip_header(&self, rdr: &mut dyn Reader) -> io::Result<Option<ChipHeader>> {
+    fn read_chip_header(&self, rdr: &mut dyn Read) -> io::Result<Option<ChipHeader>> {
         let mut signature = [0u8; 4];
         match rdr.read(&mut signature)? {
             0 => Ok(None),
@@ -108,21 +107,24 @@ impl CrtLoader {
                 };
                 Ok(Some(header))
             }
-            size => Err(format!("chip header error, expected {} got {}", 4, size)),
+            size => Err(invalid_data(format!(
+                "chip header error, expected {} got {}",
+                4, size
+            ))),
         }
     }
 
     fn validate_chip_header(&self, header: &ChipHeader) -> io::Result<()> {
-        let sig =
-            str::from_utf8(&header.signature).map_err(|_| "invalid chip signature".to_owned())?;
+        let sig = str::from_utf8(&header.signature)
+            .map_err(|_| invalid_data("invalid chip signature"))?;
         if sig == CHIP_SIG {
             Ok(())
         } else {
-            Err("invalid chip signature".to_owned())
+            Err(invalid_data("invalid chip signature"))
         }
     }
 
-    fn read_data(&self, rdr: &mut dyn Reader, length: usize) -> io::Result<Vec<u8>> {
+    fn read_data(&self, rdr: &mut dyn Read, length: usize) -> io::Result<Vec<u8>> {
         let mut data = vec![0; length];
         rdr.read_exact(&mut data)?;
         Ok(data)
@@ -140,28 +142,29 @@ impl CrtLoader {
 }
 
 impl Loader for CrtLoader {
-    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<autostart::AutostartMethod> {
-        let image = self.load(reader)?;
-        Ok(autostart::AutostartMethod::WithImage(image))
+    fn autostart(&self, reader: &mut dyn Read) -> io::Result<AutostartMethod> {
+        let media = self.load(reader)?;
+        Ok(AutostartMethod::Boot(media))
     }
 
-    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+    fn load(&self, reader: &mut dyn Read) -> io::Result<Media> {
         info!(target: "loader", "Loading CRT");
         let header = self
             .read_header(reader)
-            .map_err(|_| "invalid cartridge header".to_owned())?;
+            .map_err(|_| invalid_data("invalid cartridge header"))?;
         info!(target: "loader", "Found cartridge {}, version {}.{}, type {}",
               str::from_utf8(&header.name).unwrap_or(""),
               header.version >> 8,
               header.version & 0xff,
               header.hw_type);
         self.validate_header(&header)?;
-        reader.consume((header.header_length - 0x40) as usize);
+        let padding = u64::from(header.header_length - 0x40);
+        io::copy(&mut (&mut *reader).take(padding), &mut io::sink())?;
         let mut cartridge = self.build_cartridge(&header);
         loop {
             let chip_header_opt = self
                 .read_chip_header(reader)
-                .map_err(|_| "invalid cartridge chip header".to_owned())?;
+                .map_err(|_| invalid_data("invalid cartridge chip header"))?;
             match chip_header_opt {
                 Some(chip_header) => {
                     info!(target: "loader", "Found chip {}, type {}, offset 0x{:x}, size {}",
@@ -170,7 +173,10 @@ impl Loader for CrtLoader {
                     let chip_data = self
                         .read_data(reader, (chip_header.length - 0x10) as usize)
                         .map_err(|_| {
-                            format!("invalid cartridge chip {} data", chip_header.bank_number)
+                            invalid_data(format!(
+                                "invalid cartridge chip {} data",
+                                chip_header.bank_number
+                            ))
                         })?;
                     let chip = self.build_chip(&chip_header, chip_data);
                     cartridge.add(chip);
@@ -180,22 +186,6 @@ impl Loader for CrtLoader {
                 }
             }
         }
-        Ok(Box::new(CrtImage {
-            cartridge: Some(cartridge),
-        }))
-    }
-}
-
-struct CrtImage {
-    cartridge: Option<cartridge::Cartridge>,
-}
-
-impl Image for CrtImage {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting CRT image");
-        c64.attach_cartridge(self.cartridge.take().unwrap());
-    }
-    fn unmount(&mut self, c64: &mut C64) {
-        c64.detach_cartridge();
+        Ok(Media::Cartridge(Box::new(cartridge)))
     }
 }

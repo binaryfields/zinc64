@@ -2,14 +2,14 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use core::str;
+use std::io::{self, Read};
+use std::str;
 
-use byteorder::LittleEndian;
-use zinc64_system::autostart;
-use zinc64_system::{Autostart, AutostartMethod, C64, Image};
+use byteorder::{LittleEndian, ReadBytesExt};
+use zinc64_engine::media::Mode;
+use zinc64_engine::{Autostart, AutostartMethod, Media};
 
-use super::Loader;
-use crate::io::{self, ReadBytesExt, Reader};
+use crate::{Loader, invalid_data};
 
 static HEADER_SIG: &str = "C64File";
 
@@ -33,7 +33,7 @@ impl P00Loader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
         let mut signature = [0u8; 7];
         let mut filename = [0u8; 16];
         let header = Header {
@@ -54,46 +54,31 @@ impl P00Loader {
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
         let sig =
-            str::from_utf8(&header.signature).map_err(|_| "invalid P00 signature".to_owned())?;
+            str::from_utf8(&header.signature).map_err(|_| invalid_data("invalid P00 signature"))?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err("invalid P00 signature".to_owned())
+            Err(invalid_data("invalid P00 signature"))
         }
     }
 }
 
 impl Loader for P00Loader {
-    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<AutostartMethod> {
-        let image = self.load(reader)?;
-        let autostart = Autostart::new(autostart::Mode::Run, image);
-        Ok(AutostartMethod::WithAutostart(Some(autostart)))
+    fn autostart(&self, reader: &mut dyn Read) -> io::Result<AutostartMethod> {
+        let media = self.load(reader)?;
+        Ok(AutostartMethod::Run(Autostart::new(Mode::Run, media)))
     }
 
-    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+    fn load(&self, reader: &mut dyn Read) -> io::Result<Media> {
         info!(target: "loader", "Loading P00");
         let header = self
             .read_header(reader)
-            .map_err(|_| "invalid P00 header".to_owned())?;
+            .map_err(|_| invalid_data("invalid P00 header"))?;
         self.validate_header(&header)?;
         let offset = reader.read_u16::<LittleEndian>()?;
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
-        Ok(Box::new(P00Image { data, offset }))
+        Ok(Media::Program { data, offset })
     }
-}
-
-struct P00Image {
-    data: Vec<u8>,
-    offset: u16,
-}
-
-impl Image for P00Image {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting P00 image");
-        c64.load(&self.data, self.offset);
-    }
-
-    fn unmount(&mut self, _c64: &mut C64) {}
 }

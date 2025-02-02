@@ -2,12 +2,13 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use byteorder::LittleEndian;
-use zinc64_system::autostart;
-use zinc64_system::{Autostart, AutostartMethod, C64, Image};
+use std::io::{self, Read};
 
-use super::Loader;
-use crate::io::{self, ReadBytesExt, Reader};
+use byteorder::{LittleEndian, ReadBytesExt};
+use zinc64_engine::media::Mode;
+use zinc64_engine::{Autostart, AutostartMethod, Media};
+
+use crate::Loader;
 
 #[derive(Default)]
 pub struct PrgLoader;
@@ -19,32 +20,17 @@ impl PrgLoader {
 }
 
 impl Loader for PrgLoader {
-    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<AutostartMethod> {
-        let image = self.load(reader)?;
-        let autostart = Autostart::new(autostart::Mode::Run, image);
-        Ok(AutostartMethod::WithAutostart(Some(autostart)))
+    fn autostart(&self, reader: &mut dyn Read) -> io::Result<AutostartMethod> {
+        let media = self.load(reader)?;
+        Ok(AutostartMethod::Run(Autostart::new(Mode::Run, media)))
     }
 
-    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+    fn load(&self, reader: &mut dyn Read) -> io::Result<Media> {
         info!(target: "loader", "Loading PRG");
         let offset = reader.read_u16::<LittleEndian>()?;
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         info!(target: "loader", "Program offset 0x{:x}, size {}", offset, data.len());
-        Ok(Box::new(PrgImage { data, offset }))
+        Ok(Media::Program { data, offset })
     }
-}
-
-struct PrgImage {
-    data: Vec<u8>,
-    offset: u16,
-}
-
-impl Image for PrgImage {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting PRG image");
-        c64.load(&self.data, self.offset);
-    }
-
-    fn unmount(&mut self, _c64: &mut C64) {}
 }

@@ -4,15 +4,15 @@
 
 #![allow(clippy::cast_lossless)]
 
-use core::str;
+use std::io::{self, Read};
+use std::str;
 
-use byteorder::LittleEndian;
-use zinc64_core::factory::Tape;
-use zinc64_system::autostart;
-use zinc64_system::{Autostart, AutostartMethod, C64, Image};
+use byteorder::{LittleEndian, ReadBytesExt};
+use zinc64_engine::media::Mode;
+use zinc64_engine::peripheral::Tape;
+use zinc64_engine::{Autostart, AutostartMethod, Media};
 
-use super::Loader;
-use crate::io::{self, ReadBytesExt, Reader};
+use crate::{Loader, invalid_data};
 
 // SPEC: http://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
 
@@ -34,7 +34,7 @@ impl TapLoader {
         Self {}
     }
 
-    fn read_header(&self, rdr: &mut dyn Reader) -> io::Result<Header> {
+    fn read_header(&self, rdr: &mut dyn Read) -> io::Result<Header> {
         let mut signature = [0u8; 12];
         let mut reserved = [0u8; 3];
         let header = Header {
@@ -54,27 +54,26 @@ impl TapLoader {
 
     fn validate_header(&self, header: &Header) -> io::Result<()> {
         let sig = str::from_utf8(&header.signature)
-            .map_err(|_| "invalid cartridge signature".to_owned())?;
+            .map_err(|_| invalid_data("invalid cartridge signature"))?;
         if sig == HEADER_SIG {
             Ok(())
         } else {
-            Err("invalid cartridge signature".to_owned())
+            Err(invalid_data("invalid cartridge signature"))
         }
     }
 }
 
 impl Loader for TapLoader {
-    fn autostart(&self, reader: &mut dyn Reader) -> io::Result<AutostartMethod> {
-        let image = self.load(reader)?;
-        let autostart = Autostart::new(autostart::Mode::Run, image);
-        Ok(AutostartMethod::WithAutostart(Some(autostart)))
+    fn autostart(&self, reader: &mut dyn Read) -> io::Result<AutostartMethod> {
+        let media = self.load(reader)?;
+        Ok(AutostartMethod::Run(Autostart::new(Mode::Run, media)))
     }
 
-    fn load(&self, reader: &mut dyn Reader) -> io::Result<Box<dyn Image>> {
+    fn load(&self, reader: &mut dyn Read) -> io::Result<Media> {
         info!(target: "loader", "Loading TAP");
         let header = self
             .read_header(reader)
-            .map_err(|_| "invalid tape header".to_owned())?;
+            .map_err(|_| invalid_data("invalid tape header"))?;
         info!(target: "loader", "Found tape, version {}, size {}", header.version, header.size);
         self.validate_header(&header)?;
         let mut data = vec![0; header.size as usize];
@@ -84,24 +83,7 @@ impl Loader for TapLoader {
             data,
             pos: 0,
         };
-        Ok(Box::new(TapImage {
-            tape: Some(Box::new(tape)),
-        }))
-    }
-}
-
-struct TapImage {
-    tape: Option<Box<dyn Tape>>,
-}
-
-impl Image for TapImage {
-    fn mount(&mut self, c64: &mut C64) {
-        info!(target: "loader", "Mounting TAP image");
-        c64.attach_tape(self.tape.take().unwrap());
-    }
-
-    fn unmount(&mut self, c64: &mut C64) {
-        c64.detach_tape();
+        Ok(Media::Tape(Box::new(tape)))
     }
 }
 

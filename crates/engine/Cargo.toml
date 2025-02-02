@@ -1,0 +1,17 @@
+[package]
+name = "zinc64-engine"
+description = "Commodore 64 emulator engine: chips, peripherals and the C64 board"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords = ["c64", "commodore", "emulator"]
+categories = ["emulators"]
+include = ["src/**", "tests/**", "README.md"]
+
+[dependencies]
+bit_field.workspace = true
+log.workspace = true
+resid-rs.workspace = true
