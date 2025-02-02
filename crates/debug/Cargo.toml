@@ -14,4 +14,4 @@ categories = ["emulators"]
 bit_field.workspace = true
 byteorder.workspace = true
 log.workspace = true
-zinc64-core.workspace = true
+zinc64-engine.workspace = true

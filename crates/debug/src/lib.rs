@@ -4,17 +4,19 @@
 
 use std::sync::mpsc::Sender;
 
-pub use self::debugger::Debugger;
-pub use self::rap_server::RapServer;
+pub use self::executor::{Directive, Executor};
+pub use self::monitor::MonitorServer;
+pub use self::rap::RapServer;
 
 #[macro_use]
 extern crate log;
 
 mod charset;
-mod debugger;
 mod disassembler;
+mod executor;
 mod instruction;
-mod rap_server;
+mod monitor;
+mod rap;
 
 pub enum Output {
     Await,

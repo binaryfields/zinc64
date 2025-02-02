@@ -2,24 +2,24 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use zinc64_system::{AutostartMethod, Image};
+use std::io::{self, Read};
+
+use zinc64_engine::{AutostartMethod, Media};
 
 pub use crate::bin::BinLoader;
-pub use crate::io::{Reader, Result};
 
 #[macro_use]
 extern crate log;
 
 mod bin;
 mod crt;
-mod io;
 mod p00;
 mod prg;
 mod tap;
 
 pub trait Loader {
-    fn autostart(&self, path: &mut dyn Reader) -> io::Result<AutostartMethod>;
-    fn load(&self, path: &mut dyn Reader) -> io::Result<Box<dyn Image>>;
+    fn autostart(&self, reader: &mut dyn Read) -> io::Result<AutostartMethod>;
+    fn load(&self, reader: &mut dyn Read) -> io::Result<Media>;
 }
 
 pub enum Format {
@@ -47,11 +47,14 @@ impl Format {
 pub struct Loaders;
 
 impl Loaders {
-    pub fn from_ext(ext: Option<&str>) -> Result<Box<dyn Loader>> {
+    pub fn from_ext(ext: Option<&str>) -> io::Result<Box<dyn Loader>> {
         if let Some(kind) = Format::from_ext(ext) {
             Ok(Loaders::from(kind))
         } else {
-            Err(format!("Unknown image extension {}", ext.unwrap_or("")))
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                format!("Unknown image extension {}", ext.unwrap_or("")),
+            ))
         }
     }
 
@@ -64,4 +67,11 @@ impl Loaders {
             Format::Tap => Box::new(tap::TapLoader::new()),
         }
     }
+}
+
+fn invalid_data<E>(error: E) -> io::Error
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    io::Error::new(io::ErrorKind::InvalidData, error)
 }

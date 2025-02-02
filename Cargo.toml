@@ -1,10 +1,9 @@
 [workspace]
 members = [
-    "crates/core",
+    "crates/app",
     "crates/debug",
+    "crates/engine",
     "crates/loader",
-    "crates/system",
-    "crates/zinc64",
 ]
 exclude = ["crates/raspi3-boot", "crates/rpi"]
 resolver = "3"
@@ -22,10 +21,9 @@ bit_field = "0.10"
 byteorder = "1.5"
 log = "0.3"
 resid-rs = "1.0"
-zinc64-core = { path = "crates/core", version = "0.9.0" }
 zinc64-debug = { path = "crates/debug", version = "0.9.0" }
+zinc64-engine = { path = "crates/engine", version = "0.9.0" }
 zinc64-loader = { path = "crates/loader", version = "0.9.0" }
-zinc64-system = { path = "crates/system", version = "0.9.0" }
 
 [profile.dev]
 opt-level = 1

@@ -31,76 +31,14 @@ See crates/rpi (zinc64-rpi) for an early preview.
 
 ## Design
 
-### Extensibility
+### Crates
 
-The emulator components may be swapped out by providing custom core::ChipFactory trait
-implementation. The default implementation of the core::ChipFactory trait is done through
-system::C64Factory. The chip factory object is passed into system::C64 component
-that provides core emulator functionality.
-
-Here is an example how these components are used together:
-
-        let config = Rc::new(Config::new(SystemModel::from("pal")));
-        let chip_factory = Box::new(C64Factory::new(config.clone()));
-        let mut c64 = C64::new(config.clone(), chip_factory).unwrap();
-        c64.reset(true);
-
-The four core traits used to model system operation are Chip, Cpu, Mmu and Addressable.
-
-    /// A chip represents a system component that is driven by clock signal.
-    pub trait Chip {
-        /// The core method of the chip, emulates one clock cycle of the chip.
-        fn clock(&mut self);
-        /// Process delta cycles at once.
-        fn clock_delta(&mut self, delta: u32);
-        /// Handle vsync event.
-        fn process_vsync(&mut self);
-        /// Handle reset signal.
-        fn reset(&mut self);
-        // I/O
-        /// Read value from the specified register.
-        fn read(&mut self, reg: u8) -> u8;
-        /// Write value to the specified register.
-        fn write(&mut self, reg: u8, value: u8);
-    }
-
-    /// CPU is responsible for decoding and executing instructions.
-    pub trait Cpu {
-        ...
-        /// The core method of the cpu, decodes and executes one instruction. Tick callback is invoked
-        /// for each elapsed clock cycle.
-        fn step(&mut self, tick_fn: &TickFn);
-        // I/O
-        /// Read byte from the specified address.
-        fn read(&self, address: u16) -> u8;
-        /// Write byte to the specified address.
-        fn write(&mut self, address: u16, value: u8);
-    }
-
-    /// Represents memory management unit which controls visible memory banks
-    /// and is used by CPU to read from and write to memory locations.
-    pub trait Mmu {
-        /// Change bank configuration based on the specified mode.
-        fn switch_banks(&mut self, mode: u8);
-        // I/O
-        /// Read byte from the specified address.
-        fn read(&self, address: u16) -> u8;
-        /// Write byte to the specified address.
-        fn write(&mut self, address: u16, value: u8);
-    }
-
-    /// Addressable represents a bank of memory.
-    pub trait Addressable {
-        /// Read byte from the specified address.
-        fn read(&self, address: u16) -> u8;
-        /// Write byte to the specified address.
-        fn write(&mut self, address: u16, value: u8);
-    }
-
-Since all system components with the exception of Cpu and Mmu implement Chip trait,
-interactions between chips and other components are limited to and handled through
-shared I/O lines/pins that are provided to chip constructors. This allows implementation
-of chips to be decoupled from each other.
+| Crate | Path | Contents |
+|-------|------|----------|
+| zinc64-engine | crates/engine | chips, signal lines, peripherals and the C64 board |
+| zinc64-loader | crates/loader | readers for PRG, P00, CRT, TAP and BIN images |
+| zinc64-debug  | crates/debug  | command executor, text monitor and radare2 servers |
+| zinc64        | crates/app    | the desktop emulator |
 
 ## Status
 
