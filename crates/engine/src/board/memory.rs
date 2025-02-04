@@ -2,7 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use super::{AddressableFaded, Bank, BaseAddr, Mmio, Mmu};
+use super::{Bank, BaseAddr, ExpansionPort, Mmio, Pla};
 use crate::chip::{Addressable, Ram, Rom};
 use crate::shared::Shared;
 
@@ -14,8 +14,8 @@ use crate::shared::Shared;
 //   memory layout.
 
 pub struct Memory {
-    mmu: Shared<dyn Mmu>,
-    expansion_port: Shared<dyn AddressableFaded>,
+    mmu: Shared<Pla>,
+    expansion_port: Shared<ExpansionPort>,
     io: Mmio,
     ram: Shared<Ram>,
     basic: Shared<Rom>,
@@ -25,8 +25,8 @@ pub struct Memory {
 
 impl Memory {
     pub fn new(
-        mmu: Shared<dyn Mmu>,
-        expansion_port: Shared<dyn AddressableFaded>,
+        mmu: Shared<Pla>,
+        expansion_port: Shared<ExpansionPort>,
         io: Mmio,
         ram: Shared<Ram>,
         rom_basic: Shared<Rom>,

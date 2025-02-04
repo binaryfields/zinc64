@@ -2,27 +2,30 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use super::AddressableFaded;
-use crate::chip::{Chip, Ram};
+use super::ExpansionPort;
+use crate::chip::Ram;
+use crate::chip::cia::Cia;
+use crate::chip::sid::Sid;
+use crate::chip::vic::Vic;
 use crate::shared::Shared;
 
 pub struct Mmio {
-    cia_1: Shared<dyn Chip>,
-    cia_2: Shared<dyn Chip>,
+    cia_1: Shared<Cia>,
+    cia_2: Shared<Cia>,
     color_ram: Shared<Ram>,
-    expansion_port: Shared<dyn AddressableFaded>,
-    sid: Shared<dyn Chip>,
-    vic: Shared<dyn Chip>,
+    expansion_port: Shared<ExpansionPort>,
+    sid: Shared<Sid>,
+    vic: Shared<Vic>,
 }
 
 impl Mmio {
     pub fn new(
-        cia_1: Shared<dyn Chip>,
-        cia_2: Shared<dyn Chip>,
+        cia_1: Shared<Cia>,
+        cia_2: Shared<Cia>,
         color_ram: Shared<Ram>,
-        expansion_port: Shared<dyn AddressableFaded>,
-        sid: Shared<dyn Chip>,
-        vic: Shared<dyn Chip>,
+        expansion_port: Shared<ExpansionPort>,
+        sid: Shared<Sid>,
+        vic: Shared<Vic>,
     ) -> Self {
         Self {
             cia_1,

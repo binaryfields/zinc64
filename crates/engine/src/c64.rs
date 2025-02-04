@@ -7,11 +7,13 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::board::{BaseAddr, ExpansionPort, Mmu, Pla};
+use crate::board::{BaseAddr, ExpansionPort, Memory, Mmio, Pla};
 use crate::breakpoint::BreakpointManager;
-use crate::chip::{Chip, Cpu, Ram, SoundOutput, TickFn, VideoOutput};
+use crate::chip::cia::{self, Cia};
+use crate::chip::sid::{SamplingMethod, Sid};
+use crate::chip::vic::{Vic, VicMemory};
+use crate::chip::{Addressable, Cpu6510, Ram, Rom, SoundOutput, TickFn, VideoOutput};
 use crate::config::Config;
-use crate::factory::ChipFactory;
 use crate::media::{Autostart, Media};
 use crate::peripheral::joystick;
 use crate::peripheral::{Cartridge, Datassette, Joystick, Keyboard, Tape};
@@ -24,13 +26,13 @@ use crate::signal::{Clock, IoPort, IrqLine, Pin};
 
 pub struct C64 {
     // Dependencies
-    config: Rc<Config>,
+    config: Config,
     // Chipset
-    cpu: Box<dyn Cpu>,
-    cia_1: Shared<dyn Chip>,
-    cia_2: Shared<dyn Chip>,
-    sid: Shared<dyn Chip>,
-    vic: Shared<dyn Chip>,
+    cpu: Cpu6510,
+    cia_1: Shared<Cia>,
+    cia_2: Shared<Cia>,
+    sid: Shared<Sid>,
+    vic: Shared<Vic>,
     // Memory
     color_ram: Shared<Ram>,
     expansion_port: Shared<ExpansionPort>,
@@ -54,9 +56,8 @@ pub struct C64 {
 }
 
 impl C64 {
-    pub fn build(
-        config: Rc<Config>,
-        factory: &dyn ChipFactory,
+    pub fn new(
+        config: Config,
         frame_buffer: Shared<dyn VideoOutput>,
         sound_buffer: Arc<dyn SoundOutput>,
     ) -> C64 {
@@ -83,58 +84,78 @@ impl C64 {
         let nmi_line = new_shared(IrqLine::new("nmi"));
 
         // Memory
-        let color_ram = factory.new_ram(config.model.color_ram);
-        let ram = factory.new_ram(config.model.memory_size);
-        let rom_basic = factory.new_rom(config.roms.basic.as_slice(), BaseAddr::Basic.addr());
-        let rom_charset = factory.new_rom(config.roms.charset.as_slice(), 0);
-        let rom_kernal = factory.new_rom(config.roms.kernal.as_slice(), BaseAddr::Kernal.addr());
+        let color_ram = new_shared(Ram::new(config.model.color_ram));
+        let ram = new_shared(Ram::new(config.model.memory_size));
+        let rom_basic = new_shared(Rom::new_with_data(
+            &config.roms.basic,
+            BaseAddr::Basic.addr(),
+        ));
+        let rom_charset = new_shared(Rom::new_with_data(&config.roms.charset, 0));
+        let rom_kernal = new_shared(Rom::new_with_data(
+            &config.roms.kernal,
+            BaseAddr::Kernal.addr(),
+        ));
 
         // Chipset
-        let cia_1 = factory.new_cia_1(
-            joystick_1_state.clone(),
-            joystick_2_state.clone(),
-            keyboard_matrix.clone(),
+        let cia_1 = new_shared(Cia::new(
+            cia::Mode::Cia1,
+            Some(joystick_1_state.clone()),
+            Some(joystick_2_state.clone()),
+            Some(keyboard_matrix.clone()),
             cia_1_port_a.clone(),
             cia_1_port_b.clone(),
             cia_1_flag_pin.clone(),
             irq_line.clone(),
-        );
-        let cia_2 = factory.new_cia_2(
+        ));
+        let cia_2 = new_shared(Cia::new(
+            cia::Mode::Cia2,
+            None,
+            None,
+            None,
             cia_2_port_a.clone(),
             cia_2_port_b.clone(),
             cia_2_flag_pin.clone(),
             nmi_line.clone(),
+        ));
+        let mut sid = Sid::new(config.model.sid_model, clock.clone(), sound_buffer.clone());
+        sid.set_sampling_parameters(
+            SamplingMethod::Fast,
+            config.model.cpu_freq,
+            config.sound.sample_rate,
         );
-        let sid = factory.new_sid(config.model.sid_model, clock.clone(), sound_buffer.clone());
-        let vic = factory.new_vic(
+        sid.enable_filter(config.sound.sid_filters);
+        let sid = new_shared(sid);
+        let vic = new_shared(Vic::new(
             config.model.vic_model,
             color_ram.clone(),
-            ram.clone(),
-            rom_charset.clone(),
-            vic_base_address.clone(),
+            VicMemory::new(vic_base_address.clone(), rom_charset.clone(), ram.clone()),
             frame_buffer.clone(),
             vsync_flag.clone(),
             ba_line.clone(),
             irq_line.clone(),
-        );
+        ));
 
         // Memory Controller and Processor
         let expansion_port = new_shared(ExpansionPort::new(exp_io_line.clone()));
         let mmu = new_shared(Pla::new());
-        let mem = factory.new_memory(
-            mmu.clone(),
+        let io = Mmio::new(
             cia_1.clone(),
             cia_2.clone(),
             color_ram.clone(),
             expansion_port.clone(),
+            sid.clone(),
+            vic.clone(),
+        );
+        let mem: Shared<dyn Addressable> = new_shared(Memory::new(
+            mmu.clone(),
+            expansion_port.clone(),
+            io,
             ram.clone(),
             rom_basic.clone(),
             rom_charset.clone(),
             rom_kernal.clone(),
-            sid.clone(),
-            vic.clone(),
-        );
-        let cpu = factory.new_cpu(
+        ));
+        let cpu = Cpu6510::new(
             mem.clone(),
             cpu_io_port.clone(),
             ba_line.clone(),
@@ -235,31 +256,31 @@ impl C64 {
         &self.config
     }
 
-    pub fn get_cpu(&self) -> &dyn Cpu {
-        &*self.cpu
+    pub fn get_cpu(&self) -> &Cpu6510 {
+        &self.cpu
     }
 
-    pub fn get_cpu_mut(&mut self) -> &mut dyn Cpu {
-        &mut *self.cpu
+    pub fn get_cpu_mut(&mut self) -> &mut Cpu6510 {
+        &mut self.cpu
     }
 
     pub fn is_cpu_jam(&self) -> bool {
         self.cpu.is_cpu_jam()
     }
 
-    pub fn get_cia_1(&self) -> Shared<dyn Chip> {
+    pub fn get_cia_1(&self) -> Shared<Cia> {
         self.cia_1.clone()
     }
 
-    pub fn get_cia_2(&self) -> Shared<dyn Chip> {
+    pub fn get_cia_2(&self) -> Shared<Cia> {
         self.cia_2.clone()
     }
 
-    pub fn get_sid(&self) -> Shared<dyn Chip> {
+    pub fn get_sid(&self) -> Shared<Sid> {
         self.sid.clone()
     }
 
-    pub fn get_vic(&self) -> Shared<dyn Chip> {
+    pub fn get_vic(&self) -> Shared<Vic> {
         self.vic.clone()
     }
 
@@ -447,7 +468,7 @@ impl C64 {
     }
 
     pub fn check_breakpoints(&mut self) -> bool {
-        self.breakpoints.check(&*self.cpu).is_some()
+        self.breakpoints.check(&self.cpu).is_some()
     }
 
     #[inline]
@@ -465,7 +486,6 @@ impl C64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factory::C64Factory;
     use crate::model::SystemModel;
 
     struct NullSound;
@@ -487,16 +507,15 @@ mod tests {
     fn verify_mem_layout() {
         let mut basic = vec![0x00; 0x2000];
         basic[0] = 0x94;
-        let config = Rc::new(Config::new_with_roms(
+        let config = Config::new_with_roms(
             SystemModel::from("pal"),
             &basic,
             &[0x00; 0x1000],
             &[0x00; 0x2000],
-        ));
-        let factory = Box::new(C64Factory::new(config.clone()));
+        );
         let video_output = new_shared(NullVideo {});
         let sound_output = Arc::new(NullSound {});
-        let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
+        let mut c64 = C64::new(config, video_output, sound_output);
         c64.reset(false);
         let cpu = c64.get_cpu();
         assert_eq!(0x94, cpu.read(0xa000));

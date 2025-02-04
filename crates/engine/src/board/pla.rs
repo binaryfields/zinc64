@@ -6,7 +6,7 @@
 
 use log::LogLevel;
 
-use super::{Bank, Mmu};
+use super::Bank;
 
 #[derive(Clone, Copy)]
 struct Mode {
@@ -50,25 +50,23 @@ impl Pla {
             mode: configuration,
         }
     }
+
+    pub fn map(&self, address: u16) -> Bank {
+        let zone = address >> 12;
+        self.mode.get(zone as u8)
+    }
+
+    pub fn switch_banks(&mut self, mode: u8) {
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "mem::banks", "Switching to {}", mode);
+        }
+        self.mode = self.map.get(mode);
+    }
 }
 
 impl Default for Pla {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Mmu for Pla {
-    fn map(&self, address: u16) -> Bank {
-        let zone = address >> 12;
-        self.mode.get(zone as u8)
-    }
-
-    fn switch_banks(&mut self, mode: u8) {
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "mem::banks", "Switching to {}", mode);
-        }
-        self.mode = self.map.get(mode);
     }
 }
 

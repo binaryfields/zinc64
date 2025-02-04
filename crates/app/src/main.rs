@@ -6,12 +6,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::process;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use structopt::StructOpt;
+use zinc64_engine::C64;
 use zinc64_engine::new_shared;
-use zinc64_engine::{C64, C64Factory};
 use zinc64_loader::Loaders;
 
 use crate::app::App;
@@ -51,20 +50,14 @@ fn run(opt: &Opt) -> Result<(), String> {
     let logger = Logger::build(opt.log_level.as_str(), &opt.log_target_level)?;
     Logger::enable(logger)?;
     info!("Starting {}", NAME);
-    let config = Rc::new(cli::build_emu_config(opt)?);
+    let config = cli::build_emu_config(opt)?;
     let sound_buffer = Arc::new(SoundBuffer::new(config.sound.buffer_size << 2));
     let video_buffer = new_shared(VideoBuffer::new(
         config.model.frame_buffer_size.0,
         config.model.frame_buffer_size.1,
         Palette::default(),
     ));
-    let chip_factory = Box::new(C64Factory::new(config.clone()));
-    let mut c64 = C64::build(
-        config.clone(),
-        &*chip_factory,
-        video_buffer.clone(),
-        sound_buffer.clone(),
-    );
+    let mut c64 = C64::new(config, video_buffer.clone(), sound_buffer.clone());
     cli::set_c64_options(&mut c64, opt)?;
     c64.reset(true);
     if let Some(image_path) = &opt.image {

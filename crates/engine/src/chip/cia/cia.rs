@@ -9,7 +9,6 @@ use super::cycle_counter::CycleCounter;
 use super::rtc::Rtc;
 use super::timer;
 use super::timer::Timer;
-use crate::chip::Chip;
 use crate::shared::{Shared, SharedCell, new_shared};
 use crate::signal::{IoPort, IrqControl, IrqLine, Pin};
 
@@ -72,6 +71,8 @@ pub struct Cia {
 
 impl Cia {
     #![allow(clippy::too_many_arguments)]
+    #![allow(clippy::useless_let_if_seq)]
+
     pub fn new(
         mode: Mode,
         joystick_1: Option<SharedCell<u8>>,
@@ -103,90 +104,29 @@ impl Cia {
         }
     }
 
-    fn read_cia1_port_a(&self) -> u8 {
-        let active_columns = self.port_b.borrow().get_value();
-        let keyboard_state = self.scan_keyboard_active_cols(active_columns);
-        let joystick_state = self.scan_joystick(&self.joystick_2);
-        let result = self.port_a.borrow().get_value_2(keyboard_state);
-        result & joystick_state
-    }
-
-    fn read_cia1_port_b(&self) -> u8 {
-        let active_rows = self.port_a.borrow().get_value();
-        let keyboard_state = self.scan_keyboard_active_rows(active_rows);
-        let joystick_state = self.scan_joystick(&self.joystick_1);
-        let mut result = self.port_b.borrow().get_value_2(keyboard_state);
+    // ---- reset ----
+    pub fn reset(&mut self) {
         /*
-        http://unusedino.de/ec64/technical/misc/cia6526/timers.html
-        A control bit allows the timer output to appear on a PORT B output line
-        (PB6 for TIMER A and PB7 for TIMER B). This function overrides the DDRB
-        control bit and forces the appropriate PB line to an output.
+        A low on the RES pin resets all internal registers.The
+        port pins are set as inputs and port registers to zero
+        (although a read of the ports will return all highs
+        because of passive pullups).The timer control registers
+        are set to zero and the timer latches to all ones. All other
+        registers are reset to zero.
         */
-        if self.timer_a.is_pb_on() {
-            result.set_bit(6, self.timer_a.get_pb_output());
-        }
-        if self.timer_b.is_pb_on() {
-            result.set_bit(7, self.timer_b.get_pb_output());
-        }
-        result & joystick_state
+        self.irq_control.reset();
+        self.irq_delay.reset();
+        self.timer_a.reset();
+        self.timer_b.reset();
+        self.tod_set_alarm = false;
+        self.cnt_pin.borrow_mut().set_active(true);
+        self.flag_pin.borrow_mut().set_active(false);
+        self.port_a.borrow_mut().reset();
+        self.port_b.borrow_mut().reset();
     }
 
-    fn scan_keyboard_active_cols(&self, active_columns: u8) -> u8 {
-        if let Some(matrix) = self.keyboard_matrix.as_ref() {
-            let mut result = 0xff;
-            for col in 0..8_usize {
-                if !active_columns.get_bit(col) {
-                    result &= matrix.borrow()[8 + col];
-                }
-            }
-            result
-        } else {
-            0xff
-        }
-    }
-
-    fn scan_joystick(&self, joystick: &Option<SharedCell<u8>>) -> u8 {
-        if let Some(ref state) = *joystick {
-            !state.get()
-        } else {
-            0xff
-        }
-    }
-
-    fn scan_keyboard_active_rows(&self, active_rows: u8) -> u8 {
-        if let Some(matrix) = self.keyboard_matrix.as_ref() {
-            let mut result = 0xff;
-            for row in 0..8_usize {
-                if !active_rows.get_bit(row) {
-                    result &= matrix.borrow()[row];
-                }
-            }
-            result
-        } else {
-            0xff
-        }
-    }
-
-    fn read_cia2_port_a(&self) -> u8 {
-        // iec inputs
-        self.port_a.borrow().get_value()
-    }
-
-    fn read_cia2_port_b(&self) -> u8 {
-        let mut result = self.port_b.borrow().get_value();
-        if self.timer_a.is_pb_on() {
-            result.set_bit(6, self.timer_a.get_pb_output());
-        }
-        if self.timer_b.is_pb_on() {
-            result.set_bit(7, self.timer_b.get_pb_output());
-        }
-        result
-    }
-}
-
-impl Chip for Cia {
-    #![allow(clippy::useless_let_if_seq)]
-    fn clock(&mut self) {
+    // ---- clock ----
+    pub fn clock(&mut self) {
         // Process timers
         self.timer_a.feed_source(false);
         let timer_a_output = self.timer_a.clock();
@@ -224,13 +164,8 @@ impl Chip for Cia {
         self.irq_delay.clock();
     }
 
-    fn clock_delta(&mut self, delta: u32) {
-        for _i in 0..delta {
-            self.clock();
-        }
-    }
-
-    fn process_vsync(&mut self) {
+    // ---- time of day ----
+    pub fn process_vsync(&mut self) {
         // FIXME cia: tod counter
         self.tod_clock.tick();
         /*
@@ -244,29 +179,8 @@ impl Chip for Cia {
         */
     }
 
-    fn reset(&mut self) {
-        /*
-        A low on the RES pin resets all internal registers.The
-        port pins are set as inputs and port registers to zero
-        (although a read of the ports will return all highs
-        because of passive pullups).The timer control registers
-        are set to zero and the timer latches to all ones. All other
-        registers are reset to zero.
-        */
-        self.irq_control.reset();
-        self.irq_delay.reset();
-        self.timer_a.reset();
-        self.timer_b.reset();
-        self.tod_set_alarm = false;
-        self.cnt_pin.borrow_mut().set_active(true);
-        self.flag_pin.borrow_mut().set_active(false);
-        self.port_a.borrow_mut().reset();
-        self.port_b.borrow_mut().reset();
-    }
-
-    // I/O
-
-    fn read(&mut self, reg: u8) -> u8 {
+    // ---- registers ----
+    pub fn read(&mut self, reg: u8) -> u8 {
         let value = match reg {
             reg::PRA => match self.mode {
                 Mode::Cia1 => self.read_cia1_port_a(),
@@ -323,7 +237,87 @@ impl Chip for Cia {
         value
     }
 
-    fn write(&mut self, reg: u8, value: u8) {
+    fn read_cia1_port_a(&self) -> u8 {
+        let active_columns = self.port_b.borrow().get_value();
+        let keyboard_state = self.scan_keyboard_active_cols(active_columns);
+        let joystick_state = self.scan_joystick(&self.joystick_2);
+        let result = self.port_a.borrow().get_value_2(keyboard_state);
+        result & joystick_state
+    }
+
+    fn scan_keyboard_active_cols(&self, active_columns: u8) -> u8 {
+        if let Some(matrix) = self.keyboard_matrix.as_ref() {
+            let mut result = 0xff;
+            for col in 0..8_usize {
+                if !active_columns.get_bit(col) {
+                    result &= matrix.borrow()[8 + col];
+                }
+            }
+            result
+        } else {
+            0xff
+        }
+    }
+
+    fn scan_joystick(&self, joystick: &Option<SharedCell<u8>>) -> u8 {
+        if let Some(ref state) = *joystick {
+            !state.get()
+        } else {
+            0xff
+        }
+    }
+
+    fn read_cia2_port_a(&self) -> u8 {
+        // iec inputs
+        self.port_a.borrow().get_value()
+    }
+
+    fn read_cia1_port_b(&self) -> u8 {
+        let active_rows = self.port_a.borrow().get_value();
+        let keyboard_state = self.scan_keyboard_active_rows(active_rows);
+        let joystick_state = self.scan_joystick(&self.joystick_1);
+        let mut result = self.port_b.borrow().get_value_2(keyboard_state);
+        /*
+        http://unusedino.de/ec64/technical/misc/cia6526/timers.html
+        A control bit allows the timer output to appear on a PORT B output line
+        (PB6 for TIMER A and PB7 for TIMER B). This function overrides the DDRB
+        control bit and forces the appropriate PB line to an output.
+        */
+        if self.timer_a.is_pb_on() {
+            result.set_bit(6, self.timer_a.get_pb_output());
+        }
+        if self.timer_b.is_pb_on() {
+            result.set_bit(7, self.timer_b.get_pb_output());
+        }
+        result & joystick_state
+    }
+
+    fn scan_keyboard_active_rows(&self, active_rows: u8) -> u8 {
+        if let Some(matrix) = self.keyboard_matrix.as_ref() {
+            let mut result = 0xff;
+            for row in 0..8_usize {
+                if !active_rows.get_bit(row) {
+                    result &= matrix.borrow()[row];
+                }
+            }
+            result
+        } else {
+            0xff
+        }
+    }
+
+    fn read_cia2_port_b(&self) -> u8 {
+        let mut result = self.port_b.borrow().get_value();
+        if self.timer_a.is_pb_on() {
+            result.set_bit(6, self.timer_a.get_pb_output());
+        }
+        if self.timer_b.is_pb_on() {
+            result.set_bit(7, self.timer_b.get_pb_output());
+        }
+        result
+    }
+
+    pub fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cia::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }

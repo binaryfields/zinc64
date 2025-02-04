@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use zinc64_engine::chip::Cpu6510;
 use zinc64_engine::chip::Ram;
-use zinc64_engine::chip::{Addressable, Cpu, TickFn};
+use zinc64_engine::chip::{Addressable, TickFn};
 use zinc64_engine::signal::{IoPort, IrqLine, Pin};
 
 struct MockMemory {
@@ -313,25 +313,25 @@ fn opcode_timing() {
                 clock_clone.set(clock_clone.get().wrapping_add(1));
             });
             cpu.reset();
-            cpu.write_mem(0x1000, opcode);
-            cpu.write_mem(0x1001, 0x00);
-            cpu.write_mem(0x2000, 0x00);
-            cpu.write_mem(0x2001, 0x10);
-            cpu.write_mem(0x2100, 0x00);
-            cpu.write_mem(0x2101, 0x10);
+            cpu.write(0x1000, opcode);
+            cpu.write(0x1001, 0x00);
+            cpu.write(0x2000, 0x00);
+            cpu.write(0x2001, 0x10);
+            cpu.write(0x2100, 0x00);
+            cpu.write(0x2101, 0x10);
             if opcode != 0x20 {
-                cpu.write_mem(0x1002, 0x20);
+                cpu.write(0x1002, 0x20);
             } else {
-                cpu.write_mem(0x1002, 0x21);
+                cpu.write(0x1002, 0x21);
             }
             if opcode == 0x60 {
-                cpu.write_mem(0x0101, 0x00);
-                cpu.write_mem(0x0102, 0x10);
+                cpu.write(0x0101, 0x00);
+                cpu.write(0x0102, 0x10);
             }
             if opcode == 0x40 {
-                cpu.write_mem(0x0101, 0x00);
-                cpu.write_mem(0x0102, 0x01);
-                cpu.write_mem(0x0103, 0x10);
+                cpu.write(0x0101, 0x00);
+                cpu.write(0x0102, 0x01);
+                cpu.write(0x0103, 0x10);
             }
             cpu.set_pc(0x1000);
             cpu.clock();

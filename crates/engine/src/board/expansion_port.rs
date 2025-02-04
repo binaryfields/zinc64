@@ -4,7 +4,6 @@
 
 use bit_field::BitField;
 
-use super::AddressableFaded;
 use crate::peripheral::Cartridge;
 use crate::shared::Shared;
 use crate::signal::IoPort;
@@ -53,14 +52,12 @@ impl ExpansionPort {
             cartridge.set_io_observer(None);
         }
     }
-}
 
-impl AddressableFaded for ExpansionPort {
-    fn read(&mut self, address: u16) -> Option<u8> {
+    pub fn read(&mut self, address: u16) -> Option<u8> {
         self.cartridge.as_mut().and_then(|crt| crt.read(address))
     }
 
-    fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         if let Some(ref mut cartridge) = self.cartridge {
             cartridge.write(address, value)
         }

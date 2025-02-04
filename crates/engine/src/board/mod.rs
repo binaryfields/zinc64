@@ -12,15 +12,7 @@ mod memory;
 mod mmio;
 mod pla;
 
-/// Represents memory management unit which controls visible memory banks.
-pub trait Mmu {
-    /// Map address to currently mapped in memory bank.
-    fn map(&self, address: u16) -> Bank;
-    /// Change bank configuration based on the specified mode.
-    fn switch_banks(&mut self, mode: u8);
-}
-
-/// Memory bank type used with MMU to determine how to map a memory address
+/// Memory bank type used with the PLA to determine how to map a memory address
 #[derive(Clone, Copy)]
 pub enum Bank {
     Basic,
@@ -31,14 +23,6 @@ pub enum Bank {
     RomH,
     RomL,
     Disabled,
-}
-
-/// Addressable represents a bank of memory that may be faded by RAM.
-pub trait AddressableFaded {
-    /// Read byte from the specified address.
-    fn read(&mut self, address: u16) -> Option<u8>;
-    /// Write byte to the specified address.
-    fn write(&mut self, address: u16, value: u8);
 }
 
 #[derive(Copy, Clone)]
