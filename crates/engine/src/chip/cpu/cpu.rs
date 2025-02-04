@@ -7,7 +7,7 @@ use core::fmt;
 use log::LogLevel;
 
 use super::uops::{MicroOp, MicroOpPair, ProgramId, decode_opcode, load_program};
-use crate::chip::{Addressable, Cpu, Register, TickFn};
+use crate::chip::{Addressable, TickFn};
 use crate::shared::Shared;
 use crate::signal::{IoPort, IrqLine, Pin};
 
@@ -101,7 +101,36 @@ impl Cpu6510 {
         }
     }
 
+    // ---- reset ----
+    pub fn reset(&mut self) {
+        self.regs.reset();
+        self.address_hi = 0;
+        self.address_lo = 0;
+        self.data = 0;
+        self.page_cross = false;
+        self.last_nmi = false;
+        self.last_pc = 0;
+        self.io_port.borrow_mut().set_value(0xff);
+        self.irq_line.borrow_mut().reset();
+        self.nmi_line.borrow_mut().reset();
+        self.write(0x0000, 0b_0010_1111);
+        self.write(0x0001, 0b_0001_1111);
+        self.opcode = 0;
+        self.uops = load_program(ProgramId::Reset);
+        self.cycle = 0;
+    }
+
     // ---- clock ----
+    pub fn step(&mut self, tick_fn: &TickFn) {
+        self.last_pc = self.get_pc();
+        let mut is_done = false;
+        while !is_done {
+            self.clock();
+            tick_fn();
+            is_done = self.cycle == 1;
+        }
+    }
+
     pub fn clock(&mut self) {
         if self.ba_line.borrow().is_low() {
             return;
@@ -227,22 +256,22 @@ impl Cpu6510 {
     }
 
     fn fetch_opcode_discard(&mut self) {
-        let _ = self.read_mem(self.regs.pc);
+        let _ = self.read(self.regs.pc);
     }
 
     fn fetch_operand(&mut self) {
-        self.data = self.read_mem(self.regs.pc);
+        self.data = self.read(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
     fn fetch_adl(&mut self) {
         self.address_hi = 0;
-        self.address_lo = self.read_mem(self.regs.pc);
+        self.address_lo = self.read(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
     fn fetch_adh(&mut self) {
-        self.address_hi = self.read_mem(self.regs.pc);
+        self.address_hi = self.read(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
@@ -258,7 +287,7 @@ impl Cpu6510 {
 
     fn indirect_fetch_adl(&mut self) {
         let address = make_address(self.address_hi, self.address_lo);
-        let adl = self.read_mem(address);
+        let adl = self.read(address);
         self.data = adl;
         self.address_lo = self.address_lo.wrapping_add(1);
     }
@@ -266,12 +295,12 @@ impl Cpu6510 {
     fn indirect_fetch_adh(&mut self) {
         let address = make_address(self.address_hi, self.address_lo);
         self.address_lo = self.data;
-        self.address_hi = self.read_mem(address);
+        self.address_hi = self.read(address);
     }
 
     fn read_data(&mut self) {
         let address = make_address(self.address_hi, self.address_lo);
-        self.data = self.read_mem(address);
+        self.data = self.read(address);
     }
 
     fn read_data_or_fix_adh(&mut self) {
@@ -279,18 +308,18 @@ impl Cpu6510 {
             self.address_hi = self.address_hi.wrapping_add(1);
         } else {
             let address = make_address(self.address_hi, self.address_lo);
-            self.data = self.read_mem(address);
+            self.data = self.read(address);
             self.cycle += 1;
         }
     }
 
     fn write_data(&mut self) {
         let address = make_address(self.address_hi, self.address_lo);
-        self.write_mem(address, self.data);
+        self.write(address, self.data);
     }
 
     fn fetch_opcode(&mut self) {
-        self.opcode = self.read_mem(self.regs.pc);
+        self.opcode = self.read(self.regs.pc);
         self.uops = decode_opcode(self.opcode);
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::ins", "0x{:04x}: {:02x}; {}", self.regs.pc, self.opcode, &self);
@@ -373,7 +402,7 @@ impl Cpu6510 {
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let data = self.read_mem(address);
+                let data = self.read(address);
                 self.regs.a = data;
                 self.set_nz(data);
             }
@@ -388,7 +417,7 @@ impl Cpu6510 {
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let data = self.read_mem(address);
+                let data = self.read(address);
                 self.regs.p = data;
             }
             _ => panic!("invalid cycle {}", self.cycle),
@@ -653,7 +682,7 @@ impl Cpu6510 {
                 self.write_stack(lo_byte(self.regs.pc));
             }
             5 => {
-                self.address_hi = self.read_mem(self.regs.pc);
+                self.address_hi = self.read(self.regs.pc);
                 // Do not increment pc
             }
             6 => {
@@ -670,13 +699,13 @@ impl Cpu6510 {
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pcl = self.read_mem(address);
+                let pcl = self.read(address);
                 self.regs.pc = u16::from(pcl);
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             4 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pch = self.read_mem(address);
+                let pch = self.read(address);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
             }
             5 => {
@@ -698,11 +727,11 @@ impl Cpu6510 {
                 self.write_stack(self.regs.p | (Flag::Break as u8) | (Flag::Reserved as u8));
             }
             5 => {
-                let pcl = self.read_mem(0xfffe);
+                let pcl = self.read(0xfffe);
                 self.regs.pc = u16::from(pcl);
             }
             6 => {
-                let pch = self.read_mem(0xffff);
+                let pch = self.read(0xffff);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
                 self.set_flag(Flag::IntDisable);
             }
@@ -717,19 +746,19 @@ impl Cpu6510 {
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let p = self.read_mem(address);
+                let p = self.read(address);
                 self.regs.sp = self.regs.sp.wrapping_add(1);
                 self.regs.p = p;
             }
             4 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pcl = self.read_mem(address);
+                let pcl = self.read(address);
                 self.regs.pc = u16::from(pcl);
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             5 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pch = self.read_mem(address);
+                let pch = self.read(address);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
             }
             _ => panic!("invalid cycle {}", self.cycle),
@@ -817,11 +846,11 @@ impl Cpu6510 {
                 self.write_stack(self.regs.p & 0xef);
             }
             5 => {
-                let pcl = self.read_mem(0xfffe);
+                let pcl = self.read(0xfffe);
                 self.regs.pc = u16::from(pcl);
             }
             6 => {
-                let pch = self.read_mem(0xffff);
+                let pch = self.read(0xffff);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
                 self.set_flag(Flag::IntDisable);
             }
@@ -841,11 +870,11 @@ impl Cpu6510 {
                 self.write_stack(self.regs.p & 0xef);
             }
             5 => {
-                let pcl = self.read_mem(0xfffa);
+                let pcl = self.read(0xfffa);
                 self.regs.pc = u16::from(pcl);
             }
             6 => {
-                let pch = self.read_mem(0xfffb);
+                let pch = self.read(0xfffb);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
                 self.set_flag(Flag::IntDisable);
                 self.nmi_line.borrow_mut().reset();
@@ -859,19 +888,75 @@ impl Cpu6510 {
             2 => {}
             3 => {}
             4 => {
-                let pcl = self.read_mem(0xfffc);
+                let pcl = self.read(0xfffc);
                 self.regs.pc = u16::from(pcl);
             }
             5 => {
-                let pch = self.read_mem(0xfffd);
+                let pch = self.read(0xfffd);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
             }
             _ => panic!("invalid cycle {}", self.cycle),
         }
     }
 
+    // ---- registers ----
+    pub fn get_register(&self, reg: Register) -> u8 {
+        match reg {
+            Register::A => self.regs.a,
+            Register::X => self.regs.x,
+            Register::Y => self.regs.y,
+            Register::SP => self.regs.sp,
+            Register::PCL => self.regs.pc as u8,
+            Register::PCH => (self.regs.pc >> 8) as u8,
+            Register::P => self.regs.p,
+        }
+    }
+
+    pub fn set_register(&mut self, reg: Register, value: u8) {
+        match reg {
+            Register::A => {
+                self.regs.a = value;
+            }
+            Register::X => {
+                self.regs.x = value;
+            }
+            Register::Y => {
+                self.regs.y = value;
+            }
+            Register::SP => {
+                self.regs.sp = value;
+            }
+            Register::PCL => {
+                self.regs.pc = (self.regs.pc & 0xff00) | u16::from(value);
+            }
+            Register::PCH => {
+                self.regs.pc = (u16::from(value) << 8) | (self.regs.pc & 0xff);
+            }
+            Register::P => {
+                self.regs.p = value;
+            }
+        }
+    }
+
+    pub fn get_pc(&self) -> u16 {
+        match self.cycle {
+            1 => self.regs.pc.wrapping_sub(1),
+            _ => self.regs.pc,
+        }
+    }
+
+    pub fn set_pc(&mut self, value: u16) {
+        self.regs.pc = value;
+        self.uops = load_program(ProgramId::Start);
+        self.cycle = 0;
+    }
+
+    pub fn is_cpu_jam(&self) -> bool {
+        self.last_pc == self.get_pc()
+    }
+
     // ---- memory ----
-    pub fn read_mem(&self, address: u16) -> u8 {
+    pub fn read(&self, address: u16) -> u8 {
         match address {
             0x0000 => self.io_port.borrow().get_direction(),
             0x0001 => self.io_port.borrow().get_value() & 0x3f,
@@ -879,7 +964,7 @@ impl Cpu6510 {
         }
     }
 
-    pub fn write_mem(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x0000 => self.io_port.borrow_mut().set_direction(value),
             0x0001 => self.io_port.borrow_mut().set_value(value),
@@ -891,7 +976,7 @@ impl Cpu6510 {
     #[inline]
     pub fn write_stack(&mut self, value: u8) {
         let address = make_address(0x01, self.regs.sp);
-        self.write_mem(address, value);
+        self.write(address, value);
         self.regs.sp = self.regs.sp.wrapping_sub(1);
     }
 
@@ -919,99 +1004,6 @@ impl Cpu6510 {
         } else {
             self.regs.p &= !(flag as u8);
         }
-    }
-}
-
-impl Cpu for Cpu6510 {
-    fn get_register(&self, reg: Register) -> u8 {
-        match reg {
-            Register::A => self.regs.a,
-            Register::X => self.regs.x,
-            Register::Y => self.regs.y,
-            Register::SP => self.regs.sp,
-            Register::PCL => self.regs.pc as u8,
-            Register::PCH => (self.regs.pc >> 8) as u8,
-            Register::P => self.regs.p,
-        }
-    }
-
-    fn set_register(&mut self, reg: Register, value: u8) {
-        match reg {
-            Register::A => {
-                self.regs.a = value;
-            }
-            Register::X => {
-                self.regs.x = value;
-            }
-            Register::Y => {
-                self.regs.y = value;
-            }
-            Register::SP => {
-                self.regs.sp = value;
-            }
-            Register::PCL => {
-                self.regs.pc = (self.regs.pc & 0xff00) | u16::from(value);
-            }
-            Register::PCH => {
-                self.regs.pc = (u16::from(value) << 8) | (self.regs.pc & 0xff);
-            }
-            Register::P => {
-                self.regs.p = value;
-            }
-        }
-    }
-
-    fn get_pc(&self) -> u16 {
-        match self.cycle {
-            1 => self.regs.pc.wrapping_sub(1),
-            _ => self.regs.pc,
-        }
-    }
-
-    fn set_pc(&mut self, value: u16) {
-        self.regs.pc = value;
-        self.uops = load_program(ProgramId::Start);
-        self.cycle = 0;
-    }
-
-    fn is_cpu_jam(&self) -> bool {
-        self.last_pc == self.get_pc()
-    }
-
-    fn step(&mut self, tick_fn: &TickFn) {
-        self.last_pc = self.get_pc();
-        let mut is_done = false;
-        while !is_done {
-            self.clock();
-            tick_fn();
-            is_done = self.cycle == 1;
-        }
-    }
-
-    fn reset(&mut self) {
-        self.regs.reset();
-        self.address_hi = 0;
-        self.address_lo = 0;
-        self.data = 0;
-        self.page_cross = false;
-        self.last_nmi = false;
-        self.last_pc = 0;
-        self.io_port.borrow_mut().set_value(0xff);
-        self.irq_line.borrow_mut().reset();
-        self.nmi_line.borrow_mut().reset();
-        self.write(0x0000, 0b_0010_1111);
-        self.write(0x0001, 0b_0001_1111);
-        self.opcode = 0;
-        self.uops = load_program(ProgramId::Reset);
-        self.cycle = 0;
-    }
-
-    fn read(&self, address: u16) -> u8 {
-        self.read_mem(address)
-    }
-
-    fn write(&mut self, address: u16, value: u8) {
-        self.write_mem(address, value);
     }
 }
 
@@ -1061,6 +1053,17 @@ impl fmt::Display for Cpu6510 {
             }
         )
     }
+}
+
+#[derive(Copy, Clone)]
+pub enum Register {
+    A,
+    X,
+    Y,
+    SP,
+    PCL,
+    PCH,
+    P,
 }
 
 #[inline]

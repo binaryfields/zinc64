@@ -4,7 +4,7 @@
 
 use core::slice::Iter;
 
-use crate::chip::Cpu;
+use crate::chip::Cpu6510;
 
 pub use self::condition::Condition;
 
@@ -118,7 +118,7 @@ impl BreakpointManager {
         self.breakpoints.iter().any(|bp| bp.enabled)
     }
 
-    pub fn check(&mut self, cpu: &dyn Cpu) -> Option<usize> {
+    pub fn check(&mut self, cpu: &Cpu6510) -> Option<usize> {
         if self.breakpoints.is_empty() {
             None
         } else {

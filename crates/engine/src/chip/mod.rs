@@ -4,7 +4,7 @@
 
 use std::rc::Rc;
 
-pub use self::cpu::Cpu6510;
+pub use self::cpu::{Cpu6510, Register};
 pub use self::ram::Ram;
 pub use self::rom::Rom;
 
@@ -23,57 +23,9 @@ pub trait Addressable {
     fn write(&mut self, address: u16, value: u8);
 }
 
-/// CPU is responsible for decoding and executing instructions.
-pub trait Cpu {
-    // -- Getters/Setters
-    fn get_register(&self, reg: Register) -> u8;
-    fn set_register(&mut self, reg: Register, value: u8);
-    fn get_pc(&self) -> u16;
-    fn set_pc(&mut self, value: u16);
-    fn is_cpu_jam(&self) -> bool;
-    /// The core method of the cpu, decodes and executes one instruction. Tick callback is invoked
-    /// for each elapsed clock cycle.
-    fn step(&mut self, tick_fn: &TickFn);
-    /// Reset chip.
-    fn reset(&mut self);
-    // I/O
-    /// Read byte from the specified address.
-    fn read(&self, address: u16) -> u8;
-    /// Write byte to the specified address.
-    fn write(&mut self, address: u16, value: u8);
-}
-
-#[derive(Copy, Clone)]
-pub enum Register {
-    A,
-    X,
-    Y,
-    SP,
-    PCL,
-    PCH,
-    P,
-}
-
 /// A tick represents a callback invoked by the cpu for each clock cycle
 /// during instruction execution.
 pub type TickFn = Rc<dyn Fn()>;
-
-/// A chip represents a system component that is driven by clock signal.
-pub trait Chip {
-    /// The core method of the chip, emulates one clock cycle of the chip.
-    fn clock(&mut self);
-    /// Process delta cycles at once.
-    fn clock_delta(&mut self, delta: u32);
-    /// Handle vsync event.
-    fn process_vsync(&mut self);
-    /// Handle reset signal.
-    fn reset(&mut self);
-    // I/O
-    /// Read value from the specified register.
-    fn read(&mut self, reg: u8) -> u8;
-    /// Write value to the specified register.
-    fn write(&mut self, reg: u8, value: u8);
-}
 
 /// Sound output used by SID chip.
 pub trait SoundOutput {

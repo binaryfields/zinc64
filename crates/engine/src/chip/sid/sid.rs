@@ -10,7 +10,7 @@ use std::sync::Arc;
 use log::LogLevel;
 use resid;
 
-use crate::chip::{Chip, SoundOutput};
+use crate::chip::SoundOutput;
 use crate::signal::Clock;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -75,18 +75,33 @@ impl Sid {
             .set_sampling_parameters(resid_sampling_method, clock_freq, sample_freq);
     }
 
+    pub fn reset(&mut self) {
+        self.resid.reset();
+        self.cycles = self.system_clock.get();
+    }
+
+    pub fn read(&mut self, reg: u8) -> u8 {
+        self.sync();
+        self.resid.read(reg)
+    }
+
+    pub fn write(&mut self, reg: u8, value: u8) {
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "sid::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
+        }
+        self.sync();
+        self.resid.write(reg, value)
+    }
+
+    pub fn process_vsync(&mut self) {
+        self.sync();
+    }
+
     fn sync(&mut self) {
         if self.cycles != self.system_clock.get() {
             let delta = (self.system_clock.get() - self.cycles) as u32;
             self.clock_delta(delta);
         }
-    }
-}
-
-impl Chip for Sid {
-    fn clock(&mut self) {
-        self.resid.clock();
-        self.cycles = self.cycles.wrapping_add(1);
     }
 
     fn clock_delta(&mut self, delta: u32) {
@@ -99,30 +114,6 @@ impl Chip for Sid {
             }
         }
         self.cycles = self.cycles.wrapping_add(delta as u64);
-    }
-
-    fn process_vsync(&mut self) {
-        self.sync();
-    }
-
-    fn reset(&mut self) {
-        self.resid.reset();
-        self.cycles = self.system_clock.get();
-    }
-
-    // I/O
-
-    fn read(&mut self, reg: u8) -> u8 {
-        self.sync();
-        self.resid.read(reg)
-    }
-
-    fn write(&mut self, reg: u8, value: u8) {
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "sid::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
-        }
-        self.sync();
-        self.resid.write(reg, value)
     }
 }
 

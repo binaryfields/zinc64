@@ -14,7 +14,7 @@ use super::gfx_sequencer::{GfxSequencer, Mode};
 use super::mux_unit::MuxUnit;
 use super::spec::Spec;
 use super::sprite_sequencer::{Mode as SpriteMode, SpriteSequencer};
-use crate::chip::{Chip, Ram, VideoOutput};
+use crate::chip::{Ram, VideoOutput};
 use crate::shared::{Shared, SharedCell};
 use crate::signal::{IrqControl, IrqLine, Pin};
 
@@ -132,347 +132,32 @@ impl Vic {
         }
     }
 
-    // ---- interrupts ----
-    fn trigger_irq(&mut self, source: usize) {
-        self.irq_control.set_event(source);
-        if self.irq_control.is_triggered() {
-            if log_enabled!(LogLevel::Trace) {
-                trace!(target: "vic::reg", "Irq data = {:02x}, mask = {:02x}, source: {}",
-                       self.irq_control.get_data(),
-                       self.irq_control.get_mask(),
-                       source
-                );
-            }
-            self.irq_line
-                .borrow_mut()
-                .set_low(IrqSource::Vic.value(), true);
+    // ---- reset ----
+    pub fn reset(&mut self) {
+        // Functional Units
+        self.border_unit.reset();
+        self.gfx_seq.reset();
+        self.irq_control.reset();
+        self.mux_unit.reset();
+        self.raster_unit.reset();
+        for sprite_unit in self.sprite_units.iter_mut() {
+            sprite_unit.reset();
         }
+        // Configuration
+        self.char_base = 0x1000;
+        self.den = true;
+        self.frame_buffer_width = self.frame_buffer.borrow().get_dimension().0;
+        self.raster_compare = 0;
+        self.x_scroll = 0;
+        self.y_scroll = 3;
+        self.video_matrix = 0x0400;
+        // Runtime State
+        self.cycle = 1;
+        self.y = 0x0100;
     }
 
-    // ---- display state ----
-    fn update_display_on(&mut self) {
-        /*
-        Section: 3.10. Display Enable
-        A Bad Line Condition can only occur if the DEN bit has been set for at
-        least one cycle somewhere in raster line $30 (see section 3.5.).
-        */
-        if self.y == 0x30 && self.den {
-            self.raster_unit.display_on = true;
-        }
-    }
-
-    fn update_bad_line(&mut self) {
-        /*
-        Section: 3.5. Bad Lines
-         A Bad Line Condition is given at any arbitrary clock cycle, if at the
-         negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
-         <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
-         DEN bit was set during an arbitrary cycle of raster line $30.
-        */
-        self.raster_unit.is_bad_line = if self.raster_unit.display_on {
-            if self.y >= 0x30 && self.y <= 0xf7 {
-                (self.y & 0x07) as u8 == self.y_scroll
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-    }
-
-    fn update_display_state(&mut self) {
-        if self.raster_unit.is_bad_line {
-            self.raster_unit.display_state = true;
-        }
-    }
-
-    // ---- bus access ----
-    fn set_ba(&mut self, is_bad_line: bool) {
-        self.ba_line.borrow_mut().set_active(!is_bad_line);
-    }
-
-    fn p_access(&mut self, n: usize) {
-        let address = self.video_matrix | 0x03f8 | n as u16;
-        self.raster_unit.sprite_ptrs[n] = (self.mem.read(address) as u16) << 6;
-    }
-
-    fn s_access(&mut self, n: usize, byte: usize) {
-        /*
-        Section: 3.8. Sprites
-        5. If the DMA for a sprite is turned on, three s-accesses are done in
-           sequence in the corresponding cycles assigned to the sprite (see the
-           diagrams in section 3.6.3.). The p-accesses are always done, even if the
-           sprite is turned off. The read data of the first access is stored in the
-           upper 8 bits of the shift register, that of the second one in the middle
-           8 bits and that of the third one in the lower 8 bits. MC is incremented
-           by one after each s-access.
-        */
-        let address = self.raster_unit.sprite_ptrs[n] | (self.raster_unit.mc[n] as u16);
-        let data = self.mem.read(address);
-        self.sprite_units[n].set_data(byte, data);
-        self.raster_unit.mc[n] += 1;
-    }
-
-    fn c_access(&mut self) {
-        if self.raster_unit.is_bad_line {
-            let address = self.video_matrix | self.raster_unit.vc;
-            self.raster_unit.vm_data_line[self.raster_unit.vmli] = self.mem.read(address);
-            self.raster_unit.vm_color_line[self.raster_unit.vmli] =
-                self.color_ram.borrow().read(self.raster_unit.vc) & 0x0f;
-            // DEFERRED vic: memory no access unless ba down for 3 cycles
-        }
-    }
-
-    fn g_access(&mut self) {
-        if self.raster_unit.display_state {
-            let g_data = match self.gfx_seq.config.mode {
-                Mode::Text | Mode::McText => {
-                    let address = self.char_base
-                        | ((self.raster_unit.vm_data_line[self.raster_unit.vmli] as u16) << 3)
-                        | self.raster_unit.rc as u16;
-                    self.mem.read(address)
-                }
-                Mode::EcmText => {
-                    let address = self.char_base
-                        | (((self.raster_unit.vm_data_line[self.raster_unit.vmli] & 0x3f) as u16)
-                            << 3)
-                        | self.raster_unit.rc as u16;
-                    self.mem.read(address)
-                }
-                Mode::Bitmap | Mode::McBitmap => {
-                    let address = self.char_base & 0x2000
-                        | (self.raster_unit.vc << 3)
-                        | self.raster_unit.rc as u16;
-                    self.mem.read(address)
-                }
-                Mode::InvalidText | Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
-            };
-            let c_data = self.raster_unit.vm_data_line[self.raster_unit.vmli];
-            let c_color = self.raster_unit.vm_color_line[self.raster_unit.vmli];
-            self.gfx_seq.set_data(c_data, c_color, g_data);
-            /*
-            Section: 3.7.2. VC and RC
-            4. VC and VMLI are incremented after each g-access in display state.
-            */
-            self.raster_unit.vc += 1;
-            self.raster_unit.vmli += 1;
-        } else {
-            let g_data = self.mem.read(0x3fff);
-            self.gfx_seq.set_data(0, 0, g_data);
-        }
-    }
-
-    // ---- drawing ----
-    fn draw_border(&mut self) {
-        let x_start = (self.cycle << 3) - 12;
-        let row_start = self.y as usize * self.frame_buffer_width;
-        for x in x_start..x_start + 8 {
-            self.border_unit.update_main_flop(x, self.y, self.den);
-            self.mux_unit.feed_border(self.border_unit.output());
-            if self.raster_unit.sprites_on {
-                for sprite in self.sprite_units.iter_mut() {
-                    sprite.clock(x);
-                }
-                let sprite_output = self.output_sprites();
-                self.mux_unit.compute_collisions(&sprite_output);
-                self.mux_unit.feed_sprites(&sprite_output);
-                if self.mux_unit.mb_interrupt {
-                    self.trigger_irq(1);
-                }
-                if self.mux_unit.mm_interrupt {
-                    self.trigger_irq(2);
-                }
-            }
-            let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(row_start + x as usize, pixel);
-        }
-    }
-
-    fn draw_cycle_17_56(&mut self) {
-        let x_start = (self.cycle << 3) - 12;
-        let x_scroll_start = x_start + self.x_scroll as u16;
-        let row_start = self.y as usize * self.frame_buffer_width;
-        for x in x_start..x_start + 8 {
-            self.border_unit.update_main_flop(x, self.y, self.den);
-            if !self.border_unit.is_enabled() {
-                if x == x_scroll_start {
-                    self.gfx_seq.load_data();
-                }
-                self.gfx_seq.clock();
-                self.mux_unit.feed_graphics(self.gfx_seq.output());
-            } else {
-                self.mux_unit.feed_border(self.border_unit.output());
-            }
-            if self.raster_unit.sprites_on {
-                for sprite in self.sprite_units.iter_mut() {
-                    sprite.clock(x);
-                }
-                let sprite_output = self.output_sprites();
-                self.mux_unit.compute_collisions(&sprite_output);
-                self.mux_unit.feed_sprites(&sprite_output);
-                if self.mux_unit.mb_interrupt {
-                    self.trigger_irq(1);
-                }
-                if self.mux_unit.mm_interrupt {
-                    self.trigger_irq(2);
-                }
-            }
-            let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(row_start + x as usize, pixel);
-        }
-    }
-
-    fn draw(&mut self) {
-        let x_start = (self.cycle << 3) - 12;
-        let x_scroll_start = x_start + self.x_scroll as u16;
-        let row_start = self.y as usize * self.frame_buffer_width;
-        for x in x_start..x_start + 8 {
-            if !self.border_unit.is_enabled() {
-                if x == x_scroll_start {
-                    self.gfx_seq.load_data();
-                }
-                self.gfx_seq.clock();
-                self.mux_unit.feed_graphics(self.gfx_seq.output());
-            } else {
-                self.mux_unit.feed_border(self.border_unit.output());
-            }
-            if self.raster_unit.sprites_on {
-                for sprite in self.sprite_units.iter_mut() {
-                    sprite.clock(x);
-                }
-                let sprite_output = self.output_sprites();
-                self.mux_unit.compute_collisions(&sprite_output);
-                self.mux_unit.feed_sprites(&sprite_output);
-                if self.mux_unit.mb_interrupt {
-                    self.trigger_irq(1);
-                }
-                if self.mux_unit.mm_interrupt {
-                    self.trigger_irq(2);
-                }
-            }
-            let pixel = self.mux_unit.output();
-            self.frame_buffer
-                .borrow_mut()
-                .write(row_start + x as usize, pixel);
-        }
-    }
-
-    fn output_sprites(&self) -> [Option<u8>; 8] {
-        [
-            self.sprite_units[0].output(),
-            self.sprite_units[1].output(),
-            self.sprite_units[2].output(),
-            self.sprite_units[3].output(),
-            self.sprite_units[4].output(),
-            self.sprite_units[5].output(),
-            self.sprite_units[6].output(),
-            self.sprite_units[7].output(),
-        ]
-    }
-
-    // ---- sprites ----
-    fn update_sprite_dma_off(&mut self) {
-        /*
-        Section: 3.8. Sprites
-        8. In the first phase of cycle 16, it is checked if the expansion flip flop
-           is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
-           MCBASE is equal to 63 and turns of the DMA and the display of the sprite
-           if it is.
-        */
-        for i in 0..8 {
-            if self.sprite_units[i].expansion_flop {
-                // FIXME wrapping add
-                self.raster_unit.mc_base[i] = self.raster_unit.mc_base[i].wrapping_add(1);
-                if self.raster_unit.mc_base[i] >= 63 {
-                    self.raster_unit.sprite_dma[i] = false;
-                    self.sprite_units[i].display = false;
-                }
-            }
-        }
-    }
-
-    fn update_sprite_dma_on(&mut self) {
-        /*
-        Section: 3.8. Sprites
-        3. In the first phases of cycle 55 and 56, the VIC checks for every sprite
-           if the corresponding MxE bit in register $d015 is set and the Y
-           coordinate of the sprite (odd registers $d001-$d00f) match the lower 8
-           bits of RASTER. If this is the case and the DMA for the sprite is still
-           off, the DMA is switched on, MCBASE is cleared, and if the MxYE bit is
-           set the expansion flip flip is reset.
-        */
-        for n in 0..8 {
-            let sprite = &mut self.sprite_units[n];
-            if sprite.config.enabled
-                && sprite.config.y == (self.y as u8)
-                && !self.raster_unit.sprite_dma[n]
-            {
-                self.raster_unit.sprite_dma[n] = true;
-                self.raster_unit.mc_base[n] = 0;
-                if sprite.config.expand_y {
-                    sprite.expansion_flop = false;
-                }
-            }
-        }
-    }
-
-    fn update_sprite_expansion_ff(&mut self) {
-        /*
-        Section: 3.8. Sprites
-        2. If the MxYE bit is set in the first phase of cycle 55, the expansion
-           flip flop is inverted.
-        */
-        for sprite in self.sprite_units.iter_mut() {
-            if sprite.config.expand_y {
-                sprite.expansion_flop = !sprite.expansion_flop;
-            }
-        }
-    }
-
-    fn update_sprite_display(&mut self) {
-        /*
-        Section: 3.8. Sprites
-        4. In the first phase of cycle 58, the MC of every sprite is loaded from
-           its belonging MCBASE (MCBASE->MC) and it is checked if the DMA for the
-           sprite is turned on and the Y coordinate of the sprite matches the lower
-           8 bits of RASTER. If this is the case, the display of the sprite is
-           turned on.
-        */
-        for (i, sprite) in self.sprite_units.iter_mut().enumerate() {
-            if sprite.config.y == (self.y as u8) {
-                sprite.display = self.raster_unit.sprite_dma[i];
-            }
-        }
-        self.raster_unit.sprites_on = self.sprite_units.iter().any(|sp| sp.display);
-    }
-
-    fn map_sprite_to_screen(&self, x: u16) -> u16 {
-        match self.spec.first_x_coord {
-            0x194 => {
-                match x {
-                    0x000..=0x193 => x + 0x64, // 0x1f7 - 0x193
-                    0x194..=0x1ff => x - 0x194,
-                    _ => panic!("invalid sprite coords {}", x),
-                }
-            }
-            0x19c => {
-                match x {
-                    0x000..=0x19b => x + 0x64, // 0x1ff - 0x19b
-                    0x19c..=0x1ff => x - 0x19c,
-                    _ => panic!("invalid sprite coords {}", x),
-                }
-            }
-            _ => panic!("invalid sprite coords {}", x),
-        }
-    }
-}
-
-impl Chip for Vic {
-    fn clock(&mut self) {
+    // ---- clock ----
+    pub fn clock(&mut self) {
         match self.cycle {
             1 => {
                 /*
@@ -776,40 +461,279 @@ impl Chip for Vic {
         }
     }
 
-    fn clock_delta(&mut self, delta: u32) {
-        for _i in 0..delta {
-            self.clock();
+    // ---- display state ----
+    fn update_display_state(&mut self) {
+        if self.raster_unit.is_bad_line {
+            self.raster_unit.display_state = true;
         }
     }
 
-    fn process_vsync(&mut self) {}
-
-    fn reset(&mut self) {
-        // Functional Units
-        self.border_unit.reset();
-        self.gfx_seq.reset();
-        self.irq_control.reset();
-        self.mux_unit.reset();
-        self.raster_unit.reset();
-        for sprite_unit in self.sprite_units.iter_mut() {
-            sprite_unit.reset();
-        }
-        // Configuration
-        self.char_base = 0x1000;
-        self.den = true;
-        self.frame_buffer_width = self.frame_buffer.borrow().get_dimension().0;
-        self.raster_compare = 0;
-        self.x_scroll = 0;
-        self.y_scroll = 3;
-        self.video_matrix = 0x0400;
-        // Runtime State
-        self.cycle = 1;
-        self.y = 0x0100;
+    // ---- bus access ----
+    fn set_ba(&mut self, is_bad_line: bool) {
+        self.ba_line.borrow_mut().set_active(!is_bad_line);
     }
 
-    // I/O
+    fn p_access(&mut self, n: usize) {
+        let address = self.video_matrix | 0x03f8 | n as u16;
+        self.raster_unit.sprite_ptrs[n] = (self.mem.read(address) as u16) << 6;
+    }
 
-    fn read(&mut self, reg: u8) -> u8 {
+    fn s_access(&mut self, n: usize, byte: usize) {
+        /*
+        Section: 3.8. Sprites
+        5. If the DMA for a sprite is turned on, three s-accesses are done in
+           sequence in the corresponding cycles assigned to the sprite (see the
+           diagrams in section 3.6.3.). The p-accesses are always done, even if the
+           sprite is turned off. The read data of the first access is stored in the
+           upper 8 bits of the shift register, that of the second one in the middle
+           8 bits and that of the third one in the lower 8 bits. MC is incremented
+           by one after each s-access.
+        */
+        let address = self.raster_unit.sprite_ptrs[n] | (self.raster_unit.mc[n] as u16);
+        let data = self.mem.read(address);
+        self.sprite_units[n].set_data(byte, data);
+        self.raster_unit.mc[n] += 1;
+    }
+
+    fn c_access(&mut self) {
+        if self.raster_unit.is_bad_line {
+            let address = self.video_matrix | self.raster_unit.vc;
+            self.raster_unit.vm_data_line[self.raster_unit.vmli] = self.mem.read(address);
+            self.raster_unit.vm_color_line[self.raster_unit.vmli] =
+                self.color_ram.borrow().read(self.raster_unit.vc) & 0x0f;
+            // DEFERRED vic: memory no access unless ba down for 3 cycles
+        }
+    }
+
+    fn g_access(&mut self) {
+        if self.raster_unit.display_state {
+            let g_data = match self.gfx_seq.config.mode {
+                Mode::Text | Mode::McText => {
+                    let address = self.char_base
+                        | ((self.raster_unit.vm_data_line[self.raster_unit.vmli] as u16) << 3)
+                        | self.raster_unit.rc as u16;
+                    self.mem.read(address)
+                }
+                Mode::EcmText => {
+                    let address = self.char_base
+                        | (((self.raster_unit.vm_data_line[self.raster_unit.vmli] & 0x3f) as u16)
+                            << 3)
+                        | self.raster_unit.rc as u16;
+                    self.mem.read(address)
+                }
+                Mode::Bitmap | Mode::McBitmap => {
+                    let address = self.char_base & 0x2000
+                        | (self.raster_unit.vc << 3)
+                        | self.raster_unit.rc as u16;
+                    self.mem.read(address)
+                }
+                Mode::InvalidText | Mode::InvalidBitmap1 | Mode::InvalidBitmap2 => 0,
+            };
+            let c_data = self.raster_unit.vm_data_line[self.raster_unit.vmli];
+            let c_color = self.raster_unit.vm_color_line[self.raster_unit.vmli];
+            self.gfx_seq.set_data(c_data, c_color, g_data);
+            /*
+            Section: 3.7.2. VC and RC
+            4. VC and VMLI are incremented after each g-access in display state.
+            */
+            self.raster_unit.vc += 1;
+            self.raster_unit.vmli += 1;
+        } else {
+            let g_data = self.mem.read(0x3fff);
+            self.gfx_seq.set_data(0, 0, g_data);
+        }
+    }
+
+    // ---- drawing ----
+    fn draw_border(&mut self) {
+        let x_start = (self.cycle << 3) - 12;
+        let row_start = self.y as usize * self.frame_buffer_width;
+        for x in x_start..x_start + 8 {
+            self.border_unit.update_main_flop(x, self.y, self.den);
+            self.mux_unit.feed_border(self.border_unit.output());
+            if self.raster_unit.sprites_on {
+                for sprite in self.sprite_units.iter_mut() {
+                    sprite.clock(x);
+                }
+                let sprite_output = self.output_sprites();
+                self.mux_unit.compute_collisions(&sprite_output);
+                self.mux_unit.feed_sprites(&sprite_output);
+                if self.mux_unit.mb_interrupt {
+                    self.trigger_irq(1);
+                }
+                if self.mux_unit.mm_interrupt {
+                    self.trigger_irq(2);
+                }
+            }
+            let pixel = self.mux_unit.output();
+            self.frame_buffer
+                .borrow_mut()
+                .write(row_start + x as usize, pixel);
+        }
+    }
+
+    fn draw_cycle_17_56(&mut self) {
+        let x_start = (self.cycle << 3) - 12;
+        let x_scroll_start = x_start + self.x_scroll as u16;
+        let row_start = self.y as usize * self.frame_buffer_width;
+        for x in x_start..x_start + 8 {
+            self.border_unit.update_main_flop(x, self.y, self.den);
+            if !self.border_unit.is_enabled() {
+                if x == x_scroll_start {
+                    self.gfx_seq.load_data();
+                }
+                self.gfx_seq.clock();
+                self.mux_unit.feed_graphics(self.gfx_seq.output());
+            } else {
+                self.mux_unit.feed_border(self.border_unit.output());
+            }
+            if self.raster_unit.sprites_on {
+                for sprite in self.sprite_units.iter_mut() {
+                    sprite.clock(x);
+                }
+                let sprite_output = self.output_sprites();
+                self.mux_unit.compute_collisions(&sprite_output);
+                self.mux_unit.feed_sprites(&sprite_output);
+                if self.mux_unit.mb_interrupt {
+                    self.trigger_irq(1);
+                }
+                if self.mux_unit.mm_interrupt {
+                    self.trigger_irq(2);
+                }
+            }
+            let pixel = self.mux_unit.output();
+            self.frame_buffer
+                .borrow_mut()
+                .write(row_start + x as usize, pixel);
+        }
+    }
+
+    fn draw(&mut self) {
+        let x_start = (self.cycle << 3) - 12;
+        let x_scroll_start = x_start + self.x_scroll as u16;
+        let row_start = self.y as usize * self.frame_buffer_width;
+        for x in x_start..x_start + 8 {
+            if !self.border_unit.is_enabled() {
+                if x == x_scroll_start {
+                    self.gfx_seq.load_data();
+                }
+                self.gfx_seq.clock();
+                self.mux_unit.feed_graphics(self.gfx_seq.output());
+            } else {
+                self.mux_unit.feed_border(self.border_unit.output());
+            }
+            if self.raster_unit.sprites_on {
+                for sprite in self.sprite_units.iter_mut() {
+                    sprite.clock(x);
+                }
+                let sprite_output = self.output_sprites();
+                self.mux_unit.compute_collisions(&sprite_output);
+                self.mux_unit.feed_sprites(&sprite_output);
+                if self.mux_unit.mb_interrupt {
+                    self.trigger_irq(1);
+                }
+                if self.mux_unit.mm_interrupt {
+                    self.trigger_irq(2);
+                }
+            }
+            let pixel = self.mux_unit.output();
+            self.frame_buffer
+                .borrow_mut()
+                .write(row_start + x as usize, pixel);
+        }
+    }
+
+    fn output_sprites(&self) -> [Option<u8>; 8] {
+        [
+            self.sprite_units[0].output(),
+            self.sprite_units[1].output(),
+            self.sprite_units[2].output(),
+            self.sprite_units[3].output(),
+            self.sprite_units[4].output(),
+            self.sprite_units[5].output(),
+            self.sprite_units[6].output(),
+            self.sprite_units[7].output(),
+        ]
+    }
+
+    // ---- sprites ----
+    fn update_sprite_dma_off(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        8. In the first phase of cycle 16, it is checked if the expansion flip flop
+           is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
+           MCBASE is equal to 63 and turns of the DMA and the display of the sprite
+           if it is.
+        */
+        for i in 0..8 {
+            if self.sprite_units[i].expansion_flop {
+                // FIXME wrapping add
+                self.raster_unit.mc_base[i] = self.raster_unit.mc_base[i].wrapping_add(1);
+                if self.raster_unit.mc_base[i] >= 63 {
+                    self.raster_unit.sprite_dma[i] = false;
+                    self.sprite_units[i].display = false;
+                }
+            }
+        }
+    }
+
+    fn update_sprite_dma_on(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        3. In the first phases of cycle 55 and 56, the VIC checks for every sprite
+           if the corresponding MxE bit in register $d015 is set and the Y
+           coordinate of the sprite (odd registers $d001-$d00f) match the lower 8
+           bits of RASTER. If this is the case and the DMA for the sprite is still
+           off, the DMA is switched on, MCBASE is cleared, and if the MxYE bit is
+           set the expansion flip flip is reset.
+        */
+        for n in 0..8 {
+            let sprite = &mut self.sprite_units[n];
+            if sprite.config.enabled
+                && sprite.config.y == (self.y as u8)
+                && !self.raster_unit.sprite_dma[n]
+            {
+                self.raster_unit.sprite_dma[n] = true;
+                self.raster_unit.mc_base[n] = 0;
+                if sprite.config.expand_y {
+                    sprite.expansion_flop = false;
+                }
+            }
+        }
+    }
+
+    fn update_sprite_expansion_ff(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        2. If the MxYE bit is set in the first phase of cycle 55, the expansion
+           flip flop is inverted.
+        */
+        for sprite in self.sprite_units.iter_mut() {
+            if sprite.config.expand_y {
+                sprite.expansion_flop = !sprite.expansion_flop;
+            }
+        }
+    }
+
+    fn update_sprite_display(&mut self) {
+        /*
+        Section: 3.8. Sprites
+        4. In the first phase of cycle 58, the MC of every sprite is loaded from
+           its belonging MCBASE (MCBASE->MC) and it is checked if the DMA for the
+           sprite is turned on and the Y coordinate of the sprite matches the lower
+           8 bits of RASTER. If this is the case, the display of the sprite is
+           turned on.
+        */
+        for (i, sprite) in self.sprite_units.iter_mut().enumerate() {
+            if sprite.config.y == (self.y as u8) {
+                sprite.display = self.raster_unit.sprite_dma[i];
+            }
+        }
+        self.raster_unit.sprites_on = self.sprite_units.iter().any(|sp| sp.display);
+    }
+
+    // ---- registers ----
+    pub fn read(&mut self, reg: u8) -> u8 {
         let value = match reg {
             // Reg::M0X - Reg::M7X
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
@@ -934,7 +858,7 @@ impl Chip for Vic {
         value
     }
 
-    fn write(&mut self, reg: u8, value: u8) {
+    pub fn write(&mut self, reg: u8, value: u8) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "vic::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
@@ -1073,6 +997,73 @@ impl Chip for Vic {
             0x27..=0x2e => self.sprite_units[reg as usize - 0x27].config.color = value & 0x0f,
             _ => {}
         }
+    }
+
+    fn map_sprite_to_screen(&self, x: u16) -> u16 {
+        match self.spec.first_x_coord {
+            0x194 => {
+                match x {
+                    0x000..=0x193 => x + 0x64, // 0x1f7 - 0x193
+                    0x194..=0x1ff => x - 0x194,
+                    _ => panic!("invalid sprite coords {}", x),
+                }
+            }
+            0x19c => {
+                match x {
+                    0x000..=0x19b => x + 0x64, // 0x1ff - 0x19b
+                    0x19c..=0x1ff => x - 0x19c,
+                    _ => panic!("invalid sprite coords {}", x),
+                }
+            }
+            _ => panic!("invalid sprite coords {}", x),
+        }
+    }
+
+    // ---- shared ----
+    fn trigger_irq(&mut self, source: usize) {
+        self.irq_control.set_event(source);
+        if self.irq_control.is_triggered() {
+            if log_enabled!(LogLevel::Trace) {
+                trace!(target: "vic::reg", "Irq data = {:02x}, mask = {:02x}, source: {}",
+                       self.irq_control.get_data(),
+                       self.irq_control.get_mask(),
+                       source
+                );
+            }
+            self.irq_line
+                .borrow_mut()
+                .set_low(IrqSource::Vic.value(), true);
+        }
+    }
+
+    fn update_display_on(&mut self) {
+        /*
+        Section: 3.10. Display Enable
+        A Bad Line Condition can only occur if the DEN bit has been set for at
+        least one cycle somewhere in raster line $30 (see section 3.5.).
+        */
+        if self.y == 0x30 && self.den {
+            self.raster_unit.display_on = true;
+        }
+    }
+
+    fn update_bad_line(&mut self) {
+        /*
+        Section: 3.5. Bad Lines
+         A Bad Line Condition is given at any arbitrary clock cycle, if at the
+         negative edge of ø0 at the beginning of the cycle RASTER >= $30 and RASTER
+         <= $f7 and the lower three bits of RASTER are equal to YSCROLL and if the
+         DEN bit was set during an arbitrary cycle of raster line $30.
+        */
+        self.raster_unit.is_bad_line = if self.raster_unit.display_on {
+            if self.y >= 0x30 && self.y <= 0xf7 {
+                (self.y & 0x07) as u8 == self.y_scroll
+            } else {
+                false
+            }
+        } else {
+            false
+        };
     }
 }
 

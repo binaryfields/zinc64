@@ -5,7 +5,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use zinc64_engine::chip::Chip;
 use zinc64_engine::chip::cia::Cia;
 use zinc64_engine::chip::cia::{Mode, reg};
 use zinc64_engine::signal::{IoPort, IrqLine, Pin};

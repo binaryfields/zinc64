@@ -10,7 +10,7 @@ use zinc64_engine::SystemModel;
 use zinc64_engine::chip::cia;
 use zinc64_engine::chip::{SoundOutput, TickFn, VideoOutput};
 use zinc64_engine::new_shared;
-use zinc64_engine::{C64, C64Factory, Config};
+use zinc64_engine::{C64, Config};
 
 /*
 Program CIA1TAB - TA, TB, PB67 and ICR in cascaded mode
@@ -56,11 +56,10 @@ impl VideoOutput for NullVideo {
 #[test]
 #[ignore = "fails before and after the edition 2024 migration"]
 fn program_cia1tab() {
-    let config = Rc::new(Config::new(SystemModel::from("pal")));
-    let factory = Box::new(C64Factory::new(config.clone()));
+    let config = Config::new(SystemModel::from("pal"));
     let video_output = new_shared(NullVideo {});
     let sound_output = Arc::new(NullSound {});
-    let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
+    let mut c64 = C64::new(config, video_output, sound_output);
     c64.reset(false);
     let cia1_clone = c64.get_cia_1();
     let cia2_clone = c64.get_cia_2();
@@ -112,11 +111,10 @@ fn exec_keyboard_read() {
         0x78u8, 0xa9, 0xff, 0x8d, 0x02, 0xdc, 0xa9, 0x00, 0x8d, 0x03, 0xdc, 0xa9, 0xfd, 0x8d, 0x00,
         0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
     ];
-    let config = Rc::new(Config::new(SystemModel::from("pal")));
-    let factory = Box::new(C64Factory::new(config.clone()));
+    let config = Config::new(SystemModel::from("pal"));
     let video_output = new_shared(NullVideo {});
     let sound_output = Arc::new(NullSound {});
-    let mut c64 = C64::build(config.clone(), &*factory, video_output, sound_output);
+    let mut c64 = C64::new(config, video_output, sound_output);
     c64.load(code.as_ref(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.set_matrix((1, 5), true);

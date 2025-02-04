@@ -5,7 +5,6 @@
 pub use self::breakpoint::{Breakpoint, Condition};
 pub use self::c64::C64;
 pub use self::config::Config;
-pub use self::factory::{C64Factory, ChipFactory};
 pub use self::media::{Autostart, AutostartMethod, Media};
 pub use self::model::SystemModel;
 pub use self::shared::{Shared, SharedCell, new_shared, new_shared_cell};
@@ -18,7 +17,6 @@ mod breakpoint;
 pub mod c64;
 pub mod chip;
 pub mod config;
-mod factory;
 pub mod media;
 mod model;
 pub mod peripheral;

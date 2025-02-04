@@ -8,7 +8,7 @@ use core::fmt;
 use core::iter::Peekable;
 use core::str::Chars;
 
-use crate::chip::{Cpu, Register};
+use crate::chip::{Cpu6510, Register};
 
 enum Operator {
     Equal,
@@ -81,7 +81,7 @@ impl Condition {
         parser.parse(expr)
     }
 
-    pub fn eval(&self, cpu: &dyn Cpu) -> bool {
+    pub fn eval(&self, cpu: &Cpu6510) -> bool {
         match self.op {
             Operator::Equal => self.eval_reg(&self.reg, cpu) == self.eval_val(&self.val, cpu),
             Operator::NotEqual => self.eval_reg(&self.reg, cpu) != self.eval_val(&self.val, cpu),
@@ -94,7 +94,7 @@ impl Condition {
         }
     }
 
-    fn eval_reg(&self, reg: &Reg, cpu: &dyn Cpu) -> u16 {
+    fn eval_reg(&self, reg: &Reg, cpu: &Cpu6510) -> u16 {
         match *reg {
             Reg::A => cpu.get_register(Register::A) as u16,
             Reg::X => cpu.get_register(Register::X) as u16,
@@ -105,7 +105,7 @@ impl Condition {
         }
     }
 
-    fn eval_val(&self, val: &Value, cpu: &dyn Cpu) -> u16 {
+    fn eval_val(&self, val: &Value, cpu: &Cpu6510) -> u16 {
         match *val {
             Value::Constant(value) => value,
             Value::Register(ref reg) => self.eval_reg(reg, cpu),
