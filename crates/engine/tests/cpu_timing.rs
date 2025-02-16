@@ -2,13 +2,9 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-
+use zinc64_engine::chip::Bus;
 use zinc64_engine::chip::Cpu6510;
 use zinc64_engine::chip::Ram;
-use zinc64_engine::chip::{Addressable, TickFn};
-use zinc64_engine::signal::{IoPort, IrqLine, Pin};
 
 struct MockMemory {
     ram: Ram,
@@ -18,25 +14,6 @@ impl MockMemory {
     pub fn new(ram: Ram) -> Self {
         MockMemory { ram }
     }
-}
-
-impl Addressable for MockMemory {
-    fn read(&self, address: u16) -> u8 {
-        self.ram.read(address)
-    }
-
-    fn write(&mut self, address: u16, value: u8) {
-        self.ram.write(address, value);
-    }
-}
-
-fn setup_cpu() -> Cpu6510 {
-    let ba_line = Rc::new(RefCell::new(Pin::new_high()));
-    let cpu_io_port = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-    let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-    let cpu_nmi = Rc::new(RefCell::new(IrqLine::new("nmi")));
-    let mem = Rc::new(RefCell::new(MockMemory::new(Ram::new(0x10000))));
-    Cpu6510::new(mem, cpu_io_port, ba_line, cpu_irq, cpu_nmi)
 }
 
 // Based on 65xx Processor Data from http://www.romhacking.net/documents/318/
@@ -300,45 +277,73 @@ const OPCODE_TIMING: [u8; 256] = [
     0, // FF INS* $abcd,X
 ];
 
+impl Bus for MockMemory {
+    fn read(&mut self, address: u16) -> u8 {
+        self.ram.read(address)
+    }
+
+    fn write(&mut self, address: u16, value: u8) {
+        self.ram.write(address, value);
+    }
+
+    fn rdy(&self) -> bool {
+        true
+    }
+
+    fn irq(&self) -> bool {
+        false
+    }
+
+    fn nmi(&self) -> bool {
+        false
+    }
+
+    fn ack_nmi(&mut self) {}
+}
+
+fn setup_cpu() -> (Cpu6510, MockMemory) {
+    (Cpu6510::new(), MockMemory::new(Ram::new(0x10000)))
+}
+
 #[test]
 fn opcode_timing() {
-    let mut cpu = setup_cpu();
+    let (mut cpu, mut mem) = setup_cpu();
     for opcode in 1..=255u8 {
         //let opcode = 0x60 as u8;
         let cycles = OPCODE_TIMING[opcode as usize];
         if cycles > 0 {
-            let clock = Rc::new(Cell::new(0u8));
-            let clock_clone = clock.clone();
-            let tick_fn: TickFn = Rc::new(move || {
-                clock_clone.set(clock_clone.get().wrapping_add(1));
-            });
             cpu.reset();
-            cpu.write(0x1000, opcode);
-            cpu.write(0x1001, 0x00);
-            cpu.write(0x2000, 0x00);
-            cpu.write(0x2001, 0x10);
-            cpu.write(0x2100, 0x00);
-            cpu.write(0x2101, 0x10);
+            mem.write(0x1000, opcode);
+            mem.write(0x1001, 0x00);
+            mem.write(0x2000, 0x00);
+            mem.write(0x2001, 0x10);
+            mem.write(0x2100, 0x00);
+            mem.write(0x2101, 0x10);
             if opcode != 0x20 {
-                cpu.write(0x1002, 0x20);
+                mem.write(0x1002, 0x20);
             } else {
-                cpu.write(0x1002, 0x21);
+                mem.write(0x1002, 0x21);
             }
             if opcode == 0x60 {
-                cpu.write(0x0101, 0x00);
-                cpu.write(0x0102, 0x10);
+                mem.write(0x0101, 0x00);
+                mem.write(0x0102, 0x10);
             }
             if opcode == 0x40 {
-                cpu.write(0x0101, 0x00);
-                cpu.write(0x0102, 0x01);
-                cpu.write(0x0103, 0x10);
+                mem.write(0x0101, 0x00);
+                mem.write(0x0102, 0x01);
+                mem.write(0x0103, 0x10);
             }
             cpu.set_pc(0x1000);
-            cpu.clock();
-            cpu.step(&tick_fn);
-            assert_eq!(cycles, clock.get(), "opcode {:02x} timing failed", {
-                opcode
-            });
+            cpu.clock(&mut mem);
+            let mut elapsed = 0u8;
+            loop {
+                cpu.clock(&mut mem);
+                elapsed = elapsed.wrapping_add(1);
+                if cpu.is_opcode_fetched() {
+                    break;
+                }
+            }
+            assert_eq!(cycles, elapsed, "opcode {:02x} timing failed", { opcode });
         }
     }
 }

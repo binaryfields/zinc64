@@ -4,14 +4,12 @@
 
 #![allow(clippy::cast_lossless)]
 
-use std::rc::Rc;
 use std::sync::Arc;
 
 use log::LogLevel;
 use resid;
 
 use crate::chip::SoundOutput;
-use crate::signal::Clock;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum SamplingMethod {
@@ -25,7 +23,6 @@ pub enum SamplingMethod {
 
 pub struct Sid {
     // Dependencies
-    system_clock: Rc<Clock>,
     sound_buffer: Arc<dyn SoundOutput>,
     // Functional Units
     resid: resid::Sid,
@@ -35,11 +32,7 @@ pub struct Sid {
 }
 
 impl Sid {
-    pub fn new(
-        chip_model: SidModel,
-        system_clock: Rc<Clock>,
-        sound_buffer: Arc<dyn SoundOutput>,
-    ) -> Self {
+    pub fn new(chip_model: SidModel, sound_buffer: Arc<dyn SoundOutput>) -> Self {
         info!(target: "sound", "Initializing SID");
         let resid_model = match chip_model {
             SidModel::Mos6581 => resid::ChipModel::Mos6581,
@@ -47,7 +40,6 @@ impl Sid {
         };
         let resid = resid::Sid::new(resid_model);
         Sid {
-            system_clock,
             sound_buffer,
             resid,
             buffer: [0i16; 8192],
@@ -75,31 +67,31 @@ impl Sid {
             .set_sampling_parameters(resid_sampling_method, clock_freq, sample_freq);
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, now: u64) {
         self.resid.reset();
-        self.cycles = self.system_clock.get();
+        self.cycles = now;
     }
 
-    pub fn read(&mut self, reg: u8) -> u8 {
-        self.sync();
+    pub fn read(&mut self, reg: u8, now: u64) -> u8 {
+        self.sync(now);
         self.resid.read(reg)
     }
 
-    pub fn write(&mut self, reg: u8, value: u8) {
+    pub fn write(&mut self, reg: u8, value: u8, now: u64) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "sid::reg", "Write 0x{:02x} = 0x{:02x}", reg, value);
         }
-        self.sync();
+        self.sync(now);
         self.resid.write(reg, value)
     }
 
-    pub fn process_vsync(&mut self) {
-        self.sync();
+    pub fn process_vsync(&mut self, now: u64) {
+        self.sync(now);
     }
 
-    fn sync(&mut self) {
-        if self.cycles != self.system_clock.get() {
-            let delta = (self.system_clock.get() - self.cycles) as u32;
+    fn sync(&mut self, now: u64) {
+        if self.cycles != now {
+            let delta = (now - self.cycles) as u32;
             self.clock_delta(delta);
         }
     }
@@ -121,58 +113,4 @@ impl Sid {
 pub enum SidModel {
     Mos6581,
     Mos8580,
-}
-
-#[cfg(test)]
-mod tests {
-    /*
-    use super::*;
-
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    static SID_DATA: [u16; 51] = [
-        25, 177, 250, 28, 214, 250,
-        25, 177, 250, 25, 177, 250,
-        25, 177, 125, 28, 214, 125,
-        32, 94, 750, 25, 177, 250,
-        28, 214, 250, 19, 63, 250,
-        19, 63, 250, 19, 63, 250,
-        21, 154, 63, 24, 63, 63,
-        25, 177, 250, 24, 63, 125,
-        19, 63, 250,
-    ];
-
-    fn setup_sid(clock: Rc<Clock>) -> Sid {
-        let sound_buffer = Arc::new(Mutex::new(CircularBuffer::new(8192)));
-        let mut sid = Sid::new(SidModel::Mos6581, clock, sound_buffer);
-        sid.reset();
-        sid
-    }
-
-    #[test]
-    fn test_sid_output() {
-        let clock = Rc::new(Clock::new());
-        let mut sid = setup_sid(clock.clone());
-        sid.write(0x05, 0x09); // AD1
-        sid.write(0x06, 0x00); // SR1
-        sid.write(0x18, 0x0f); // MODVOL
-        let mut i = 0;
-        while i < SID_DATA.len() {
-            sid.write(0x01, SID_DATA[i + 0] as u8); // FREQHI1
-            sid.write(0x00, SID_DATA[i + 1] as u8); // FREQLO1
-            sid.write(0x00, 0x21); // CR1
-            for _j in 0..SID_DATA[i + 2] {
-                sid.clock_delta(22);
-                clock.tick_delta(22);
-            }
-            sid.write(0x00, 0x20); // CR1
-            for _j in 0..50 {
-                sid.clock_delta(22);
-                clock.tick_delta(22);
-            }
-            i += 3;
-        }
-        let buffer = sid.sound_buffer.lock().unwrap();
-        assert_eq!(clock.get() * 44100 / 985248, buffer.len() as u64);
-    }
-    */
 }

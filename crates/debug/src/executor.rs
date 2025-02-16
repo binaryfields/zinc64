@@ -218,11 +218,10 @@ impl Executor {
     }
 
     fn mem_read(&self, c64: &mut C64, start: u16, end: u16) -> Result<CmdResult, String> {
-        let cpu = c64.get_cpu();
         let mut buffer = Vec::new();
         let mut address = start;
         while address < end {
-            buffer.push(cpu.read(address));
+            buffer.push(c64.read(address));
             address = address.wrapping_add(1);
         }
         CmdResult::ok(Output::Buffer(buffer))
@@ -235,6 +234,8 @@ impl Executor {
 
     fn reg_read(&self, c64: &mut C64) -> Result<CmdResult, String> {
         let clock = c64.get_cycles();
+        let port_00 = c64.read(0x00);
+        let port_01 = c64.read(0x01);
         let cpu = c64.get_cpu();
         let regs = RegData {
             a: cpu.get_register(Register::A),
@@ -243,8 +244,8 @@ impl Executor {
             p: cpu.get_register(Register::P),
             sp: cpu.get_register(Register::SP),
             pc: cpu.get_pc(),
-            port_00: cpu.read(0x00),
-            port_01: cpu.read(0x01),
+            port_00,
+            port_01,
             clock,
         };
         CmdResult::ok(Output::Registers(regs))
@@ -271,10 +272,8 @@ impl Executor {
     }
 
     fn sys_screen(&self, c64: &mut C64) -> Result<CmdResult, String> {
-        let cia2 = c64.get_cia_2();
-        let vic = c64.get_vic();
-        let cia2_port_a = cia2.borrow_mut().read(0x00);
-        let vm = (((vic.borrow_mut().read(0x18) & 0xf0) >> 4) as u16) << 10;
+        let cia2_port_a = c64.get_cia_2().port_a().get_value();
+        let vm = (((c64.get_vic_mut().read(0x18) & 0xf0) >> 4) as u16) << 10;
         let vm_base = ((!cia2_port_a & 0x03) as u16) << 14 | vm;
         CmdResult::ok(Output::Number(vm_base))
     }

@@ -2,9 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::rc::Rc;
-
-pub use self::cpu::{Cpu6510, Register};
+pub use self::cpu::{Bus, Cpu6510, Register};
 pub use self::ram::Ram;
 pub use self::rom::Rom;
 
@@ -15,37 +13,10 @@ mod rom;
 pub mod sid;
 pub mod vic;
 
-/// Addressable represents a bank of memory.
-pub trait Addressable {
-    /// Read byte from the specified address.
-    fn read(&self, address: u16) -> u8;
-    /// Write byte to the specified address.
-    fn write(&mut self, address: u16, value: u8);
-}
-
-/// A tick represents a callback invoked by the cpu for each clock cycle
-/// during instruction execution.
-pub type TickFn = Rc<dyn Fn()>;
-
 /// Sound output used by SID chip.
 pub trait SoundOutput {
     /// Reset output.
     fn reset(&self);
     /// Write generated sample to the output buffer.
     fn write(&self, samples: &[i16]);
-}
-
-/// Video output used by VIC chip.
-pub trait VideoOutput {
-    /// Get frame buffer width and height.
-    fn get_dimension(&self) -> (usize, usize);
-    /// Reset output.
-    fn reset(&mut self);
-    /// Write pixel color to the specified location. Index is computed from raster x, y coordinates:
-    /// index = y * pitch + x.
-    fn write(&mut self, index: usize, color: u8);
-}
-
-pub fn make_noop() -> TickFn {
-    Rc::new(|| {})
 }

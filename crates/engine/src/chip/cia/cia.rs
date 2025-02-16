@@ -9,7 +9,6 @@ use super::cycle_counter::CycleCounter;
 use super::rtc::Rtc;
 use super::timer;
 use super::timer::Timer;
-use crate::shared::{Shared, SharedCell, new_shared};
 use crate::signal::{IoPort, IrqControl, IrqLine, Pin};
 
 // Spec: 6526 COMPLEX INTERFACE ADAPTER (CIA) Datasheet
@@ -50,9 +49,6 @@ impl Mode {
 pub struct Cia {
     // Dependencies
     mode: Mode,
-    joystick_1: Option<SharedCell<u8>>,
-    joystick_2: Option<SharedCell<u8>>,
-    keyboard_matrix: Option<Shared<[u8; 16]>>,
     // Functional Units
     irq_control: IrqControl,
     irq_delay: CycleCounter,
@@ -61,51 +57,41 @@ pub struct Cia {
     tod_alarm: Rtc,
     tod_clock: Rtc,
     tod_set_alarm: bool,
+    cnt_pin: Pin,
     // I/O
-    cnt_pin: Shared<Pin>,
-    flag_pin: Shared<Pin>,
-    irq_line: Shared<IrqLine>,
-    port_a: Shared<IoPort>,
-    port_b: Shared<IoPort>,
+    port_a: IoPort,
+    port_b: IoPort,
 }
 
 impl Cia {
-    #![allow(clippy::too_many_arguments)]
     #![allow(clippy::useless_let_if_seq)]
 
-    pub fn new(
-        mode: Mode,
-        joystick_1: Option<SharedCell<u8>>,
-        joystick_2: Option<SharedCell<u8>>,
-        keyboard_matrix: Option<Shared<[u8; 16]>>,
-        port_a: Shared<IoPort>,
-        port_b: Shared<IoPort>,
-        flag_pin: Shared<Pin>,
-        irq_line: Shared<IrqLine>,
-    ) -> Self {
-        let cnt_pin = new_shared(Pin::new_high());
+    pub fn new(mode: Mode) -> Self {
         Self {
             mode,
-            joystick_1,
-            joystick_2,
-            keyboard_matrix,
             irq_control: IrqControl::default(),
             irq_delay: CycleCounter::new(0xffff),
-            timer_a: Timer::new(timer::Mode::TimerA, cnt_pin.clone()),
-            timer_b: Timer::new(timer::Mode::TimerB, cnt_pin.clone()),
+            timer_a: Timer::new(timer::Mode::TimerA),
+            timer_b: Timer::new(timer::Mode::TimerB),
             tod_alarm: Rtc::new(),
             tod_clock: Rtc::new(),
             tod_set_alarm: false,
-            cnt_pin: cnt_pin.clone(),
-            flag_pin,
-            irq_line,
-            port_a,
-            port_b,
+            cnt_pin: Pin::new_high(),
+            port_a: IoPort::new(0x00, 0xff),
+            port_b: IoPort::new(0x00, 0xff),
         }
     }
 
+    pub fn port_a(&self) -> &IoPort {
+        &self.port_a
+    }
+
+    pub fn port_b(&self) -> &IoPort {
+        &self.port_b
+    }
+
     // ---- reset ----
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, pins: &mut CiaPins) {
         /*
         A low on the RES pin resets all internal registers.The
         port pins are set as inputs and port registers to zero
@@ -119,18 +105,19 @@ impl Cia {
         self.timer_a.reset();
         self.timer_b.reset();
         self.tod_set_alarm = false;
-        self.cnt_pin.borrow_mut().set_active(true);
-        self.flag_pin.borrow_mut().set_active(false);
-        self.port_a.borrow_mut().reset();
-        self.port_b.borrow_mut().reset();
+        self.cnt_pin.set_active(true);
+        pins.flag.set_active(false);
+        self.port_a.reset();
+        self.port_b.reset();
     }
 
     // ---- clock ----
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self, pins: &mut CiaPins) {
         // Process timers
-        self.timer_a.feed_source(false);
+        let cnt_rising = self.cnt_pin.is_rising();
+        self.timer_a.feed_source(false, cnt_rising);
         let timer_a_output = self.timer_a.clock();
-        self.timer_b.feed_source(timer_a_output);
+        self.timer_b.feed_source(timer_a_output, cnt_rising);
         let timer_b_output = self.timer_b.clock();
 
         // Process interrupts
@@ -149,7 +136,7 @@ impl Cia {
             self.irq_control.set_event(1);
             irq_event = true;
         }
-        if self.flag_pin.borrow().is_falling() {
+        if pins.flag.is_falling() {
             self.irq_control.set_event(4);
             irq_event = true;
         }
@@ -157,9 +144,7 @@ impl Cia {
             self.irq_delay.feed(IntDelay::Interrupt0 as u16);
         }
         if self.irq_delay.has_cycle(IntDelay::Interrupt1 as u16) {
-            self.irq_line
-                .borrow_mut()
-                .set_low(self.mode.irq_source(), true);
+            pins.irq.set_low(self.mode.irq_source(), true);
         }
         self.irq_delay.clock();
     }
@@ -180,18 +165,12 @@ impl Cia {
     }
 
     // ---- registers ----
-    pub fn read(&mut self, reg: u8) -> u8 {
+    pub fn read(&mut self, reg: u8, input: PortInput, pins: &mut CiaPins) -> u8 {
         let value = match reg {
-            reg::PRA => match self.mode {
-                Mode::Cia1 => self.read_cia1_port_a(),
-                Mode::Cia2 => self.read_cia2_port_a(),
-            },
-            reg::PRB => match self.mode {
-                Mode::Cia1 => self.read_cia1_port_b(),
-                Mode::Cia2 => self.read_cia2_port_b(),
-            },
-            reg::DDRA => self.port_a.borrow().get_direction(),
-            reg::DDRB => self.port_b.borrow().get_direction(),
+            reg::PRA => self.port_a.get_value_2(input.a),
+            reg::PRB => self.read_port_b(input.b),
+            reg::DDRA => self.port_a.get_direction(),
+            reg::DDRB => self.port_b.get_direction(),
             reg::TALO => self.timer_a.get_counter_lo(),
             reg::TAHI => self.timer_a.get_counter_hi(),
             reg::TBLO => self.timer_b.get_counter_lo(),
@@ -218,9 +197,7 @@ impl Cia {
                 let data = self.irq_control.get_data();
                 self.irq_control.clear();
                 self.irq_delay.reset();
-                self.irq_line
-                    .borrow_mut()
-                    .set_low(self.mode.irq_source(), false);
+                pins.irq.set_low(self.mode.irq_source(), false);
                 data
             }
             reg::CRA => self.timer_a.get_config(),
@@ -237,77 +214,14 @@ impl Cia {
         value
     }
 
-    fn read_cia1_port_a(&self) -> u8 {
-        let active_columns = self.port_b.borrow().get_value();
-        let keyboard_state = self.scan_keyboard_active_cols(active_columns);
-        let joystick_state = self.scan_joystick(&self.joystick_2);
-        let result = self.port_a.borrow().get_value_2(keyboard_state);
-        result & joystick_state
-    }
-
-    fn scan_keyboard_active_cols(&self, active_columns: u8) -> u8 {
-        if let Some(matrix) = self.keyboard_matrix.as_ref() {
-            let mut result = 0xff;
-            for col in 0..8_usize {
-                if !active_columns.get_bit(col) {
-                    result &= matrix.borrow()[8 + col];
-                }
-            }
-            result
-        } else {
-            0xff
-        }
-    }
-
-    fn scan_joystick(&self, joystick: &Option<SharedCell<u8>>) -> u8 {
-        if let Some(ref state) = *joystick {
-            !state.get()
-        } else {
-            0xff
-        }
-    }
-
-    fn read_cia2_port_a(&self) -> u8 {
-        // iec inputs
-        self.port_a.borrow().get_value()
-    }
-
-    fn read_cia1_port_b(&self) -> u8 {
-        let active_rows = self.port_a.borrow().get_value();
-        let keyboard_state = self.scan_keyboard_active_rows(active_rows);
-        let joystick_state = self.scan_joystick(&self.joystick_1);
-        let mut result = self.port_b.borrow().get_value_2(keyboard_state);
+    fn read_port_b(&self, input: u8) -> u8 {
+        let mut result = self.port_b.get_value_2(input);
         /*
         http://unusedino.de/ec64/technical/misc/cia6526/timers.html
         A control bit allows the timer output to appear on a PORT B output line
         (PB6 for TIMER A and PB7 for TIMER B). This function overrides the DDRB
         control bit and forces the appropriate PB line to an output.
         */
-        if self.timer_a.is_pb_on() {
-            result.set_bit(6, self.timer_a.get_pb_output());
-        }
-        if self.timer_b.is_pb_on() {
-            result.set_bit(7, self.timer_b.get_pb_output());
-        }
-        result & joystick_state
-    }
-
-    fn scan_keyboard_active_rows(&self, active_rows: u8) -> u8 {
-        if let Some(matrix) = self.keyboard_matrix.as_ref() {
-            let mut result = 0xff;
-            for row in 0..8_usize {
-                if !active_rows.get_bit(row) {
-                    result &= matrix.borrow()[row];
-                }
-            }
-            result
-        } else {
-            0xff
-        }
-    }
-
-    fn read_cia2_port_b(&self) -> u8 {
-        let mut result = self.port_b.borrow().get_value();
         if self.timer_a.is_pb_on() {
             result.set_bit(6, self.timer_a.get_pb_output());
         }
@@ -323,16 +237,16 @@ impl Cia {
         }
         match reg {
             reg::PRA => {
-                self.port_a.borrow_mut().set_value(value);
+                self.port_a.set_value(value);
             }
             reg::PRB => {
-                self.port_b.borrow_mut().set_value(value);
+                self.port_b.set_value(value);
             }
             reg::DDRA => {
-                self.port_a.borrow_mut().set_direction(value);
+                self.port_a.set_direction(value);
             }
             reg::DDRB => {
-                self.port_b.borrow_mut().set_direction(value);
+                self.port_b.set_direction(value);
             }
             reg::TALO => {
                 self.timer_a.set_latch_lo(value);
@@ -416,6 +330,17 @@ enum IntDelay {
     Interrupt1 = 1 << 1,
 }
 
+pub struct CiaPins<'a> {
+    pub flag: &'a mut Pin,
+    pub irq: &'a mut IrqLine,
+}
+
+#[derive(Clone, Copy)]
+pub struct PortInput {
+    pub a: u8,
+    pub b: u8,
+}
+
 fn to_bcd(num: u8) -> u8 {
     ((num / 10) << 4) | (num % 10)
 }
@@ -426,47 +351,62 @@ fn from_bcd(decimal: u8) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::shared::new_shared;
+    use core::ops::{Deref, DerefMut};
 
-    fn setup_cia() -> Cia {
-        let cia_flag = new_shared(Pin::new_low());
-        let cia_port_a = new_shared(IoPort::new(0x00, 0xff));
-        let cia_port_b = new_shared(IoPort::new(0x00, 0xff));
-        let cpu_irq = new_shared(IrqLine::new("irq"));
-        let keyboard_matrix = new_shared([0xff; 16]);
-        let mut cia = Cia::new(
-            Mode::Cia1,
-            None,
-            None,
-            Some(keyboard_matrix),
-            cia_port_a,
-            cia_port_b,
-            cia_flag,
-            cpu_irq,
-        );
-        cia.reset();
-        cia
+    use super::*;
+
+    struct Harness {
+        cia: Cia,
+        flag: Pin,
+        irq: IrqLine,
     }
 
-    #[allow(dead_code)]
-    fn setup_cia_with_keyboard(keyboard_matrix: Shared<[u8; 16]>) -> Cia {
-        let cia_flag = new_shared(Pin::new_low());
-        let cia_port_a = new_shared(IoPort::new(0x00, 0xff));
-        let cia_port_b = new_shared(IoPort::new(0x00, 0xff));
-        let cpu_irq = new_shared(IrqLine::new("irq"));
-        let mut cia = Cia::new(
-            Mode::Cia1,
-            None,
-            None,
-            Some(keyboard_matrix),
-            cia_port_a,
-            cia_port_b,
-            cia_flag,
-            cpu_irq,
-        );
-        cia.reset();
-        cia
+    impl Harness {
+        fn clock(&mut self) {
+            self.cia.clock(&mut CiaPins {
+                flag: &mut self.flag,
+                irq: &mut self.irq,
+            });
+        }
+
+        fn read(&mut self, reg: u8) -> u8 {
+            let input = PortInput { a: 0xff, b: 0xff };
+            self.cia.read(
+                reg,
+                input,
+                &mut CiaPins {
+                    flag: &mut self.flag,
+                    irq: &mut self.irq,
+                },
+            )
+        }
+    }
+
+    impl Deref for Harness {
+        type Target = Cia;
+
+        fn deref(&self) -> &Cia {
+            &self.cia
+        }
+    }
+
+    impl DerefMut for Harness {
+        fn deref_mut(&mut self) -> &mut Cia {
+            &mut self.cia
+        }
+    }
+
+    fn setup_cia() -> Harness {
+        let mut harness = Harness {
+            cia: Cia::new(Mode::Cia1),
+            flag: Pin::new_low(),
+            irq: IrqLine::new("irq"),
+        };
+        harness.cia.reset(&mut CiaPins {
+            flag: &mut harness.flag,
+            irq: &mut harness.irq,
+        });
+        harness
     }
 
     #[test]
@@ -480,23 +420,23 @@ mod tests {
         cia.write(reg::CRA, 0b_0000_1001_u8);
         {
             cia.clock(); // COUNT0|COUNT1
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT2
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT3|INT0
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // INT1
             assert_eq!(1, cia.timer_a.get_counter());
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(cpu_irq.is_low());
         }
     }
@@ -514,23 +454,23 @@ mod tests {
         cia.write(reg::CRB, 0b_0000_1001_u8);
         {
             cia.clock(); // COUNT0|COUNT1
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT2
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // COUNT3|INT0
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(!cpu_irq.is_low());
         }
         {
             cia.clock(); // INT1
             assert_eq!(1, cia.timer_b.get_counter());
-            let cpu_irq = cia.irq_line.borrow();
+            let cpu_irq = &cia.irq;
             assert!(cpu_irq.is_low());
         }
     }
@@ -560,28 +500,28 @@ mod tests {
     fn write_reg_0x00() {
         let mut cia = setup_cia();
         cia.write(reg::PRA, 0xff);
-        assert_eq!(0xff, cia.port_a.borrow().get_value());
+        assert_eq!(0xff, cia.port_a.get_value());
     }
 
     #[test]
     fn write_reg_0x01() {
         let mut cia = setup_cia();
         cia.write(reg::PRB, 0xff);
-        assert_eq!(0xff, cia.port_b.borrow().get_value());
+        assert_eq!(0xff, cia.port_b.get_value());
     }
 
     #[test]
     fn write_reg_0x02() {
         let mut cia = setup_cia();
         cia.write(reg::DDRA, 0xff);
-        assert_eq!(0xff, cia.port_a.borrow().get_direction());
+        assert_eq!(0xff, cia.port_a.get_direction());
     }
 
     #[test]
     fn write_reg_0x03() {
         let mut cia = setup_cia();
         cia.write(reg::DDRB, 0xff);
-        assert_eq!(0xff, cia.port_b.borrow().get_direction());
+        assert_eq!(0xff, cia.port_b.get_direction());
     }
 
     #[test]

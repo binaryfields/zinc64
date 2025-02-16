@@ -107,11 +107,10 @@ impl MainScreen {
     }
 
     fn toggle_datassette_play(&mut self, state: &mut AppState) {
-        let datassette = state.c64.get_datasette();
-        if !datassette.borrow().is_playing() {
-            datassette.borrow_mut().play();
+        if !state.c64.is_tape_playing() {
+            state.c64.play_tape();
         } else {
-            datassette.borrow_mut().stop();
+            state.c64.stop_tape();
         }
     }
 
@@ -299,7 +298,7 @@ impl Screen<AppState> for MainScreen {
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
         if state.c64.get_vsync() {
-            self.video_renderer.render(ctx)?;
+            self.video_renderer.render(ctx, state.c64.frame())?;
             state.c64.reset_vsync();
             ctx.platform
                 .windowed_context

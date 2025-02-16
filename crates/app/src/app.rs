@@ -10,7 +10,6 @@ use std::thread;
 use glutin::event::Event;
 use zinc64_debug::{Command, Executor, MonitorServer, RunRequest};
 use zinc64_engine::C64;
-use zinc64_engine::Shared;
 use zinc64_engine::peripheral::joystick;
 
 use crate::audio::SoundBuffer;
@@ -18,7 +17,6 @@ use crate::console::Console;
 use crate::framework::gfx::Font;
 use crate::framework::{Context, State};
 use crate::ui::{MainScreen, Screen, Transition};
-use crate::video::VideoBuffer;
 
 const CONSOLE_BUFFER: usize = 2048;
 
@@ -30,7 +28,6 @@ pub struct AppState {
     pub debug: Executor,
     pub options: Options,
     pub sound_buffer: Arc<SoundBuffer>,
-    pub video_buffer: Shared<VideoBuffer>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -87,7 +84,6 @@ impl App {
         ctx: &mut Context,
         c64: C64,
         sound_buffer: Arc<SoundBuffer>,
-        video_buffer: Shared<VideoBuffer>,
         options: Options,
     ) -> Result<App, String> {
         let window_size = ctx.platform.windowed_context.window().inner_size();
@@ -125,7 +121,6 @@ impl App {
             debug: Executor::new(debug_rx),
             options,
             sound_buffer,
-            video_buffer,
         };
         let main_screen = MainScreen::build(ctx, &mut state)?;
         let screens: Vec<Box<dyn Screen<AppState>>> = vec![Box::new(main_screen)];

@@ -2,14 +2,11 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::Cell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use zinc64_engine::SystemModel;
+use zinc64_engine::chip::SoundOutput;
 use zinc64_engine::chip::cia;
-use zinc64_engine::chip::{SoundOutput, TickFn, VideoOutput};
-use zinc64_engine::new_shared;
 use zinc64_engine::{C64, Config};
 
 /*
@@ -44,50 +41,30 @@ impl SoundOutput for NullSound {
     fn write(&self, _samples: &[i16]) {}
 }
 
-struct NullVideo;
-impl VideoOutput for NullVideo {
-    fn get_dimension(&self) -> (usize, usize) {
-        (0, 0)
-    }
-    fn reset(&mut self) {}
-    fn write(&mut self, _index: usize, _color: u8) {}
-}
-
 #[test]
 #[ignore = "fails before and after the edition 2024 migration"]
 fn program_cia1tab() {
     let config = Config::new(SystemModel::from("pal"));
-    let video_output = new_shared(NullVideo {});
     let sound_output = Arc::new(NullSound {});
-    let mut c64 = C64::new(config, video_output, sound_output);
+    let mut c64 = C64::new(config, sound_output);
     c64.reset(false);
-    let cia1_clone = c64.get_cia_1();
-    let cia2_clone = c64.get_cia_2();
-    let clock_clone = c64.get_clock();
-    let test_flag = Rc::new(Cell::new(false));
-    let test_flag_clone = test_flag.clone();
-    let test_cycle = Rc::new(Cell::new(0));
-    let test_cycle_clone = test_cycle.clone();
-    let tick_fn: TickFn = Rc::new(move || {
-        cia1_clone.borrow_mut().clock();
-        cia2_clone.borrow_mut().clock();
-        clock_clone.tick();
-        if test_flag_clone.get() {
-            if test_cycle_clone.get() >= 1 && test_cycle_clone.get() < 13 {
-                let i = test_cycle_clone.get() - 1;
-                assert_eq!(cia1_clone.borrow_mut().read(cia::reg::TALO), CIA1TAB_TA[i]);
-                assert_eq!(cia1_clone.borrow_mut().read(cia::reg::TBLO), CIA1TAB_TB[i]);
-                assert_eq!(cia1_clone.borrow_mut().read(cia::reg::PRB), CIA1TAB_PB[i]);
-            }
-            test_cycle_clone.set(test_cycle_clone.get() + 1);
-        }
-    });
     c64.load(&CIA1TAB_PRG.to_vec()[2..], 0x4000);
     c64.get_cpu_mut().set_pc(0x4000);
-    while test_cycle.get() < 13 {
-        c64.step_internal(&tick_fn);
-        if c64.get_cpu().get_pc() == 0x402d {
-            test_flag.set(true);
+    let mut test_cycle: Option<usize> = None;
+    while test_cycle.is_none_or(|cycle| cycle < 13) {
+        c64.clock();
+        if let Some(cycle) = test_cycle.as_mut() {
+            if (1..13).contains(cycle) {
+                let cia1 = 0xdc00 | u16::from(cia::reg::TALO);
+                assert_eq!(c64.read(cia1), CIA1TAB_TA[*cycle - 1]);
+                let cia1 = 0xdc00 | u16::from(cia::reg::TBLO);
+                assert_eq!(c64.read(cia1), CIA1TAB_TB[*cycle - 1]);
+                let cia1 = 0xdc00 | u16::from(cia::reg::PRB);
+                assert_eq!(c64.read(cia1), CIA1TAB_PB[*cycle - 1]);
+            }
+            *cycle += 1;
+        } else if c64.get_cpu().is_opcode_fetched() && c64.get_cpu().get_pc() == 0x402d {
+            test_cycle = Some(0);
         }
     }
 }
@@ -112,13 +89,12 @@ fn exec_keyboard_read() {
         0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
     ];
     let config = Config::new(SystemModel::from("pal"));
-    let video_output = new_shared(NullVideo {});
     let sound_output = Arc::new(NullSound {});
-    let mut c64 = C64::new(config, video_output, sound_output);
+    let mut c64 = C64::new(config, sound_output);
     c64.load(code.as_ref(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.set_matrix((1, 5), true);
-    c64.get_cpu_mut().write(0x0001, 0x06);
+    c64.write(0x0001, 0x06);
     c64.get_cpu_mut().set_pc(0xc000);
     let mut branch_count = 0;
     loop {
@@ -134,22 +110,6 @@ fn exec_keyboard_read() {
         }
     }
 }
-
-/*
-#[test]
-fn read_keyboard_s() {
-    let keyboard_matrix = Rc::new(RefCell::new([0xff; 8]));
-    let keyboard = Rc::new(RefCell::new(Keyboard::new(keyboard_matrix.clone())));
-    keyboard.borrow_mut().reset();
-    let mut cia = setup_cia_with_keyboard(keyboard_matrix.clone());
-    keyboard.borrow_mut().enqueue("S");
-    keyboard.borrow_mut().drain_event();
-    cia.write(reg::DDRA.addr(), 0xff);
-    cia.write(reg::DDRB.addr(), 0x00);
-    cia.write(reg::PRA.addr(), 0xfd);
-    assert_eq!(!(1 << 5), cia.read(reg::PRB.addr()));
-}
-*/
 
 /*
 ; This program waits until the key "S" was pushed.

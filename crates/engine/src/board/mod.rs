@@ -2,14 +2,13 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
+pub use self::board::Board;
 pub use self::expansion_port::ExpansionPort;
-pub use self::memory::Memory;
-pub use self::mmio::Mmio;
 pub use self::pla::Pla;
 
+#[allow(clippy::module_inception)]
+mod board;
 mod expansion_port;
-mod memory;
-mod mmio;
 mod pla;
 
 /// Memory bank type used with the PLA to determine how to map a memory address

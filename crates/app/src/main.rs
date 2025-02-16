@@ -10,14 +10,12 @@ use std::sync::Arc;
 
 use structopt::StructOpt;
 use zinc64_engine::C64;
-use zinc64_engine::new_shared;
 use zinc64_loader::Loaders;
 
 use crate::app::App;
 use crate::audio::SoundBuffer;
 use crate::cli::Opt;
 use crate::logger::Logger;
-use crate::video::{Palette, VideoBuffer};
 
 #[macro_use]
 extern crate log;
@@ -52,12 +50,7 @@ fn run(opt: &Opt) -> Result<(), String> {
     info!("Starting {}", NAME);
     let config = cli::build_emu_config(opt)?;
     let sound_buffer = Arc::new(SoundBuffer::new(config.sound.buffer_size << 2));
-    let video_buffer = new_shared(VideoBuffer::new(
-        config.model.frame_buffer_size.0,
-        config.model.frame_buffer_size.1,
-        Palette::default(),
-    ));
-    let mut c64 = C64::new(config, video_buffer.clone(), sound_buffer.clone());
+    let mut c64 = C64::new(config, sound_buffer.clone());
     cli::set_c64_options(&mut c64, opt)?;
     c64.reset(true);
     if let Some(image_path) = &opt.image {
@@ -73,13 +66,7 @@ fn run(opt: &Opt) -> Result<(), String> {
             fullscreen: opt.fullscreen,
         };
         framework::run(fx_options, |ctx| {
-            App::build(
-                ctx,
-                c64,
-                sound_buffer.clone(),
-                video_buffer.clone(),
-                app_options,
-            )
+            App::build(ctx, c64, sound_buffer.clone(), app_options)
         })?;
     }
     Ok(())

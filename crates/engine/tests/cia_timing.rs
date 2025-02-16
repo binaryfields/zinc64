@@ -2,31 +2,51 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use zinc64_engine::chip::cia::{Cia, CiaPins, Mode, PortInput, reg};
+use zinc64_engine::signal::{IrqLine, Pin};
 
-use zinc64_engine::chip::cia::Cia;
-use zinc64_engine::chip::cia::{Mode, reg};
-use zinc64_engine::signal::{IoPort, IrqLine, Pin};
+struct Harness {
+    cia: Cia,
+    flag: Pin,
+    irq: IrqLine,
+}
 
-fn setup_cia() -> Cia {
-    let cia_flag = Rc::new(RefCell::new(Pin::new_low()));
-    let cia_port_a = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-    let cia_port_b = Rc::new(RefCell::new(IoPort::new(0x00, 0xff)));
-    let cpu_irq = Rc::new(RefCell::new(IrqLine::new("irq")));
-    let keyboard_matrix = Rc::new(RefCell::new([0xff; 16]));
-    let mut cia = Cia::new(
-        Mode::Cia1,
-        None,
-        None,
-        Some(keyboard_matrix),
-        cia_port_a,
-        cia_port_b,
-        cia_flag,
-        cpu_irq,
-    );
-    cia.reset();
-    cia
+impl Harness {
+    fn clock(&mut self) {
+        self.cia.clock(&mut CiaPins {
+            flag: &mut self.flag,
+            irq: &mut self.irq,
+        });
+    }
+
+    fn read(&mut self, reg: u8) -> u8 {
+        let input = PortInput { a: 0xff, b: 0xff };
+        self.cia.read(
+            reg,
+            input,
+            &mut CiaPins {
+                flag: &mut self.flag,
+                irq: &mut self.irq,
+            },
+        )
+    }
+
+    fn write(&mut self, reg: u8, value: u8) {
+        self.cia.write(reg, value);
+    }
+}
+
+fn setup_cia() -> Harness {
+    let mut harness = Harness {
+        cia: Cia::new(Mode::Cia1),
+        flag: Pin::new_low(),
+        irq: IrqLine::new("irq"),
+    };
+    harness.cia.reset(&mut CiaPins {
+        flag: &mut harness.flag,
+        irq: &mut harness.irq,
+    });
+    harness
 }
 
 #[test]

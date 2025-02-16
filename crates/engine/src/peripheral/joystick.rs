@@ -4,8 +4,6 @@
 
 use bit_field::BitField;
 
-use crate::shared::SharedCell;
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     None = 0xff,
@@ -52,15 +50,15 @@ pub struct Joystick {
     mode: Mode,
     threshold: i16,
     // State
-    state: SharedCell<u8>,
+    state: u8,
 }
 
 impl Joystick {
-    pub fn new(mode: Mode, threshold: i16, state: SharedCell<u8>) -> Self {
+    pub fn new(mode: Mode, threshold: i16) -> Self {
         Self {
             mode,
             threshold,
-            state,
+            state: 0,
         }
     }
 
@@ -72,8 +70,12 @@ impl Joystick {
         self.mode == Mode::Numpad
     }
 
+    pub fn port_lines(&self) -> u8 {
+        !self.state
+    }
+
     pub fn reset(&mut self) {
-        self.state.set(0);
+        self.state = 0;
     }
 
     pub fn on_axis_motion(&mut self, axis_idx: u8, value: i16) {
@@ -123,8 +125,6 @@ impl Joystick {
     }
 
     fn set_state(&mut self, bit: usize, value: bool) {
-        let mut new_state = self.state.get();
-        new_state.set_bit(bit, value);
-        self.state.set(new_state);
+        self.state.set_bit(bit, value);
     }
 }
