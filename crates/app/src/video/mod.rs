@@ -9,8 +9,6 @@ use std::result::Result;
 
 use cgmath::num_traits::zero;
 use cgmath::{Vector2, vec2};
-use zinc64_engine::Shared;
-use zinc64_engine::chip::VideoOutput;
 
 use crate::app::AppState;
 use crate::framework::Context;
@@ -20,8 +18,7 @@ pub use self::palette::Palette;
 
 mod palette;
 
-pub struct VideoBuffer {
-    dim: (usize, usize),
+struct VideoBuffer {
     palette: [u32; 16],
     pixels: Vec<u32>,
 }
@@ -29,9 +26,14 @@ pub struct VideoBuffer {
 impl VideoBuffer {
     pub fn new(width: u32, height: u32, palette: [u32; 16]) -> VideoBuffer {
         VideoBuffer {
-            dim: (width as usize, height as usize),
             palette,
             pixels: vec![0; (width * height) as usize],
+        }
+    }
+
+    pub fn update(&mut self, frame: &[u8]) {
+        for (pixel, color) in self.pixels.iter_mut().zip(frame) {
+            *pixel = self.palette[*color as usize];
         }
     }
 
@@ -43,26 +45,9 @@ impl VideoBuffer {
     }
 }
 
-impl VideoOutput for VideoBuffer {
-    fn get_dimension(&self) -> (usize, usize) {
-        self.dim
-    }
-
-    fn reset(&mut self) {
-        for pixel in self.pixels.iter_mut() {
-            *pixel = 0x00;
-        }
-    }
-
-    fn write(&mut self, index: usize, color: u8) {
-        self.pixels[index] = self.palette[color as usize];
-    }
-}
-
 pub struct VideoRenderer {
-    // Dependencies
-    video_buffer: Shared<VideoBuffer>,
     // Resources
+    video_buffer: VideoBuffer,
     batch: sprite::Batch,
     texture: Rc<gl::Texture>,
 }
@@ -72,7 +57,7 @@ impl VideoRenderer {
         let screen_size = state.c64.get_config().model.frame_buffer_size;
         let viewport_offset = state.c64.get_config().model.viewport_offset;
         let viewport_size = state.c64.get_config().model.viewport_size;
-        let video_buffer = state.video_buffer.clone();
+        let video_buffer = VideoBuffer::new(screen_size.0, screen_size.1, Palette::default());
         let viewport = Rect::new(
             vec2(viewport_offset.0 as f32, viewport_offset.1 as f32),
             vec2(viewport_size.0 as f32, viewport_size.1 as f32),
@@ -106,10 +91,11 @@ impl VideoRenderer {
         );
     }
 
-    pub fn render(&mut self, ctx: &mut Context) -> Result<(), String> {
+    pub fn render(&mut self, ctx: &mut Context, frame: &[u8]) -> Result<(), String> {
         let gl = &mut ctx.platform.gl;
         let tex_size = self.texture.size.cast::<f32>().unwrap();
-        gl.set_texture_data(&self.texture, self.video_buffer.borrow().get_pixel_data());
+        self.video_buffer.update(frame);
+        gl.set_texture_data(&self.texture, self.video_buffer.get_pixel_data());
         gl.clear(Color::BLACK);
 
         self.batch.begin(gl, Some(self.texture.clone()));

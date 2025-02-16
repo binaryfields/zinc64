@@ -3,7 +3,7 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 pub use self::vic::{Vic, VicModel};
-pub use self::vic_memory::VicMemory;
+pub use self::vic_bus::VicBus;
 
 mod border_unit;
 mod gfx_sequencer;
@@ -12,4 +12,4 @@ mod spec;
 mod sprite_sequencer;
 #[allow(clippy::module_inception)]
 mod vic;
-mod vic_memory;
+mod vic_bus;

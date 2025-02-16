@@ -7,7 +7,6 @@ pub use self::c64::C64;
 pub use self::config::Config;
 pub use self::media::{Autostart, AutostartMethod, Media};
 pub use self::model::SystemModel;
-pub use self::shared::{Shared, SharedCell, new_shared, new_shared_cell};
 
 #[macro_use]
 extern crate log;
@@ -20,5 +19,4 @@ pub mod config;
 pub mod media;
 mod model;
 pub mod peripheral;
-mod shared;
 pub mod signal;

@@ -4,8 +4,6 @@
 
 use bit_field::BitField;
 
-use crate::shared::Shared;
-
 #[derive(Copy, Clone, Debug)]
 pub struct KeyEvent {
     keycode: Key,
@@ -42,26 +40,26 @@ impl KeyEvent {
 // SPEC: https://www.c64-wiki.com/index.php/Keyboard#Hardware
 
 pub struct Keyboard {
-    matrix: Shared<[u8; 16]>,
+    matrix: [u8; 16],
     queue: Vec<(KeyEvent, bool)>,
     disabled_shift: u8,
 }
 
 impl Keyboard {
-    pub fn new(matrix: Shared<[u8; 16]>) -> Self {
+    pub fn new() -> Self {
         Self {
-            matrix,
+            matrix: [0; 16],
             queue: Vec::new(),
             disabled_shift: 0,
         }
     }
 
     pub fn get_col(&self, col: u8) -> u8 {
-        self.matrix.borrow()[8 + col as usize]
+        self.matrix[8 + col as usize]
     }
 
     pub fn get_row(&self, row: u8) -> u8 {
-        self.matrix.borrow()[row as usize]
+        self.matrix[row as usize]
     }
 
     pub fn has_events(&self) -> bool {
@@ -71,10 +69,7 @@ impl Keyboard {
     // ---- reset ----
 
     pub fn reset(&mut self) {
-        let mut matrix = self.matrix.borrow_mut();
-        for i in 0..16 {
-            matrix[i] = 0xff;
-        }
+        self.matrix.fill(0xff);
         self.queue.clear();
     }
 
@@ -203,18 +198,18 @@ impl Keyboard {
 
     pub fn set_key(&mut self, keycode: Key, enabled: bool) {
         let mapping = self.map_keycode(keycode);
-        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
-        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
+        self.matrix[mapping.0].set_bit(mapping.1, !enabled);
+        self.matrix[8 + mapping.1].set_bit(mapping.0, !enabled);
     }
 
     pub fn set_matrix(&mut self, mapping: (usize, usize), enabled: bool) {
-        self.matrix.borrow_mut()[mapping.0].set_bit(mapping.1, !enabled);
-        self.matrix.borrow_mut()[8 + mapping.1].set_bit(mapping.0, !enabled);
+        self.matrix[mapping.0].set_bit(mapping.1, !enabled);
+        self.matrix[8 + mapping.1].set_bit(mapping.0, !enabled);
     }
 
     fn is_pressed(&self, keycode: Key) -> bool {
         let mapping = self.map_keycode(keycode);
-        !self.matrix.borrow()[mapping.0].get_bit(mapping.1)
+        !self.matrix[mapping.0].get_bit(mapping.1)
     }
 
     fn map_keycode(&self, keycode: Key) -> (usize, usize) {
@@ -292,6 +287,34 @@ impl Keyboard {
             Key::Q => (7, 6),
             Key::RunStop => (7, 7),
         }
+    }
+
+    // ---- port scan ----
+
+    pub fn scan_port_a(&self, port_b: u8) -> u8 {
+        let mut result = 0xff;
+        for col in 0..8_usize {
+            if !port_b.get_bit(col) {
+                result &= self.matrix[8 + col];
+            }
+        }
+        result
+    }
+
+    pub fn scan_port_b(&self, port_a: u8) -> u8 {
+        let mut result = 0xff;
+        for row in 0..8_usize {
+            if !port_a.get_bit(row) {
+                result &= self.matrix[row];
+            }
+        }
+        result
+    }
+}
+
+impl Default for Keyboard {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -371,12 +394,10 @@ pub enum Key {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shared::new_shared;
 
     #[test]
     fn enqueue_key_event() {
-        let matrix = new_shared([0; 16]);
-        let mut keyboard = Keyboard::new(matrix);
+        let mut keyboard = Keyboard::new();
         keyboard.reset();
         assert!(!keyboard.has_events());
         keyboard.enqueue("S");
@@ -385,8 +406,7 @@ mod tests {
 
     #[test]
     fn drain_key_event() {
-        let matrix = new_shared([0; 16]);
-        let mut keyboard = Keyboard::new(matrix);
+        let mut keyboard = Keyboard::new();
         keyboard.reset();
         keyboard.enqueue("S");
         assert!(keyboard.has_events());
@@ -397,8 +417,7 @@ mod tests {
 
     #[test]
     fn emulate_key_press() {
-        let matrix = new_shared([0; 16]);
-        let mut keyboard = Keyboard::new(matrix);
+        let mut keyboard = Keyboard::new();
         keyboard.reset();
         keyboard.enqueue("S");
         keyboard.drain_event();

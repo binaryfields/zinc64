@@ -7,9 +7,6 @@ use core::fmt;
 use log::LogLevel;
 
 use super::uops::{MicroOp, MicroOpPair, ProgramId, decode_opcode, load_program};
-use crate::chip::{Addressable, TickFn};
-use crate::shared::Shared;
-use crate::signal::{IoPort, IrqLine, Pin};
 
 pub enum Flag {
     Carry = 1,
@@ -54,8 +51,6 @@ impl Registers {
 }
 
 pub struct Cpu6510 {
-    // Dependencies
-    mem: Shared<dyn Addressable>,
     // Runtime State
     regs: Registers,
     opcode: u8,
@@ -66,24 +61,11 @@ pub struct Cpu6510 {
     data: u8,
     page_cross: bool,
     last_nmi: bool,
-    last_pc: u16,
-    // I/O
-    ba_line: Shared<Pin>,
-    io_port: Shared<IoPort>,
-    irq_line: Shared<IrqLine>,
-    nmi_line: Shared<IrqLine>,
 }
 
 impl Cpu6510 {
-    pub fn new(
-        mem: Shared<dyn Addressable>,
-        io_port: Shared<IoPort>,
-        ba_line: Shared<Pin>,
-        irq_line: Shared<IrqLine>,
-        nmi_line: Shared<IrqLine>,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
-            mem,
             regs: Registers::new(),
             opcode: 0,
             uops: load_program(ProgramId::Start),
@@ -93,11 +75,6 @@ impl Cpu6510 {
             data: 0,
             page_cross: false,
             last_nmi: false,
-            last_pc: 0,
-            ba_line,
-            io_port,
-            irq_line,
-            nmi_line,
         }
     }
 
@@ -109,57 +86,45 @@ impl Cpu6510 {
         self.data = 0;
         self.page_cross = false;
         self.last_nmi = false;
-        self.last_pc = 0;
-        self.io_port.borrow_mut().set_value(0xff);
-        self.irq_line.borrow_mut().reset();
-        self.nmi_line.borrow_mut().reset();
-        self.write(0x0000, 0b_0010_1111);
-        self.write(0x0001, 0b_0001_1111);
         self.opcode = 0;
         self.uops = load_program(ProgramId::Reset);
         self.cycle = 0;
     }
 
     // ---- clock ----
-    pub fn step(&mut self, tick_fn: &TickFn) {
-        self.last_pc = self.get_pc();
-        let mut is_done = false;
-        while !is_done {
-            self.clock();
-            tick_fn();
-            is_done = self.cycle == 1;
-        }
-    }
-
-    pub fn clock(&mut self) {
-        if self.ba_line.borrow().is_low() {
+    pub fn clock<B: Bus>(&mut self, bus: &mut B) {
+        if !bus.rdy() {
             return;
         }
         let pair = self.uops[self.cycle as usize];
-        self.execute(pair.0);
+        self.execute(pair.0, bus);
         if let Some(op1) = pair.1 {
-            self.execute(op1);
+            self.execute(op1, bus);
         }
         self.cycle += 1;
     }
 
-    fn execute(&mut self, op: MicroOp) {
+    pub fn is_opcode_fetched(&self) -> bool {
+        self.cycle == 1
+    }
+
+    fn execute<B: Bus>(&mut self, op: MicroOp, bus: &mut B) {
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::uop", "0x{:04x}: {:02x} #{} {:<18}; {}", self.regs.pc, self.opcode, self.cycle, format!("{:?}", op), &self);
         }
         match op {
-            MicroOp::FetchOpcode => self.load_next_program(),
-            MicroOp::FetchOpcodeDiscard => self.fetch_opcode_discard(),
-            MicroOp::FetchOperand => self.fetch_operand(),
-            MicroOp::FetchAdl => self.fetch_adl(),
-            MicroOp::FetchAdh => self.fetch_adh(),
+            MicroOp::FetchOpcode => self.load_next_program(bus),
+            MicroOp::FetchOpcodeDiscard => self.fetch_opcode_discard(bus),
+            MicroOp::FetchOperand => self.fetch_operand(bus),
+            MicroOp::FetchAdl => self.fetch_adl(bus),
+            MicroOp::FetchAdh => self.fetch_adh(bus),
             MicroOp::IncrementAdlX => self.increment_adl_x(),
             MicroOp::IncrementAdlY => self.increment_adl_y(),
-            MicroOp::IndirectFetchAdl => self.indirect_fetch_adl(),
-            MicroOp::IndirectFetchAdh => self.indirect_fetch_adh(),
-            MicroOp::ReadData => self.read_data(),
-            MicroOp::ReadDataOrFixAdh => self.read_data_or_fix_adh(),
-            MicroOp::WriteData => self.write_data(),
+            MicroOp::IndirectFetchAdl => self.indirect_fetch_adl(bus),
+            MicroOp::IndirectFetchAdh => self.indirect_fetch_adh(bus),
+            MicroOp::ReadData => self.read_data(bus),
+            MicroOp::ReadDataOrFixAdh => self.read_data_or_fix_adh(bus),
+            MicroOp::WriteData => self.write_data(bus),
             MicroOp::OpLDA => self.lda(),
             MicroOp::OpLDX => self.ldx(),
             MicroOp::OpLDY => self.ldy(),
@@ -172,10 +137,10 @@ impl Cpu6510 {
             MicroOp::OpTYA => self.tya(),
             MicroOp::OpTSX => self.tsx(),
             MicroOp::OpTXS => self.txs(),
-            MicroOp::OpPLA => self.pla(),
-            MicroOp::OpPLP => self.plp(),
-            MicroOp::OpPHA => self.pha(),
-            MicroOp::OpPHP => self.php(),
+            MicroOp::OpPLA => self.pla(bus),
+            MicroOp::OpPLP => self.plp(bus),
+            MicroOp::OpPHA => self.pha(bus),
+            MicroOp::OpPHP => self.php(bus),
             MicroOp::OpAND => self.and(),
             MicroOp::OpEOR => self.eor(),
             MicroOp::OpORA => self.ora(),
@@ -200,18 +165,18 @@ impl Cpu6510 {
             MicroOp::OpROR => self.ror(),
             MicroOp::OpRORImplied => self.ror_implied(),
             MicroOp::OpJMP => self.jmp(),
-            MicroOp::OpJSR => self.jsr(),
-            MicroOp::OpRTS => self.rts(),
-            MicroOp::OpBRK => self.brk(),
-            MicroOp::OpRTI => self.rti(),
-            MicroOp::OpBCC => self.branch(Flag::Carry, false),
-            MicroOp::OpBCS => self.branch(Flag::Carry, true),
-            MicroOp::OpBEQ => self.branch(Flag::Zero, true),
-            MicroOp::OpBNE => self.branch(Flag::Zero, false),
-            MicroOp::OpBMI => self.branch(Flag::Negative, true),
-            MicroOp::OpBPL => self.branch(Flag::Negative, false),
-            MicroOp::OpBVC => self.branch(Flag::Overflow, false),
-            MicroOp::OpBVS => self.branch(Flag::Overflow, true),
+            MicroOp::OpJSR => self.jsr(bus),
+            MicroOp::OpRTS => self.rts(bus),
+            MicroOp::OpBRK => self.brk(bus),
+            MicroOp::OpRTI => self.rti(bus),
+            MicroOp::OpBCC => self.branch(Flag::Carry, false, bus),
+            MicroOp::OpBCS => self.branch(Flag::Carry, true, bus),
+            MicroOp::OpBEQ => self.branch(Flag::Zero, true, bus),
+            MicroOp::OpBNE => self.branch(Flag::Zero, false, bus),
+            MicroOp::OpBMI => self.branch(Flag::Negative, true, bus),
+            MicroOp::OpBPL => self.branch(Flag::Negative, false, bus),
+            MicroOp::OpBVC => self.branch(Flag::Overflow, false, bus),
+            MicroOp::OpBVS => self.branch(Flag::Overflow, true, bus),
             MicroOp::OpCLC => self.clear_flag(Flag::Carry),
             MicroOp::OpCLD => self.clear_flag(Flag::Decimal),
             MicroOp::OpCLI => self.clear_flag(Flag::IntDisable),
@@ -226,9 +191,9 @@ impl Cpu6510 {
             MicroOp::OpAXS => self.axs(),
             MicroOp::OpLAX => self.lax(),
             MicroOp::OpLSE => self.lse(),
-            MicroOp::OpIRQ => self.irq(),
-            MicroOp::OpNMI => self.nmi(),
-            MicroOp::OpRST => self.rst(),
+            MicroOp::OpIRQ => self.irq(bus),
+            MicroOp::OpNMI => self.nmi(bus),
+            MicroOp::OpRST => self.rst(bus),
         }
     }
 
@@ -238,40 +203,40 @@ impl Cpu6510 {
     }
 
     // ---- fetch and addressing ----
-    fn load_next_program(&mut self) {
-        if self.nmi_line.borrow().is_low() {
+    fn load_next_program<B: Bus>(&mut self, bus: &mut B) {
+        if bus.nmi() {
             if log_enabled!(LogLevel::Trace) {
                 trace!(target: "cpu::int", "IRQ");
             }
             self.uops = load_program(ProgramId::Nmi);
-        } else if self.irq_line.borrow().is_low() && !self.test_flag(Flag::IntDisable) {
+        } else if bus.irq() && !self.test_flag(Flag::IntDisable) {
             if log_enabled!(LogLevel::Trace) {
                 trace!(target: "cpu::int", "NMI");
             }
             self.uops = load_program(ProgramId::Irq);
         } else {
-            self.fetch_opcode();
+            self.fetch_opcode(bus);
         }
         self.cycle = 0;
     }
 
-    fn fetch_opcode_discard(&mut self) {
-        let _ = self.read(self.regs.pc);
+    fn fetch_opcode_discard<B: Bus>(&mut self, bus: &mut B) {
+        let _ = bus.read(self.regs.pc);
     }
 
-    fn fetch_operand(&mut self) {
-        self.data = self.read(self.regs.pc);
+    fn fetch_operand<B: Bus>(&mut self, bus: &mut B) {
+        self.data = bus.read(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
-    fn fetch_adl(&mut self) {
+    fn fetch_adl<B: Bus>(&mut self, bus: &mut B) {
         self.address_hi = 0;
-        self.address_lo = self.read(self.regs.pc);
+        self.address_lo = bus.read(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
-    fn fetch_adh(&mut self) {
-        self.address_hi = self.read(self.regs.pc);
+    fn fetch_adh<B: Bus>(&mut self, bus: &mut B) {
+        self.address_hi = bus.read(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
     }
 
@@ -285,41 +250,41 @@ impl Cpu6510 {
         self.address_lo = self.address_lo.wrapping_add(self.regs.y);
     }
 
-    fn indirect_fetch_adl(&mut self) {
+    fn indirect_fetch_adl<B: Bus>(&mut self, bus: &mut B) {
         let address = make_address(self.address_hi, self.address_lo);
-        let adl = self.read(address);
+        let adl = bus.read(address);
         self.data = adl;
         self.address_lo = self.address_lo.wrapping_add(1);
     }
 
-    fn indirect_fetch_adh(&mut self) {
+    fn indirect_fetch_adh<B: Bus>(&mut self, bus: &mut B) {
         let address = make_address(self.address_hi, self.address_lo);
         self.address_lo = self.data;
-        self.address_hi = self.read(address);
+        self.address_hi = bus.read(address);
     }
 
-    fn read_data(&mut self) {
+    fn read_data<B: Bus>(&mut self, bus: &mut B) {
         let address = make_address(self.address_hi, self.address_lo);
-        self.data = self.read(address);
+        self.data = bus.read(address);
     }
 
-    fn read_data_or_fix_adh(&mut self) {
+    fn read_data_or_fix_adh<B: Bus>(&mut self, bus: &mut B) {
         if self.page_cross {
             self.address_hi = self.address_hi.wrapping_add(1);
         } else {
             let address = make_address(self.address_hi, self.address_lo);
-            self.data = self.read(address);
+            self.data = bus.read(address);
             self.cycle += 1;
         }
     }
 
-    fn write_data(&mut self) {
+    fn write_data<B: Bus>(&mut self, bus: &mut B) {
         let address = make_address(self.address_hi, self.address_lo);
-        self.write(address, self.data);
+        bus.write(address, self.data);
     }
 
-    fn fetch_opcode(&mut self) {
-        self.opcode = self.read(self.regs.pc);
+    fn fetch_opcode<B: Bus>(&mut self, bus: &mut B) {
+        self.opcode = bus.read(self.regs.pc);
         self.uops = decode_opcode(self.opcode);
         if log_enabled!(LogLevel::Trace) {
             trace!(target: "cpu::ins", "0x{:04x}: {:02x}; {}", self.regs.pc, self.opcode, &self);
@@ -395,14 +360,14 @@ impl Cpu6510 {
     }
 
     // ---- stack ----
-    fn pla(&mut self) {
+    fn pla<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let data = self.read(address);
+                let data = bus.read(address);
                 self.regs.a = data;
                 self.set_nz(data);
             }
@@ -410,33 +375,36 @@ impl Cpu6510 {
         }
     }
 
-    fn plp(&mut self) {
+    fn plp<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let data = self.read(address);
+                let data = bus.read(address);
                 self.regs.p = data;
             }
             _ => panic!("invalid cycle {}", self.cycle),
         }
     }
 
-    fn pha(&mut self) {
+    fn pha<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
-                self.write_stack(self.regs.a);
+                self.write_stack(self.regs.a, bus);
             }
             _ => panic!("invalid cycle {}", self.cycle),
         }
     }
 
-    fn php(&mut self) {
+    fn php<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
-                self.write_stack(self.regs.p | (Flag::Break as u8) | (Flag::Reserved as u8));
+                self.write_stack(
+                    self.regs.p | (Flag::Break as u8) | (Flag::Reserved as u8),
+                    bus,
+                );
             }
             _ => panic!("invalid cycle {}", self.cycle),
         }
@@ -670,19 +638,19 @@ impl Cpu6510 {
         self.regs.pc = make_address(self.address_hi, self.address_lo);
     }
 
-    fn jsr(&mut self) {
+    fn jsr<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
                 // SP -> Address Bus
             }
             3 => {
-                self.write_stack(hi_byte(self.regs.pc));
+                self.write_stack(hi_byte(self.regs.pc), bus);
             }
             4 => {
-                self.write_stack(lo_byte(self.regs.pc));
+                self.write_stack(lo_byte(self.regs.pc), bus);
             }
             5 => {
-                self.address_hi = self.read(self.regs.pc);
+                self.address_hi = bus.read(self.regs.pc);
                 // Do not increment pc
             }
             6 => {
@@ -692,20 +660,20 @@ impl Cpu6510 {
         }
     }
 
-    fn rts(&mut self) {
+    fn rts<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pcl = self.read(address);
+                let pcl = bus.read(address);
                 self.regs.pc = u16::from(pcl);
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             4 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pch = self.read(address);
+                let pch = bus.read(address);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
             }
             5 => {
@@ -715,23 +683,26 @@ impl Cpu6510 {
         }
     }
 
-    fn brk(&mut self) {
+    fn brk<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
-                self.write_stack(hi_byte(self.regs.pc));
+                self.write_stack(hi_byte(self.regs.pc), bus);
             }
             3 => {
-                self.write_stack(lo_byte(self.regs.pc));
+                self.write_stack(lo_byte(self.regs.pc), bus);
             }
             4 => {
-                self.write_stack(self.regs.p | (Flag::Break as u8) | (Flag::Reserved as u8));
+                self.write_stack(
+                    self.regs.p | (Flag::Break as u8) | (Flag::Reserved as u8),
+                    bus,
+                );
             }
             5 => {
-                let pcl = self.read(0xfffe);
+                let pcl = bus.read(0xfffe);
                 self.regs.pc = u16::from(pcl);
             }
             6 => {
-                let pch = self.read(0xffff);
+                let pch = bus.read(0xffff);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
                 self.set_flag(Flag::IntDisable);
             }
@@ -739,33 +710,33 @@ impl Cpu6510 {
         }
     }
 
-    fn rti(&mut self) {
+    fn rti<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             3 => {
                 let address = make_address(0x01, self.regs.sp);
-                let p = self.read(address);
+                let p = bus.read(address);
                 self.regs.sp = self.regs.sp.wrapping_add(1);
                 self.regs.p = p;
             }
             4 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pcl = self.read(address);
+                let pcl = bus.read(address);
                 self.regs.pc = u16::from(pcl);
                 self.regs.sp = self.regs.sp.wrapping_add(1);
             }
             5 => {
                 let address = make_address(0x01, self.regs.sp);
-                let pch = self.read(address);
+                let pch = bus.read(address);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
             }
             _ => panic!("invalid cycle {}", self.cycle),
         }
     }
 
-    fn branch(&mut self, flag: Flag, value: bool) {
+    fn branch<B: Bus>(&mut self, flag: Flag, value: bool, bus: &mut B) {
         match self.cycle {
             2 => {
                 let cond = self.test_flag(flag) == value;
@@ -778,7 +749,7 @@ impl Cpu6510 {
                     };
                     self.regs.pc = ea;
                 } else {
-                    self.load_next_program();
+                    self.load_next_program(bus);
                 }
             }
             _ => panic!("invalid cycle {}", self.cycle),
@@ -834,23 +805,23 @@ impl Cpu6510 {
     }
 
     // ---- interrupts ----
-    fn irq(&mut self) {
+    fn irq<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
-                self.write_stack(hi_byte(self.regs.pc));
+                self.write_stack(hi_byte(self.regs.pc), bus);
             }
             3 => {
-                self.write_stack(lo_byte(self.regs.pc));
+                self.write_stack(lo_byte(self.regs.pc), bus);
             }
             4 => {
-                self.write_stack(self.regs.p & 0xef);
+                self.write_stack(self.regs.p & 0xef, bus);
             }
             5 => {
-                let pcl = self.read(0xfffe);
+                let pcl = bus.read(0xfffe);
                 self.regs.pc = u16::from(pcl);
             }
             6 => {
-                let pch = self.read(0xffff);
+                let pch = bus.read(0xffff);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
                 self.set_flag(Flag::IntDisable);
             }
@@ -858,41 +829,41 @@ impl Cpu6510 {
         }
     }
 
-    fn nmi(&mut self) {
+    fn nmi<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {
-                self.write_stack(hi_byte(self.regs.pc));
+                self.write_stack(hi_byte(self.regs.pc), bus);
             }
             3 => {
-                self.write_stack(lo_byte(self.regs.pc));
+                self.write_stack(lo_byte(self.regs.pc), bus);
             }
             4 => {
-                self.write_stack(self.regs.p & 0xef);
+                self.write_stack(self.regs.p & 0xef, bus);
             }
             5 => {
-                let pcl = self.read(0xfffa);
+                let pcl = bus.read(0xfffa);
                 self.regs.pc = u16::from(pcl);
             }
             6 => {
-                let pch = self.read(0xfffb);
+                let pch = bus.read(0xfffb);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
                 self.set_flag(Flag::IntDisable);
-                self.nmi_line.borrow_mut().reset();
+                bus.ack_nmi();
             }
             _ => panic!("invalid cycle {}", self.cycle),
         }
     }
 
-    fn rst(&mut self) {
+    fn rst<B: Bus>(&mut self, bus: &mut B) {
         match self.cycle {
             2 => {}
             3 => {}
             4 => {
-                let pcl = self.read(0xfffc);
+                let pcl = bus.read(0xfffc);
                 self.regs.pc = u16::from(pcl);
             }
             5 => {
-                let pch = self.read(0xfffd);
+                let pch = bus.read(0xfffd);
                 self.regs.pc = make_address(pch, self.regs.pc as u8);
             }
             _ => panic!("invalid cycle {}", self.cycle),
@@ -951,36 +922,14 @@ impl Cpu6510 {
         self.cycle = 0;
     }
 
-    pub fn is_cpu_jam(&self) -> bool {
-        self.last_pc == self.get_pc()
-    }
-
-    // ---- memory ----
-    pub fn read(&self, address: u16) -> u8 {
-        match address {
-            0x0000 => self.io_port.borrow().get_direction(),
-            0x0001 => self.io_port.borrow().get_value() & 0x3f,
-            _ => self.mem.borrow().read(address),
-        }
-    }
-
-    pub fn write(&mut self, address: u16, value: u8) {
-        match address {
-            0x0000 => self.io_port.borrow_mut().set_direction(value),
-            0x0001 => self.io_port.borrow_mut().set_value(value),
-            _ => {}
-        }
-        self.mem.borrow_mut().write(address, value);
-    }
-
+    // ---- shared ----
     #[inline]
-    pub fn write_stack(&mut self, value: u8) {
+    fn write_stack<B: Bus>(&mut self, value: u8, bus: &mut B) {
         let address = make_address(0x01, self.regs.sp);
-        self.write(address, value);
+        bus.write(address, value);
         self.regs.sp = self.regs.sp.wrapping_sub(1);
     }
 
-    // ---- shared ----
     #[inline]
     fn set_flag(&mut self, flag: Flag) {
         self.regs.p |= flag as u8;
@@ -1053,6 +1002,21 @@ impl fmt::Display for Cpu6510 {
             }
         )
     }
+}
+
+impl Default for Cpu6510 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub trait Bus {
+    fn read(&mut self, address: u16) -> u8;
+    fn write(&mut self, address: u16, value: u8);
+    fn rdy(&self) -> bool;
+    fn irq(&self) -> bool;
+    fn nmi(&self) -> bool;
+    fn ack_nmi(&mut self);
 }
 
 #[derive(Copy, Clone)]

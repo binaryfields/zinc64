@@ -7,8 +7,6 @@
 use bit_field::BitField;
 
 use super::cycle_counter::CycleCounter;
-use crate::shared::Shared;
-use crate::signal::Pin;
 
 // SPEC: A Software Model of the CIA6526 by Wolfgang Lorenz
 
@@ -41,8 +39,6 @@ enum RunMode {
 }
 
 pub struct Timer {
-    // Dependencies
-    cnt_pin: Shared<Pin>,
     // Configuration
     mode: Mode,
     enabled: bool,
@@ -59,9 +55,8 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(mode: Mode, cnt_pin: Shared<Pin>) -> Self {
+    pub fn new(mode: Mode) -> Self {
         Self {
-            cnt_pin,
             mode,
             enabled: false,
             input_mode: InputMode::SystemClock,
@@ -109,7 +104,7 @@ impl Timer {
     }
 
     // ---- counting ----
-    pub fn feed_source(&mut self, timer_a_output: bool) {
+    pub fn feed_source(&mut self, timer_a_output: bool, cnt_rising: bool) {
         match self.input_mode {
             InputMode::SystemClock => {
                 // Already fed through by Count0 in self.feed
@@ -123,7 +118,7 @@ impl Timer {
                 is always 0, a single 1 is shifted through the pipeline until it reaches
                 CountA3, which will then decrement the counter.
                 */
-                if self.cnt_pin.borrow().is_rising() {
+                if cnt_rising {
                     self.delay.feed(Delay::Count0 as u16);
                 }
             }
@@ -133,7 +128,7 @@ impl Timer {
                 }
             }
             InputMode::TimerAWithCNT => {
-                if timer_a_output && self.cnt_pin.borrow().is_rising() {
+                if timer_a_output && cnt_rising {
                     self.delay.feed(Delay::Count0 as u16);
                 }
             }
@@ -312,12 +307,10 @@ enum Delay {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shared::new_shared;
 
     #[test]
     fn count_delay_2c() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
         timer.set_latch_hi(0x00);
@@ -334,8 +327,7 @@ mod tests {
 
     #[test]
     fn load_delay_1c() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
         timer.set_latch_hi(0x00);
@@ -347,8 +339,7 @@ mod tests {
 
     #[test]
     fn pb_output_pulse() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
         timer.set_latch_hi(0x00);
@@ -378,8 +369,7 @@ mod tests {
 
     #[test]
     fn reload_delay_0c() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
         timer.set_latch_hi(0x00);
@@ -397,8 +387,7 @@ mod tests {
 
     #[test]
     fn reload_count_delay_1c() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
         timer.set_latch_hi(0x00);
@@ -416,8 +405,7 @@ mod tests {
 
     #[test]
     fn reload_scenario() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0x00);
         timer.set_latch_lo(0x02);
         timer.set_latch_hi(0x00);
@@ -441,8 +429,7 @@ mod tests {
 
     #[test]
     fn set_config() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0b_0010_1001);
         assert!(timer.enabled);
         //assert_eq!(RunMode::OneShot, timer.run_mode);
@@ -451,8 +438,7 @@ mod tests {
 
     #[test]
     fn set_and_get_config() {
-        let cnt_pin = new_shared(Pin::new_high());
-        let mut timer = Timer::new(Mode::TimerA, cnt_pin);
+        let mut timer = Timer::new(Mode::TimerA);
         timer.set_config(0b_0010_1001);
         assert_eq!(0b_0010_1001, timer.get_config());
     }

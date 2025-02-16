@@ -17,8 +17,6 @@ pub struct Chip {
     pub data: Vec<u8>,
 }
 
-type IoObserver = Box<dyn Fn(&IoConfig)>;
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum HwType {
     Normal,
@@ -96,7 +94,6 @@ pub struct Cartridge {
     exrom: bool,
     game: bool,
     banks: [Option<Chip>; 64],
-    io_observer: Option<IoObserver>,
     is_mirrowed: bool,
     // Runtime state
     bank_lo: Option<usize>,
@@ -119,7 +116,6 @@ impl Cartridge {
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None, None, None, None, None, None, None, None,
             ],
-            io_observer: None,
             is_mirrowed: hw_type.is_mirrowed(),
             bank_lo: None,
             bank_hi: None,
@@ -128,8 +124,8 @@ impl Cartridge {
         }
     }
 
-    pub fn set_io_observer(&mut self, observer: Option<IoObserver>) {
-        self.io_observer = observer;
+    pub fn io_config(&self) -> &IoConfig {
+        &self.io_config
     }
 
     pub fn add(&mut self, chip: Chip) {
@@ -147,7 +143,6 @@ impl Cartridge {
         if !self.banks.is_empty() {
             self.switch_bank(0);
         }
-        self.notify_io_changed();
     }
 
     pub fn read(&mut self, address: u16) -> Option<u8> {
@@ -177,7 +172,7 @@ impl Cartridge {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) -> bool {
         match address {
             0xde00..=0xdfff => self.write_io(address, value),
             _ => panic!("writes to cartridge are not supported"),
@@ -193,8 +188,9 @@ impl Cartridge {
         self.reg_value
     }
 
-    fn write_io(&mut self, address: u16, value: u8) {
+    fn write_io(&mut self, address: u16, value: u8) -> bool {
         self.reg_value = value;
+        let mut io_changed = false;
         match self.hw_type {
             HwType::EasyFlash => {
                 if address == 0xde00 {
@@ -212,11 +208,11 @@ impl Cartridge {
                         self.switch_bank(value & 0x3f);
                         self.io_config.exrom = self.exrom;
                         self.io_config.game = self.game;
-                        self.notify_io_changed();
+                        io_changed = true;
                     } else {
                         self.io_config.exrom = true;
                         self.io_config.game = true;
-                        self.notify_io_changed();
+                        io_changed = true;
                     }
                 }
             }
@@ -236,10 +232,11 @@ impl Cartridge {
             }
             HwType::SimonsBasic if address == 0xde00 => {
                 self.io_config.game = value == 0x01;
-                self.notify_io_changed();
+                io_changed = true;
             }
             _ => {}
         }
+        io_changed
     }
 
     fn switch_bank(&mut self, bank_number: u8) {
@@ -268,12 +265,6 @@ impl Cartridge {
             }
         } else {
             panic!("invalid bank number {}", bank_number);
-        }
-    }
-
-    fn notify_io_changed(&self) {
-        if let Some(ref observer) = self.io_observer {
-            observer(&self.io_config);
         }
     }
 }

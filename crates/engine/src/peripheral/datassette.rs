@@ -5,7 +5,6 @@
 use bit_field::BitField;
 
 use super::Tape;
-use crate::shared::Shared;
 use crate::signal::{IoPort, Pin};
 
 // DEFERRED device: datassette test cases
@@ -54,9 +53,6 @@ impl Pulse {
 */
 
 pub struct Datassette {
-    // Dependencies
-    cia_flag_pin: Shared<Pin>,
-    cpu_io_port: Shared<IoPort>,
     // Runtime State
     playing: bool,
     tape: Option<Box<dyn Tape>>,
@@ -64,20 +60,16 @@ pub struct Datassette {
 }
 
 impl Datassette {
-    pub fn new(cia_flag_pin: Shared<Pin>, cpu_io_port: Shared<IoPort>) -> Self {
+    pub fn new() -> Self {
         Self {
-            cia_flag_pin,
-            cpu_io_port,
             playing: false,
             tape: None,
             current_pulse: Pulse::new(0, DUTY_CYCLE),
         }
     }
 
-    pub fn reset(&mut self) {
-        self.cpu_io_port
-            .borrow_mut()
-            .set_input_bit(ControlPort::CassetteSwitch.value(), true);
+    pub fn reset(&mut self, cpu_port: &mut IoPort) {
+        cpu_port.set_input_bit(ControlPort::CassetteSwitch.value(), true);
         self.playing = false;
         self.current_pulse = Pulse::new(0, DUTY_CYCLE);
         if let Some(ref mut tape) = self.tape {
@@ -85,8 +77,8 @@ impl Datassette {
         }
     }
 
-    pub fn clock(&mut self) {
-        if self.is_playing() && self.tape.is_some() {
+    pub fn clock(&mut self, cpu_port: &mut IoPort, flag: &mut Pin) {
+        if self.is_playing(cpu_port) && self.tape.is_some() {
             if self.current_pulse.is_done() {
                 let pulse_maybe = if let Some(ref mut tape) = self.tape {
                     tape.read_pulse()
@@ -96,13 +88,11 @@ impl Datassette {
                 if let Some(pulse) = pulse_maybe {
                     self.current_pulse = Pulse::new(pulse, DUTY_CYCLE);
                 } else {
-                    self.stop();
+                    self.stop(cpu_port);
                 }
             }
             if !self.current_pulse.is_done() {
-                self.cia_flag_pin
-                    .borrow_mut()
-                    .set_active(self.current_pulse.advance());
+                flag.set_active(self.current_pulse.advance());
             }
         }
     }
@@ -111,37 +101,37 @@ impl Datassette {
         self.tape = Some(tape);
     }
 
-    pub fn detach(&mut self) {
-        self.stop();
+    pub fn detach(&mut self, cpu_port: &mut IoPort) {
+        self.stop(cpu_port);
         self.tape = None;
     }
 
-    pub fn is_playing(&self) -> bool {
+    pub fn is_playing(&self, cpu_port: &IoPort) -> bool {
         // Cassette motor control (0=motor spins)
-        let motor_on = !self
-            .cpu_io_port
-            .borrow()
+        let motor_on = !cpu_port
             .get_value()
             .get_bit(ControlPort::CassetteMotor.value());
         self.playing & motor_on
     }
 
-    pub fn play(&mut self) {
+    pub fn play(&mut self, cpu_port: &mut IoPort) {
         info!(target: "device", "Starting datassette");
         if self.tape.is_some() {
-            self.cpu_io_port
-                .borrow_mut()
-                .set_input_bit(ControlPort::CassetteSwitch.value(), false);
+            cpu_port.set_input_bit(ControlPort::CassetteSwitch.value(), false);
             self.playing = true;
         }
     }
 
-    pub fn stop(&mut self) {
+    pub fn stop(&mut self, cpu_port: &mut IoPort) {
         info!(target: "device", "Stopping datassette");
-        self.cpu_io_port
-            .borrow_mut()
-            .set_input_bit(ControlPort::CassetteSwitch.value(), true);
+        cpu_port.set_input_bit(ControlPort::CassetteSwitch.value(), true);
         self.playing = false;
+    }
+}
+
+impl Default for Datassette {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
