@@ -268,3 +268,34 @@ impl Cartridge {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chip(bank_number: u8, offset: u16, fill: u8) -> Chip {
+        Chip {
+            chip_type: ChipType::FlashRom,
+            bank_number,
+            offset,
+            size: 0x2000,
+            data: vec![fill; 0x2000],
+        }
+    }
+
+    #[test]
+    fn magic_desk_write_selects_bank_and_bit_7_disables() {
+        let mut cartridge = Cartridge::new(0x0100, HwType::MagicDesk, false, true);
+        for bank in 0..4 {
+            cartridge.add(chip(bank, 0x8000, 0x40 + bank));
+        }
+        cartridge.reset();
+        let lines =
+            |cartridge: &Cartridge| (cartridge.io_config().exrom, cartridge.io_config().game);
+        assert!(cartridge.write(0xde00, 0x02));
+        assert_eq!(cartridge.read(0x8000), Some(0x42));
+        assert_eq!(lines(&cartridge), (false, true));
+        assert!(cartridge.write(0xde00, 0x80));
+        assert_eq!(lines(&cartridge), (true, true));
+    }
+}
