@@ -5,18 +5,17 @@
 use std::io::Write;
 use std::result::Result;
 
-use zinc64_engine::C64;
-
 use super::Handler;
+use crate::session::Session;
 
 pub struct ResetCommand<'a> {
-    c64: &'a mut C64,
+    session: &'a mut Session,
     hard: bool,
 }
 
 impl<'a> ResetCommand<'a> {
-    pub fn new(c64: &'a mut C64, hard: bool) -> Self {
-        Self { c64, hard }
+    pub fn new(session: &'a mut Session, hard: bool) -> Self {
+        Self { session, hard }
     }
 
     pub fn help() -> &'static str {
@@ -26,7 +25,7 @@ impl<'a> ResetCommand<'a> {
 
 impl<'a> Handler for ResetCommand<'a> {
     fn run(&mut self, out: &mut dyn Write) -> Result<(), String> {
-        self.c64.reset(self.hard);
+        self.session.reset(self.hard);
         out.write("Reset system.\n".as_bytes())
             .map_err(|err| format!("{}", err))?;
         Ok(())

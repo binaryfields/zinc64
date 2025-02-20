@@ -3,19 +3,16 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 #![allow(clippy::cast_lossless)]
 
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
 use std::result::Result;
 
 use glutin::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use glutin::window::Fullscreen;
-use zinc64_loader::Loaders;
 
-use crate::app::{AppState, JamAction, RuntimeState};
+use crate::app::AppState;
 use crate::audio::AudioRenderer;
 use crate::framework::Context;
 use crate::input::InputSystem;
+use crate::session::RunState;
 use crate::ui::console::ConsoleScreen;
 use crate::ui::{Screen, Transition};
 use crate::video::VideoRenderer;
@@ -26,7 +23,7 @@ pub struct MainScreen {
     input_system: InputSystem,
     video_renderer: VideoRenderer,
     // Runtime State
-    next_keyboard_event: u64,
+    audio_state: RunState,
 }
 
 impl MainScreen {
@@ -34,9 +31,9 @@ impl MainScreen {
         // Initialize audio
         let mut audio_device = AudioRenderer::build(
             //&audio_sys,
-            state.c64.get_config().sound.sample_rate as i32,
+            state.session.c64().get_config().sound.sample_rate as i32,
             1,
-            state.c64.get_config().sound.buffer_size as u16,
+            state.session.c64().get_config().sound.buffer_size as u16,
             state.sound_buffer.clone(),
         )
         .map_err(|err| format!("{}", err))?;
@@ -49,29 +46,8 @@ impl MainScreen {
             audio_device,
             input_system,
             video_renderer,
-            next_keyboard_event: 0,
+            audio_state: RunState::Running,
         })
-    }
-
-    // ---- runtime state ----
-
-    fn halt(&mut self, state: &mut AppState) -> Result<(), String> {
-        self.set_state(state, RuntimeState::Halted);
-        state.debug.halt()
-    }
-
-    fn toggle_pause(&mut self, state: &mut AppState) {
-        let emu_state = state.state;
-        match emu_state {
-            RuntimeState::Running => self.set_state(state, RuntimeState::Paused),
-            RuntimeState::Paused => self.set_state(state, RuntimeState::Running),
-            _ => (),
-        };
-    }
-
-    fn reset(&mut self, state: &mut AppState) {
-        state.c64.reset(false);
-        self.next_keyboard_event = 0;
     }
 
     // ---- hotkey toggles ----
@@ -84,7 +60,7 @@ impl MainScreen {
         let value = state.options.warp_mode;
         state.options.warp_mode = !value;
         let fps = if !state.options.warp_mode {
-            Some(state.c64.get_config().model.refresh_rate as f64)
+            Some(state.session.c64().get_config().model.refresh_rate as f64)
         } else {
             None
         };
@@ -106,74 +82,17 @@ impl MainScreen {
         }
     }
 
-    fn toggle_datassette_play(&mut self, state: &mut AppState) {
-        if !state.c64.is_tape_playing() {
-            state.c64.play_tape();
-        } else {
-            state.c64.stop_tape();
+    // ---- audio ----
+
+    fn follow_audio(&mut self, state: RunState) {
+        if self.audio_state == state {
+            return;
         }
-    }
-
-    // ---- image loading ----
-
-    fn load_image(&mut self, state: &mut AppState, path: &Path) -> Result<(), String> {
-        let ext = path.extension().map(|s| s.to_str().unwrap());
-        let loader = Loaders::from_ext(ext).map_err(|err| err.to_string())?;
-        let file = File::open(path).map_err(|err| err.to_string())?;
-        let mut reader = BufReader::new(file);
-        let autostart = loader
-            .autostart(&mut reader)
-            .map_err(|err| err.to_string())?;
-        autostart.execute(&mut state.c64);
-        Ok(())
-    }
-
-    // ---- frame processing ----
-
-    fn process_keyboard_events(&mut self, state: &mut AppState) {
-        if state.c64.get_keyboard().has_events()
-            && state.c64.get_cycles() >= self.next_keyboard_event
-        {
-            state.c64.get_keyboard().drain_event();
-            self.next_keyboard_event = state.c64.get_cycles().wrapping_add(20000);
+        match state {
+            RunState::Running => self.audio_device.play(),
+            RunState::Paused | RunState::Halted | RunState::Stopped => self.audio_device.pause(),
         }
-    }
-
-    #[allow(dead_code)]
-    fn process_cpu_jam(&mut self, state: &mut AppState) -> bool {
-        let jam_action = JamAction::Quit; // FIXME state.options.jam_action;
-        match jam_action {
-            JamAction::Continue => true,
-            JamAction::Quit => {
-                warn!("CPU JAM detected at 0x{:x}", state.c64.get_cpu().get_pc());
-                self.set_state(state, RuntimeState::Stopped);
-                false
-            }
-            JamAction::Reset => {
-                warn!("CPU JAM detected at 0x{:x}", state.c64.get_cpu().get_pc());
-                self.reset(state);
-                false
-            }
-        }
-    }
-
-    // ---- shared ----
-
-    fn set_state(&mut self, state: &mut AppState, new_state: RuntimeState) {
-        if state.state != new_state {
-            state.state = new_state;
-            self.update_audio_state(state);
-        }
-    }
-
-    fn update_audio_state(&mut self, state: &mut AppState) {
-        let emu_state = state.state;
-        match emu_state {
-            RuntimeState::Running => self.audio_device.play(),
-            RuntimeState::Paused => self.audio_device.pause(),
-            RuntimeState::Halted => self.audio_device.pause(),
-            RuntimeState::Stopped => self.audio_device.pause(),
-        }
+        self.audio_state = state;
     }
 }
 
@@ -209,7 +128,7 @@ impl Screen<AppState> for MainScreen {
                         Ok(Transition::Push(Box::new(screen)))
                     }
                     (VirtualKeyCode::H, ElementState::Pressed) if modifiers.alt() => {
-                        self.halt(app_state)?;
+                        app_state.session.halt()?;
                         Ok(Transition::None)
                     }
                     (VirtualKeyCode::M, ElementState::Pressed) if modifiers.alt() => {
@@ -217,11 +136,11 @@ impl Screen<AppState> for MainScreen {
                         Ok(Transition::None)
                     }
                     (VirtualKeyCode::P, ElementState::Pressed) if modifiers.alt() => {
-                        self.toggle_pause(app_state);
+                        app_state.session.toggle_pause();
                         Ok(Transition::None)
                     }
                     (VirtualKeyCode::Q, ElementState::Pressed) if modifiers.alt() => {
-                        self.set_state(app_state, RuntimeState::Stopped);
+                        app_state.session.quit();
                         Ok(Transition::None)
                     }
                     (VirtualKeyCode::W, ElementState::Pressed) if modifiers.alt() => {
@@ -233,22 +152,18 @@ impl Screen<AppState> for MainScreen {
                         Ok(Transition::None)
                     }
                     (VirtualKeyCode::F1, ElementState::Pressed) if modifiers.ctrl() => {
-                        self.toggle_datassette_play(app_state);
+                        app_state.session.toggle_tape();
                         Ok(Transition::None)
                     }
                     (VirtualKeyCode::F9, ElementState::Pressed) if modifiers.ctrl() => {
-                        self.reset(app_state);
+                        app_state.session.reset(false);
                         Ok(Transition::None)
                     }
                     _ => Ok(Transition::None),
                 },
                 WindowEvent::DroppedFile(path) => {
-                    // info!("Dropped file {}", path);
-                    match self.load_image(app_state, path) {
-                        Ok(_) => (),
-                        Err(err) => {
-                            error!("Failed to load image, error: {}", err);
-                        }
+                    if let Err(err) = app_state.session.open_image(path) {
+                        error!("Failed to load image, error: {}", err);
                     }
                     Ok(Transition::None)
                 }
@@ -256,7 +171,8 @@ impl Screen<AppState> for MainScreen {
             },
             _ => Ok(Transition::None),
         };
-        self.input_system.handle_event(&mut app_state.c64, &event);
+        self.input_system
+            .handle_event(app_state.session.c64_mut(), &event);
         transition
     }
 
@@ -265,30 +181,11 @@ impl Screen<AppState> for MainScreen {
         _ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
-        self.process_keyboard_events(state);
-        loop {
-            let debugging = state.state == RuntimeState::Halted;
-            let command_maybe = state.debug.poll(debugging);
-            if let Some(command) = command_maybe {
-                let result = state.debug.execute(&mut state.c64, &command);
-                if let Ok(Some(directive)) = result {
-                    self.set_state(state, directive.into())
-                }
-            } else {
-                break;
-            }
-        }
-        match state.state {
-            RuntimeState::Running => {
-                let vsync = state.c64.run_frame();
-                if !vsync {
-                    self.halt(state)?;
-                }
-                Ok(Transition::None)
-            }
-            RuntimeState::Paused => Ok(Transition::None),
-            RuntimeState::Halted => Ok(Transition::None),
-            RuntimeState::Stopped => Ok(Transition::Pop),
+        state.session.update()?;
+        self.follow_audio(state.session.state());
+        match state.session.state() {
+            RunState::Stopped => Ok(Transition::Pop),
+            _ => Ok(Transition::None),
         }
     }
 
@@ -297,9 +194,10 @@ impl Screen<AppState> for MainScreen {
         ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
-        if state.c64.get_vsync() {
-            self.video_renderer.render(ctx, state.c64.frame())?;
-            state.c64.reset_vsync();
+        if state.session.c64().get_vsync() {
+            self.video_renderer
+                .render(ctx, state.session.c64().frame())?;
+            state.session.c64_mut().reset_vsync();
             ctx.platform
                 .windowed_context
                 .swap_buffers()

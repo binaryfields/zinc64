@@ -4,54 +4,30 @@
 
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{Arc, mpsc};
-use std::thread;
+use std::sync::Arc;
 
 use glutin::event::Event;
-use zinc64_debug::{Command, Directive, Executor, MonitorServer};
-use zinc64_engine::C64;
 use zinc64_engine::peripheral::joystick;
 
 use crate::audio::SoundBuffer;
 use crate::console::Console;
 use crate::framework::gfx::Font;
 use crate::framework::{Context, State};
+use crate::session::Session;
 use crate::ui::{MainScreen, Screen, Transition};
 
 const CONSOLE_BUFFER: usize = 2048;
 
 pub struct AppState {
-    pub state: RuntimeState,
-    pub c64: C64,
+    pub session: Session,
     pub console: Console,
     pub console_history: Vec<String>,
-    pub debug: Executor,
     pub options: Options,
     pub sound_buffer: Arc<SoundBuffer>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum RuntimeState {
-    Running,
-    Paused,
-    Halted,
-    Stopped,
-}
-
-impl From<Directive> for RuntimeState {
-    fn from(directive: Directive) -> Self {
-        match directive {
-            Directive::Halt => RuntimeState::Halted,
-            Directive::Resume => RuntimeState::Running,
-            Directive::Quit => RuntimeState::Stopped,
-        }
-    }
-}
-
 pub struct Options {
     // Emulator
-    #[allow(dead_code)]
-    pub jam_action: JamAction,
     #[allow(dead_code)]
     pub speed: u8,
     pub warp_mode: bool,
@@ -67,13 +43,6 @@ pub struct Options {
     pub rap_address: SocketAddr,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum JamAction {
-    Continue,
-    Quit,
-    Reset,
-}
-
 pub struct App {
     state: AppState,
     screens: Vec<Box<dyn Screen<AppState>>>,
@@ -82,14 +51,14 @@ pub struct App {
 impl App {
     pub fn build(
         ctx: &mut Context,
-        c64: C64,
+        session: Session,
         sound_buffer: Arc<SoundBuffer>,
         options: Options,
     ) -> Result<App, String> {
         let window_size = ctx.platform.windowed_context.window().inner_size();
         // Initialize fps
         let fps = if !options.warp_mode {
-            Some(c64.get_config().model.refresh_rate as f64)
+            Some(session.c64().get_config().model.refresh_rate as f64)
         } else {
             None
         };
@@ -101,24 +70,11 @@ impl App {
         let mut console = Console::new(cols, rows, CONSOLE_BUFFER);
         console.print("Type ? for the list of available commands\n".as_bytes());
         console.save_pos();
-        // Initialize debuggers
-        let (debug_tx, debug_rx) = mpsc::channel::<Command>();
-        if options.debug {
-            let address = options.dbg_address;
-            info!("Starting debugger at {}", address);
-            let debug_tx_clone = debug_tx.clone();
-            thread::spawn(move || {
-                let debugger = MonitorServer::new(debug_tx_clone);
-                debugger.start(address).expect("Failed to start debugger");
-            });
-        }
         // Initialize state
         let mut state = AppState {
-            state: RuntimeState::Running,
-            c64,
+            session,
             console,
             console_history: Vec::new(),
-            debug: Executor::new(debug_rx),
             options,
             sound_buffer,
         };

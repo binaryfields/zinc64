@@ -54,9 +54,10 @@ pub struct VideoRenderer {
 
 impl VideoRenderer {
     pub fn build(ctx: &mut Context, state: &mut AppState) -> Result<VideoRenderer, String> {
-        let screen_size = state.c64.get_config().model.frame_buffer_size;
-        let viewport_offset = state.c64.get_config().model.viewport_offset;
-        let viewport_size = state.c64.get_config().model.viewport_size;
+        let model = &state.session.c64().get_config().model;
+        let screen_size = model.frame_buffer_size;
+        let viewport_offset = model.viewport_offset;
+        let viewport_size = model.viewport_size;
         let video_buffer = VideoBuffer::new(screen_size.0, screen_size.1, Palette::default());
         let viewport = Rect::new(
             vec2(viewport_offset.0 as f32, viewport_offset.1 as f32),
