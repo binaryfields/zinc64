@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::result::Result;
 
-use zinc64_engine::C64;
+use crate::session::Session;
 
 use self::help::HelpCommand;
 use self::load::LoadCommand;
@@ -30,12 +30,17 @@ impl Executor {
         }
     }
 
-    pub fn execute(&self, input: &str, c64: &mut C64, out: &mut dyn Write) -> Result<(), String> {
+    pub fn execute(
+        &self,
+        input: &str,
+        session: &mut Session,
+        out: &mut dyn Write,
+    ) -> Result<(), String> {
         let command = self.parser.parse(input)?;
         let mut handler: Box<dyn Handler> = match command {
-            Cmd::Load(path) => Box::new(LoadCommand::new(c64, path)),
+            Cmd::Load(path) => Box::new(LoadCommand::new(session, path)),
             Cmd::Ls(path) => Box::new(LsCommand::new(path)),
-            Cmd::Reset(hard) => Box::new(ResetCommand::new(c64, hard)),
+            Cmd::Reset(hard) => Box::new(ResetCommand::new(session, hard)),
             Cmd::Help(command) => Box::new(HelpCommand::new(command)),
         };
         handler.run(out)

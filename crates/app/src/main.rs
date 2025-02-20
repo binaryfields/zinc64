@@ -2,20 +2,19 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
 use std::process;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
+use std::thread;
 
 use structopt::StructOpt;
+use zinc64_debug::{Command, Executor, MonitorServer};
 use zinc64_engine::C64;
-use zinc64_loader::Loaders;
 
-use crate::app::App;
+use crate::app::{App, Options};
 use crate::audio::SoundBuffer;
 use crate::cli::Opt;
 use crate::logger::Logger;
+use crate::session::{JamAction, Session};
 
 #[macro_use]
 extern crate log;
@@ -26,8 +25,10 @@ mod circular_buffer;
 mod cli;
 mod console;
 mod framework;
+mod headless;
 mod input;
 mod logger;
+mod session;
 mod ui;
 mod video;
 
@@ -53,44 +54,42 @@ fn run(opt: &Opt) -> Result<(), String> {
     let mut c64 = C64::new(config, sound_buffer.clone());
     cli::set_c64_options(&mut c64, opt)?;
     c64.reset(true);
+    let app_options = cli::build_app_options(opt)?;
+    // Nobody watches a console run, so a jam ends it unless asked otherwise.
+    let jam_action = opt.jam_action.unwrap_or(if opt.console {
+        JamAction::Quit
+    } else {
+        JamAction::Continue
+    });
+    let mut session = Session::new(c64, start_debugger(&app_options), jam_action);
     if let Some(image_path) = &opt.image {
-        load_image(&mut c64, Path::new(image_path))?;
+        session.open_image(image_path)?;
     }
     if opt.console {
-        run_console(&mut c64);
+        headless::run(&mut session)?;
     } else {
-        let app_options = cli::build_app_options(opt)?;
         let fx_options = framework::Options {
             title: NAME.to_owned(),
             window_size: (opt.width, opt.height),
             fullscreen: opt.fullscreen,
         };
         framework::run(fx_options, |ctx| {
-            App::build(ctx, c64, sound_buffer.clone(), app_options)
+            App::build(ctx, session, sound_buffer, app_options)
         })?;
     }
     Ok(())
 }
 
-fn load_image(c64: &mut C64, path: &Path) -> Result<(), String> {
-    let ext = path.extension().map(|s| s.to_str().unwrap());
-    let loader = Loaders::from_ext(ext).map_err(|err| err.to_string())?;
-    let file = File::open(path).map_err(|err| err.to_string())?;
-    let mut reader = BufReader::new(file);
-    let autostart = loader
-        .autostart(&mut reader)
-        .map_err(|err| err.to_string())?;
-    autostart.execute(c64);
-    Ok(())
-}
-
-fn run_console(c64: &mut C64) {
-    loop {
-        c64.run_frame();
-        c64.reset_vsync();
-        if c64.is_cpu_jam() {
-            warn!(target: "main", "CPU JAM detected at 0x{:x}", c64.get_cpu().get_pc());
-            break;
-        }
+fn start_debugger(options: &Options) -> Executor {
+    let (command_tx, command_rx) = mpsc::channel::<Command>();
+    if options.debug {
+        let address = options.dbg_address;
+        info!("Starting debugger at {}", address);
+        let command_tx = command_tx.clone();
+        thread::spawn(move || {
+            let debugger = MonitorServer::new(command_tx);
+            debugger.start(address).expect("Failed to start debugger");
+        });
     }
+    Executor::new(command_rx)
 }

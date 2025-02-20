@@ -240,7 +240,7 @@ impl Screen<AppState> for ConsoleScreen {
                             app_state.console.restore_pos();
                             match self.cmd_handler.execute(
                                 &input,
-                                &mut app_state.c64,
+                                &mut app_state.session,
                                 &mut app_state.console,
                             ) {
                                 Ok(_) => {}

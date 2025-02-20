@@ -13,7 +13,8 @@ use zinc64_engine::SystemModel;
 use zinc64_engine::peripheral::joystick;
 use zinc64_engine::{C64, Config};
 
-use crate::app::{self, JamAction};
+use crate::app;
+use crate::session::JamAction;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "zinc64")]
@@ -34,14 +35,14 @@ pub struct Opt {
     /// enable wrap mode
     #[structopt(long = "warp")]
     pub warp_mode: bool,
-    /// set cpu jam handling
+    /// set cpu jam handling: continue, quit or reset (default: quit in
+    /// console mode, continue otherwise)
     #[structopt(
         long = "jamaction",
-        default_value = "continue",
         parse(try_from_str = parse_jam_action),
         group = "debug"
     )]
-    pub jam_action: JamAction,
+    pub jam_action: Option<JamAction>,
 
     // -- Ui
     /// window width
@@ -227,7 +228,6 @@ fn set_c64_debug_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
 
 pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
     Ok(app::Options {
-        jam_action: opt.jam_action,
         speed: opt.speed.unwrap_or(100),
         warp_mode: opt.warp_mode,
         joydev_1: opt.joydev_1,
