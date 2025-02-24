@@ -12,11 +12,3 @@ mod ram;
 mod rom;
 pub mod sid;
 pub mod vic;
-
-/// Sound output used by SID chip.
-pub trait SoundOutput {
-    /// Reset output.
-    fn reset(&self);
-    /// Write generated sample to the output buffer.
-    fn write(&self, samples: &[i16]);
-}

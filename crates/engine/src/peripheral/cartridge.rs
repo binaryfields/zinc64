@@ -147,6 +147,13 @@ impl Cartridge {
 
     pub fn read(&mut self, address: u16) -> Option<u8> {
         match address {
+            0xde00..=0xdfff => Some(self.read_io(address)),
+            _ => self.peek(address),
+        }
+    }
+
+    pub fn peek(&self, address: u16) -> Option<u8> {
+        match address {
             0x8000..=0x9fff => {
                 if let Some(bank_num) = self.bank_lo {
                     let bank = self.banks[bank_num].as_ref().unwrap();
@@ -167,7 +174,7 @@ impl Cartridge {
                     None
                 }
             }
-            0xde00..=0xdfff => Some(self.read_io(address)),
+            0xde00..=0xdfff => Some(self.reg_value),
             _ => panic!("invalid address {:04x}", address),
         }
     }
@@ -293,7 +300,7 @@ mod tests {
         let lines =
             |cartridge: &Cartridge| (cartridge.io_config().exrom, cartridge.io_config().game);
         assert!(cartridge.write(0xde00, 0x02));
-        assert_eq!(cartridge.read(0x8000), Some(0x42));
+        assert_eq!(cartridge.peek(0x8000), Some(0x42));
         assert_eq!(lines(&cartridge), (false, true));
         assert!(cartridge.write(0xde00, 0x80));
         assert_eq!(lines(&cartridge), (true, true));

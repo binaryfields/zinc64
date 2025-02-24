@@ -166,7 +166,30 @@ impl Cia {
 
     // ---- registers ----
     pub fn read(&mut self, reg: u8, input: PortInput, pins: &mut CiaPins) -> u8 {
-        let value = match reg {
+        let value = self.peek(reg, input);
+        match reg {
+            reg::TODTS => self.tod_clock.set_enabled(true),
+            reg::ICR => {
+                /*
+                In a multi-chip system, the IR bit can be polled to detect which chip has generated
+                an interrupt request. The interrupt DATA register
+                is cleared and the IRQ line returns high following a
+                read of the DATA register.
+                */
+                self.irq_control.clear();
+                self.irq_delay.reset();
+                pins.irq.set_low(self.mode.irq_source(), false);
+            }
+            _ => {}
+        }
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "cia::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
+        }
+        value
+    }
+
+    pub fn peek(&self, reg: u8, input: PortInput) -> u8 {
+        match reg {
             reg::PRA => self.port_a.get_value_2(input.a),
             reg::PRB => self.read_port_b(input.b),
             reg::DDRA => self.port_a.get_direction(),
@@ -175,10 +198,7 @@ impl Cia {
             reg::TAHI => self.timer_a.get_counter_hi(),
             reg::TBLO => self.timer_b.get_counter_lo(),
             reg::TBHI => self.timer_b.get_counter_hi(),
-            reg::TODTS => {
-                self.tod_clock.set_enabled(true);
-                to_bcd(self.tod_clock.get_tenth())
-            }
+            reg::TODTS => to_bcd(self.tod_clock.get_tenth()),
             reg::TODSEC => to_bcd(self.tod_clock.get_seconds()),
             reg::TODMIN => to_bcd(self.tod_clock.get_minutes()),
             reg::TODHR => {
@@ -187,19 +207,7 @@ impl Cia {
                 result
             }
             reg::SDR => 0,
-            reg::ICR => {
-                /*
-                In a multi-chip system, the IR bit can be polled to detect which chip has generated
-                an interrupt request. The interrupt DATA register
-                is cleared and the IRQ line returns high following a
-                read of the DATA register.
-                */
-                let data = self.irq_control.get_data();
-                self.irq_control.clear();
-                self.irq_delay.reset();
-                pins.irq.set_low(self.mode.irq_source(), false);
-                data
-            }
+            reg::ICR => self.irq_control.get_data(),
             reg::CRA => self.timer_a.get_config(),
             reg::CRB => {
                 let mut config = self.timer_b.get_config();
@@ -207,11 +215,7 @@ impl Cia {
                 config
             }
             _ => panic!("invalid reg {}", reg),
-        };
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "cia::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
         }
-        value
     }
 
     fn read_port_b(&self, input: u8) -> u8 {

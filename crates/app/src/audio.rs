@@ -9,7 +9,6 @@ use std::thread;
 
 use cpal::SampleFormat;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use zinc64_engine::chip::SoundOutput;
 
 use crate::circular_buffer::CircularBuffer;
 
@@ -40,15 +39,8 @@ impl SoundBuffer {
             buffer: Mutex::new(CircularBuffer::new(length)),
         }
     }
-}
 
-impl SoundOutput for SoundBuffer {
-    fn reset(&self) {
-        let mut output = self.buffer.lock().unwrap();
-        output.reset();
-    }
-
-    fn write(&self, samples: &[i16]) {
+    pub fn push(&self, samples: &[i16]) {
         let mut output = self.buffer.lock().unwrap();
         for sample in samples {
             output.push(*sample);

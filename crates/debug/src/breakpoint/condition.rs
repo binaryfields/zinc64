@@ -8,7 +8,7 @@ use core::fmt;
 use core::iter::Peekable;
 use core::str::Chars;
 
-use crate::chip::{Cpu6510, Register};
+use zinc64_engine::chip::{Cpu6510, Register};
 
 enum Operator {
     Equal,

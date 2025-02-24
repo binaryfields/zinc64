@@ -4,7 +4,7 @@
 
 use core::slice::Iter;
 
-use crate::chip::Cpu6510;
+use zinc64_engine::chip::Cpu6510;
 
 pub use self::condition::Condition;
 

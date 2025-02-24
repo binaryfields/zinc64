@@ -4,14 +4,10 @@
 
 use std::fs;
 use std::hash::{DefaultHasher, Hasher};
-use std::sync::{Arc, Mutex};
 
-use zinc64_engine::chip::SoundOutput;
 use zinc64_engine::media::{Autostart, AutostartMethod, Media, Mode};
-use zinc64_engine::peripheral::joystick::{self, Button};
+use zinc64_engine::peripheral::joystick::Button;
 use zinc64_engine::{C64, Config, SystemModel};
-
-const KEY_EVENT_CYCLES: u64 = 20_000;
 
 const ALL_CHIPS_PRG: &[u8] = &[
     0x0b, 0x08, 0x0a, 0x00, 0x9e, 0x32, 0x30, 0x36, 0x34, 0x00, 0x00, 0x00, // 10 SYS2064
@@ -50,49 +46,27 @@ const ALL_CHIPS_PRG: &[u8] = &[
     0x4c, 0x31, 0xea, // jmp $ea31
 ];
 
-#[derive(Default)]
-struct SampleHash {
-    hasher: Mutex<DefaultHasher>,
-}
-
-impl SoundOutput for SampleHash {
-    fn reset(&self) {}
-
-    fn write(&self, samples: &[i16]) {
-        let mut hasher = self.hasher.lock().unwrap();
-        for sample in samples {
-            hasher.write_i16(*sample);
-        }
-    }
-}
-
 struct Replay {
     c64: C64,
-    sample_hash: Arc<SampleHash>,
-    next_key_event: u64,
+    sample_hash: DefaultHasher,
 }
 
 impl Replay {
     fn new(config: Config) -> Self {
-        let sample_hash = Arc::new(SampleHash::default());
-        let mut c64 = C64::new(config, sample_hash.clone());
+        let mut c64 = C64::new(config);
         c64.reset(true);
         Self {
             c64,
-            sample_hash,
-            next_key_event: 0,
+            sample_hash: DefaultHasher::new(),
         }
     }
 
     fn run(&mut self, frames: u32) {
         for _ in 0..frames {
-            if self.c64.get_keyboard().has_events() && self.c64.get_cycles() >= self.next_key_event
-            {
-                self.c64.get_keyboard().drain_event();
-                self.next_key_event = self.c64.get_cycles().wrapping_add(KEY_EVENT_CYCLES);
-            }
             self.c64.run_frame();
-            self.c64.reset_vsync();
+            for sample in self.c64.samples() {
+                self.sample_hash.write_i16(*sample);
+            }
         }
     }
 
@@ -105,7 +79,7 @@ impl Replay {
             hasher.write_u8(self.c64.read(address));
         }
         hasher.write(self.c64.frame());
-        hasher.write_u64(self.sample_hash.hasher.lock().unwrap().finish());
+        hasher.write_u64(self.sample_hash.finish());
         hasher.write_u16(self.c64.get_cpu().get_pc());
         hasher.finish()
     }
@@ -143,14 +117,12 @@ fn music_irq_plays() {
 
 #[test]
 fn all_chips_program_drives_every_chip() {
-    let mut config = config();
-    config.joystick.joystick_2 = joystick::Mode::Numpad;
-    let mut replay = Replay::new(config);
+    let mut replay = Replay::new(config());
     autostart(&mut replay.c64, ALL_CHIPS_PRG, 0x0801);
     replay.run(150);
-    let joystick = replay.c64.get_joystick2_mut().as_mut().unwrap();
-    joystick.on_key_down(Button::Up);
-    joystick.on_key_down(Button::Fire);
+    let joystick = replay.c64.get_joystick2_mut();
+    joystick.press(Button::Up);
+    joystick.press(Button::Fire);
     replay.run(150);
     assert_eq!(replay.state_hash(), 0xad7bcc50769d486a);
 }

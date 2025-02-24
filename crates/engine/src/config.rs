@@ -3,23 +3,6 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use crate::model::SystemModel;
-use crate::peripheral::joystick;
-
-pub struct JoystickConfig {
-    pub axis_motion_threshold: i16,
-    pub joystick_1: joystick::Mode,
-    pub joystick_2: joystick::Mode,
-}
-
-impl Default for JoystickConfig {
-    fn default() -> JoystickConfig {
-        JoystickConfig {
-            axis_motion_threshold: 3200,
-            joystick_1: joystick::Mode::Numpad,
-            joystick_2: joystick::Mode::None,
-        }
-    }
-}
 
 pub struct RomData {
     pub basic: Vec<u8>,
@@ -48,8 +31,6 @@ impl Default for RomData {
 }
 
 pub struct SoundConfig {
-    pub enable: bool,
-    pub buffer_size: usize,
     pub sample_rate: u32,
     pub sid_filters: bool,
 }
@@ -57,8 +38,6 @@ pub struct SoundConfig {
 impl Default for SoundConfig {
     fn default() -> SoundConfig {
         SoundConfig {
-            enable: true,
-            buffer_size: 4096,
             sample_rate: 44100,
             sid_filters: true,
         }
@@ -67,7 +46,6 @@ impl Default for SoundConfig {
 
 pub struct Config {
     pub model: SystemModel,
-    pub joystick: JoystickConfig,
     pub sound: SoundConfig,
     pub roms: RomData,
 }
@@ -76,7 +54,6 @@ impl Config {
     pub fn new(model: SystemModel) -> Config {
         Config {
             model,
-            joystick: JoystickConfig::default(),
             sound: SoundConfig::default(),
             roms: RomData::default(),
         }
@@ -90,7 +67,6 @@ impl Config {
     ) -> Config {
         Config {
             model,
-            joystick: JoystickConfig::default(),
             sound: SoundConfig::default(),
             roms: RomData::new(basic, charset, kernal),
         }

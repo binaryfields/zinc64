@@ -7,7 +7,6 @@ use crate::session::{RunState, Session};
 pub fn run(session: &mut Session) -> Result<(), String> {
     while session.state() != RunState::Stopped {
         session.update()?;
-        session.c64_mut().reset_vsync();
     }
     Ok(())
 }

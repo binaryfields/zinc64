@@ -2,17 +2,16 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::sync::Arc;
-
 use super::{Bank, BaseAddr, ExpansionPort, Pla};
 use crate::chip::cia::{self, Cia, CiaPins, PortInput};
 use crate::chip::sid::{SamplingMethod, Sid};
 use crate::chip::vic::{Vic, VicBus};
-use crate::chip::{Bus, Ram, Rom, SoundOutput};
+use crate::chip::{Bus, Ram, Rom};
 use crate::config::Config;
-use crate::peripheral::joystick;
 use crate::peripheral::{Cartridge, Datassette, Joystick, Keyboard, Tape};
 use crate::signal::{IoPort, IrqLine, Pin};
+
+const CIA_2_INPUT: PortInput = PortInput { a: 0xff, b: 0xff };
 
 // Spec: COMMODORE 64 MEMORY MAPS p. 263
 // Design:
@@ -45,8 +44,8 @@ pub struct Board {
     vic: Vic,
     // Peripherals
     datassette: Datassette,
-    joystick_1: Option<Joystick>,
-    joystick_2: Option<Joystick>,
+    joystick_1: Joystick,
+    joystick_2: Joystick,
     keyboard: Keyboard,
     // I/O
     lines: Lines,
@@ -56,7 +55,7 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new(config: &Config, sound_buffer: Arc<dyn SoundOutput>) -> Self {
+    pub fn new(config: &Config) -> Self {
         // I/O Lines
         let cpu_port = IoPort::new(0x00, 0xff);
         let lines = Lines {
@@ -79,7 +78,7 @@ impl Board {
         // Chipset
         let cia_1 = Cia::new(cia::Mode::Cia1);
         let cia_2 = Cia::new(cia::Mode::Cia2);
-        let mut sid = Sid::new(config.model.sid_model, sound_buffer);
+        let mut sid = Sid::new(config.model.sid_model);
         sid.set_sampling_parameters(
             SamplingMethod::Fast,
             config.model.cpu_freq,
@@ -90,22 +89,6 @@ impl Board {
 
         // Peripherals
         let datassette = Datassette::new();
-        let joystick_1 = if config.joystick.joystick_1 != joystick::Mode::None {
-            Some(Joystick::new(
-                config.joystick.joystick_1,
-                config.joystick.axis_motion_threshold,
-            ))
-        } else {
-            None
-        };
-        let joystick_2 = if config.joystick.joystick_2 != joystick::Mode::None {
-            Some(Joystick::new(
-                config.joystick.joystick_2,
-                config.joystick.axis_motion_threshold,
-            ))
-        } else {
-            None
-        };
         let keyboard = Keyboard::new();
 
         Self {
@@ -122,8 +105,8 @@ impl Board {
             sid,
             vic,
             datassette,
-            joystick_1,
-            joystick_2,
+            joystick_1: Joystick::new(),
+            joystick_2: Joystick::new(),
             keyboard,
             lines,
             cycles: 0,
@@ -135,47 +118,31 @@ impl Board {
         &self.cia_1
     }
 
-    pub fn cia_1_mut(&mut self) -> &mut Cia {
-        &mut self.cia_1
-    }
-
     pub fn cia_2(&self) -> &Cia {
         &self.cia_2
-    }
-
-    pub fn cia_2_mut(&mut self) -> &mut Cia {
-        &mut self.cia_2
     }
 
     pub fn sid(&self) -> &Sid {
         &self.sid
     }
 
-    pub fn sid_mut(&mut self) -> &mut Sid {
-        &mut self.sid
-    }
-
     pub fn vic(&self) -> &Vic {
         &self.vic
     }
 
-    pub fn vic_mut(&mut self) -> &mut Vic {
-        &mut self.vic
-    }
-
-    pub fn joystick_1(&self) -> &Option<Joystick> {
+    pub fn joystick_1(&self) -> &Joystick {
         &self.joystick_1
     }
 
-    pub fn joystick_1_mut(&mut self) -> &mut Option<Joystick> {
+    pub fn joystick_1_mut(&mut self) -> &mut Joystick {
         &mut self.joystick_1
     }
 
-    pub fn joystick_2(&self) -> &Option<Joystick> {
+    pub fn joystick_2(&self) -> &Joystick {
         &self.joystick_2
     }
 
-    pub fn joystick_2_mut(&mut self) -> &mut Option<Joystick> {
+    pub fn joystick_2_mut(&mut self) -> &mut Joystick {
         &mut self.joystick_2
     }
 
@@ -220,12 +187,8 @@ impl Board {
         self.switch_banks();
         // Peripherals
         self.datassette.reset(&mut self.cpu_port);
-        if let Some(ref mut joystick) = self.joystick_1 {
-            joystick.reset();
-        }
-        if let Some(ref mut joystick) = self.joystick_2 {
-            joystick.reset();
-        }
+        self.joystick_1.reset();
+        self.joystick_2.reset();
         self.keyboard.reset();
         // Runtime State
         self.vsync = false;
@@ -303,8 +266,9 @@ impl Board {
         self.cia_2.process_vsync();
     }
 
-    pub fn reset_vsync(&mut self) {
+    pub fn begin_run(&mut self) {
         self.vsync = false;
+        self.sid.clear_samples();
     }
 
     // ---- i/o ----
@@ -321,10 +285,7 @@ impl Board {
     }
 
     fn read_cia_1(&mut self, reg: u8) -> u8 {
-        let input = PortInput {
-            a: self.keyboard.scan_port_a(self.cia_1.port_b().get_value()),
-            b: self.keyboard.scan_port_b(self.cia_1.port_a().get_value()),
-        };
+        let input = self.cia_1_input();
         let value = self.cia_1.read(
             reg,
             input,
@@ -333,15 +294,11 @@ impl Board {
                 irq: &mut self.lines.irq,
             },
         );
-        match reg {
-            cia::reg::PRA => value & self.joystick_2.as_ref().map_or(0xff, Joystick::port_lines),
-            cia::reg::PRB => value & self.joystick_1.as_ref().map_or(0xff, Joystick::port_lines),
-            _ => value,
-        }
+        value & self.joystick_lines(reg)
     }
 
     fn read_cia_2(&mut self, reg: u8) -> u8 {
-        let input = PortInput { a: 0xff, b: 0xff };
+        let input = CIA_2_INPUT;
         self.cia_2.read(
             reg,
             input,
@@ -370,10 +327,61 @@ impl Board {
         }
     }
 
+    // ---- inspection ----
+    pub fn peek(&self, address: u16) -> u8 {
+        match address {
+            0x0000 => return self.cpu_port.get_direction(),
+            0x0001 => return self.cpu_port.get_value() & 0x3f,
+            _ => {}
+        }
+        match self.pla.map(address) {
+            Bank::Ram => self.ram.read(address),
+            Bank::Basic => self.basic.read(address),
+            Bank::Charset => self.charset.read(address - BaseAddr::Charset.addr()),
+            Bank::Kernal => self.kernal.read(address),
+            Bank::RomL | Bank::RomH => self
+                .expansion_port
+                .peek(address)
+                .unwrap_or(self.ram.read(address)),
+            Bank::Io => self.peek_io(address),
+            Bank::Disabled => 0,
+        }
+    }
+
+    fn peek_io(&self, address: u16) -> u8 {
+        match address {
+            0xd000..=0xd3ff => self.vic.peek((address & 0x003f) as u8),
+            0xd400..=0xd7ff => self.sid.peek((address & 0x001f) as u8),
+            0xd800..=0xdbff => self.color_ram.read(address - 0xd800),
+            0xdc00..=0xdcff => {
+                let reg = (address & 0x000f) as u8;
+                self.cia_1.peek(reg, self.cia_1_input()) & self.joystick_lines(reg)
+            }
+            0xdd00..=0xddff => self.cia_2.peek((address & 0x000f) as u8, CIA_2_INPUT),
+            0xde00..=0xdfff => self.expansion_port.peek(address).unwrap_or(0),
+            _ => panic!("invalid address 0x{:x}", address),
+        }
+    }
+
     // ---- shared ----
     fn switch_banks(&mut self) {
         let mode = self.cpu_port.get_value() & 0x07 | self.expansion_port.io_lines() & 0x18;
         self.pla.switch_banks(mode);
+    }
+
+    fn cia_1_input(&self) -> PortInput {
+        PortInput {
+            a: self.keyboard.scan_port_a(self.cia_1.port_b().get_value()),
+            b: self.keyboard.scan_port_b(self.cia_1.port_a().get_value()),
+        }
+    }
+
+    fn joystick_lines(&self, reg: u8) -> u8 {
+        match reg {
+            cia::reg::PRA => self.joystick_2.port_lines(),
+            cia::reg::PRB => self.joystick_1.port_lines(),
+            _ => 0xff,
+        }
     }
 }
 

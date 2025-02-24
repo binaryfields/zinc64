@@ -51,6 +51,10 @@ impl ExpansionPort {
         self.cartridge.as_mut().and_then(|crt| crt.read(address))
     }
 
+    pub fn peek(&self, address: u16) -> Option<u8> {
+        self.cartridge.as_ref().and_then(|crt| crt.peek(address))
+    }
+
     pub fn write(&mut self, address: u16, value: u8) -> bool {
         if let Some(ref mut cartridge) = self.cartridge
             && cartridge.write(address, value)

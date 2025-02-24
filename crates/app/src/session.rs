@@ -7,10 +7,8 @@ use std::io::BufReader;
 use std::path::Path;
 
 use zinc64_debug::{Executor, RunRequest};
-use zinc64_engine::C64;
+use zinc64_engine::{C64, StopReason};
 use zinc64_loader::Loaders;
-
-const KEY_EVENT_CYCLES: u64 = 20_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunState {
@@ -42,7 +40,6 @@ pub struct Session {
     debugger: Executor,
     jam_action: JamAction,
     state: RunState,
-    next_key_event: u64,
 }
 
 impl Session {
@@ -52,7 +49,6 @@ impl Session {
             debugger,
             jam_action,
             state: RunState::Running,
-            next_key_event: 0,
         }
     }
 
@@ -93,21 +89,18 @@ impl Session {
         if self.state != RunState::Running {
             return Ok(false);
         }
-        self.type_queued_key();
-        if self.c64.run_frame() {
-            self.handle_jam();
+        let stop = if self.debugger.has_breakpoints() {
+            let debugger = &mut self.debugger;
+            self.c64
+                .run_frame_until(|cpu| debugger.check_breakpoint(cpu))
         } else {
-            self.halt()?;
+            self.c64.run_frame()
+        };
+        match stop {
+            StopReason::Frame => self.handle_jam(),
+            StopReason::Breakpoint => self.halt()?,
         }
         Ok(true)
-    }
-
-    fn type_queued_key(&mut self) {
-        let keyboard_ready = self.c64.get_cycles() >= self.next_key_event;
-        if keyboard_ready && self.c64.get_keyboard().has_events() {
-            self.c64.get_keyboard().drain_event();
-            self.next_key_event = self.c64.get_cycles().wrapping_add(KEY_EVENT_CYCLES);
-        }
     }
 
     fn handle_jam(&mut self) {
@@ -122,7 +115,7 @@ impl Session {
             }
             JamAction::Reset => {
                 warn!("CPU JAM detected at 0x{:x}", self.c64.get_cpu().get_pc());
-                self.reset(false);
+                self.c64.reset(false);
             }
         }
     }
@@ -148,7 +141,6 @@ impl Session {
 
     pub fn reset(&mut self, hard: bool) {
         self.c64.reset(hard);
-        self.next_key_event = 0;
     }
 
     pub fn toggle_tape(&mut self) {
