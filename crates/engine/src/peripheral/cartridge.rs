@@ -147,6 +147,13 @@ impl Cartridge {
 
     pub fn read(&mut self, address: u16) -> Option<u8> {
         match address {
+            0xde00..=0xdfff => Some(self.read_io(address)),
+            _ => self.peek(address),
+        }
+    }
+
+    pub fn peek(&self, address: u16) -> Option<u8> {
+        match address {
             0x8000..=0x9fff => {
                 if let Some(bank_num) = self.bank_lo {
                     let bank = self.banks[bank_num].as_ref().unwrap();
@@ -167,7 +174,7 @@ impl Cartridge {
                     None
                 }
             }
-            0xde00..=0xdfff => Some(self.read_io(address)),
+            0xde00..=0xdfff => Some(self.reg_value),
             _ => panic!("invalid address {:04x}", address),
         }
     }

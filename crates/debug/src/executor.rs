@@ -11,8 +11,9 @@ use std::time::Duration;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use zinc64_engine::C64;
-use zinc64_engine::chip::Register;
+use zinc64_engine::chip::{Cpu6510, Register};
 
+use crate::breakpoint::BreakpointManager;
 use crate::{Command, Output, RegData, RegOp};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,6 +42,7 @@ impl CmdResult {
 // DEFERRED debugger: impl io
 
 pub struct Executor {
+    breakpoints: BreakpointManager,
     debug_rx: mpsc::Receiver<Command>,
     debugger: Option<Sender<Output>>,
 }
@@ -48,6 +50,7 @@ pub struct Executor {
 impl Executor {
     pub fn new(debug_rx: mpsc::Receiver<Command>) -> Self {
         Self {
+            breakpoints: BreakpointManager::default(),
             debug_rx,
             debugger: None,
         }
@@ -90,18 +93,16 @@ impl Executor {
             Command::Continue => self.continue_(c64),
             Command::SysQuit => self.quit(c64),
             Command::Step => self.step(c64),
-            Command::BpClear => self.bp_clear(c64),
-            Command::BpCondition(index, ref expr, radix) => {
-                self.bp_condition(c64, index, expr, radix)
-            }
-            Command::BpDisable(index) => self.bp_enable(c64, index, false),
-            Command::BpDisableAll => self.bp_enable_all(c64, false),
-            Command::BpEnable(index) => self.bp_enable(c64, index, true),
-            Command::BpEnableAll => self.bp_enable_all(c64, true),
-            Command::BpIgnore(index, count) => self.bp_ignore(c64, index, count),
-            Command::BpList => self.bp_list(c64),
-            Command::BpRemove(index) => self.bp_remove(c64, index),
-            Command::BpSet(address, autodelete) => self.bp_set(c64, address, autodelete),
+            Command::BpClear => self.bp_clear(),
+            Command::BpCondition(index, ref expr, radix) => self.bp_condition(index, expr, radix),
+            Command::BpDisable(index) => self.bp_enable(index, false),
+            Command::BpDisableAll => self.bp_enable_all(false),
+            Command::BpEnable(index) => self.bp_enable(index, true),
+            Command::BpEnableAll => self.bp_enable_all(true),
+            Command::BpIgnore(index, count) => self.bp_ignore(index, count),
+            Command::BpList => self.bp_list(),
+            Command::BpRemove(index) => self.bp_remove(index),
+            Command::BpSet(address, autodelete) => self.bp_set(address, autodelete),
             Command::MemRead(start, end) => self.mem_read(c64, start, end),
             Command::MemWrite(address, ref data) => self.mem_write(c64, address, data),
             Command::RegRead => self.reg_read(c64),
@@ -130,26 +131,23 @@ impl Executor {
         CmdResult::ok_with_state(Output::Unit, Directive::Quit)
     }
 
-    fn step(&self, c64: &mut C64) -> Result<CmdResult, String> {
+    fn step(&mut self, c64: &mut C64) -> Result<CmdResult, String> {
         c64.step();
-        let bp_hit = if c64.check_breakpoints() { 1 } else { 0 };
+        let bp_hit = if self.check_breakpoint(c64.get_cpu()) {
+            1
+        } else {
+            0
+        };
         CmdResult::ok(Output::Number(bp_hit))
     }
 
-    fn bp_clear(&self, c64: &mut C64) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
-        bpm.clear();
+    fn bp_clear(&mut self) -> Result<CmdResult, String> {
+        self.breakpoints.clear();
         CmdResult::unit()
     }
 
-    fn bp_condition(
-        &self,
-        c64: &mut C64,
-        index: u16,
-        expr: &str,
-        radix: u32,
-    ) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
+    fn bp_condition(&mut self, index: u16, expr: &str, radix: u32) -> Result<CmdResult, String> {
+        let bpm = &mut self.breakpoints;
         bpm.set_condition(index, expr, Some(radix))?;
         let bp = bpm.get(index)?;
         let buffer = format!(
@@ -163,28 +161,24 @@ impl Executor {
         CmdResult::ok(Output::Text(buffer))
     }
 
-    fn bp_enable(&self, c64: &mut C64, index: u16, enabled: bool) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
-        bpm.set_enabled(index, enabled)?;
+    fn bp_enable(&mut self, index: u16, enabled: bool) -> Result<CmdResult, String> {
+        self.breakpoints.set_enabled(index, enabled)?;
         CmdResult::unit()
     }
 
-    fn bp_enable_all(&self, c64: &mut C64, enabled: bool) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
-        bpm.enable_all(enabled);
+    fn bp_enable_all(&mut self, enabled: bool) -> Result<CmdResult, String> {
+        self.breakpoints.enable_all(enabled);
         CmdResult::unit()
     }
 
-    fn bp_ignore(&self, c64: &mut C64, index: u16, count: u16) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
-        bpm.ignore(index, count)?;
+    fn bp_ignore(&mut self, index: u16, count: u16) -> Result<CmdResult, String> {
+        self.breakpoints.ignore(index, count)?;
         CmdResult::unit()
     }
 
-    fn bp_list(&self, c64: &mut C64) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm();
+    fn bp_list(&self) -> Result<CmdResult, String> {
         let mut buffer = String::new();
-        for bp in bpm.list() {
+        for bp in self.breakpoints.list() {
             buffer.push_str(
                 format!(
                     "Bp {}: ${:04x}{}{}\n",
@@ -204,15 +198,13 @@ impl Executor {
         CmdResult::ok(Output::Text(buffer))
     }
 
-    fn bp_remove(&self, c64: &mut C64, index: u16) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
-        bpm.remove(index)?;
+    fn bp_remove(&mut self, index: u16) -> Result<CmdResult, String> {
+        self.breakpoints.remove(index)?;
         CmdResult::unit()
     }
 
-    fn bp_set(&self, c64: &mut C64, address: u16, autodelete: bool) -> Result<CmdResult, String> {
-        let bpm = c64.get_bpm_mut();
-        let index = bpm.set(address, autodelete);
+    fn bp_set(&mut self, address: u16, autodelete: bool) -> Result<CmdResult, String> {
+        let index = self.breakpoints.set(address, autodelete);
         let buffer = format!("Bp {}: ${:04x}\n", index, address);
         CmdResult::ok(Output::Text(buffer))
     }
@@ -221,7 +213,7 @@ impl Executor {
         let mut buffer = Vec::new();
         let mut address = start;
         while address < end {
-            buffer.push(c64.read(address));
+            buffer.push(c64.peek(address));
             address = address.wrapping_add(1);
         }
         CmdResult::ok(Output::Buffer(buffer))
@@ -234,8 +226,8 @@ impl Executor {
 
     fn reg_read(&self, c64: &mut C64) -> Result<CmdResult, String> {
         let clock = c64.get_cycles();
-        let port_00 = c64.read(0x00);
-        let port_01 = c64.read(0x01);
+        let port_00 = c64.peek(0x00);
+        let port_01 = c64.peek(0x01);
         let cpu = c64.get_cpu();
         let regs = RegData {
             a: cpu.get_register(Register::A),
@@ -273,7 +265,7 @@ impl Executor {
 
     fn sys_screen(&self, c64: &mut C64) -> Result<CmdResult, String> {
         let cia2_port_a = c64.get_cia_2().port_a().get_value();
-        let vm = (((c64.get_vic_mut().read(0x18) & 0xf0) >> 4) as u16) << 10;
+        let vm = (((c64.get_vic().peek(0x18) & 0xf0) >> 4) as u16) << 10;
         let vm_base = ((!cia2_port_a & 0x03) as u16) << 14 | vm;
         CmdResult::ok(Output::Number(vm_base))
     }
@@ -287,6 +279,20 @@ impl Executor {
             .write_u64::<BigEndian>(c64.stopwatch())
             .map_err(|_| "Op failed")?;
         CmdResult::ok(Output::Buffer(buffer))
+    }
+
+    // ---- breakpoints ----
+
+    pub fn set_breakpoint(&mut self, address: u16) {
+        self.breakpoints.set(address, false);
+    }
+
+    pub fn has_breakpoints(&self) -> bool {
+        self.breakpoints.is_bp_present()
+    }
+
+    pub fn check_breakpoint(&mut self, cpu: &Cpu6510) -> bool {
+        self.breakpoints.check(cpu).is_some()
     }
 
     // ---- halt notification ----

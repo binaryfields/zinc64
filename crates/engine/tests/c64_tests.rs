@@ -2,10 +2,7 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::sync::Arc;
-
 use zinc64_engine::SystemModel;
-use zinc64_engine::chip::SoundOutput;
 use zinc64_engine::chip::cia;
 use zinc64_engine::{C64, Config};
 
@@ -35,18 +32,11 @@ static CIA1TAB_PB: [u8; 12] = [
     0x80, 0xC0, 0x80, 0x80, 0xC0, 0x80, 0x80, 0xC0, 0x00, 0x00, 0x40, 0x00,
 ];
 
-struct NullSound;
-impl SoundOutput for NullSound {
-    fn reset(&self) {}
-    fn write(&self, _samples: &[i16]) {}
-}
-
 #[test]
 #[ignore = "fails before and after the edition 2024 migration"]
 fn program_cia1tab() {
     let config = Config::new(SystemModel::from("pal"));
-    let sound_output = Arc::new(NullSound {});
-    let mut c64 = C64::new(config, sound_output);
+    let mut c64 = C64::new(config);
     c64.reset(false);
     c64.load(&CIA1TAB_PRG.to_vec()[2..], 0x4000);
     c64.get_cpu_mut().set_pc(0x4000);
@@ -89,8 +79,7 @@ fn exec_keyboard_read() {
         0xdc, 0xad, 0x01, 0xdc, 0x29, 0x20, 0xd0, 0xf9, 0x58,
     ];
     let config = Config::new(SystemModel::from("pal"));
-    let sound_output = Arc::new(NullSound {});
-    let mut c64 = C64::new(config, sound_output);
+    let mut c64 = C64::new(config);
     c64.load(code.as_ref(), 0xc000);
     let keyboard = c64.get_keyboard();
     keyboard.set_matrix((1, 5), true);

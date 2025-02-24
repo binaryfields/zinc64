@@ -11,6 +11,7 @@ pub use self::rap::RapServer;
 #[macro_use]
 extern crate log;
 
+mod breakpoint;
 mod charset;
 mod disassembler;
 mod executor;

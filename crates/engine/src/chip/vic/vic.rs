@@ -713,7 +713,21 @@ impl Vic {
 
     // ---- registers ----
     pub fn read(&mut self, reg: u8) -> u8 {
-        let value = match reg {
+        let value = self.peek(reg);
+        // Reading a collision register clears it.
+        match reg {
+            0x1e => self.mux_unit.mm_collision = 0,
+            0x1f => self.mux_unit.mb_collision = 0,
+            _ => {}
+        }
+        if log_enabled!(LogLevel::Trace) {
+            trace!(target: "vic::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
+        }
+        value
+    }
+
+    pub fn peek(&self, reg: u8) -> u8 {
+        match reg {
             // Reg::M0X - Reg::M7X
             0x00 | 0x02 | 0x04 | 0x06 | 0x08 | 0x0a | 0x0c | 0x0e => {
                 (self.sprite_units[(reg >> 1) as usize].config.x & 0x00ff) as u8
@@ -810,17 +824,9 @@ impl Vic {
                 result
             }
             // Reg::MM
-            0x1e => {
-                let result = self.mux_unit.mm_collision;
-                self.mux_unit.mm_collision = 0;
-                result
-            }
+            0x1e => self.mux_unit.mm_collision,
             // Reg::MD
-            0x1f => {
-                let result = self.mux_unit.mb_collision;
-                self.mux_unit.mb_collision = 0;
-                result
-            }
+            0x1f => self.mux_unit.mb_collision,
             // Reg::EC
             0x20 => self.border_unit.config.border_color | 0xf0,
             // Reg::B0C - Reg::B3C
@@ -830,11 +836,7 @@ impl Vic {
             // Reg::M0C - Reg::M7C
             0x27..=0x2e => self.sprite_units[(reg - 0x27) as usize].config.color | 0xf0,
             _ => 0xff,
-        };
-        if log_enabled!(LogLevel::Trace) {
-            trace!(target: "vic::reg", "Read 0x{:02x} = 0x{:02x}", reg, value);
         }
-        value
     }
 
     pub fn write(&mut self, reg: u8, value: u8, irq: &mut IrqLine) {

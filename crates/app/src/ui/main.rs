@@ -1,6 +1,7 @@
 // This file is part of zinc64.
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
+
 #![allow(clippy::cast_lossless)]
 
 use std::result::Result;
@@ -19,52 +20,56 @@ use crate::video::VideoRenderer;
 
 pub struct MainScreen {
     // Components
-    audio_device: AudioRenderer,
+    audio_device: Option<AudioRenderer>,
     input_system: InputSystem,
     video_renderer: VideoRenderer,
     // Runtime State
     audio_state: RunState,
+    presented_frame: Option<u32>,
 }
 
 impl MainScreen {
     pub fn build(ctx: &mut Context, state: &mut AppState) -> Result<MainScreen, String> {
         // Initialize audio
-        let mut audio_device = AudioRenderer::build(
-            //&audio_sys,
-            state.session.c64().get_config().sound.sample_rate as i32,
-            1,
-            state.session.c64().get_config().sound.buffer_size as u16,
-            state.sound_buffer.clone(),
-        )
-        .map_err(|err| format!("{}", err))?;
-        audio_device.start();
+        let audio_device = if state.settings.audio {
+            let mut audio_device = AudioRenderer::build(
+                state.session.c64().get_config().sound.sample_rate as i32,
+                1,
+                state.settings.audio_buffer as u16,
+                state.sound_buffer.clone(),
+            )
+            .map_err(|err| format!("{}", err))?;
+            audio_device.start();
+            Some(audio_device)
+        } else {
+            None
+        };
         // Initialize video
         let video_renderer = VideoRenderer::build(ctx, state)?;
         // Initialize input
-        let input_system = InputSystem::build()?;
+        let input_system =
+            InputSystem::build([state.settings.joystick_1, state.settings.joystick_2])?;
         Ok(MainScreen {
             audio_device,
             input_system,
             video_renderer,
             audio_state: RunState::Running,
+            presented_frame: None,
         })
     }
 
     // ---- hotkey toggles ----
 
     fn toggle_mute(&mut self) {
-        self.audio_device.toggle_mute();
+        if let Some(audio_device) = &mut self.audio_device {
+            audio_device.toggle_mute();
+        }
     }
 
     fn toggle_warp(&mut self, ctx: &mut Context, state: &mut AppState) {
-        let value = state.options.warp_mode;
-        state.options.warp_mode = !value;
-        let fps = if !state.options.warp_mode {
-            Some(state.session.c64().get_config().model.refresh_rate as f64)
-        } else {
-            None
-        };
-        ctx.time.set_fps(fps);
+        state.settings.warp_mode = !state.settings.warp_mode;
+        let refresh_rate = state.session.c64().get_config().model.refresh_rate;
+        ctx.time.set_fps(state.settings.frame_rate(refresh_rate));
     }
 
     fn toggle_fullscreen(&mut self, ctx: &mut Context) {
@@ -88,9 +93,11 @@ impl MainScreen {
         if self.audio_state == state {
             return;
         }
-        match state {
-            RunState::Running => self.audio_device.play(),
-            RunState::Paused | RunState::Halted | RunState::Stopped => self.audio_device.pause(),
+        if let Some(audio_device) = &mut self.audio_device {
+            match state {
+                RunState::Running => audio_device.play(),
+                RunState::Paused | RunState::Halted | RunState::Stopped => audio_device.pause(),
+            }
         }
         self.audio_state = state;
     }
@@ -181,7 +188,9 @@ impl Screen<AppState> for MainScreen {
         _ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
-        state.session.update()?;
+        if state.session.update()? {
+            state.sound_buffer.push(state.session.c64().samples());
+        }
         self.follow_audio(state.session.state());
         match state.session.state() {
             RunState::Stopped => Ok(Transition::Pop),
@@ -194,10 +203,11 @@ impl Screen<AppState> for MainScreen {
         ctx: &mut Context,
         state: &mut AppState,
     ) -> Result<Transition<AppState>, String> {
-        if state.session.c64().get_vsync() {
+        let frame = state.session.c64().get_frame_count();
+        if self.presented_frame != Some(frame) {
             self.video_renderer
                 .render(ctx, state.session.c64().frame())?;
-            state.session.c64_mut().reset_vsync();
+            self.presented_frame = Some(frame);
             ctx.platform
                 .windowed_context
                 .swap_buffers()

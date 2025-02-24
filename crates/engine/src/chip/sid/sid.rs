@@ -4,12 +4,8 @@
 
 #![allow(clippy::cast_lossless)]
 
-use std::sync::Arc;
-
 use log::LogLevel;
 use resid;
-
-use crate::chip::SoundOutput;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum SamplingMethod {
@@ -22,17 +18,17 @@ pub enum SamplingMethod {
 // TODO sound: add sid output sample rate test cases
 
 pub struct Sid {
-    // Dependencies
-    sound_buffer: Arc<dyn SoundOutput>,
     // Functional Units
     resid: resid::Sid,
     // Runtime State
     buffer: [i16; 8192],
     cycles: u64,
+    // Output
+    samples: Vec<i16>,
 }
 
 impl Sid {
-    pub fn new(chip_model: SidModel, sound_buffer: Arc<dyn SoundOutput>) -> Self {
+    pub fn new(chip_model: SidModel) -> Self {
         info!(target: "sound", "Initializing SID");
         let resid_model = match chip_model {
             SidModel::Mos6581 => resid::ChipModel::Mos6581,
@@ -40,11 +36,15 @@ impl Sid {
         };
         let resid = resid::Sid::new(resid_model);
         Sid {
-            sound_buffer,
             resid,
             buffer: [0i16; 8192],
             cycles: 0,
+            samples: Vec::new(),
         }
+    }
+
+    pub fn samples(&self) -> &[i16] {
+        &self.samples
     }
 
     pub fn enable_filter(&mut self, enabled: bool) {
@@ -70,10 +70,19 @@ impl Sid {
     pub fn reset(&mut self, now: u64) {
         self.resid.reset();
         self.cycles = now;
+        self.samples.clear();
+    }
+
+    pub fn clear_samples(&mut self) {
+        self.samples.clear();
     }
 
     pub fn read(&mut self, reg: u8, now: u64) -> u8 {
         self.sync(now);
+        self.resid.read(reg)
+    }
+
+    pub fn peek(&self, reg: u8) -> u8 {
         self.resid.read(reg)
     }
 
@@ -101,7 +110,7 @@ impl Sid {
             let mut delta = delta;
             while delta > 0 {
                 let (samples, next_delta) = self.resid.sample(delta, &mut self.buffer[..], 1);
-                self.sound_buffer.write(&self.buffer[0..samples]);
+                self.samples.extend_from_slice(&self.buffer[0..samples]);
                 delta = next_delta;
             }
         }

@@ -4,17 +4,16 @@
 
 #![allow(clippy::cast_lossless)]
 
-use std::sync::Arc;
-
 use crate::board::{BaseAddr, Board};
-use crate::breakpoint::BreakpointManager;
 use crate::chip::cia::Cia;
 use crate::chip::sid::Sid;
 use crate::chip::vic::Vic;
-use crate::chip::{Bus, Cpu6510, SoundOutput};
+use crate::chip::{Bus, Cpu6510};
 use crate::config::Config;
 use crate::media::{Autostart, Media};
 use crate::peripheral::{Cartridge, Joystick, Keyboard, Tape};
+
+const KEY_EVENT_CYCLES: u64 = 20_000;
 
 pub struct C64 {
     // Dependencies
@@ -22,29 +21,26 @@ pub struct C64 {
     // Chipset
     cpu: Cpu6510,
     board: Board,
-    // Buffers
-    sound_buffer: Arc<dyn SoundOutput>,
     // Runtime State
     autostart: Option<Autostart>,
-    breakpoints: BreakpointManager,
     frame_count: u32,
     last_pc: u16,
+    next_key_event: u64,
     stopwatch_start: u64,
 }
 
 impl C64 {
-    pub fn new(config: Config, sound_buffer: Arc<dyn SoundOutput>) -> C64 {
+    pub fn new(config: Config) -> C64 {
         info!(target: "c64", "Initializing system");
-        let board = Board::new(&config, sound_buffer.clone());
+        let board = Board::new(&config);
         C64 {
             config,
             cpu: Cpu6510::new(),
             board,
-            sound_buffer,
             autostart: None,
-            breakpoints: BreakpointManager::default(),
             frame_count: 0,
             last_pc: 0,
+            next_key_event: 0,
             stopwatch_start: 0,
         }
     }
@@ -69,60 +65,36 @@ impl C64 {
         self.board.cia_1()
     }
 
-    pub fn get_cia_1_mut(&mut self) -> &mut Cia {
-        self.board.cia_1_mut()
-    }
-
     pub fn get_cia_2(&self) -> &Cia {
         self.board.cia_2()
-    }
-
-    pub fn get_cia_2_mut(&mut self) -> &mut Cia {
-        self.board.cia_2_mut()
     }
 
     pub fn get_sid(&self) -> &Sid {
         self.board.sid()
     }
 
-    pub fn get_sid_mut(&mut self) -> &mut Sid {
-        self.board.sid_mut()
-    }
-
     pub fn get_vic(&self) -> &Vic {
         self.board.vic()
     }
 
-    pub fn get_vic_mut(&mut self) -> &mut Vic {
-        self.board.vic_mut()
-    }
-
-    pub fn get_joystick1(&self) -> &Option<Joystick> {
+    pub fn get_joystick1(&self) -> &Joystick {
         self.board.joystick_1()
     }
 
-    pub fn get_joystick1_mut(&mut self) -> &mut Option<Joystick> {
+    pub fn get_joystick1_mut(&mut self) -> &mut Joystick {
         self.board.joystick_1_mut()
     }
 
-    pub fn get_joystick2(&self) -> &Option<Joystick> {
+    pub fn get_joystick2(&self) -> &Joystick {
         self.board.joystick_2()
     }
 
-    pub fn get_joystick2_mut(&mut self) -> &mut Option<Joystick> {
+    pub fn get_joystick2_mut(&mut self) -> &mut Joystick {
         self.board.joystick_2_mut()
     }
 
     pub fn get_keyboard(&mut self) -> &mut Keyboard {
         self.board.keyboard_mut()
-    }
-
-    pub fn get_bpm(&self) -> &BreakpointManager {
-        &self.breakpoints
-    }
-
-    pub fn get_bpm_mut(&mut self) -> &mut BreakpointManager {
-        &mut self.breakpoints
     }
 
     pub fn get_cycles(&self) -> u64 {
@@ -133,12 +105,12 @@ impl C64 {
         self.board.vic().frame()
     }
 
-    pub fn get_frame_count(&self) -> u32 {
-        self.frame_count
+    pub fn samples(&self) -> &[i16] {
+        self.board.sid().samples()
     }
 
-    pub fn get_vsync(&self) -> bool {
-        self.board.vsync()
+    pub fn get_frame_count(&self) -> u32 {
+        self.frame_count
     }
 
     pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
@@ -150,11 +122,10 @@ impl C64 {
         info!(target: "c64", "Resetting system");
         self.cpu.reset();
         self.board.reset(hard);
-        // Buffers
-        self.sound_buffer.reset();
         // Runtime State
         self.frame_count = 0;
         self.last_pc = 0;
+        self.next_key_event = 0;
         self.stopwatch_start = 0;
     }
 
@@ -170,6 +141,10 @@ impl C64 {
     // ---- memory ----
     pub fn read(&mut self, address: u16) -> u8 {
         self.board.read(address)
+    }
+
+    pub fn peek(&self, address: u16) -> u8 {
+        self.board.peek(address)
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
@@ -234,31 +209,31 @@ impl C64 {
     }
 
     // ---- execution ----
-    pub fn run_frame(&mut self) -> bool {
-        let bp_present = self.breakpoints.is_bp_present();
+    pub fn run_frame(&mut self) -> Stop {
+        self.run_frame_until(|_| false)
+    }
+
+    pub fn run_frame_until(&mut self, mut stop: impl FnMut(&Cpu6510) -> bool) -> Stop {
+        self.board.begin_run();
+        self.type_queued_key();
         while !self.board.vsync() {
             self.step_internal();
-            if bp_present && self.check_breakpoints() {
+            if stop(&self.cpu) {
                 break;
             }
         }
-        if self.board.vsync() {
-            self.board.process_vsync();
-            self.frame_count = self.frame_count.wrapping_add(1);
+        if self.end_frame() {
+            Stop::Frame
+        } else {
+            Stop::Breakpoint
         }
-        self.board.vsync()
-    }
-
-    pub fn reset_vsync(&mut self) {
-        self.board.reset_vsync();
     }
 
     pub fn step(&mut self) {
+        self.board.begin_run();
+        self.type_queued_key();
         self.step_internal();
-        if self.board.vsync() {
-            self.board.process_vsync();
-            self.frame_count = self.frame_count.wrapping_add(1);
-        }
+        self.end_frame();
     }
 
     pub fn clock(&mut self) {
@@ -266,8 +241,21 @@ impl C64 {
         self.board.tick();
     }
 
-    pub fn check_breakpoints(&mut self) -> bool {
-        self.breakpoints.check(&self.cpu).is_some()
+    fn end_frame(&mut self) -> bool {
+        if self.board.vsync() {
+            self.board.process_vsync();
+            self.frame_count = self.frame_count.wrapping_add(1);
+        }
+        self.board.vsync()
+    }
+
+    fn type_queued_key(&mut self) {
+        let cycles = self.board.cycles();
+        let keyboard = self.board.keyboard_mut();
+        if keyboard.has_events() && cycles >= self.next_key_event {
+            keyboard.drain_event();
+            self.next_key_event = cycles.wrapping_add(KEY_EVENT_CYCLES);
+        }
     }
 
     #[inline]
@@ -288,16 +276,16 @@ impl C64 {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stop {
+    Frame,
+    Breakpoint,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::SystemModel;
-
-    struct NullSound;
-    impl SoundOutput for NullSound {
-        fn reset(&self) {}
-        fn write(&self, _samples: &[i16]) {}
-    }
 
     #[test]
     fn verify_mem_layout() {
@@ -309,8 +297,7 @@ mod tests {
             &[0x00; 0x1000],
             &[0x00; 0x2000],
         );
-        let sound_output = Arc::new(NullSound {});
-        let mut c64 = C64::new(config, sound_output);
+        let mut c64 = C64::new(config);
         c64.reset(false);
         assert_eq!(0x94, c64.read(0xa000));
     }

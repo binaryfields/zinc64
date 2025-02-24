@@ -3,16 +3,14 @@
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
 use std::fs;
-use std::sync::{Arc, Mutex};
 
-use zinc64_engine::chip::{Register, SoundOutput};
+use zinc64_engine::chip::Register;
 use zinc64_engine::media::{Autostart, AutostartMethod, Media, Mode};
 use zinc64_engine::peripheral::Tape;
 use zinc64_engine::peripheral::cartridge::{Cartridge, Chip, ChipType, HwType};
-use zinc64_engine::peripheral::joystick::{self, Button};
+use zinc64_engine::peripheral::joystick::Button;
 use zinc64_engine::{C64, Config, SystemModel};
 
-const KEY_EVENT_CYCLES: u64 = 20_000;
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
@@ -69,58 +67,45 @@ const MAGIC_DESK_BANK_0: &[u8] = &[
     0xee, 0x20, 0xd0, 0x4c, 0x21, 0xc0, // inc $d020, jmp *-3
 ];
 
-struct Sound {
-    state: Mutex<(u64, u64)>,
-}
+struct Fnv(u64);
 
-impl Default for Sound {
-    fn default() -> Self {
-        Self {
-            state: Mutex::new((FNV_OFFSET, 0)),
-        }
+impl Fnv {
+    fn new() -> Self {
+        Self(FNV_OFFSET)
     }
-}
 
-impl SoundOutput for Sound {
-    fn reset(&self) {}
-
-    fn write(&self, samples: &[i16]) {
-        let mut state = self.state.lock().unwrap();
-        let mut fnv = Fnv(state.0);
-        for sample in samples {
-            fnv.write(&sample.to_le_bytes());
+    fn write(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.0 ^= u64::from(*byte);
+            self.0 = self.0.wrapping_mul(FNV_PRIME);
         }
-        *state = (fnv.0, state.1 + samples.len() as u64);
     }
 }
 
 struct Replay {
     c64: C64,
-    sound: Arc<Sound>,
-    next_key_event: u64,
+    sound: Fnv,
+    samples: u64,
 }
 
 impl Replay {
     fn new(config: Config) -> Self {
-        let sound = Arc::new(Sound::default());
-        let mut c64 = C64::new(config, sound.clone());
+        let mut c64 = C64::new(config);
         c64.reset(true);
         Self {
             c64,
-            sound,
-            next_key_event: 0,
+            sound: Fnv::new(),
+            samples: 0,
         }
     }
 
     fn run(&mut self, frames: u32) {
         for _ in 0..frames {
-            if self.c64.get_keyboard().has_events() && self.c64.get_cycles() >= self.next_key_event
-            {
-                self.c64.get_keyboard().drain_event();
-                self.next_key_event = self.c64.get_cycles().wrapping_add(KEY_EVENT_CYCLES);
-            }
             self.c64.run_frame();
-            self.c64.reset_vsync();
+            for sample in self.c64.samples() {
+                self.sound.write(&sample.to_le_bytes());
+            }
+            self.samples += self.c64.samples().len() as u64;
         }
     }
 
@@ -134,9 +119,8 @@ impl Replay {
         }
         let cpu = self.c64.get_cpu();
         fnv.write(self.c64.frame());
-        let (sound_hash, sample_count) = *self.sound.state.lock().unwrap();
-        fnv.write(&sound_hash.to_le_bytes());
-        fnv.write(&sample_count.to_le_bytes());
+        fnv.write(&self.sound.0.to_le_bytes());
+        fnv.write(&self.samples.to_le_bytes());
         for reg in [
             Register::A,
             Register::X,
@@ -150,21 +134,6 @@ impl Replay {
         fnv.write(&self.c64.get_cycles().to_le_bytes());
         fnv.write(&self.c64.get_frame_count().to_le_bytes());
         fnv.0
-    }
-}
-
-struct Fnv(u64);
-
-impl Fnv {
-    fn new() -> Self {
-        Self(FNV_OFFSET)
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        for byte in bytes {
-            self.0 ^= u64::from(*byte);
-            self.0 = self.0.wrapping_mul(FNV_PRIME);
-        }
     }
 }
 
@@ -226,14 +195,12 @@ fn music_irq_plays() {
 
 #[test]
 fn chip_tour_drives_every_chip() {
-    let mut config = config();
-    config.joystick.joystick_2 = joystick::Mode::Numpad;
-    let mut replay = Replay::new(config);
+    let mut replay = Replay::new(config());
     autostart(&mut replay.c64, CHIP_TOUR, 0x0801);
     replay.run(150);
-    let joystick = replay.c64.get_joystick2_mut().as_mut().unwrap();
-    joystick.on_key_down(Button::Up);
-    joystick.on_key_down(Button::Fire);
+    let joystick = replay.c64.get_joystick2_mut();
+    joystick.press(Button::Up);
+    joystick.press(Button::Fire);
     replay.run(150);
     assert_eq!(replay.fingerprint(), 0x2644f39ba9fe0b61);
 }

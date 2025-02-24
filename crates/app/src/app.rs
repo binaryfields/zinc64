@@ -2,18 +2,17 @@
 // Copyright (c) 2016-2019 Sebastian Jastrzebski. All rights reserved.
 // Licensed under the GPLv3. See LICENSE file in the project root for full license text.
 
-use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
 use glutin::event::Event;
-use zinc64_engine::peripheral::joystick;
 
 use crate::audio::SoundBuffer;
 use crate::console::Console;
 use crate::framework::gfx::Font;
 use crate::framework::{Context, State};
 use crate::session::Session;
+use crate::settings::Settings;
 use crate::ui::{MainScreen, Screen, Transition};
 
 const CONSOLE_BUFFER: usize = 2048;
@@ -22,25 +21,8 @@ pub struct AppState {
     pub session: Session,
     pub console: Console,
     pub console_history: Vec<String>,
-    pub options: Options,
+    pub settings: Settings,
     pub sound_buffer: Arc<SoundBuffer>,
-}
-
-pub struct Options {
-    // Emulator
-    #[allow(dead_code)]
-    pub speed: u8,
-    pub warp_mode: bool,
-    // Controllers
-    #[allow(dead_code)]
-    pub joydev_1: joystick::Mode,
-    #[allow(dead_code)]
-    pub joydev_2: joystick::Mode,
-    // Debug
-    pub debug: bool,
-    pub dbg_address: SocketAddr,
-    #[allow(dead_code)]
-    pub rap_address: SocketAddr,
 }
 
 pub struct App {
@@ -53,16 +35,12 @@ impl App {
         ctx: &mut Context,
         session: Session,
         sound_buffer: Arc<SoundBuffer>,
-        options: Options,
+        settings: Settings,
     ) -> Result<App, String> {
         let window_size = ctx.platform.windowed_context.window().inner_size();
         // Initialize fps
-        let fps = if !options.warp_mode {
-            Some(session.c64().get_config().model.refresh_rate as f64)
-        } else {
-            None
-        };
-        ctx.time.set_fps(fps);
+        let refresh_rate = session.c64().get_config().model.refresh_rate;
+        ctx.time.set_fps(settings.frame_rate(refresh_rate));
         // Initiliaze console
         let font = Font::load_psf(Path::new("res/font/font.psf"))?;
         let cols = window_size.width / font.get_width();
@@ -75,7 +53,7 @@ impl App {
             session,
             console,
             console_history: Vec::new(),
-            options,
+            settings,
             sound_buffer,
         };
         let main_screen = MainScreen::build(ctx, &mut state)?;

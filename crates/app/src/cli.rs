@@ -9,12 +9,12 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use structopt::StructOpt;
+use zinc64_engine::Config;
 use zinc64_engine::SystemModel;
-use zinc64_engine::peripheral::joystick;
-use zinc64_engine::{C64, Config};
 
-use crate::app;
+use crate::input::JoystickDevice;
 use crate::session::JamAction;
+use crate::settings::Settings;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "zinc64")]
@@ -29,7 +29,7 @@ pub struct Opt {
     /// start in console mode
     #[structopt(long)]
     pub console: bool,
-    /// set speed of the emulator
+    /// set speed of the emulator in percent of real time
     #[structopt(long)]
     pub speed: Option<u8>,
     /// enable wrap mode
@@ -39,8 +39,7 @@ pub struct Opt {
     /// console mode, continue otherwise)
     #[structopt(
         long = "jamaction",
-        parse(try_from_str = parse_jam_action),
-        group = "debug"
+        parse(try_from_str = parse_jam_action)
     )]
     pub jam_action: Option<JamAction>,
 
@@ -56,30 +55,30 @@ pub struct Opt {
     pub fullscreen: bool,
 
     // -- Devices
-    /// set device for joystick 1
+    /// set device for joystick 1: none or numpad
     #[structopt(
         long = "joydev1",
         default_value = "none",
-        parse(try_from_str = parse_joy_mode)
+        parse(try_from_str = parse_joystick_device)
     )]
-    pub joydev_1: joystick::Mode,
-    /// set device for joystick 2
+    pub joydev_1: JoystickDevice,
+    /// set device for joystick 2: none or numpad
     #[structopt(
         long = "joydev2",
         default_value = "numpad",
-        parse(try_from_str = parse_joy_mode)
+        parse(try_from_str = parse_joystick_device)
     )]
-    pub joydev_2: joystick::Mode,
+    pub joydev_2: JoystickDevice,
 
     // -- Roms
     /// filename of the basic ROM
-    #[structopt(long, parse(from_os_str), group = "rom")]
+    #[structopt(long, parse(from_os_str))]
     pub basic: Option<PathBuf>,
     /// filename of the character generator ROM
-    #[structopt(long, parse(from_os_str), group = "rom")]
+    #[structopt(long, parse(from_os_str))]
     pub charset: Option<PathBuf>,
     /// filename of the kernal ROM
-    #[structopt(long, parse(from_os_str), group = "rom")]
+    #[structopt(long, parse(from_os_str))]
     pub kernal: Option<PathBuf>,
 
     // -- Sound
@@ -110,21 +109,16 @@ pub struct Opt {
         parse(try_from_str = parse_socket_addr)
     )]
     pub dbg_address: SocketAddr,
-    /// start rap server bound to the specified address
-    #[structopt(
-        long = "rap-address",
-        default_value = "127.0.0.1:9999",
-        parse(try_from_str = parse_socket_addr)
-    )]
-    #[allow(dead_code)]
-    pub rap_address: SocketAddr,
+    /// start a radare2 server bound to the specified address
+    #[structopt(long = "rap-address", parse(try_from_str = parse_socket_addr))]
+    pub rap_address: Option<SocketAddr>,
 
     // -- Logging
     /// set log level
     #[structopt(long = "loglevel", default_value = "info")]
     pub log_level: String,
     /// set log level for a target
-    #[structopt(long = "log", parse(try_from_str = parse_key_val), group = "logging")]
+    #[structopt(long = "log", parse(try_from_str = parse_key_val))]
     pub log_target_level: Vec<(String, String)>,
 }
 
@@ -139,13 +133,13 @@ fn parse_jam_action(s: &str) -> Result<JamAction, Box<dyn Error>> {
     }
 }
 
-fn parse_joy_mode(mode: &str) -> Result<joystick::Mode, Box<dyn Error>> {
-    match mode {
-        "none" => Ok(joystick::Mode::None),
-        "numpad" => Ok(joystick::Mode::Numpad),
-        "joy0" => Ok(joystick::Mode::Joy0),
-        "joy1" => Ok(joystick::Mode::Joy1),
-        _ => Err(Box::<dyn Error>::from("invalid joystick".to_string())),
+fn parse_joystick_device(device: &str) -> Result<JoystickDevice, Box<dyn Error>> {
+    match device {
+        "none" => Ok(JoystickDevice::None),
+        "numpad" => Ok(JoystickDevice::Numpad),
+        _ => Err(Box::<dyn Error>::from(
+            "invalid joystick device, expected none or numpad".to_string(),
+        )),
     }
 }
 
@@ -172,8 +166,6 @@ where
 pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
     let model = SystemModel::from(opt.model.as_str());
     let mut config = Config::new(model);
-    config.joystick.joystick_1 = opt.joydev_1;
-    config.joystick.joystick_2 = opt.joydev_2;
     let basic_path = Path::new(
         opt.basic
             .as_ref()
@@ -196,8 +188,6 @@ pub fn build_emu_config(opt: &Opt) -> Result<Config, String> {
     config.roms.charset =
         load_file(charset_path).map_err(|_| "Invalid rom: charset".to_string())?;
     config.roms.kernal = load_file(kernal_path).map_err(|_| "Invalid rom: kernal".to_string())?;
-    config.sound.enable = !opt.no_sound;
-    config.sound.buffer_size = opt.sound_samples as usize;
     config.sound.sample_rate = opt.sound_rate;
     config.sound.sid_filters = !opt.no_sid_filters;
     Ok(config)
@@ -210,30 +200,20 @@ fn load_file(path: &Path) -> Result<Vec<u8>, io::Error> {
     Ok(data)
 }
 
-// ---- c64 options ----
+// ---- host settings ----
 
-pub fn set_c64_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
-    set_c64_debug_options(c64, opt)?;
-    Ok(())
-}
-
-fn set_c64_debug_options(c64: &mut C64, opt: &Opt) -> Result<(), String> {
-    for bp in &opt.bp {
-        c64.get_bpm_mut().set(*bp, false);
-    }
-    Ok(())
-}
-
-// ---- app options ----
-
-pub fn build_app_options(opt: &Opt) -> Result<app::Options, String> {
-    Ok(app::Options {
+pub fn build_settings(opt: &Opt) -> Settings {
+    Settings {
+        window_size: (opt.width, opt.height),
+        fullscreen: opt.fullscreen,
         speed: opt.speed.unwrap_or(100),
         warp_mode: opt.warp_mode,
-        joydev_1: opt.joydev_1,
-        joydev_2: opt.joydev_2,
-        debug: opt.debug,
-        dbg_address: opt.dbg_address,
-        rap_address: SocketAddr::from(([127, 0, 0, 1], 9999)), // opt.rap_address,
-    })
+        audio: !opt.no_sound,
+        audio_buffer: opt.sound_samples as usize,
+        joystick_1: opt.joydev_1,
+        joystick_2: opt.joydev_2,
+        breakpoints: opt.bp.clone(),
+        monitor_address: opt.debug.then_some(opt.dbg_address),
+        rap_address: opt.rap_address,
+    }
 }
